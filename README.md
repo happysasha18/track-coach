@@ -94,4 +94,4 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## License
 
-Personal project. All rights reserved (for now).
+[MIT](LICENSE) © Alexander Abramovich — covers this repository's own orchestration and analysis code. Deep mode pulls in **Demucs** and **PyTorch**, which carry their own licenses; check those before any commercial or redistributive use.
