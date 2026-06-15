@@ -26,3 +26,4 @@ stems/
 # Logs / temp
 *.log
 *.tmp
+*.bak

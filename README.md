@@ -6,7 +6,9 @@ Give it a track (and optionally your Ableton project), and it runs the complete 
 
 > **Status:** early / unstable (`v0.5.10`). macOS-first. Built and refined hands-on.
 
-![hero](docs/hero.png)
+![Track story — the whole song at a glance](docs/hero.png)
+
+<sub>**The whole song at a glance:** a colour-coded form map (repeated sections share a colour), the power curve broken into the lanes that drive it — energy, brightness, density, modulation, stereo width — drum lanes underneath, and a synced stem player at the bottom. Press play; click anywhere to jump.</sub>
 
 ---
 
