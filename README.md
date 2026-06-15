@@ -12,6 +12,22 @@ Give it a track (and optionally your Ableton project), and it runs the complete 
 
 ---
 
+## Why it exists
+
+It started when another AI flat-out hallucinated about one of my tracks — wrong duration, an arc that didn't exist, made-up gear — and the real measurements proved it wrong. So I built a tool that **can't** lie: it reports only what `librosa` and `Demucs` actually measure. The orchestration just conducts; all the real work lives in deterministic scripts, so the same track gives the same answer every time instead of being re-improvised on a whim.
+
+The output is split into three honest layers, and it never crosses the line between them:
+
+```
+measured  →  what it means  →  up to you
+```
+
+*Measured* — exact numbers only. *What it means* — specific, concrete interpretation (not "energy is low," but "bass dominates 250–500 Hz for the first two minutes, mids are present but buried"). *Up to you* — patterns observed, never directives. The author decides.
+
+> Built for my own music as **[Total Reboot](https://totalreboot.com)**. More about me: [github.com/happysasha18](https://github.com/happysasha18).
+
+---
+
 ## What it does
 
 Everything runs by default — no need to ask for "deep mode":
@@ -25,8 +41,6 @@ Everything runs by default — no need to ask for "deep mode":
 - **Ableton `.als` parsing** — tracks, MIDI + audio clips, automation envelopes, locators
 - **Intention vs. result** — overlays your automation against what actually happened in the audio
 - **Demucs-stem ↔ real-track map** — connects separated stems back to your project's tracks
-
-All wrapped in three honest output layers: **Measured** (exact numbers only) → **What this typically means** (specific interpretation) → **Up to you** (patterns, never directives).
 
 ---
 
