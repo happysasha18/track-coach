@@ -2,6 +2,8 @@
 
 **A full-stack compositional coach for music producers — a [Claude Code](https://claude.com/claude-code) skill.**
 
+> ⚡ **It's a Claude Code skill, not a standalone app.** Drop the folder into `~/.claude/skills/track-coach/`, run `./setup.sh` once ([details ↓](#install)), then just talk to Claude about your track — *"why does this sound stuck?"*, *"analyse this project"*.
+
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not "energy is low," but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
 > **Status:** early / unstable (`v0.5.10`). macOS-first. Built and refined hands-on.
@@ -60,7 +62,9 @@ macOS (v1). Requires Python 3.11, `ffmpeg`, and the deps in `requirements.txt`.
 ./setup.sh
 ```
 
-`setup.sh` installs [Homebrew](https://brew.sh) (if missing), `ffmpeg`, and [`uv`](https://github.com/astral-sh/uv), then the pinned Python deps. It will ask **once** for your Mac login password — that prompt comes from the Homebrew installer itself.
+`setup.sh` is a short, readable bash script — skim it before you run it. It installs [Homebrew](https://brew.sh) (only if missing), `ffmpeg`, and [`uv`](https://github.com/astral-sh/uv), then the pinned Python deps. The single password prompt is Homebrew's own (your Mac login), and only fires if Homebrew isn't already there.
+
+Prefer not to run it? Already have `ffmpeg` and a Python 3.11 env? Install the deps from `requirements.txt` yourself and skip the script entirely.
 
 See [`references/install_troubleshooting.md`](references/install_troubleshooting.md) if anything fails.
 
