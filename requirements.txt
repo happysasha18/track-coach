@@ -1,0 +1,24 @@
+# track-coach dependencies — pinned for determinism
+# macOS only (v1). librosa is sensitive to numpy 2.x — pin numpy<2.
+
+numpy==1.26.4
+librosa==0.10.2
+soundfile==0.12.1
+audioread==3.0.1
+scipy==1.13.1
+scikit-learn==1.5.1
+pyloudnorm==0.1.1   # integrated LUFS for the vitals strip (ITU-R BS.1770)
+
+# Deep mode (Demucs + PyTorch CPU)
+# CPU build only — works everywhere; Apple MPS is optional and auto-detected at runtime
+torch==2.3.1
+torchaudio==2.3.1
+demucs==4.0.1
+
+# Note transcription (Part D) — basic-pitch needs an inference backend (onnx) and an
+# OLD setuptools, because resampy still imports pkg_resources (removed in setuptools 81+).
+# Run via:  uv run --python 3.11 --with 'basic-pitch[onnx]' --with numpy==1.26.4 --with 'setuptools<70'
+basic-pitch[onnx]
+setuptools<70
+
+# Web stems for the in-page player (Part E) need ffmpeg on PATH (already a hard dep).

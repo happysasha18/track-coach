@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Skill output — user audio analyses, stems, rendered widgets (never commit)
+track-coach-output/
+*-output/
+output/
+stems/
+*.html
+
+# Audio / project files (user data — never commit)
+*.wav
+*.mp3
+*.m4a
+*.aiff
+*.flac
+*.als
+
+# Logs / temp
+*.log
+*.tmp
