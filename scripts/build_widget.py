@@ -25,10 +25,10 @@ Usage:
                          [--out analysis_widget.html] [--title "Track v0.6.2"]
                          [--strings strings.json] [--dump-strings]
 """
-import sys, argparse, json, math, copy
+import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.5.10"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.5.13"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -93,6 +93,21 @@ STRINGS = {
         "presence_playing": "playing",
         "presence_active": "{p}% active",
         "footer": "Track Coach v{ver} · data embedded in this file · works offline",
+        "view_simple": "Simple",
+        "view_full": "Detailed",
+        "view_aria": "Detail level",
+        "verdict_lead": "In short",
+        "src_audio": "Audio",
+        "src_project": "Project",
+        "src_analyzed": "Analyzed",
+        "cat_title": "All analyses — every track & version",
+        "cat_hint": "Each analysis is kept in its own dated folder (nothing is overwritten). Open an earlier version to compare verdicts.",
+        "cat_this_track": "This track",
+        "cat_other_tracks": "Other tracks",
+        "cat_open": "open →",
+        "cat_current": "you are here",
+        "cat_versions": "{n} version(s)",
+        "cat_missing": "(widget file not found)",
     },
     # metric cards: label + sub + the tag variants chosen by the data
     # Each card: a short verdict + a plain detail line WITH units, and a `help`
@@ -822,7 +837,7 @@ def build_story(core, als_overlay):
 
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
-               narrative_md=None, selfsim=None):
+               narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -955,6 +970,9 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "narrative": narrative_md,
         "story": story,
         "version": TC_VERSION,
+        "meta": meta or {},
+        "verdict": _verdict_text(verdict, narrative_md),
+        "catalog": catalog or None,
         "t": S["ui"],
     }
     title = title or f'{core.get("tempo","?")} BPM · {dur:.0f}s'
@@ -966,6 +984,26 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
 
 def _esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _verdict_text(verdict, narrative_md):
+    """The 1–2 sentence headline for the calm/Simple view. Prefer an explicit
+    --verdict; otherwise fall back to the first real sentence(s) of the Producer's
+    read so the Simple view is never empty when a narrative exists."""
+    if verdict and verdict.strip():
+        return verdict.strip()
+    if not narrative_md:
+        return ""
+    for blk in narrative_md.split("\n\n"):
+        t = blk.strip()
+        if not t or t.startswith("#"):
+            continue
+        t = " ".join(t.split())
+        # first one or two sentences, capped so the calm view stays calm
+        parts = re.split(r"(?<=[.!?])\s+", t)
+        out = " ".join(parts[:2]).strip()
+        return out[:320]
+    return ""
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -980,7 +1018,31 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
 .wrap{max-width:1120px;margin:0 auto}
 h1{font-size:22px;margin:0 0 2px;font-weight:650}
-.sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:4px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+/* srcmeta — what file was analysed & when. Lives just under the title (and in footer). */
+.srcmeta{color:var(--muted);font-size:12px;margin:2px 0 20px;display:flex;flex-wrap:wrap;gap:4px 16px}
+.srcmeta b{color:var(--ink);font-weight:600}
+.srcmeta:empty{display:none}
+/* segmented Simple⇄Detailed control */
+.viewtoggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);
+ border-radius:11px;padding:3px;gap:2px;flex:0 0 auto}
+.viewtoggle button{appearance:none;border:0;background:transparent;color:var(--muted);
+ font:600 12.5px/1 inherit;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .12s}
+.viewtoggle button.on{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+.viewtoggle button:hover:not(.on){color:var(--ink)}
+/* verdict — the calm one-glance headline */
+.verdict{background:linear-gradient(180deg,rgba(167,139,250,.10),rgba(167,139,250,.03));
+ border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:14px;
+ padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:#eef1f8;max-width:840px}
+.verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
+ text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+/* SIMPLE VIEW — hide the deep panels; the calm essentials stay. Pure CSS, no recompute. */
+body.simple #playerControls,
+body.simple #readPanel,
+body.simple #evidence,
+body.simple #storyCues{display:none!important}
+body.simple #recs .rec:nth-of-type(n+4){display:none}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1036,6 +1098,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .rec .when.glob{color:var(--muted);background:transparent;border:1px solid var(--line)}
 .rec.tb{cursor:pointer}
 .rec[data-t]:hover{border-color:var(--muted)}
+.rec.flash{border-color:var(--wob);box-shadow:0 0 0 2px rgba(167,139,250,.35);transition:box-shadow .2s}
 .rec[data-t]:hover .when.tbound{background:rgba(255,209,102,.2)}
 .rec p{margin:6px 0 0;font-size:12.8px;color:#cfd6e6}.rec p b{color:#fff}
 .rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:8px;color:#dfe7d8}
@@ -1101,13 +1164,52 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .more>summary::before{content:"▸ ";color:var(--accent,#a78bfa)}
 .more[open]>summary::before{content:"▾ "}
 .more[open]>summary{color:var(--ink)}
+/* CATALOG — all tracks & versions, collapsible. Lives at the very bottom, both views. */
+.catalog{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+ padding:14px 20px 18px;margin:24px 0 0}
+.catalog>summary{cursor:pointer;list-style:none;color:var(--ink);font-size:15px;font-weight:620;
+ padding:6px 0;user-select:none}
+.catalog>summary::-webkit-details-marker{display:none}
+.catalog>summary::before{content:"▸ ";color:var(--wob)}
+.catalog[open]>summary::before{content:"▾ "}
+.catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
+ letter-spacing:.7px;font-weight:700}
+.catrun{display:flex;align-items:baseline;gap:10px;padding:9px 12px;border:1px solid var(--line);
+ border-radius:11px;margin:7px 0;background:var(--panel2)}
+.catrun.self{border-color:var(--wob);box-shadow:inset 0 0 0 1px rgba(167,139,250,.25)}
+.catrun .cv{font-weight:650;color:var(--ink);white-space:nowrap}
+.catrun .cd{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.catrun .cmode{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+ border:1px solid var(--line);border-radius:20px;padding:1px 7px}
+.catrun .cverd{color:#cfd6e6;font-size:12.5px;flex:1;min-width:120px}
+.catrun a.copen{margin-left:auto;color:var(--wob);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.catrun a.copen:hover{text-decoration:underline}
+.catrun .cnow{margin-left:auto;color:var(--wob);font-size:11px;font-weight:700;white-space:nowrap}
+.catrun .cmiss{margin-left:auto;color:var(--muted);font-size:11px}
+.cattrack{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:rgba(0,0,0,.12)}
+.cattrack>summary{cursor:pointer;list-style:none;padding:11px 14px;font-weight:600;color:var(--ink)}
+.cattrack>summary::-webkit-details-marker{display:none}
+.cattrack>summary::before{content:"▸ ";color:var(--muted)}
+.cattrack[open]>summary::before{content:"▾ "}
+.cattrack>summary .cvn{color:var(--muted);font-weight:500;font-size:12px;margin-left:6px}
+.cattrack .catinner{padding:0 14px 10px}
 </style></head><body><div class="wrap">
 <div class="ctip" id="ctip"></div>
-<h1 id="title"></h1><div class="sub" id="sub"></div>
+<div class="topbar">
+ <div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+ <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
+      embedded in this file. It never calls the network, never costs anything. -->
+ <div class="viewtoggle" id="viewToggle"></div>
+</div>
+<div class="srcmeta" id="srcmeta"></div>
 
 <!-- VITALS — the credible spec-sheet, read in one glance, builds trust.
      Single authoritative numbers about the finished mix (no time axis). -->
 <div class="vitals" id="vitals"></div>
+
+<!-- VERDICT — the calm headline. First thing in the Simple view: what this track is
+     and the single most important takeaway, in one or two sentences. -->
+<div class="verdict" id="verdict" style="display:none"></div>
 
 <!-- 1. VISUAL FIRST: Track Story + player/sequencer is the centrepiece & the proof. -->
 <div class="panel" id="storyPanel">
@@ -1178,6 +1280,15 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
  </div>
 </details>
 
+<!-- CATALOG — every track & version analysed. Current track's versions inline; other
+     tracks fold open to their own versions. Links are relative (work on GitHub Pages).
+     Shown in BOTH Simple and Detailed views. -->
+<details class="catalog" id="catalog" style="display:none">
+ <summary id="catSummary"></summary>
+ <p class="hint" id="catHint" style="margin:6px 2px 14px"></p>
+ <div id="catBody"></div>
+</details>
+
 <div class="foot" id="foot"></div>
 </div>
 <script>
@@ -1193,8 +1304,43 @@ const cueByIdx={};CUES.forEach(c=>{cueByIdx[c.idx]=c;});
 function flashCue(letter){const el=document.querySelector('#storyCues .cue[data-let="'+letter+'"]');
  if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
  setTimeout(()=>el.classList.remove("flash"),1400);}
+// flash + scroll to the FULL recommendation card at the bottom (the single place the
+// paragraph + "→ Try" fix live). Used when a timeline triangle / cue-index item is tapped.
+function flashRec(letter){if(!letter)return;const el=document.querySelector('#recs .rec[data-let="'+letter+'"]');
+ if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
+ setTimeout(()=>el.classList.remove("flash"),1600);}
 document.getElementById("title").textContent="Track Coach · "+document.title.replace("Track Coach · ","");
 document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${T.subtitle}`;
+// ── Source files + date: what was analysed and when (header line + folded into footer)
+const META=D.meta||{};
+(function(){const el=document.getElementById("srcmeta");if(!el)return;const bits=[];
+ if(META.audio)bits.push(`${T.src_audio||"Audio"}: <b>${META.audio}</b>`);
+ if(META.als)bits.push(`${T.src_project||"Project"}: <b>${META.als}</b>`);
+ if(META.track_version)bits.push(`<b>${META.track_version}</b>`);
+ if(META.analyzed_at)bits.push(`${T.src_analyzed||"Analyzed"}: <b>${META.analyzed_at}</b>`);
+ el.innerHTML=bits.join('<span style="opacity:.4">·</span>');})();
+// ── Verdict: the calm one-glance headline (Simple view leads with this)
+(function(){const el=document.getElementById("verdict");if(!el)return;const v=(D.verdict||"").trim();
+ if(!v){el.style.display="none";return;}
+ el.innerHTML=`<span class="vlead">${T.verdict_lead||"In short"}</span>${v.replace(/&/g,"&amp;").replace(/</g,"&lt;")}`;})();
+// ── Simple⇄Detailed toggle. PURE presentation: flips a body class that hides/shows
+// already-embedded panels and re-filters the story lanes. No network, no recompute.
+(function(){const tg=document.getElementById("viewToggle");if(!tg)return;
+ tg.setAttribute("aria-label",T.view_aria||"Detail level");
+ tg.innerHTML=`<button data-v="simple">${T.view_simple||"Simple"}</button>`+
+  `<button data-v="full">${T.view_full||"Detailed"}</button>`;
+ function apply(v){document.body.classList.toggle("simple",v==="simple");
+  tg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  try{localStorage.setItem("tc_view",v);}catch(e){}
+  // let every canvas relayout for its new width / lane count
+  window.dispatchEvent(new Event("resize"));}
+ tg.querySelectorAll("button").forEach(b=>b.onclick=()=>apply(b.dataset.v));
+ // initial view: URL hash (#full/#detailed/#simple) wins, else last choice, else Simple
+ let init="simple";const h=(location.hash||"").toLowerCase();
+ if(h.indexOf("full")>=0||h.indexOf("detail")>=0)init="full";
+ else if(h.indexOf("simple")>=0)init="simple";
+ else{try{init=localStorage.getItem("tc_view")||"simple";}catch(e){}}
+ apply(init);})();
 if(D.narrative){
  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>");
@@ -1214,7 +1360,38 @@ document.getElementById("recLegend").innerHTML=
  `<span><i style="background:var(--bad)"></i>${T.legend_crit}</span>`+
  `<span><i style="background:var(--good)"></i>${T.legend_do}</span>`+
  `<span><i style="background:var(--bright)"></i>${T.legend_concept}</span>`;
-document.getElementById("foot").textContent=(T.footer||"").replace("{ver}",D.version||"");
+(function(){let f=(T.footer||"").replace("{ver}",D.version||"");
+ const tail=[];if(META.audio)tail.push(META.audio);if(META.analyzed_at)tail.push(META.analyzed_at);
+ if(tail.length)f+=" · "+tail.join(" · ");
+ document.getElementById("foot").textContent=f;})();
+// ── CATALOG: every track & version analysed. Current track inline; others fold open.
+// Relative links → work when the whole output tree is published (e.g. GitHub Pages).
+(function(){const wrap=document.getElementById("catalog");const C=D.catalog;
+ if(!wrap||!C||!C.tracks||!C.tracks.length){if(wrap)wrap.style.display="none";return;}
+ const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+ const runRow=r=>{const right=r.self?`<span class="cnow">● ${T.cat_current||"you are here"}</span>`
+    :r.exists?`<a class="copen" href="${encodeURI(r.rel)}">${T.cat_open||"open →"}</a>`
+    :`<span class="cmiss">${T.cat_missing||"(file not found)"}</span>`;
+  // self row may not have its verdict recorded in index.json yet — fall back to this build's
+  const vt=(r.self&&!r.verdict)?(D.verdict||""):(r.verdict||"");
+  return `<div class="catrun${r.self?" self":""}">`+
+   `<span class="cv">${esc(r.version||"—")}</span>`+
+   (r.date?`<span class="cd">${esc(r.date)}</span>`:"")+
+   (r.mode?`<span class="cmode">${esc(r.mode)}</span>`:"")+
+   `<span class="cverd">${esc(vt)}</span>${right}</div>`;};
+ const selfTrack=C.tracks.find(t=>t.self),others=C.tracks.filter(t=>!t.self);
+ let html="";
+ if(selfTrack){html+=`<div class="catgrp">${T.cat_this_track||"This track"} · ${esc(selfTrack.track)}</div>`+
+   selfTrack.runs.map(runRow).join("");}
+ if(others.length){html+=`<div class="catgrp" style="margin-top:14px">${T.cat_other_tracks||"Other tracks"}</div>`+
+   others.map(t=>{const vn=(T.cat_versions||"{n} version(s)").replace("{n}",t.runs.length);
+    return `<details class="cattrack"><summary>${esc(t.track)}<span class="cvn">${vn}</span></summary>`+
+     `<div class="catinner">${t.runs.map(runRow).join("")}</div></details>`;}).join("");}
+ document.getElementById("catBody").innerHTML=html;
+ document.getElementById("catSummary").textContent=`${T.cat_title||"All analyses"} (${C.n_runs})`;
+ document.getElementById("catHint").textContent=T.cat_hint||"";
+ wrap.style.display="";
+ if((location.hash||"").toLowerCase().indexOf("catalog")>=0)wrap.open=true;})();
 // sequencer legend — what the lane drawing actually encodes (two dimensions + controls)
 (function(){const el=document.getElementById("seqKey");if(!el)return;
  const stk="linear-gradient(0deg,rgb(255,78,80) 0 34%,rgb(76,214,140) 34% 67%,rgb(80,168,255) 67% 100%)";
@@ -1263,7 +1440,8 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>{
  const fix=r.fix?`<p class="fix"><span class="fixlab">→ Try</span> ${r.fix}</p>`:"";
  const cue=cueByIdx[i];const tag=cue?`<b style="color:var(--ink);text-transform:uppercase">${cue.letter}</b> `:"";
  const chip=tb?`<span class="when tbound">⏱ ${r.when}</span>`:`<span class="when glob">whole track</span>`;
- return `<div class="rec ${r.cls}${tb?' tb':''}"${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}</div>`;}).join("")||"<p class='hint'>—</p>";
+ const dl=cue?` data-let="${cue.letter}"`:"";
+ return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}</div>`;}).join("")||"<p class='hint'>—</p>";
 document.getElementById("recs").querySelectorAll(".rec[data-t]").forEach(el=>
  el.onclick=()=>{const t=+el.dataset.t;if(window.__seek)window.__seek(t);
   document.getElementById("storyPanel").scrollIntoView({behavior:"smooth",block:"start"});});
@@ -1303,7 +1481,11 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // colour for a callout cue/triangle by its rec class (crit/do/concept)
  const cueCol=cls=>cls==="crit"?getCss("--bad"):cls==="do"?getCss("--good"):cls==="concept"?getCss("--bright"):getCss("--wob");
  const fams=ST.families||[],nf=fams.length,bins=ST.bins,iv=ST.intensity,nb=bins.length;
- const comps=ST.components||[],ncomp=comps.length,compLaneH=20;
+ // Simple view shows only the power-curve drivers (energy/brightness/density);
+ // Detailed adds modulation + stereo. Recomputed on each resize/toggle — no recompute of data.
+ const ALLCOMPS=ST.components||[],compLaneH=20;
+ let comps=ALLCOMPS,ncomp=comps.length;
+ const pickComps=()=>{comps=document.body.classList.contains("simple")?ALLCOMPS.filter(c=>c.in_power):ALLCOMPS;ncomp=comps.length;};
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
  let famTop=compTop+ncomp*compLaneH+gap;
  let W,H;const xOf=t=>PADL+(t/ST.dur)*(W-PADL-PADR);
@@ -1311,7 +1493,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const tcol=v=>{v=Math.max(0,Math.min(1,v));for(let i=0;i<SC.length-1;i++){const a=SC[i],b=SC[i+1];
   if(v<=b[0]){const f=(v-a[0])/((b[0]-a[0])||1);return `rgb(${a[1]+(b[1]-a[1])*f|0},${a[2]+(b[2]-a[2])*f|0},${a[3]+(b[3]-a[3])*f|0})`;}}return "rgb(255,93,115)";};
  const imax=Math.max.apply(null,iv);
- function resize(){W=cv.clientWidth;famTop=compTop+ncomp*compLaneH+gap;H=famTop+nf*rowH+PADB;cv.style.height=H+"px";
+ function resize(){W=cv.clientWidth;pickComps();famTop=compTop+ncomp*compLaneH+gap;H=famTop+nf*rowH+PADB;cv.style.height=H+"px";
   cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw();}
  function draw(hx){ctx.clearRect(0,0,W,H);
   ST.scenes.forEach(s=>{const x0=xOf(s.t0),x1=xOf(s.t1);ctx.globalAlpha=.85;ctx.fillStyle=tcol(s.tier);ctx.fillRect(x0,PADT,Math.max(1,x1-x0-1),RIB);ctx.globalAlpha=1;
@@ -1367,17 +1549,20 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   if(cue){if(window.__seek)window.__seek(cue.t);flashCue(cue.letter);return;}
   const t=Math.max(0,Math.min(ST.dur,(mx-PADL)/(W-PADL-PADR)*ST.dur));if(window.__seek)window.__seek(t);});
  PH.push(t=>draw(xOf(t)));
- // duplicated list of the same callouts, under the player — touch-friendly, no hover needed
+ // COMPACT INDEX under the player — letter · when · one-line headline only. It is a
+ // navigational index into the timeline, NOT a second copy of the recs: the full text
+ // (paragraph + "→ Try" fix) lives ONCE, in Recommendations below. Tap → seek + flash
+ // the matching full card down there. (Touch-friendly; no hover needed.)
  (function(){const box=document.getElementById("storyCues");if(!box)return;
   if(!CUES.length){box.style.display="none";return;}
-  box.innerHTML=`<div class="cueshdr">${T.cues_title||"Callouts on the timeline — tap a triangle above, or an item here"}</div>`+
-   CUES.map(c=>{const fx=c.r.fix?`<div class="cuep" style="color:#dfe7d8">→ ${c.r.fix}</div>`:"";
-    return `<div class="cue ${c.cls}" data-let="${c.letter}" data-t="${c.t}">`+
+  box.innerHTML=`<div class="cueshdr">${T.cues_title||"Callouts on the timeline — tap one to jump there and read it below"}</div>`+
+   CUES.map(c=>
+    `<div class="cue ${c.cls}" data-let="${c.letter}" data-t="${c.t}">`+
      `<div class="cuelet">${c.letter}</div><div class="cuebody">`+
      `<div class="cuewhen">${c.r.when}</div><div class="cueh">${c.r.h}</div>`+
-     `<div class="cuep">${c.r.p}</div>${fx}</div></div>`;}).join("");
+     `</div></div>`).join("");
   box.querySelectorAll(".cue").forEach(el=>el.onclick=()=>{const t=+el.dataset.t;
-   if(window.__seek)window.__seek(t);document.getElementById("storyPanel").scrollIntoView({behavior:"smooth",block:"start"});});})();
+   if(window.__seek)window.__seek(t);flashRec(el.dataset.let);});})();
  window.addEventListener("resize",resize);resize();
 })();
 
@@ -1782,6 +1967,16 @@ def main():
     p.add_argument("--title", default=None)
     p.add_argument("--strings", default=None, help="JSON file overriding the English text (any language)")
     p.add_argument("--dump-strings", action="store_true", help="print the canonical English strings JSON and exit")
+    p.add_argument("--verdict", default=None,
+                   help="1–2 sentence headline shown at the top of the Simple view. "
+                        "If omitted, the first sentences of the --narrative are used.")
+    p.add_argument("--src-audio", default=None, help="source audio filename, shown in the widget header/footer")
+    p.add_argument("--src-als", default=None, help="source .als filename, shown in the widget header/footer")
+    p.add_argument("--track-version", default=None, help="the track's own version label (e.g. v0.6.2)")
+    p.add_argument("--analyzed-at", default=None, help="ISO timestamp of this run (defaults to now)")
+    p.add_argument("--catalog", default=None,
+                   help="catalog.json from run_dir.py — embeds the all-tracks/all-versions index "
+                        "(collapsible, with past verdicts + relative links) at the bottom of the widget")
     args = p.parse_args()
 
     if args.dump_strings:
@@ -1809,10 +2004,44 @@ def main():
     drums = json.loads(Path(args.drums_breakdown).read_text()) if args.drums_breakdown else None
     selfsim = json.loads(Path(args.selfsim).read_text()) if args.selfsim else None
     narrative_md = Path(args.narrative).read_text(encoding="utf-8") if args.narrative else None
+    from datetime import datetime
+    meta = {
+        "audio": args.src_audio,
+        "als": args.src_als,
+        "track_version": args.track_version,
+        "analyzed_at": args.analyzed_at or datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    catalog = json.loads(Path(args.catalog).read_text()) if args.catalog and Path(args.catalog).exists() else None
     build_html(core, detail, masking, als, args.out, args.title, S,
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
-               narrative_md=narrative_md, selfsim=selfsim)
+               narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog)
+    # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
+    # can show this version's verdict alongside the others. Best-effort, never fatal.
+    try:
+        _record_history(Path(args.out), _verdict_text(args.verdict, narrative_md))
+    except Exception as e:
+        print(f"(history update skipped: {e})")
+
+
+def _record_history(out_path, verdict):
+    out_dir = out_path.resolve().parent
+    widget = out_path.name
+    rm = out_dir / "run_meta.json"
+    if rm.exists():
+        meta = json.loads(rm.read_text())
+        meta["verdict"] = verdict or meta.get("verdict", "")
+        meta["widget"] = widget
+        rm.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
+    idx_path = out_dir.parent.parent / "index.json"  # base/<slug>/<run>/  → base/index.json
+    if not idx_path.exists():
+        return
+    idx = json.loads(idx_path.read_text())
+    for e in idx.get("runs", []) + ([idx["latest"]] if idx.get("latest") else []):
+        if Path(e.get("run_dir", "")).resolve() == out_dir:
+            e["verdict"] = verdict or e.get("verdict", "")
+            e["widget"] = widget
+    idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

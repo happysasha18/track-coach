@@ -116,6 +116,54 @@ for Demucs only — core/detail/als/masking/widget all finish within one call).
 
 ---
 
+## Step 0c — Output folder (versioned, NEVER overwrite)
+
+Every run gets its OWN timestamped folder so re-analysing the same track never
+clobbers a previous verdict. **Do not invent the path** — let `run_dir.py` (stdlib,
+no deps, instant) create it and tell you where it is:
+
+```bash
+SKILL_DIR="<absolute path to skill>"
+AUDIO="<path to audio file>"
+# ALS="<path to .als>"   # only if the user gave a project
+
+# Make a fresh run folder; capture its absolute path. MODE is quick or full (see below).
+OUT_DIR="$(python3 "$SKILL_DIR/scripts/run_dir.py" init --audio "$AUDIO" \
+            ${ALS:+--als "$ALS"} --mode full)"
+echo "$OUT_DIR"   # e.g. .../track-coach-output/My_Track/v0.6.2__2026-06-16_2231
+```
+
+This writes `run_meta.json` (audio + .als filename, track version, date), appends the
+run to `track-coach-output/index.json` (honest append-only history), and points a
+`latest` symlink at it. Use this `$OUT_DIR` for the WHOLE run below.
+
+**Upgrading a quick run to full** (the user looked at the calm view and wants the
+stems/player): don't recompute what's already there. Find the last run and reuse it:
+
+```bash
+python3 "$SKILL_DIR/scripts/run_dir.py" resume --audio "$AUDIO"
+# → prints {"run_dir":..., "computed":[core,detail,...], "missing":[masking,...]}
+```
+Point `OUT_DIR` at that `run_dir` and run ONLY the missing heavy steps (Demucs →
+masking → stemmap → web stems), then rebuild the widget. core/detail/als are reused.
+
+### Modes — quick vs full (cost control)
+
+The friend-feedback driver: a full run is great but heavy, and the widget can feel
+like a lot. So there are two depths AND a calm default view:
+
+- **`full`** (default, `/tc`): everything — Demucs stems, masking, sequencer, player,
+  evidence. Minutes of compute.
+- **`quick`** (`/tc-quick`): Fast analysis ONLY (core + detail, + .als if given). No
+  Demucs/stems/player. Seconds, cheap. Build the widget with just `--core/--detail`
+  (+ `--als`, `--selfsim` if you ran it) — every stem-dependent panel auto-omits.
+
+Independently of mode, the widget opens in a **calm "Simple" view** (verdict + vitals +
+power curve + repeats + top-3 recs); a **Detailed** toggle reveals the rest. That toggle
+is pure client-side JS — it never recomputes or calls anything, so it's free to flip.
+
+---
+
 ## Step 1 — Run Fast analysis (audio)
 
 Once you have the audio file, immediately run core + detail. These run in Cowork's bash sandbox (fast, no timeout issues):
@@ -123,8 +171,7 @@ Once you have the audio file, immediately run core + detail. These run in Cowork
 ```bash
 SKILL_DIR="<absolute path to skill>"
 AUDIO="<path to audio file>"
-OUT_DIR="<output directory, e.g. alongside the audio>"
-mkdir -p "$OUT_DIR"
+OUT_DIR="<the folder from Step 0c>"
 
 UV="uv run --python 3.11 --with numpy==1.26.4 --with librosa==0.10.2 --with soundfile==0.12.1 --with audioread==3.0.1 --with scipy==1.13.1 --with scikit-learn==1.5.1"
 
@@ -346,6 +393,10 @@ $UV python "$SKILL_DIR/scripts/build_widget.py" \
     --detail  "$OUT_DIR/result_detail.json" \
     --out     "$OUT_DIR/analysis_widget.html" \
     --title   "<track name + version>" \
+    --src-audio "<audio filename, e.g. My_Track_[v0.6.2].mp3>" \
+    --track-version "<the track's own version, e.g. v0.6.2>" \
+    --verdict "<your 1–2 sentence headline for the calm Simple view>" \
+    $([ -n "$ALS" ] && echo "--src-als $(basename "$ALS")") \
     $([ -f "$OUT_DIR/result_masking.json" ]      && echo "--masking $OUT_DIR/result_masking.json") \
     $([ -f "$OUT_DIR/result_als.json" ]          && echo "--als $OUT_DIR/result_als.json") \
     $([ -n "$OFFSET" ]                           && echo "--als-offset-s $OFFSET") \
@@ -358,12 +409,41 @@ $UV python "$SKILL_DIR/scripts/build_widget.py" \
     $([ -f "$OUT_DIR/narrative.md" ]             && echo "--narrative $OUT_DIR/narrative.md")
 ```
 
+**Catalog of all versions (v0.5.12).** After this build (which records THIS run's verdict
+into `index.json`), generate the cross-version catalog and rebuild once with `--catalog`
+so the widget gets a collapsible **"All analyses"** list at the bottom — every track and
+every version, with each past verdict and a RELATIVE link to its widget (so the links keep
+working if the whole `track-coach-output/` tree is moved/published):
+
+```bash
+CAT="$(python3 "$SKILL_DIR/scripts/run_dir.py" catalog --self "$OUT_DIR")"
+# re-run the SAME build_widget command as above, adding:  --catalog "$CAT"
+```
+The catalog is shown in BOTH Simple and Detailed views (it's reference, not analysis).
+`#catalog` in the URL opens it. The verdict shown for each older version is whatever was
+passed as `--verdict` when that version was built — so always give a good `--verdict`.
+
 **Write your Producer's Read (Step 5) to `$OUT_DIR/narrative.md` BEFORE this build** so
 `--narrative` picks it up — then the widget opens with your words on top. Optional flags
 also: `--presence-threshold 0.3` (playing cutoff).
 
+**`--verdict`** is the calm one-glance headline shown at the very top of the Simple view:
+the single most important takeaway in 1–2 plain sentences (what KIND of track + the one
+thing that matters). Distil it from your Step 5 read. If you omit it, the widget falls
+back to the first sentences of `narrative.md` — so always give a narrative at minimum.
+
 The widget storytelling is a FUNNEL (v0.5.4, user-driven): **quick measured facts →
 SEE it → understand it → act**. Top → bottom (each panel appears only if its data is present):
+
+**Simple⇄Detailed view (v0.5.11, friend-feedback):** the widget opens in a calm **Simple**
+view so a non-power-user isn't overwhelmed — header **verdict** (1–2 sentences, `--verdict`),
+vitals, power curve + repeats + locators, the 3 power-driver lanes (energy/brightness/density),
+and the top-3 recs. A segmented **toggle** (top-right, `#viewToggle`) flips to **Detailed**,
+which adds the stem player/sequencer, the modulation/stereo lanes, the full prose read, all
+recs, and the evidence drawer. It is **pure offline JS** (a `body.simple` class + lane re-filter)
+— it never recomputes or hits the network, so it's free to flip. Hash deep-links: `…#full` /
+`…#simple`. A **source-meta line** (`#srcmeta`) + footer show the analysed **filename, track
+version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed-at`).
 
 0. **Vitals strip** (`#vitals`) — the credible spec-sheet, read in one glance, builds trust
    ("this is real measurement, not vibes"). Single authoritative numbers about the FINISHED
@@ -398,13 +478,20 @@ SEE it → understand it → act**. Top → bottom (each panel appears only if i
    Demucs stem (minus drums/bass) only when there's no .als — and the label is **hidden when the lead
    doesn't vary** (a uniform "lead: other" from Demucs lumping every melodic part into one stem is
    noise). Shown on wide blocks + in the hover.
-   **Timeline callouts (v0.5.3):** the located recs are placed on the timeline as **downward
-   triangles above the scenes**, lettered A·B·C… and coloured by class (crit/do/concept).
-   **Click/tap** a triangle → seek there + flash the matching item in a **duplicated callout
-   list** under the player (`#storyCues`) — touch-friendly, no hover required. The same
-   letters tag those recs in "Recommendations". (Replaces the rejected hover-only / equal-pin
-   designs.) `CUES` is built once from `D.recs` (time-sorted) and shared by triangles, list,
-   and badges.
+   **Timeline callouts (v0.5.3; de-duped v0.5.13):** the located recs are placed on the timeline as
+   **downward triangles above the scenes**, lettered A·B·C… and coloured by class (crit/do/concept).
+   Under the player sits `#storyCues` — a **COMPACT INDEX**, NOT a second copy of the recs: each item
+   is just **letter · when · one-line headline**. **Tap a triangle** → seek + flash its compact index
+   item (stays near the player, good for scrubbing). **Tap an index item** → seek + scroll to and flash
+   the matching **full** card in "Recommendations" (`flashRec`). **The paragraph + "→ Try" fix live in
+   exactly ONE place — the bottom Recommendations cards** (this fixed the v0.5.10 bug where the same
+   insight, e.g. "the end sounds like the start", appeared in full both under the player AND at the
+   bottom). The same letters tag the recs (rec cards carry `data-let`). `CUES` is built once from
+   `D.recs` (time-sorted) and shared by triangles, the index, and the badges.
+   **One-card-one-text rule:** an insight's full prose belongs to its Recommendation card only;
+   everything else (timeline triangle, `#storyCues` index, lane verdicts) is a pointer/headline to it,
+   never a re-statement. The "→ Try" action label is shown ONLY on the bottom rec cards — keep the
+   fix-line format consistent (don't render a bare "→ fix" elsewhere).
    Below the sequencer sits the **transport** (v0.5.3 moved it UNDER the lanes): a compact
    **⏮ rewind-to-start** button + **Play** + time. No seek slider — the moving playhead line
    IS the scrub UI; click any chart/lane to jump. (Clicking the lane GUTTER no longer seeks to 0.)

@@ -6,7 +6,7 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not "energy is low," but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early / unstable (`v0.5.10`). macOS-first. Built and refined hands-on.
+> **Status:** early / unstable (`v0.5.13`). macOS-first. Built and refined hands-on.
 
 ![Track story — the whole song at a glance](docs/hero.png)
 
