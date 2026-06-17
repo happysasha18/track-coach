@@ -66,6 +66,14 @@ Point it at your Ableton set and it stops guessing. The arrangement and automati
 
 <sub>**Intention vs. result:** your real automation curves (filter, gain, pitch, sends…), each scaled to its own range. Read them against the energy/brightness arc — where a curve flattens but the sound keeps moving, or moves while the sound sits still, your intention and the result disagree.</sub>
 
+### Evidence & detail
+
+Collapsed by default at the bottom of the Detailed view, one drawer holds everything it measured — the receipts behind every call above:
+
+![Evidence drawer — tonal balance, the project arrangement, stem↔track map, rhythm and separation quality, transcribed notes](docs/evidence.png)
+
+<sub>**The full drawer:** the mix's average spectrum (**tonal balance**), the real **arrangement** from the `.als`, the **stem ↔ track map** (does separation match the project?), per-stem **rhythm & separation quality**, and the **transcribed notes**. Nothing interpreted here — just the measurements the read is built on.</sub>
+
 ---
 
 ## Install
