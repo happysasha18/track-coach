@@ -6,11 +6,11 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not "energy is low," but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early / unstable (`v0.5.13`). macOS-first. Built and refined hands-on.
+> **Status:** early / unstable (`v0.5.19`). macOS-first. Built and refined hands-on.
 
-![Track story — the whole song at a glance](docs/hero.png)
+![The calm Simple view — verdict, vitals, the song at a glance, top recommendations](docs/hero.png)
 
-<sub>**The whole song at a glance:** a colour-coded form map (repeated sections share a colour), the power curve broken into the lanes that drive it — energy, brightness, density, modulation, stereo width — drum lanes underneath, and a synced stem player at the bottom. Press play; click anywhere to jump.</sub>
+<sub>**Opens calm (Simple view):** a one-line verdict, the vitals spec-sheet, a colour-coded form map (repeated sections share a colour) over the power curve broken into its driving lanes — energy, brightness, density, modulation, stereo width — and the top recommendations. One toggle flips to **Detailed** for the stem player, full read and evidence.</sub>
 
 ---
 
@@ -48,9 +48,24 @@ Everything runs by default — no need to ask for "deep mode":
 
 ## A look at the output
 
-| Arrangement on a timeline | Stems + synced player | Automation: intention vs result |
-|---|---|---|
-| ![arrangement](docs/arrangement.png) | ![stems](docs/stems.png) | ![automation](docs/automation.png) |
+The **Detailed** view adds the stem player + per-stem frequency lanes and the full Producer's read:
+
+| Stems + synced player | The Producer's read |
+|---|---|
+| ![stem player with stacked frequency lanes](docs/stems.png) | ![the producer's read](docs/producer_read.png) |
+
+---
+
+## What's new
+
+**v0.5.19** (latest) — the Producer's read is rebuilt for scanning (calm body, clear section
+headers and dividers, real bullet lists, full width); the header now leads with the **track
+name**; analyses get **self-identifying, versioned filenames** (no more invented versions); the
+widget **always opens in the calm Simple view**; a missing-stem-player bug in deep runs is fixed;
+and every pipeline step now goes through a **shell-agnostic runner** (`scripts/tc_uv.sh`) so it
+works the same under bash or zsh.
+
+→ **Full history in [CHANGELOG.md](CHANGELOG.md).**
 
 ---
 
@@ -85,7 +100,7 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 | | |
 |---|---|
 | `SKILL.md` | Orchestration — how Claude runs the pipeline and writes the read-out |
-| `scripts/` | The analysis engine (Python): `analyze_core`, `masking`, `separate`, `parse_als`, `build_widget`, … |
+| `scripts/` | The analysis engine (Python): `analyze_core`, `masking`, `separate`, `parse_als`, `build_widget`, … plus `tc_uv.sh`, the shell-agnostic dependency-pinned runner every step goes through |
 | `references/` | `methodology.md` (the conceptual framework), `interpretation.md` (numeric ranges), troubleshooting |
 | `docs/` | Screenshots |
 | `setup.sh` · `requirements.txt` | Environment setup, pinned deps |

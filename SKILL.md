@@ -103,7 +103,7 @@ Do NOT attempt sudo. uv installs in `~/.local/bin` and works without sudo.
   compute happens on the sandbox CPU, not the user's hardware. Demucs still works but a
   full track exceeds one call. Run it in the background and poll:
   ```bash
-  nohup $UV_DEEP python "$SKILL_DIR/scripts/separate.py" "$AUDIO" \
+  nohup bash "$SKILL_DIR/scripts/tc_uv.sh" deep "$SKILL_DIR/scripts/separate.py" "$AUDIO" \
       --out-dir "$OUT_DIR/stems" > "$OUT_DIR/demucs.log" 2>&1 &
   echo $! > "$OUT_DIR/demucs.pid"
   ```
@@ -168,18 +168,29 @@ is pure client-side JS — it never recomputes or calls anything, so it's free t
 
 Once you have the audio file, immediately run core + detail. These run in Cowork's bash sandbox (fast, no timeout issues):
 
+> ✅ **Run every Python step through `scripts/tc_uv.sh` — do NOT inline a `$UV` string.**
+> `tc_uv.sh <profile> <script.py> [args…]` pins the dependency set per profile
+> (`core`/`fast`/`deep`/`bp`) in ONE place and is **shell-agnostic**: it runs under its own
+> bash shebang, so it behaves identically whether the caller's shell is bash or zsh. (The
+> old `UV="uv run …"; $UV python …` pattern relied on POSIX word-splitting, which **zsh —
+> the default macOS shell — does not do**, so it failed with `command not found: uv run
+> --python 3.11 …`.) The script also sets `PATH` so `uv` is found. Always **quote paths** —
+> track/album folders routinely contain spaces and `[brackets]`.
+
+**Call form (use this everywhere):** `bash "$SKILL_DIR/scripts/tc_uv.sh" <profile> "<script.py>" [args…]`.
+Write it literally — do NOT stuff `bash …tc_uv.sh` into a variable and expand it unquoted, or
+you reintroduce the very word-splitting problem the runner exists to avoid.
+
 ```bash
 SKILL_DIR="<absolute path to skill>"
 AUDIO="<path to audio file>"
 OUT_DIR="<the folder from Step 0c>"
 
-UV="uv run --python 3.11 --with numpy==1.26.4 --with librosa==0.10.2 --with soundfile==0.12.1 --with audioread==3.0.1 --with scipy==1.13.1 --with scikit-learn==1.5.1"
-
 # analyze_core also computes the VITALS spec-sheet (key/scale, integrated LUFS,
-# true-peak dBTP, dynamic range) shown at the very top of the widget. LUFS needs
-# pyloudnorm — add it to this one call (everything else degrades gracefully if absent).
-$UV --with pyloudnorm python "$SKILL_DIR/scripts/analyze_core.py" "$AUDIO" --out "$OUT_DIR/result_core.json"
-$UV python "$SKILL_DIR/scripts/analyze_detail.py" "$AUDIO" --out "$OUT_DIR/result_detail.json"
+# true-peak dBTP, dynamic range) shown at the very top of the widget. The `core` profile
+# adds pyloudnorm for LUFS (everything else degrades gracefully if absent).
+bash "$SKILL_DIR/scripts/tc_uv.sh" core "$SKILL_DIR/scripts/analyze_core.py" "$AUDIO" --out "$OUT_DIR/result_core.json"
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/analyze_detail.py" "$AUDIO" --out "$OUT_DIR/result_detail.json"
 ```
 
 While these run, tell the user what you're computing and why.
@@ -189,7 +200,7 @@ While these run, tell the user what you're computing and why.
 If the user gave an .als file:
 
 ```bash
-$UV python "$SKILL_DIR/scripts/parse_als.py" "$ALS" --out "$OUT_DIR/result_als.json"
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/parse_als.py" "$ALS" --out "$OUT_DIR/result_als.json"
 ```
 
 No extra dependencies needed — parse_als.py uses only stdlib + numpy. It extracts,
@@ -215,15 +226,8 @@ SKILL_DIR="<absolute path to skill>"
 AUDIO="<path to audio file>"
 OUT_DIR="<output directory>"
 
-UV_DEEP="uv run --python 3.11 \
-  --with numpy==1.26.4 \
-  --with torch==2.3.1 \
-  --with torchaudio==2.3.1 \
-  --with demucs==4.0.1 \
-  --with soundfile==0.12.1 \
-  --with audioread==3.0.1"
-
-$UV_DEEP python "$SKILL_DIR/scripts/separate.py" "$AUDIO" --out-dir "$OUT_DIR/stems"
+# `deep` profile = the fast deps + torch/torchaudio/demucs.
+bash "$SKILL_DIR/scripts/tc_uv.sh" deep "$SKILL_DIR/scripts/separate.py" "$AUDIO" --out-dir "$OUT_DIR/stems"
 ```
 
 On the user's Mac (Claude Code) this finishes fast on MPS — run it and wait.
@@ -243,7 +247,7 @@ English — translate, don't paste verbatim):
 5. After Demucs finishes, run masking in bash:
 
 ```bash
-$UV python "$SKILL_DIR/scripts/masking.py" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/masking.py" \
     --manifest "$OUT_DIR/stems/stems_manifest.json" \
     --out "$OUT_DIR/result_masking.json"
 ```
@@ -255,34 +259,24 @@ $UV python "$SKILL_DIR/scripts/masking.py" \
 Set SKILL_DIR to the absolute path of this skill folder. Set AUDIO to the user's file.
 Set OUT_DIR to a working directory (e.g. a `track-coach-output/` subfolder next to the audio file).
 
-**All scripts run via `uv run`** — packages are downloaded automatically on first run (~2 min).
-On subsequent runs they're cached and start instantly.
+**Every Python step runs through `scripts/tc_uv.sh <profile> <script.py> [args…]`** (see the
+shell-safety box in Step 1). Profiles: `core` (analyze_core, +pyloudnorm), `fast` (everything
+else), `deep` (separate.py / Demucs), `bp` (transcribe.py). `uv` downloads the pinned packages
+on first run (~2 min) and caches them after, so later runs start instantly.
 
-Define the uv run prefix:
 ```bash
 SKILL_DIR="/var/folders/76/f5bl3yp57wsd1n_wc5z8yxmw0000gn/T/claude-hostloop-plugins/66078eafcb0b97d4/skills/track-coach"
-UV="uv run --python 3.11 \
-  --with numpy==1.26.4 \
-  --with librosa==0.10.2 \
-  --with soundfile==0.12.1 \
-  --with audioread==3.0.1 \
-  --with scipy==1.13.1 \
-  --with scikit-learn==1.5.1"
-UV_DEEP="$UV \
-  --with torch==2.3.1 \
-  --with torchaudio==2.3.1 \
-  --with demucs==4.0.1"
 ```
 
 ### Fast mode
 
 ```bash
 # Core analysis (energy arc, endpoint cosine, wobble drift, section boundaries)
-$UV python "$SKILL_DIR/scripts/analyze_core.py" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" core "$SKILL_DIR/scripts/analyze_core.py" \
     "$AUDIO" --out "$OUT_DIR/result_core.json"
 
 # Detail analysis (tonality, articulation, harmonic change, crest, swing)
-$UV python "$SKILL_DIR/scripts/analyze_detail.py" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/analyze_detail.py" \
     "$AUDIO" --out "$OUT_DIR/result_detail.json"
 ```
 
@@ -293,15 +287,22 @@ $UV python "$SKILL_DIR/scripts/analyze_detail.py" \
 # Use htdemucs_6s when the track has melodic/harmonic parts (chords, leads, synths) so
 # guitar + piano get their own stems instead of being dumped into 'other'. Keep masking,
 # map_stems, make_web_stems all pointed at THIS same stems dir (here: stems_6s/).
-$UV_DEEP python "$SKILL_DIR/scripts/separate.py" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" deep "$SKILL_DIR/scripts/separate.py" \
     "$AUDIO" --model htdemucs_6s --out-dir "$OUT_DIR/stems_6s"
 
+# ONE stems dir for EVERY later step (masking, map_stems, rhythm, drums, transcribe,
+# make_web_stems). Set it once, right here, to whatever separate.py wrote. The default
+# below matches the recommended htdemucs_6s run; use "$OUT_DIR/stems" if you ran the
+# 4-stem default model. NEVER hardcode stems/ vs stems_6s/ downstream — always use $STEMS,
+# or a step will read a missing dir and silently produce nothing (e.g. no stems_web → no
+# player → no stem lanes in the widget).
+STEMS="$OUT_DIR/stems_6s"
+
 # Masking analysis — run on the SAME stem set the player/sequencer will draw.
-# If you separated with htdemucs_6s (recommended when melodic parts exist), point this
-# at stems_6s/ so guitar + piano also get viz band data → frequency-colour detail in
-# their lanes. Using the 4-stem manifest leaves guitar/piano flat. Match it to map_stems.
-$UV python "$SKILL_DIR/scripts/masking.py" \
-    --manifest "$OUT_DIR/stems_6s/stems_manifest.json" \
+# Pointing at $STEMS (stems_6s/ here) means guitar + piano also get viz band data →
+# frequency-colour detail in their lanes. The 4-stem manifest leaves guitar/piano flat.
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/masking.py" \
+    --manifest "$STEMS/stems_manifest.json" \
     --out "$OUT_DIR/result_masking.json"
 ```
 
@@ -323,45 +324,50 @@ Run these after stems exist. They add the layers that make the widget specific.
 #     Correlates loudness envelope vs project MIDI note-density AND audio-clip presence.
 #     This method is unreliable for dense electronic music (everything plays together), so it
 #     errs toward humility — track_matches (per-track) are usually more meaningful than family.
-$UV python "$SKILL_DIR/scripts/map_stems.py" \
-    --stems-dir "$OUT_DIR/stems_6s" --als "$OUT_DIR/result_als.json" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/map_stems.py" \
+    --stems-dir "$STEMS" --als "$OUT_DIR/result_als.json" \
     --als-offset-s "$OFFSET" --out "$OUT_DIR/result_stemmap.json"
 
 # C — per-stem onset density / timing / syncopation + separation confidence
 #     (mix vs sum-of-stems residual, pairwise leakage). Pass --tempo from the .als.
-$UV python "$SKILL_DIR/scripts/rhythm_quality.py" \
-    --manifest "$OUT_DIR/stems/stems_manifest.json" \
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/rhythm_quality.py" \
+    --manifest "$STEMS/stems_manifest.json" \
     --tempo "$BPM" --out "$OUT_DIR/result_rhythm.json"
 
 # D — classify drum hits in the drums stem into kick/snare/hat (not separation)
-$UV python "$SKILL_DIR/scripts/drum_breakdown.py" \
-    --drums "$OUT_DIR/stems/drums.wav" --out "$OUT_DIR/result_drums.json"
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/drum_breakdown.py" \
+    --drums "$STEMS/drums.wav" --out "$OUT_DIR/result_drums.json"
 
 # STRUCTURE — find REPEATING sections from the audio (self-similarity / recurrence,
 # McFee-Ellis Laplacian segmentation). Powers the "Form" lane: same colour = the same
 # part returns (reprise), confirming motif/variation/repeat beyond the family letters.
-# Needs scikit-learn (already in $UV). Runs on the full mix; no .als/offset needed.
-$UV python "$SKILL_DIR/scripts/self_similarity.py" \
+# Needs scikit-learn (in the `fast` profile). Runs on the full mix; no .als/offset needed.
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/self_similarity.py" \
     "$AUDIO" --out "$OUT_DIR/result_selfsim.json"
 
-# D — transcribe a melodic/bass stem to real notes (basic-pitch). Run on the stem
-#     that actually carries pitch (usually 'other'); skip on near-empty stems.
-UV_BP="uv run --python 3.11 --with 'basic-pitch[onnx]' --with numpy==1.26.4 --with 'setuptools<70'"
-$UV_BP python "$SKILL_DIR/scripts/transcribe.py" \
-    --stem "$OUT_DIR/stems/other.wav" --label other --out "$OUT_DIR/result_notes_other.json"
+# D — transcribe a melodic/bass stem to real notes (basic-pitch, `bp` profile). Run on the
+#     stem that actually carries pitch (usually 'other'); skip on near-empty stems.
+bash "$SKILL_DIR/scripts/tc_uv.sh" bp "$SKILL_DIR/scripts/transcribe.py" \
+    --stem "$STEMS/other.wav" --label other --out "$OUT_DIR/result_notes_other.json"
 ```
 
-### Web stems for the player (E)
+### Web stems for the player (E) — MANDATORY in deep mode, do not skip
+
+This is what makes the widget's **synced multi-stem player AND the per-stem envelope
+lanes** appear. Skip it and `stems_web/` never exists, so the widget build (Step 4) drops
+`--audio-stems-rel` and you ship a deep analysis with NO player and NO stem lanes — the
+exact regression we hit before. Always run it as the last deep step.
 
 The raw Demucs WAVs are ~100 MB each — too heavy for the in-page player. Transcode
-them to small AAC `.m4a` once (needs ffmpeg):
+them to small AAC `.m4a` (needs ffmpeg). Read from the SAME `$STEMS` dir as everything else:
 
 ```bash
-$UV python "$SKILL_DIR/scripts/make_web_stems.py" \
-    --stems-dir "$OUT_DIR/stems" --out-dir "$OUT_DIR/stems_web"
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/make_web_stems.py" \
+    --stems-dir "$STEMS" --out-dir "$OUT_DIR/stems_web"
 ```
 
-Then point the widget's player at that folder with `--audio-stems-rel stems_web`.
+Then the Step 4 build picks it up automatically via `[ -d stems_web ] && --audio-stems-rel
+stems_web`. Verify before building: `ls "$OUT_DIR/stems_web"/*.m4a` should list one file per stem.
 
 ---
 
@@ -377,7 +383,7 @@ else — Russian, Hebrew, Thai, whatever — localise it:
 
 ```bash
 # 1. get the canonical English strings schema
-$UV python "$SKILL_DIR/scripts/build_widget.py" --dump-strings > "$OUT_DIR/strings_en.json"
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/build_widget.py" --dump-strings > "$OUT_DIR/strings_en.json"
 # 2. YOU (the agent) translate every value in that JSON into the user's language,
 #    keeping keys and {placeholders} intact, and write it to strings_<lang>.json
 # 3. pass it with --strings (missing keys fall back to English)
@@ -388,11 +394,24 @@ layer that exists — the widget shows a panel only when its data is present, so
 degrades gracefully when the user gave audio only:
 
 ```bash
-$UV python "$SKILL_DIR/scripts/build_widget.py" \
+# Self-identifying filename: carry the version so files never collide / are never
+# anonymous (matches the old analysis_widget_v0.6.2.html convention).
+# ⚠ NEVER INVENT A VERSION. TRACK_VERSION must be a REAL version that appears in the
+# source filename, e.g. "[v0.6.2]" -> v0.6.2. A year/tag like "[2026_version]" is NOT a
+# version — leave TRACK_VERSION EMPTY in that case. When it's empty the filename falls
+# back to the analyzer version (v$TCV, e.g. analysis_widget_v0.5.19.html), exactly like the
+# old convention. Do NOT fabricate things like "v2026" — that produces a nonsense filename.
+TCV=$(grep -m1 'TC_VERSION =' "$SKILL_DIR/scripts/build_widget.py" | sed -E 's/.*"(.*)".*/\1/')
+WIDGET="analysis_widget_${TRACK_VERSION:-v$TCV}.html"
+
+# ALWAYS pass --title (track name) and --src-audio (the source filename, shown right
+# under the title). Skip them and the header falls back to a generic "83.4 BPM · 154s"
+# with no track name and no file shown — looks broken.
+bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/build_widget.py" \
     --core    "$OUT_DIR/result_core.json" \
     --detail  "$OUT_DIR/result_detail.json" \
-    --out     "$OUT_DIR/analysis_widget.html" \
-    --title   "<track name + version>" \
+    --out     "$OUT_DIR/$WIDGET" \
+    --title   "<track name + version, e.g. My Track v0.6.2>" \
     --src-audio "<audio filename, e.g. My_Track_[v0.6.2].mp3>" \
     --track-version "<the track's own version, e.g. v0.6.2>" \
     --verdict "<your 1–2 sentence headline for the calm Simple view>" \
@@ -542,7 +561,7 @@ Naming: keep the UI **genre-neutral** — the modulation metric is "Modulation" 
 "wobble"); it measures any rhythmic movement (LFO/tremolo/sidechain/gating). `analyze_core`
 also emits `stereo_width` (0 mono…1 wide); no extra flag needed.
 
-Then open it (`open "$OUT_DIR/analysis_widget.html"`) and tell the user — **in their
+Then open it (`open "$OUT_DIR/$WIDGET"`) and tell the user — **in their
 language** — that the widget is ready: hover gives a shared cursor across all lanes,
 the playhead is synced across every chart (click anywhere to scrub), and the project layers (arrangement,
 automation) are the ground truth that separation only approximates.

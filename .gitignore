@@ -27,3 +27,6 @@ stems/
 *.log
 *.tmp
 *.bak
+
+# Internal dev/resume state (not part of the released skill)
+NEXT_STEPS.md

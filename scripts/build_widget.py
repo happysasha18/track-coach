@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.5.13"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.5.19"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1017,6 +1017,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--bg) 60%);
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
 .wrap{max-width:1120px;margin:0 auto}
+.brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--wob);font-weight:700;margin:0 0 3px}
 h1{font-size:22px;margin:0 0 2px;font-weight:650}
 .sub{color:var(--muted);font-size:13px;margin-bottom:4px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
@@ -1037,7 +1038,8 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
  padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:#eef1f8;max-width:840px}
 .verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
-/* SIMPLE VIEW — hide the deep panels; the calm essentials stay. Pure CSS, no recompute. */
+/* SIMPLE VIEW — hide the deep panels (incl. the per-stem player); calm essentials + the
+   Track-story component layers stay. Stem-envelope lanes are a Detailed-only thing. */
 body.simple #playerControls,
 body.simple #readPanel,
 body.simple #evidence,
@@ -1068,10 +1070,22 @@ body.simple #recs .rec:nth-of-type(n+4){display:none}
 .formlabel{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin:2px 0 3px}
 #formWrap canvas{width:100%;display:block}
 .read{border-left:3px solid var(--wob)}
-.read #readBody{font-size:14px;line-height:1.65;color:#dce3f2;max-width:820px}
-.read #readBody p{margin:0 0 10px}
-.read #readBody strong{color:#fff}
-.read #readBody h3{font-size:13px;color:var(--bright);margin:14px 0 4px;font-weight:650}
+/* Producer's read — built for SCANNING, not a wall: calm muted body so emphasis
+   (white bold) and section heads (yellow) carry the hierarchy; generous spacing;
+   section dividers; real bullet list. Full width (no reading cap — line length
+   was never the problem; structure + colour hierarchy is). */
+.read #readBody{font-size:14.5px;line-height:1.8;color:#aab3c7}
+.read #readBody p{margin:0 0 16px}
+.read #readBody strong{color:#fff;font-weight:650}
+.read #readBody em{color:#cdd5e6;font-style:italic}
+.read #readBody h3{font-size:15.5px;color:var(--bright);margin:30px 0 12px;font-weight:700;
+ letter-spacing:.01em;padding-top:16px;border-top:1px solid var(--line)}
+.read #readBody h3:first-child{margin-top:2px;padding-top:0;border-top:0}
+.read #readBody ul{margin:0 0 16px;padding:0;list-style:none}
+.read #readBody li{position:relative;margin:0 0 12px;padding:0 0 0 22px}
+.read #readBody li:last-child{margin-bottom:0}
+.read #readBody li:before{content:"";position:absolute;left:3px;top:8px;width:6px;height:6px;
+ border-radius:50%;background:var(--wob)}
 .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;margin-top:8px;font-weight:600}
 .tag.good{background:rgba(70,211,154,.14);color:var(--good)}
 .tag.warn{background:rgba(255,180,84,.14);color:var(--warn)}
@@ -1196,7 +1210,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 </style></head><body><div class="wrap">
 <div class="ctip" id="ctip"></div>
 <div class="topbar">
- <div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+ <div><div class="brandkick">Track Coach</div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
  <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
       embedded in this file. It never calls the network, never costs anything. -->
  <div class="viewtoggle" id="viewToggle"></div>
@@ -1309,7 +1323,9 @@ function flashCue(letter){const el=document.querySelector('#storyCues .cue[data-
 function flashRec(letter){if(!letter)return;const el=document.querySelector('#recs .rec[data-let="'+letter+'"]');
  if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
  setTimeout(()=>el.classList.remove("flash"),1600);}
-document.getElementById("title").textContent="Track Coach · "+document.title.replace("Track Coach · ","");
+// H1 leads with the TRACK name (from --title); the brand lives in the .brandkick
+// eyebrow above + the footer + the browser tab, not stealing the track-name slot.
+document.getElementById("title").textContent=document.title.replace(/^Track Coach · /,"");
 document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${T.subtitle}`;
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
@@ -1335,19 +1351,31 @@ const META=D.meta||{};
   // let every canvas relayout for its new width / lane count
   window.dispatchEvent(new Event("resize"));}
  tg.querySelectorAll("button").forEach(b=>b.onclick=()=>apply(b.dataset.v));
- // initial view: URL hash (#full/#detailed/#simple) wins, else last choice, else Simple
+ // initial view: ALWAYS open Simple (the calm default) unless the URL hash explicitly
+ // asks for Detailed (#full/#detailed). We deliberately do NOT restore a previous
+ // Detailed choice from localStorage — every fresh open is calm; the toggle still works
+ // in-session.
  let init="simple";const h=(location.hash||"").toLowerCase();
  if(h.indexOf("full")>=0||h.indexOf("detail")>=0)init="full";
- else if(h.indexOf("simple")>=0)init="simple";
- else{try{init=localStorage.getItem("tc_view")||"simple";}catch(e){}}
  apply(init);})();
 if(D.narrative){
  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>");
+ // Source narrative is hard-wrapped (~80 chars/line). Treat single newlines as soft
+ // wraps -> collapse to a space so the browser reflows; only a real markdown hard break
+ // (line ending in 2+ trailing spaces) stays a <br>.
+ const para=s=>inline(s).replace(/ {2,}\n/g,"<br>").replace(/\n/g," ");
  const html=D.narrative.split(/\n{2,}/).map(blk=>{const t=blk.trim();if(!t)return"";
   if(t.startsWith("### "))return `<h3>${inline(t.slice(4))}</h3>`;
   if(t.startsWith("## "))return `<h3>${inline(t.slice(3))}</h3>`;
-  return `<p>${inline(t).replace(/\n/g,"<br>")}</p>`;}).join("");
+  // Bullet list ("- " / "* "): each bullet is an <li>; non-bullet continuation lines
+  // fold into the current item. Without this the whole list collapses into one run-on
+  // paragraph (dashes inline) — the main cause of the "wall of text" read.
+  if(/^\s*[-*]\s+/.test(t)){const items=[];
+   t.split("\n").forEach(ln=>{const m=ln.match(/^\s*[-*]\s+(.*)$/);
+    if(m)items.push(m[1]);else if(items.length)items[items.length-1]+="\n"+ln;});
+   return `<ul>${items.map(it=>`<li>${para(it)}</li>`).join("")}</ul>`;}
+  return `<p>${para(t)}</p>`;}).join("");
  document.getElementById("readTitle").textContent=T.read_title;
  document.getElementById("readBody").innerHTML=html;
  document.getElementById("readPanel").style.display="";
@@ -1481,11 +1509,12 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // colour for a callout cue/triangle by its rec class (crit/do/concept)
  const cueCol=cls=>cls==="crit"?getCss("--bad"):cls==="do"?getCss("--good"):cls==="concept"?getCss("--bright"):getCss("--wob");
  const fams=ST.families||[],nf=fams.length,bins=ST.bins,iv=ST.intensity,nb=bins.length;
- // Simple view shows only the power-curve drivers (energy/brightness/density);
- // Detailed adds modulation + stereo. Recomputed on each resize/toggle — no recompute of data.
+ // The Track-story chart is the showpiece — show ALL component lanes in BOTH views.
+ // (Regression in 0.5.13: Simple filtered to in_power only, gutting the rich layers from
+ //  the default view. Simple stays calm by hiding the *other* heavy panels, not this graph.)
  const ALLCOMPS=ST.components||[],compLaneH=20;
  let comps=ALLCOMPS,ncomp=comps.length;
- const pickComps=()=>{comps=document.body.classList.contains("simple")?ALLCOMPS.filter(c=>c.in_power):ALLCOMPS;ncomp=comps.length;};
+ const pickComps=()=>{comps=ALLCOMPS;ncomp=comps.length;};
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
  let famTop=compTop+ncomp*compLaneH+gap;
  let W,H;const xOf=t=>PADL+(t/ST.dur)*(W-PADL-PADR);
