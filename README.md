@@ -8,9 +8,9 @@ Give it a track (and optionally your Ableton project), and it runs the complete 
 
 > **Status:** early / unstable (`v0.5.19`). macOS-first. Built and refined hands-on.
 
-![The calm Simple view — verdict, vitals, the song at a glance, top recommendations](docs/hero.png)
+![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
 
-<sub>**Opens calm (Simple view):** a one-line verdict, the vitals spec-sheet, a colour-coded form map (repeated sections share a colour) over the power curve broken into its driving lanes — energy, brightness, density, modulation, stereo width — and the top recommendations. One toggle flips to **Detailed** for the stem player, full read and evidence.</sub>
+**Two views, one toggle.** It opens calm in **Simple** — a one-line verdict, the vitals spec-sheet, and a colour-coded form map (repeated sections share a colour) over the power curve broken into its driving lanes: energy, brightness, density, modulation, stereo width. Flip to **Detailed** for the synced stem player, the full Producer's read, and the evidence behind every call.
 
 ---
 
@@ -48,24 +48,23 @@ Everything runs by default — no need to ask for "deep mode":
 
 ## A look at the output
 
-The **Detailed** view adds the stem player + per-stem frequency lanes and the full Producer's read:
-
-| Stems + synced player | The Producer's read |
+| The stem player (Detailed view) | What to change, ranked |
 |---|---|
-| ![stem player with stacked frequency lanes](docs/stems.png) | ![the producer's read](docs/producer_read.png) |
+| ![the whole song decomposed into stem lanes under one transport](docs/stems.png) | ![ranked, colour-coded recommendations](docs/recommendations.png) |
 
----
+<sub>**Left — the song decomposed:** the form map and power curve over its driving lanes, then every stem on its own lane under one transport (play / seek / mute / solo, playhead linked to every chart). **Right — concrete feedback:** the few things that stood out, most important first — red = worth fixing, green = working, yellow = a creative choice. Specific and timestamped, never "energy is low."</sub>
 
-## What's new
+### It reads your project, not just the audio
 
-**v0.5.19** (latest) — the Producer's read is rebuilt for scanning (calm body, clear section
-headers and dividers, real bullet lists, full width); the header now leads with the **track
-name**; analyses get **self-identifying, versioned filenames** (no more invented versions); the
-widget **always opens in the calm Simple view**; a missing-stem-player bug in deep runs is fixed;
-and every pipeline step now goes through a **shell-agnostic runner** (`scripts/tc_uv.sh`) so it
-works the same under bash or zsh.
+Point it at your Ableton set and it stops guessing. The arrangement and automation come straight from the `.als` — the ground truth that stem separation can only approximate.
 
-→ **Full history in [CHANGELOG.md](CHANGELOG.md).**
+![The real arrangement from the .als — every project track, MIDI and audio, aligned to the audio](docs/arrangement.png)
+
+<sub>**Arrangement, from the project:** which real tracks actually play, and when. Solid blocks = MIDI (brightness = note density), thin strips = audio clips, labelled lines = locators — all aligned to the rendered audio.</sub>
+
+![Automation envelopes from the project — intention vs. result](docs/automation.png)
+
+<sub>**Intention vs. result:** your real automation curves (filter, gain, pitch, sends…), each scaled to its own range. Read them against the energy/brightness arc — where a curve flattens but the sound keeps moving, or moves while the sound sits still, your intention and the result disagree.</sub>
 
 ---
 
@@ -92,6 +91,19 @@ This is a **Claude Code skill** — drop the folder into `~/.claude/skills/track
 > *"why does my track sound stuck?"* · *"analyse this project"* · *"compare these two versions"*
 
 Claude grabs the audio (and `.als` if available), runs the pipeline, and opens the widget. You can also point it at a whole project folder and it'll find the latest render and `.als` itself.
+
+---
+
+## What's new
+
+**v0.5.19** (latest) — the Producer's read is rebuilt for scanning (calm body, clear section
+headers and dividers, real bullet lists, full width); the header now leads with the **track
+name**; analyses get **self-identifying, versioned filenames** (no more invented versions); the
+widget **always opens in the calm Simple view**; a missing-stem-player bug in deep runs is fixed;
+and every pipeline step now goes through a **shell-agnostic runner** (`scripts/tc_uv.sh`) so it
+works the same under bash or zsh.
+
+→ **Full history in [CHANGELOG.md](CHANGELOG.md).**
 
 ---
 
