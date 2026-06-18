@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.5.20"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.6.5"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -41,6 +41,7 @@ BAND_LABEL = {  # frequency ranges — language-neutral, never translated
 STRINGS = {
     "ui": {
         "subtitle": "deep mode",
+        "subtitle_quick": "quick read",
         "arc_title": "Arrangement map",
         "arc_hint": "Energy / brightness / density / wobble over time. Grey bars = section boundaries. Hover for a shared cursor.",
         "arr_title": "Arrangement — from the project (.als)",
@@ -74,8 +75,7 @@ STRINGS = {
         "mask_windows": "{fw}/{tw} windows · avg {diff} dB",
         "read_title": "Producer's read",
         "story_title": "Track story — the shape at a glance",
-        "form_label": "Form — same colour = the same part returns",
-        "story_hint": "One map. Top: scenes (named, repeat letters A·B·A). Then the POWER curve (a blend of loudness+busy-ness+brightness) with its peak ★ and key moments. Below it the same curve DECOMPOSED into the lanes that drive it — energy (loudness), brightness (treble), density (how busy), modulation (how fast it pulses/throbs per second), stereo width. Bottom: which families play. Press play, click anywhere to jump.",
+        "story_hint": "One map. Top: the structure bar — named scenes (Intro/Build/Drop), each coloured by its musical part; same colour + same letter = that part RETURNS (e.g. A at the intro and again at the outro), outlined when it repeats. Then the POWER curve (a blend of loudness+busy-ness+brightness) with its peak ★ and key moments. Below it the same curve DECOMPOSED into the lanes that drive it — energy (loudness), brightness (treble), density (how busy), modulation (how fast it pulses/throbs per second), stereo width. Bottom: which families play. Press play, click anywhere to jump.",
         "recs_title": "Recommendations",
         "recs_hint": "The few things that stood out, most important first. Red = worth fixing · green = working / do it · yellow = a creative choice. A ⏱ tag means it's tied to a moment in the track — click it to jump there; the rest apply to the whole mix.",
         "legend_crit": "worth fixing",
@@ -100,11 +100,11 @@ STRINGS = {
         "src_audio": "Audio",
         "src_project": "Project",
         "src_analyzed": "Analyzed",
-        "cat_title": "All analyses — every track & version",
-        "cat_hint": "Each analysis is kept in its own dated folder (nothing is overwritten). Open an earlier version to compare verdicts.",
+        "cat_title": "Library — every track & version",
+        "cat_hint": "Your analysis library. Each run is kept in its own dated folder (nothing is overwritten) — open an earlier version to compare verdicts.",
         "cat_this_track": "This track",
         "cat_other_tracks": "Other tracks",
-        "cat_open": "open →",
+        "cat_open": "Open ↗",
         "cat_current": "you are here",
         "cat_versions": "{n} version(s)",
         "cat_missing": "(widget file not found)",
@@ -837,7 +837,7 @@ def build_story(core, als_overlay):
 
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
-               narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None):
+               narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full"):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -921,6 +921,26 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                     best, bestv = st, mean_db
             if best is not None and bestv > -45:   # above near-silence
                 seg["lead"] = best
+
+    # ── ONE structure bar (0.6.1): collapse the two clashing rows into one. The named
+    # scenes (Intro/Build/Drop, from arrangement boundaries) become the only bar; each
+    # is COLOURED + LETTERED by the self-similarity recurrence cluster that dominates it
+    # (max time-overlap). A returning motif therefore shares one letter+colour across,
+    # e.g., intro & outro — a single A/B/C scheme instead of two. Lead instrument comes
+    # from the same dominant cluster. Falls back to the scene's own family/intensity
+    # letter (and no lead) when there's no self-similarity data.
+    if story and story.get("scenes") and ss_segs:
+        for sc in story["scenes"]:
+            best, bestov = None, 0.0
+            for seg in ss_segs:
+                ov = min(sc["t1"], seg["t1"]) - max(sc["t0"], seg["t0"])
+                if ov > bestov:
+                    best, bestov = seg, ov
+            if best is not None:
+                sc["letter"] = best.get("letter", sc["letter"])
+                if best.get("lead"):
+                    sc["lead"] = best["lead"]
+
     recs = build_recommendations(core, detail, masking, S,
                                  als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm)
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
@@ -969,6 +989,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "presence_threshold": presence_threshold,
         "narrative": narrative_md,
         "story": story,
+        "mode": mode,
         "version": TC_VERSION,
         "meta": meta or {},
         "verdict": _verdict_text(verdict, narrative_md),
@@ -1038,13 +1059,11 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
  padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:#eef1f8;max-width:840px}
 .verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
-/* SIMPLE VIEW — hide the deep panels (incl. the per-stem player); calm essentials + the
-   Track-story component layers stay. Stem-envelope lanes are a Detailed-only thing. */
-body.simple #playerControls,
-body.simple #readPanel,
-body.simple #evidence,
-body.simple #storyCues{display:none!important}
-body.simple #recs .rec:nth-of-type(n+4){display:none}
+/* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, and all
+   recommendation cards stay visible in BOTH views (hiding them just read as "things vanished").
+   Detailed adds ONE thing on top: the raw "Evidence & detail" drawer. That's the only panel
+   gated by Simple now. */
+body.simple #evidence{display:none!important}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1067,8 +1086,6 @@ body.simple #recs .rec:nth-of-type(n+4){display:none}
 .card[title]{cursor:help}
 .cardhdr{grid-column:1/-1;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin:6px 2px 0}
 .cardhdrhint{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;color:var(--muted);opacity:.85;margin-top:3px}
-.formlabel{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin:2px 0 3px}
-#formWrap canvas{width:100%;display:block}
 .read{border-left:3px solid var(--wob)}
 /* Producer's read — built for SCANNING, not a wall: calm muted body so emphasis
    (white bold) and section heads (yellow) carry the hierarchy; generous spacing;
@@ -1196,8 +1213,9 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .catrun .cmode{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
  border:1px solid var(--line);border-radius:20px;padding:1px 7px}
 .catrun .cverd{color:#cfd6e6;font-size:12.5px;flex:1;min-width:120px}
-.catrun a.copen{margin-left:auto;color:var(--wob);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
-.catrun a.copen:hover{text-decoration:underline}
+.catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;text-decoration:none;
+ white-space:nowrap;border:1px solid var(--wob);border-radius:8px;padding:3px 10px;transition:background .12s}
+.catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:none}
 .catrun .cnow{margin-left:auto;color:var(--wob);font-size:11px;font-weight:700;white-space:nowrap}
 .catrun .cmiss{margin-left:auto;color:var(--muted);font-size:11px}
 .cattrack{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:rgba(0,0,0,.12)}
@@ -1228,8 +1246,6 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 <!-- 1. VISUAL FIRST: Track Story + player/sequencer is the centrepiece & the proof. -->
 <div class="panel" id="storyPanel">
  <h2 id="storyTitle"></h2><p class="hint" id="storyHint"></p>
- <div id="formWrap" style="display:none"><div class="formlabel" id="formLabel"></div>
-  <canvas id="formlane" height="40" style="cursor:pointer"></canvas></div>
  <canvas id="story" height="300"></canvas>
  <div id="playerControls">
   <canvas id="stemlanes" height="200" style="margin-top:12px;cursor:pointer"></canvas>
@@ -1326,7 +1342,7 @@ function flashRec(letter){if(!letter)return;const el=document.querySelector('#re
 // H1 leads with the TRACK name (from --title); the brand lives in the .brandkick
 // eyebrow above + the footer + the browser tab, not stealing the track-name slot.
 document.getElementById("title").textContent=document.title.replace(/^Track Coach · /,"");
-document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${T.subtitle}`;
+document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${D.mode==="quick"?(T.subtitle_quick||"quick read"):T.subtitle}`;
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
 (function(){const el=document.getElementById("srcmeta");if(!el)return;const bits=[];
@@ -1505,7 +1521,15 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  document.getElementById("storyTitle").textContent=T.story_title;
  document.getElementById("storyHint").textContent=T.story_hint;
  const cv=document.getElementById("story"),ctx=cv.getContext("2d");
- const PADL=70,PADR=14,PADT=30,PADB=22,RIB=24,MOM=18,CUR=112,rowH=12,gap=8;
+ const PADL=70,PADR=14,PADT=30,PADB=22,RIB=30,MOM=18,CUR=112,rowH=12,gap=8;
+ // ONE structure bar: scenes are coloured + lettered by their self-similarity cluster
+ // (s.letter = recurrence cluster). Same letter ⇒ same hue ⇒ that part returns; the
+ // repeating ones get an outline. (Replaces the old separate "Form / repeats" lane.)
+ const SPAL=["#5b8cff","#46d39a","#ffb454","#c77dff","#5ad1c2","#ff6b9d"];
+ const sceneLetters=[...new Set((ST.scenes||[]).map(s=>s.letter))];
+ const scol=L=>SPAL[Math.max(0,sceneLetters.indexOf(L))%SPAL.length];
+ const sreps=new Set();{const seen={};(ST.scenes||[]).forEach(s=>{if(seen[s.letter])sreps.add(s.letter);seen[s.letter]=1;});}
+ const sceneLeadVaries=new Set((ST.scenes||[]).map(s=>s.lead).filter(Boolean)).size>1;
  // colour for a callout cue/triangle by its rec class (crit/do/concept)
  const cueCol=cls=>cls==="crit"?getCss("--bad"):cls==="do"?getCss("--good"):cls==="concept"?getCss("--bright"):getCss("--wob");
  const fams=ST.families||[],nf=fams.length,bins=ST.bins,iv=ST.intensity,nb=bins.length;
@@ -1518,15 +1542,16 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
  let famTop=compTop+ncomp*compLaneH+gap;
  let W,H;const xOf=t=>PADL+(t/ST.dur)*(W-PADL-PADR);
- const SC=[[0,38,50,74],[0.5,63,111,158],[0.8,224,137,74],[1,255,93,115]];
- const tcol=v=>{v=Math.max(0,Math.min(1,v));for(let i=0;i<SC.length-1;i++){const a=SC[i],b=SC[i+1];
-  if(v<=b[0]){const f=(v-a[0])/((b[0]-a[0])||1);return `rgb(${a[1]+(b[1]-a[1])*f|0},${a[2]+(b[2]-a[2])*f|0},${a[3]+(b[3]-a[3])*f|0})`;}}return "rgb(255,93,115)";};
  const imax=Math.max.apply(null,iv);
  function resize(){W=cv.clientWidth;pickComps();famTop=compTop+ncomp*compLaneH+gap;H=famTop+nf*rowH+PADB;cv.style.height=H+"px";
   cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw();}
  function draw(hx){ctx.clearRect(0,0,W,H);
-  ST.scenes.forEach(s=>{const x0=xOf(s.t0),x1=xOf(s.t1);ctx.globalAlpha=.85;ctx.fillStyle=tcol(s.tier);ctx.fillRect(x0,PADT,Math.max(1,x1-x0-1),RIB);ctx.globalAlpha=1;
-   if(x1-x0>44){ctx.fillStyle="rgba(255,255,255,.95)";ctx.font="600 11px sans-serif";ctx.textAlign="left";ctx.fillText(s.letter+"  "+s.name,x0+6,PADT+16);}});
+  ST.scenes.forEach(s=>{const x0=xOf(s.t0),x1=xOf(s.t1),w=Math.max(1,x1-x0-1),rep=sreps.has(s.letter),c=scol(s.letter);
+   ctx.fillStyle=c+(rep?"cc":"99");ctx.fillRect(x0,PADT,w,RIB);
+   if(rep){ctx.strokeStyle=c;ctx.lineWidth=1.2;ctx.strokeRect(x0+.5,PADT+.5,w-1,RIB-1);}
+   if(w>44){ctx.fillStyle="#0c0e14";ctx.textAlign="left";ctx.textBaseline="alphabetic";
+    ctx.font="700 11px sans-serif";ctx.fillText(s.letter+" · "+s.name,x0+6,PADT+13);
+    if(s.lead&&sceneLeadVaries){ctx.font="600 9px sans-serif";ctx.fillText("lead: "+s.lead,x0+6,PADT+25);}}});
   // callout cues: downward triangles over the scenes (a,b,c…), click to read below. Touch-friendly.
   CUES.forEach(c=>{const x=xOf(c.t),col=cueCol(c.cls),ct=8,cb=23;
    ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x-8,ct);ctx.lineTo(x+8,ct);ctx.lineTo(x,cb);ctx.closePath();ctx.fill();
@@ -1571,7 +1596,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   const t=Math.max(0,Math.min(ST.dur,(mx-PADL)/(W-PADL-PADR)*ST.dur));draw(xOf(t));
   if(cue){showTip(e,`<b>${cue.letter.toUpperCase()} · ${cue.r.when}</b><br>${cue.r.h}<br><span class="tdim">click to read below</span>`);return;}
   const sc=ST.scenes.find(s=>t>=s.t0&&t<s.t1);const on=fams.filter(f=>f.intervals.some(p=>t>=p[0]&&t<=p[1])).map(f=>f.name);
-  showTip(e,`<b>${fmtT(t)}</b>`+(sc?` · <b>${sc.letter} ${sc.name}</b>`:"")+(on.length?`<br><span class="tdim">playing: ${on.join(", ")}</span>`:""));});
+  showTip(e,`<b>${fmtT(t)}</b>`+(sc?` · <b>${sc.letter} · ${sc.name}</b>`:"")
+   +(sc&&sc.lead&&sceneLeadVaries?` <span class="tdim">· lead: ${sc.lead}</span>`:"")
+   +(sc&&sreps.has(sc.letter)?`<br><span class="tdim">part ${sc.letter} returns elsewhere</span>`:"")
+   +(on.length?`<br><span class="tdim">playing: ${on.join(", ")}</span>`:""));});
  cv.addEventListener("mouseleave",()=>{draw();hideTip();cv.style.cursor="default";});
  cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
   const cue=cueAt(mx,my);
@@ -1595,47 +1623,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  window.addEventListener("resize",resize);resize();
 })();
 
-// ── Form / repeats lane: audio self-similarity (chroma/MFCC → Laplacian segmentation).
-// Coloured blocks per section; SAME colour + SAME letter = the same musical material
-// coming back (a reprise), not just "something changed". Aligned to the story scale.
-(function(){
- const SS=D.selfsim||[],wrap=document.getElementById("formWrap");
- if(!wrap||SS.length<2){if(wrap)wrap.style.display="none";return;}
- wrap.style.display="block";
- const cv=document.getElementById("formlane"),ctx=cv.getContext("2d");
- const PADL=70,PADR=14;const dur=D.dur||SS[SS.length-1].t1;
- // stable colour per letter; repeated letters reuse the same hue → repeats look alike
- const PAL=["#5b8cff","#46d39a","#ffb454","#c77dff","#5ad1c2","#ff6b9d"];
- const letters=[...new Set(SS.map(s=>s.letter))];
- const colOf=L=>PAL[letters.indexOf(L)%PAL.length];
- const reps=new Set();{const seen={};SS.forEach(s=>{if(seen[s.letter])reps.add(s.letter);seen[s.letter]=1;});}
- // Lead is only worth showing if it actually VARIES between sections. When Demucs lumps
- // every melodic part into one stem ("other" everywhere), a uniform "lead: other" is noise.
- const leadVaries=new Set(SS.map(s=>s.lead).filter(Boolean)).size>1;
- const nrep=reps.size;
- document.getElementById("formLabel").textContent=(T.form_label||"Form — same colour = the same part returns")
-   +(nrep?`  (↻ ${[...reps].join(", ")} repeat)`:"  (no repeats detected)");
- let W=0,H=40,hx=null;
- const xOf=t=>PADL+(t/dur)*(W-PADL-PADR);
- function draw(px){ctx.clearRect(0,0,W,H);
-  SS.forEach(s=>{const x0=xOf(s.t0),x1=xOf(s.t1),w=Math.max(2,x1-x0-1),rep=reps.has(s.letter),c=colOf(s.letter);
-   ctx.fillStyle=c+(rep?"":"99");ctx.fillRect(x0,6,w,H-12);
-   if(rep){ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.strokeRect(x0+.5,6.5,w-1,H-13);}
-   if(w>13){const cx=(x0+x1)/2;ctx.fillStyle="#0c0e14";ctx.textAlign="center";ctx.textBaseline="middle";
-    if(s.lead&&leadVaries&&w>52){ctx.font="800 11px sans-serif";ctx.fillText(s.letter,cx,H/2-5);
-     ctx.font="700 9px sans-serif";ctx.fillText("lead: "+s.lead,cx,H/2+7);}
-    else{ctx.font="800 11px sans-serif";ctx.fillText(s.letter,cx,H/2);}ctx.textBaseline="alphabetic";}});
-  if(px!=null){ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px,2);ctx.lineTo(px,H-2);ctx.stroke();}}
- function resize(){W=cv.clientWidth||cv.parentNode.clientWidth;cv.width=W;cv.height=H;draw(hx);}
- cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left;
-  const t=Math.max(0,Math.min(dur,(mx-PADL)/(W-PADL-PADR)*dur));const s=SS.find(s=>t>=s.t0&&t<s.t1);
-  if(s)showTip(e,`<b>Part ${s.letter}</b> · ${fmtT(s.t0)}–${fmtT(s.t1)}`+(s.lead&&leadVaries?` · <span class="tdim">lead: ${s.lead}</span>`:"")+(reps.has(s.letter)?`<br><span class="tdim">this material returns elsewhere</span>`:""));});
- cv.addEventListener("mouseleave",hideTip);
- cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left;
-  const t=Math.max(0,Math.min(dur,(mx-PADL)/(W-PADL-PADR)*dur));if(window.__seek)window.__seek(t);});
- PH.push(t=>{hx=xOf(t);draw(hx);});
- window.addEventListener("resize",resize);resize();
-})();
+// ── Form / repeats: now folded INTO the single structure bar at the top of the Track
+// Story (each named scene is coloured + lettered by its self-similarity cluster, so a
+// returning part shares letter+colour). The old standalone form lane was removed in 0.6.1.
 
 // ── Tonal balance: average mix spectrum per octave band, with deviation flags. ──
 (function(){
@@ -1993,6 +1983,8 @@ def main():
                         "Required to align the .als arrangement to the audio. NEVER guessed: if the picture "
                         "doesn't line up, ask the user which locator the render starts from.")
     p.add_argument("--out", default="analysis_widget.html")
+    p.add_argument("--mode", default="full", choices=["quick", "full"],
+                   help="run mode — sets the header label (full→'deep mode', quick→'quick read')")
     p.add_argument("--title", default=None)
     p.add_argument("--strings", default=None, help="JSON file overriding the English text (any language)")
     p.add_argument("--dump-strings", action="store_true", help="print the canonical English strings JSON and exit")
@@ -2044,7 +2036,8 @@ def main():
     build_html(core, detail, masking, als, args.out, args.title, S,
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
-               narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog)
+               narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
+               mode=args.mode)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

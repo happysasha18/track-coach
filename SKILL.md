@@ -34,6 +34,58 @@ Read `references/methodology.md` for the conceptual framework (variety vs develo
 
 ---
 
+## ▶ How to run it (0.6) — one command does the pipeline; YOU do the read
+
+The whole deterministic pipeline (run dir → fast analysis → .als → Demucs → masking/
+maps/rhythm/drums/notes/web-stems → first build + catalog) is now ONE command. Do not
+hand-drive the individual steps below — they are the *internals* this entrypoint automates,
+kept as reference. Division of labour:
+
+- **The app measures and renders** (deterministic): `scripts/track_analyzer.py` + the analysis
+  scripts produce the result JSON, the stems, and the widget. Same input → same output. No opinion.
+- **You (the skill) decide and interpret** (judgment): pick mode, ask for the render offset,
+  then READ the numbers and write the Producer's Read — the part that can't be deterministic.
+
+```bash
+SKILL_DIR="<absolute path to skill>"
+
+# 1) MEASURE (heavy, deterministic): runs everything → result_*.json + stems. Prints {run_dir}.
+#    No widget yet — measuring only. (.als offset defaults to the first locator / first clip.)
+python3 "$SKILL_DIR/scripts/track_analyzer.py" analyze "<AUDIO>" \
+    [--als "<ALS>" --als-offset-s <N>] [--mode quick|full] \
+    [--track-version "<vX.Y from filename, or omit>"]
+
+# 2) INTERPRET (you): read the result_*.json, write your Producer's Read to <run_dir>/narrative.md.
+
+# 3) RENDER (cheap, one pass): build the widget WITH the read + the cross-version catalog.
+python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
+    --title "<Track name + version>" --verdict "<1–2 sentence calm headline>"
+```
+
+`--mode quick` = fast analysis only (`/tc-quick`); `full` (default, `/tc`) = stems + player +
+everything. Localising? Pass `--strings <file>` (build the schema with `build_widget.py
+--dump-strings`, translate the values). Add `--dry-run` to print the plan without running.
+The per-step sections below explain WHAT each stage measures — read them for the methodology,
+but invoke the pipeline through the entrypoint, not by pasting the step commands.
+
+**Re-analysing a track?** `analyze` auto-inherits the previous run's `narrative.md` + title +
+verdict into the new dated run (it won't clobber anything you set), so the Producer's read is
+never silently lost — just edit `narrative.md` before `build` if it needs updating.
+
+**Global library (auto).** Every `build` also deposits the finished widget into the global
+library at `~/.track-coach/library/` (override with `$TRACK_COACH_LIBRARY`; pass `--no-deposit`
+to skip). Manage it with `scripts/library.py`:
+```bash
+python3 "$SKILL_DIR/scripts/library.py" path           # where the library lives
+python3 "$SKILL_DIR/scripts/library.py" list [--track T]
+python3 "$SKILL_DIR/scripts/library.py" clean --dry-run [--older-than DAYS] \
+    [--keep-per-track N] [--track T] [--missing]        # add --yes to actually delete
+```
+The library archives the self-contained HTML only (never stems/audio). This is separate from the
+in-widget **Library** panel (the cross-version catalog rendered at the bottom of each widget).
+
+---
+
 ## Step 0 — Welcome + collect files
 
 Greet the user warmly and frame the inputs as tiers — every tier works, more just

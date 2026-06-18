@@ -30,3 +30,6 @@ stems/
 
 # Internal dev/resume state (not part of the released skill)
 NEXT_STEPS.md
+
+# Internal working agreement (dev process, not the released skill)
+PLAYBOOK.md

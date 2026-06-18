@@ -5,6 +5,112 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.6.5] — 2026-06-18
+
+### Added
+- **Global widget library** (`scripts/library.py`). One place that collects every rendered
+  widget across projects, at `~/.track-coach/library/` (override `$TRACK_COACH_LIBRARY`):
+  `widgets/<track>__<version>__<stamp>.html` + `index.json`. `build` now **deposits**
+  automatically (best-effort; `--no-deposit` to skip). Subcommands: `path`, `list [--track]`,
+  `clean` with `--all/--yes`, `--older-than DAYS`, `--keep-per-track N`, `--track`, `--missing`,
+  `--dry-run`. Archives the self-contained HTML only (never stems/audio).
+- Tests (44 → 53): `tests/test_library.py` — canonical naming/sanitize, `upsert` dedupe, the pure
+  `clean_plan` policy (all/older-than/keep-per-track/missing + track scope), and a deposit
+  round-trip (copies the widget, indexes it, re-deposit upserts not duplicates).
+
+## [0.6.4] — 2026-06-18
+
+### Changed
+- **"All analyses" panel renamed to "Library"** (`cat_title` + hint) — the cross-version index at
+  the bottom now reads "Library — every track & version (N)". First step toward the planned global
+  library; in-widget behaviour unchanged.
+
+## [0.6.3] — 2026-06-18
+
+### Fixed
+- **Re-analysing a track no longer drops the Producer's read.** A fresh `analyze` makes a new
+  dated run dir; the hand-written `narrative.md` (+ title/verdict) from the prior run used to
+  vanish — the root cause of "the producer view is gone". `analyze` now inherits the most recent
+  sibling run's narrative + title + verdict into the new run (without clobbering anything the new
+  run already set). Pure picker `pick_inherit_source()` + `inherit_prior_read()`.
+- **Quick runs no longer mislabelled "deep mode".** The header subtitle was the hardcoded string
+  "deep mode" for every run. The widget now carries `mode` and shows "quick read" for quick runs,
+  "deep mode" for full. Verified in the rendered DOM (Fragile → "quick read", SM → "deep mode").
+
+### Added
+- Tests (37 → 44): `pick_inherit_source`/`inherit_prior_read` carry-forward (incl. the exact
+  "new run, prior holds the read" incident and a no-clobber case), and a contract test that the
+  header subtitle branches on `mode` rather than hardcoding "deep mode".
+
+## [0.6.2] — 2026-06-18
+
+### Changed
+- **Simple view stops hiding substance.** Previously Simple hid the stem player, the Producer's
+  read and capped recommendations to 3 — they read as "things vanished". Now Simple shows the
+  player, the Producer's read and **all** recommendation cards; the ONLY panel gated to Detailed
+  is the deep "Evidence & detail" drawer.
+
+### Fixed
+- **Rebuilds no longer drop the title / verdict / narrative.** `build` resolved title only from
+  its flag, so a bare rebuild silently replaced a curated title (e.g. "Total Reboot — Shared
+  Memories (2026)") with the raw folder name. Title + verdict are now persisted to `run_meta.json`
+  and reused, and narrative defaults to `<run>/narrative.md`. Logic extracted to the pure
+  `resolve_build_inputs()` (flag > run_meta > derived/auto).
+
+### Added
+- **Regression tests for exactly what kept breaking** (22 → 37):
+  - `tests/test_widget_contract.py` — the player, Producer's read and recs must exist in the
+    template and must NOT be hidden in Simple (Simple may gate only `#evidence`).
+  - `tests/test_build_inputs.py` — a bare `build` reuses persisted title/verdict and picks up
+    `narrative.md`; explicit flags still win.
+- A grounded `narrative.md` for the Shared Memories run (it had none → its Producer's read was
+  empty); the read is now populated.
+
+## [0.6.1] — 2026-06-18
+
+### Changed
+- **One structure bar.** The Track-Story used to stack two rows above the power curve that
+  clashed on A/B/C: a self-similarity "Form / repeats" lane on top and the named scenes
+  (Intro/Build/Drop) below, each on its own letter+colour scheme. They're now a single bar —
+  the named scenes are the only row, and each scene is **coloured and lettered by the
+  self-similarity recurrence cluster that dominates it** (max time-overlap). A returning part
+  therefore shares one letter+colour across the track (e.g. `B` green at the build *and* again
+  at the outro), repeating parts are outlined, and a `lead: <instrument>` sublabel shows when
+  the lead actually varies between sections. One scheme, not two.
+
+### Removed
+- The standalone Form/repeats lane (`#formWrap` + its canvas/JS, the `.formlabel`/`#formWrap`
+  CSS, the now-dead `tcol`/`SC` intensity-colour helpers, and the `form_label` string) — its
+  information lives in the merged bar now.
+
+### Internal
+- Merge happens in `build_html` (Python) right after per-section leads are attached and before
+  recommendations, so `story.scenes[].letter/lead` carry the cluster; the story-canvas JS just
+  recolours the ribbon (`SPAL` palette, `sreps`, `sceneLeadVaries`, ribbon height `RIB` 24→30).
+- Verified headless in both modes: full (Shared Memories, with .als → real lead labels) and
+  quick (Fragile, no .als/stems → no lead sublabels, as expected). 22 tests still pass.
+
+## [0.6.0] — 2026-06-18
+
+Architecture: move the brittle pipeline orchestration out of SKILL.md prose and into one
+deterministic CLI entrypoint. The app measures and renders; the skill decides and interprets.
+
+### Added
+- **`scripts/track_analyzer.py` — one-command engine.** `analyze` runs the whole deterministic
+  flow (run dir → fast analysis → .als → Demucs → masking/maps/rhythm/drums/notes/web-stems →
+  first build + catalog); `build` cheaply rebuilds an existing run to inject the agent's read +
+  the cross-version catalog. Stdlib-only, shells every heavy step through `tc_uv.sh`, feeds one
+  `$STEMS` dir to every deep step (the `stems/` vs `stems_6s/` path-class bug can't recur), and
+  supports `--dry-run`.
+- **`tests/test_pipeline_plan.py` — first tests.** Assert the orchestration *plan* via `--dry-run`
+  (no audio/deps/Demucs): deep steps share one stems dir, web-stems is always produced in full
+  mode, quick mode never touches Demucs, run-dir first / build last. Run: `python3 -m unittest
+  discover tests`.
+
+### Changed
+- **SKILL.md now drives the pipeline through the entrypoint** instead of hand-running each step;
+  the per-step sections remain as methodology reference.
+
 ## [0.5.20] — 2026-06-18
 
 ### Changed

@@ -6,11 +6,11 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not "energy is low," but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early / unstable (`v0.5.19`). macOS-first. Built and refined hands-on.
+> **Status:** early / unstable (`v0.6.5`). macOS-first. Built and refined hands-on.
 
 ![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
 
-**Two views, one toggle.** It opens calm in **Simple** — a one-line verdict, the vitals spec-sheet, and a colour-coded form map (repeated sections share a colour) over the power curve broken into its driving lanes: energy, brightness, density, modulation, stereo width. Flip to **Detailed** for the synced stem player, the full Producer's read, and the evidence behind every call.
+**Two views, one toggle.** It opens calm in **Simple** — the one-line verdict, the vitals spec-sheet, a colour-coded **structure bar** (a returning section keeps its colour *and* its letter, so reprises are obvious) over the power curve broken into its driving lanes (energy, brightness, density, modulation, stereo width), the synced multi-stem player, the Producer's read, and ranked feedback. Flip to **Detailed** to also open the **Evidence drawer** — every raw measurement behind the calls.
 
 ---
 
@@ -41,8 +41,9 @@ Everything runs by default — no need to ask for "deep mode":
 - **Drum-hit breakdown** — kick / snare / hat detection and timing
 - **Note transcription** — basic-pitch on the melodic content
 - **Ableton `.als` parsing** — tracks, MIDI + audio clips, automation envelopes, locators
-- **Intention vs. result** — overlays your automation against what actually happened in the audio
+- **Intention vs. result** — reads your automation against what actually happened in the audio (e.g. a cutoff that stops moving while brightness keeps rising), surfaced as a recommendation
 - **Demucs-stem ↔ real-track map** — connects separated stems back to your project's tracks
+- **Self-similarity / form** — folds repeated sections into one colour-coded structure bar (a returning part keeps its colour + letter)
 
 ---
 
@@ -52,19 +53,15 @@ Everything runs by default — no need to ask for "deep mode":
 |---|---|
 | ![the whole song decomposed into stem lanes under one transport](docs/stems.png) | ![ranked, colour-coded recommendations](docs/recommendations.png) |
 
-<sub>**Left — the song decomposed:** the form map and power curve over its driving lanes, then every stem on its own lane under one transport (play / seek / mute / solo, playhead linked to every chart). **Right — concrete feedback:** the few things that stood out, most important first — red = worth fixing, green = working, yellow = a creative choice. Specific and timestamped, never "energy is low."</sub>
+<sub>**Left — the song decomposed:** the colour-coded structure bar and power curve over its driving lanes, then every stem on its own lane under one transport (play / seek / mute / solo, playhead linked to every chart). **Right — concrete feedback:** the few things that stood out, most important first — red = worth fixing, green = working, yellow = a creative choice. Specific and timestamped, never "energy is low."</sub>
 
 ### It reads your project, not just the audio
 
-Point it at your Ableton set and it stops guessing. The arrangement and automation come straight from the `.als` — the ground truth that stem separation can only approximate.
+Point it at your Ableton set and it stops guessing. The arrangement comes straight from the `.als` — the ground truth that stem separation can only approximate.
 
 ![The real arrangement from the .als — every project track, MIDI and audio, aligned to the audio](docs/arrangement.png)
 
 <sub>**Arrangement, from the project:** which real tracks actually play, and when. Solid blocks = MIDI (brightness = note density), thin strips = audio clips, labelled lines = locators — all aligned to the rendered audio.</sub>
-
-![Automation envelopes from the project — intention vs. result](docs/automation.png)
-
-<sub>**Intention vs. result:** your real automation curves (filter, gain, pitch, sends…), each scaled to its own range. Read them against the energy/brightness arc — where a curve flattens but the sound keeps moving, or moves while the sound sits still, your intention and the result disagree.</sub>
 
 ### Evidence & detail
 
@@ -104,12 +101,20 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.5.19** (latest) — the Producer's read is rebuilt for scanning (calm body, clear section
-headers and dividers, real bullet lists, full width); the header now leads with the **track
-name**; analyses get **self-identifying, versioned filenames** (no more invented versions); the
-widget **always opens in the calm Simple view**; a missing-stem-player bug in deep runs is fixed;
-and every pipeline step now goes through a **shell-agnostic runner** (`scripts/tc_uv.sh`) so it
-works the same under bash or zsh.
+**v0.6** (latest) — a substantial re-architecture:
+
+- **One command runs the pipeline.** `track_analyzer.py analyze` measures (audio → `.als` → stems →
+  masking/rhythm/drums/notes), then `build` renders the widget — a strict *measure → interpret →
+  render* flow, so the read is written from real numbers, never fabricated.
+- **One structure bar.** The two clashing form/scene rows are merged: named scenes (Intro/Build/Drop)
+  coloured + lettered by the section that recurs, so a returning part shares its colour and letter.
+- **Simple shows the substance.** The stem player, the Producer's read and all recommendations now
+  live in the calm Simple view too; Detailed only adds the raw evidence drawer.
+- **Nothing gets lost on rebuild.** Re-analysing a track carries its Producer's read / title / verdict
+  forward; quick runs are labelled "quick read" (not "deep mode").
+- **Global library.** Every build deposits its self-contained widget into `~/.track-coach/library/`;
+  `library.py list` / `clean` browse and prune across projects.
+- Backed by a **53-test suite** that guards against panels disappearing and reads being dropped.
 
 → **Full history in [CHANGELOG.md](CHANGELOG.md).**
 
@@ -120,7 +125,9 @@ works the same under bash or zsh.
 | | |
 |---|---|
 | `SKILL.md` | Orchestration — how Claude runs the pipeline and writes the read-out |
-| `scripts/` | The analysis engine (Python): `analyze_core`, `masking`, `separate`, `parse_als`, `build_widget`, … plus `tc_uv.sh`, the shell-agnostic dependency-pinned runner every step goes through |
+| `scripts/track_analyzer.py` | The one-command engine — `analyze` (measure) and `build` (render once), driving every step below |
+| `scripts/` | The analysis units (Python): `analyze_core`, `masking`, `separate`, `parse_als`, `self_similarity`, `build_widget`, … plus `library.py` (global widget library) and `tc_uv.sh`, the shell-agnostic dependency-pinned runner every step goes through |
+| `tests/` | Dependency-free regression suite (`python3 -m unittest discover tests`) — pipeline plan, offset, build-input preservation, widget contract, library |
 | `references/` | `methodology.md` (the conceptual framework), `interpretation.md` (numeric ranges), troubleshooting |
 | `docs/` | Screenshots |
 | `setup.sh` · `requirements.txt` | Environment setup, pinned deps |
