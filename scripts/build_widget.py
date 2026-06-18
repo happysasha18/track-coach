@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.5.19"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.5.20"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1170,14 +1170,14 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .seqkey .chip{display:inline-flex;align-items:center}
 .seqkey .ms{display:inline-block;min-width:13px;height:13px;line-height:13px;text-align:center;
  border-radius:3px;font-size:8px;font-weight:700;color:#0c0e14;margin-right:4px}
-/* collapsed "evidence & detail" drawer for the power-user panels */
-.more{margin:22px 0 0;border-top:1px solid var(--line);padding-top:6px}
-.more>summary{cursor:pointer;list-style:none;color:var(--muted);font-size:13px;font-weight:600;
- padding:10px 2px;user-select:none}
+/* collapsed "evidence & detail" drawer — same framed-card style as the catalog below */
+.more{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+ padding:14px 20px 18px;margin:24px 0 0}
+.more>summary{cursor:pointer;list-style:none;color:var(--ink);font-size:15px;font-weight:620;
+ padding:6px 0;user-select:none}
 .more>summary::-webkit-details-marker{display:none}
-.more>summary::before{content:"▸ ";color:var(--accent,#a78bfa)}
+.more>summary::before{content:"▸ ";color:var(--wob)}
 .more[open]>summary::before{content:"▾ "}
-.more[open]>summary{color:var(--ink)}
 /* CATALOG — all tracks & versions, collapsible. Lives at the very bottom, both views. */
 .catalog{background:var(--panel);border:1px solid var(--line);border-radius:18px;
  padding:14px 20px 18px;margin:24px 0 0}

@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.5.20] — 2026-06-18
+
+### Changed
+- **The two bottom collapsibles now share one style.** The "Evidence & detail" drawer was bare
+  (just a top-border line and small muted text) while "All analyses — every track & version" sat
+  in a rounded framed card. The evidence drawer (`.more`) now uses the same framed-card style as
+  the catalog — panel background, border, 18px radius, white 15px summary, purple ▸ marker — so
+  both fold-outs match each other and the rest of the panels.
+
 ## [0.5.19] — 2026-06-17
 
 Producer-read readability, header/branding, file naming, default view, and a shell-safe
