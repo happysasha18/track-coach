@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.6.10"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.6.11"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1070,9 +1070,11 @@ body.simple #evidence{display:none!important}
    "в симпл не должно быть этих стемов"). The transport (play/seek/time) stays usable in both;
    only the stem-lane canvas + its key are hidden in Simple. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
-/* The callout cards under the graph: Simple shows the first 3 (calm); Detailed shows them all
-   (Sasha: "карточки под графиком, в детальном больше"). */
-body.simple #storyCues .cue:nth-of-type(n+4){display:none!important}
+/* Recommendation cards now sit directly under the graph (the cards the timeline triangles
+   point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
+   Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
+   just however many recs are timecoded. (Sasha 2026-06-19.) */
+body.simple #recs .rec:not([data-t]){display:none!important}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1157,21 +1159,8 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .pbtn.pmini{padding:7px 10px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-size:13px}
 .pbtn.pmini:hover{background:var(--panel2);color:var(--ink)}
 .ptime{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
-/* timeline callouts ("comments"): triangle cues over the scenes + a duplicated list below */
-#storyCues{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:760px){#storyCues{grid-template-columns:1fr}}
-#storyCues .cue{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);
- border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:10px;padding:10px 12px;cursor:pointer;transition:background .15s}
-#storyCues .cue:hover,#storyCues .cue.flash{background:rgba(167,139,250,.12)}
-#storyCues .cue.crit{border-left-color:var(--bad)}#storyCues .cue.do{border-left-color:var(--good)}#storyCues .cue.concept{border-left-color:var(--bright)}
-#storyCues .cuelet{flex:none;width:20px;height:20px;border-radius:6px;background:var(--wob);color:#0c0e14;
- font-weight:800;font-size:11px;text-align:center;line-height:20px;text-transform:uppercase}
-#storyCues .cue.crit .cuelet{background:var(--bad)}#storyCues .cue.do .cuelet{background:var(--good)}#storyCues .cue.concept .cuelet{background:var(--bright)}
-#storyCues .cuebody{flex:1;min-width:0}
-#storyCues .cuewhen{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.3px}
-#storyCues .cueh{font-size:12.8px;font-weight:640;margin:2px 0 0}
-#storyCues .cuep{font-size:12px;color:#cfd6e6;margin:4px 0 0}
-.cueshdr{grid-column:1/-1;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
+/* timeline callouts ("comments"): triangle cues over the scenes (canvas-drawn). The cards they
+   point to live in the Recommendations panel under the graph — no separate list here any more. */
 .ctip{position:fixed;z-index:60;pointer-events:none;display:none;background:rgba(12,14,20,.96);
  border:1px solid var(--line);border-radius:9px;padding:7px 11px;font-size:12.5px;color:var(--ink);
  line-height:1.55;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
@@ -1267,21 +1256,22 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
   <p class="hint" id="playNote" style="margin:10px 0 0"></p>
   <div id="playAudios" style="display:none"></div>
  </div>
- <div id="storyCues"></div>
 </div>
 
-<!-- 2. THE READ: the diagnosis in prose, sits under the visual. -->
-<div class="panel read" id="readPanel" style="display:none">
- <h2 id="readTitle"></h2>
- <div id="readBody"></div>
-</div>
-
-<!-- 3. RECOMMENDATIONS: what to change. Some are time-bound (a moment in the
-     track), some are global — shown visually, not just by a click. -->
+<!-- 2. RECOMMENDATIONS sit DIRECTLY under the graph — these ARE the cards the timeline
+     triangles point to (no separate callout list on the graph any more). Each timecoded
+     rec has a matching triangle above; clicking a triangle flashes its card here. Simple
+     shows ONLY the timecoded recs (the ones with a triangle); Detailed shows all. -->
 <div class="panel" id="recsPanel">
  <h2 id="recsTitle"></h2><p class="hint" id="recsHint"></p>
  <div class="legend" id="recLegend" style="margin-bottom:14px"></div>
  <div class="recs" id="recs"></div>
+</div>
+
+<!-- 3. THE READ: the diagnosis in prose, the Producer's view. -->
+<div class="panel read" id="readPanel" style="display:none">
+ <h2 id="readTitle"></h2>
+ <div id="readBody"></div>
 </div>
 
 <!-- Tonal balance — pulled OUT of the Evidence drawer (Sasha: "он прикольный") so it's always
@@ -1348,10 +1338,7 @@ const CUELET="abcdefghijklmnopqrstuvwxyz";
 const CUES=(D.recs||[]).map((r,i)=>({r,i})).filter(o=>o.r.t!=null)
   .sort((a,b)=>a.r.t-b.r.t).map((o,k)=>({r:o.r,idx:o.i,t:+o.r.t,letter:CUELET[k]||"•",cls:o.r.cls||""}));
 const cueByIdx={};CUES.forEach(c=>{cueByIdx[c.idx]=c;});
-function flashCue(letter){const el=document.querySelector('#storyCues .cue[data-let="'+letter+'"]');
- if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
- setTimeout(()=>el.classList.remove("flash"),1400);}
-// flash + scroll to the FULL recommendation card at the bottom (the single place the
+// flash + scroll to the FULL recommendation card (the single place the
 // paragraph + "→ Try" fix live). Used when a timeline triangle / cue-index item is tapped.
 function flashRec(letter){if(!letter)return;const el=document.querySelector('#recs .rec[data-let="'+letter+'"]');
  if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
@@ -1627,22 +1614,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  cv.addEventListener("mouseleave",()=>{draw();hideTip();cv.style.cursor="default";});
  cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
   const cue=cueAt(mx,my);
-  if(cue){if(window.__seek)window.__seek(cue.t);flashCue(cue.letter);return;}
+  if(cue){if(window.__seek)window.__seek(cue.t);flashRec(cue.letter);return;}
   const t=Math.max(0,Math.min(ST.dur,(mx-PADL)/(W-PADL-PADR)*ST.dur));if(window.__seek)window.__seek(t);});
  PH.push(t=>draw(xOf(t)));
- // COMPACT INDEX under the player — letter · when · one-line headline only. It is a
- // navigational index into the timeline, NOT a second copy of the recs: the full text
- // (paragraph + "→ Try" fix) lives ONCE, in Recommendations below. Tap → seek + flash
- // the matching full card down there. (Touch-friendly; no hover needed.)
- (function(){const box=document.getElementById("storyCues");if(!box)return;
-  if(!CUES.length){box.style.display="none";return;}
-  box.innerHTML=CUES.map(c=>
-    `<div class="cue ${c.cls}" data-let="${c.letter}" data-t="${c.t}">`+
-     `<div class="cuelet">${c.letter}</div><div class="cuebody">`+
-     `<div class="cuewhen">${c.r.when}</div><div class="cueh">${c.r.h}</div>`+
-     `</div></div>`).join("");
-  box.querySelectorAll(".cue").forEach(el=>el.onclick=()=>{const t=+el.dataset.t;
-   if(window.__seek)window.__seek(t);flashRec(el.dataset.let);});})();
  window.addEventListener("resize",resize);resize();
 })();
 

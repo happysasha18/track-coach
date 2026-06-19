@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.6.11] — 2026-06-19
+
+### Changed
+- **Recommendations now sit directly under the graph**, and the separate callout list under the
+  graph (`#storyCues`) is gone — the timeline triangles point straight at the recommendation cards.
+  New panel order: graph → Recommendations → Producer's read.
+- **Simple vs Detailed for the cards is now timecoded-vs-all** (reverses [0.6.10]'s fixed cap):
+  Simple shows only the recs that have a triangle on the graph; Detailed shows all. The count is
+  per-track (e.g. Shared Memories = 2 timecoded of 5).
+- Clicking a timeline triangle flashes its card in the Recommendations panel.
+- Tests 61 → 61 (two `#storyCues`-cap tests replaced by a timecoded-recs contract test).
+
 ## [0.6.10] — 2026-06-19
 
 ### Changed

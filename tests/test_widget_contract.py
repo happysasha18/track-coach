@@ -60,17 +60,22 @@ class SimpleViewContract(unittest.TestCase):
 
     def test_simple_gating_is_a_small_known_set(self):
         # What Simple touches via display:none is a SMALL fixed set: the evidence drawer; the demux
-        # stem viz (#stemlanes + #seqKey, Detailed-only per Sasha L982); and a CAP on the callout
-        # cards (#storyCues shows the first 3 in Simple, all in Detailed — Sasha "в детальном больше").
-        # It must NOT creep to hide the transport, the read, or the recs panel.
+        # stem viz (#stemlanes + #seqKey, Detailed-only per Sasha L982); and the recs panel filtered
+        # to ONLY the timecoded cards (#recs — Simple shows the ones with a triangle on the graph,
+        # Detailed shows all). It must NOT creep to hide the transport, the read, or the recs panel
+        # wholesale. (Sasha 2026-06-19: recs moved under the graph, callout list removed.)
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE_SELECTORS))
-        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey", "storyCues"},
+        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey", "recs"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
 
-    def test_callout_cards_capped_in_simple_not_detailed(self):
-        # the cap must be Simple-only and target the cards under the graph
-        self.assertRegex(TPL, r"body\.simple\s+#storyCues\s+\.cue:nth-of-type",
-                         "the callout cards are not capped in Simple")
+    def test_simple_shows_only_timecoded_recs(self):
+        # Recs sit under the graph and are the cards the timeline triangles point to. Simple shows
+        # ONLY the timecoded ones (those with a triangle); Detailed shows all. The gate targets the
+        # global (non-data-t) cards, never a blanket #recs hide.
+        self.assertRegex(TPL, r"body\.simple\s+#recs\s+\.rec:not\(\[data-t\]\)",
+                         "Simple must hide ONLY the non-timecoded recs, not all of them")
+        self.assertNotIn("storyCues", TPL,
+                         "the separate callout list under the graph should be gone")
 
     def test_player_transport_visible_in_simple(self):
         # Sasha 2026-06-19 "плеер в обоих норм": only the stem-lane viz is gated, never the transport.
