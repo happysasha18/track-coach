@@ -63,6 +63,14 @@ Point it at your Ableton set and it stops guessing. The arrangement comes straig
 
 <sub>**Arrangement, from the project:** which real tracks actually play, and when. Solid blocks = MIDI (brightness = note density), thin strips = audio clips, labelled lines = locators — all aligned to the rendered audio.</sub>
 
+### Intention vs. result
+
+Your automation is what you *meant* to happen; the audio is what *did*. Track Coach plots the real envelopes from the `.als` — filter, gain, pitch, sends — each scaled to its own range, against the measured brightness (the faint dashed line in every lane). Where a curve flattens but the sound keeps moving, intention and result have drifted apart.
+
+![Automation envelopes from the project, each scaled to its own range, with the measured brightness arc ghosted behind every lane](docs/automation.png)
+
+<sub>**The "intention" layer:** real automation envelopes aligned to the audio, with the Brightness arc ghosted into each lane for direct comparison. It's where the *"the cutoff stops moving at 2:45 but brightness keeps rising to 3:10"* recommendation comes from — now you can see it, not just read it.</sub>
+
 ### Evidence & detail
 
 Collapsed by default at the bottom of the Detailed view, one drawer holds everything it measured — the receipts behind every call above:

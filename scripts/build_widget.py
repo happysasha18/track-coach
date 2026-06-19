@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.6.5"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.6.9"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -62,8 +62,10 @@ STRINGS = {
         "rhy_rate": "{r} hits/s", "rhy_tight": "{ms} ms off-grid", "rhy_sync": "{p}% off-beat",
         "rhy_sep": "Separation confidence", "rhy_leak": "Leakage (stems rising & falling together)",
         "rhy_noleak": "No significant bleed between stems.",
-        "note_title": "Transcribed notes — “{label}”",
+        "note_title": "Transcribed notes — {label}",
         "note_hint": "Pitches pulled straight from the audio of this stem (basic-pitch), not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
+        "note_label_other": "the melodic layer (synths / keys / pads)",
+        "note_hint_other": " This is Demucs’s “other” stem — everything that isn’t drums, bass or vocals, so it’s where the track’s chords and lead lines live.",
         "drum_title": "Drum breakdown — kick / snare / hat",
         "drum_hint": "Every hit in the drums stem, classified by spectral shape (not separated into audio). Bar height = hits per window. Kicks {k} · snares {s} · hats {h}.",
         "stem_title": "Stem frequency map",
@@ -1064,6 +1066,10 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
    Detailed adds ONE thing on top: the raw "Evidence & detail" drawer. That's the only panel
    gated by Simple now. */
 body.simple #evidence{display:none!important}
+/* Demux / per-stem visualisation stays in Detailed only — Sasha, repeatedly (transcript L982:
+   "в симпл не должно быть этих стемов"). The transport (play/seek/time) stays usable in both;
+   only the stem-lane canvas + its key are hidden in Simple. */
+body.simple #stemlanes,body.simple #seqKey{display:none!important}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1276,7 +1282,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 </div>
 
 <details class="more" id="evidence">
- <summary>Evidence &amp; detail — tonal balance, the project arrangement, stem↔track map, rhythm and transcribed notes (click to open)</summary>
+ <summary>Evidence &amp; detail — tonal balance, the project arrangement, stem↔track map, rhythm and transcribed notes</summary>
 
  <div class="panel" id="tonalPanel">
   <h2>Tonal balance — average spectrum of the mix</h2>
@@ -1289,6 +1295,12 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
   <div class="legend" id="arrLegend"></div>
   <canvas id="arr" height="300"></canvas>
   <div class="readout" id="arrReadout"></div>
+ </div>
+
+ <div class="panel" id="autoPanel">
+  <h2 id="autoTitle"></h2><p class="hint" id="autoHint"></p>
+  <canvas id="auto" height="220"></canvas>
+  <div class="readout" id="autoReadout"></div>
  </div>
 
  <div class="panel" id="mapPanel">
@@ -1533,12 +1545,19 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // colour for a callout cue/triangle by its rec class (crit/do/concept)
  const cueCol=cls=>cls==="crit"?getCss("--bad"):cls==="do"?getCss("--good"):cls==="concept"?getCss("--bright"):getCss("--wob");
  const fams=ST.families||[],nf=fams.length,bins=ST.bins,iv=ST.intensity,nb=bins.length;
- // The Track-story chart is the showpiece — show ALL component lanes in BOTH views.
- // (Regression in 0.5.13: Simple filtered to in_power only, gutting the rich layers from
- //  the default view. Simple stays calm by hiding the *other* heavy panels, not this graph.)
- const ALLCOMPS=ST.components||[],compLaneH=20;
+ // The Track-story graph REACTS to the view toggle (Sasha's call, 2026-06-19; restores the
+ // 0.5.13 behaviour that 0.5.19 wrongly removed — see JOURNAL.md). Simple = the 3 power-driving
+ // lanes only (energy/brightness/density = in_power); Detailed = all lanes (+modulation, +stereo
+ // width). apply() dispatches a resize on toggle, so resize()→pickComps() relayouts live.
+ const ALLCOMPS=ST.components||[];let compLaneH=20;
+ // Simple = the 2 lanes Sasha named (energy + brightness, transcript L80), drawn FULL-SIZE;
+ // Detailed = all lanes at the compact small-multiple height. (Sasha 2026-06-19: "в кратком эти
+ // же две но полноразмерные, а в детальном все 5".)
+ const SIMPLE_LANES=["energy","brightness"];
  let comps=ALLCOMPS,ncomp=comps.length;
- const pickComps=()=>{comps=ALLCOMPS;ncomp=comps.length;};
+ const pickComps=()=>{const simple=document.body.classList.contains("simple");
+   comps=simple?ALLCOMPS.filter(c=>SIMPLE_LANES.includes(c.key)):ALLCOMPS;
+   ncomp=comps.length;compLaneH=simple?40:20;};
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
  let famTop=compTop+ncomp*compLaneH+gap;
  let W,H;const xOf=t=>PADL+(t/ST.dur)*(W-PADL-PADR);
@@ -1612,8 +1631,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // the matching full card down there. (Touch-friendly; no hover needed.)
  (function(){const box=document.getElementById("storyCues");if(!box)return;
   if(!CUES.length){box.style.display="none";return;}
-  box.innerHTML=`<div class="cueshdr">${T.cues_title||"Callouts on the timeline — tap one to jump there and read it below"}</div>`+
-   CUES.map(c=>
+  box.innerHTML=CUES.map(c=>
     `<div class="cue ${c.cls}" data-let="${c.letter}" data-t="${c.t}">`+
      `<div class="cuelet">${c.letter}</div><div class="cuebody">`+
      `<div class="cuewhen">${c.r.when}</div><div class="cueh">${c.r.h}</div>`+
@@ -1700,9 +1718,59 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  window.addEventListener("resize",resize);resize();
 })();
 
-// Automation small-multiples + stem frequency heatmap panels were cut in the declutter
-// (v0.5.2): the sequencer under Track Story now carries frequency-as-colour, and raw
-// automation curves weren't actionable. Their data still rides in the payload, unused.
+// ── Automation "intention vs result": real project envelopes (filter/gain/pitch/sends)
+// as small-multiple lanes, each scaled to its own range, on the SAME time axis as the
+// arrangement. A faint Brightness ghost rides in every lane so a flat automation against
+// a still-rising sound reads at a glance — the marquee "intention and result disagree".
+// (Restored in 0.6.6; the panel was dropped in the 0.6 declutter though its data stayed
+//  in the payload. The stem-frequency heatmap remains folded into the sequencer colour.)
+(function(){
+ const A=ALS,P=document.getElementById("autoPanel");
+ if(!A||!A.automations||!A.automations.length){if(P)P.style.display="none";return;}
+ const AU=A.automations;
+ document.getElementById("autoTitle").textContent=T.auto_title;
+ document.getElementById("autoHint").textContent=T.auto_hint;
+ // Brightness reference (normalised 0..1 over story bins) — the "result" the ear hears.
+ const SB=(D.story&&D.story.bins)||null;
+ const bComp=((D.story&&D.story.components)||[]).find(c=>c.key==="brightness");
+ const bref=(SB&&bComp&&bComp.vals&&bComp.vals.length===SB.length)?bComp.vals:null;
+ const cv=document.getElementById("auto"),ctx=cv.getContext("2d");
+ const PADL=140,PADR=14,PADT=14,PADB=24,laneGap=10;const n=AU.length;
+ let W,H,laneH;const xOf=t=>PADL+(t/D.dur)*(W-PADL-PADR);
+ // step lookup of an envelope value at time t (envelopes hold between points)
+ const valAt=(pts,t)=>{let v=pts[0][1];for(const p of pts){if(p[0]<=t)v=p[1];else break;}return v;};
+ const yIn=(top,v,lo,hi)=>top+laneH-3-((hi>lo?(v-lo)/(hi-lo):0))*(laneH-6);
+ function resize(){W=cv.clientWidth;laneH=54;H=PADT+PADB+n*(laneH+laneGap);cv.style.height=H+"px";
+  cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw();}
+ function draw(hx){ctx.clearRect(0,0,W,H);
+  AU.forEach((au,i)=>{const top=PADT+i*(laneH+laneGap),col=au.fam||"#8b94a8";
+   // lane baseline + label
+   ctx.strokeStyle=getCss("--line");ctx.globalAlpha=.5;ctx.beginPath();ctx.moveTo(PADL,top+laneH-2);ctx.lineTo(W-PADR,top+laneH-2);ctx.stroke();ctx.globalAlpha=1;
+   ctx.fillStyle=getCss("--muted");ctx.font="600 10px sans-serif";ctx.textAlign="right";ctx.textBaseline="middle";
+   const lbl=au.label.length>26?au.label.slice(0,25)+"…":au.label;
+   ctx.fillText(lbl,PADL-8,top+laneH/2-4);ctx.textBaseline="alphabetic";
+   // faint Brightness ghost (the "result") for direct comparison
+   if(bref){ctx.strokeStyle="#ffd166";ctx.globalAlpha=.28;ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();
+    SB.forEach((t,j)=>{const x=xOf(t),y=top+laneH-3-bref[j]*(laneH-6);j?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;}
+   // the automation envelope itself (the "intention"), scaled to its own range
+   ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.beginPath();
+   au.pts.forEach((p,j)=>{const x=xOf(p[0]),y=yIn(top,p[1],au.vmin,au.vmax);j?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();});
+  drawLocators(ctx,xOf,PADT,H-PADB,null);
+  ctx.fillStyle=getCss("--muted");ctx.font="10px sans-serif";ctx.textAlign="center";
+  for(let t=0;t<=D.dur;t+=60)ctx.fillText(fmtT(t),xOf(t),H-8);
+  if(hx!=null){ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,H-PADB);ctx.stroke();}}
+ cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect();
+  const t=Math.max(0,Math.min(D.dur,(e.clientX-r.left-PADL)/(W-PADL-PADR)*D.dur));draw(xOf(t));
+  const parts=AU.map(au=>`${au.label.split(" · ").pop()}: <b>${(+valAt(au.pts,t)).toFixed(2)}</b>`);
+  document.getElementById("autoReadout").innerHTML=`<span><b>${fmtT(t)}</b></span>`+parts.map(p=>`<span>${p}</span>`).join("");});
+ cv.addEventListener("mouseleave",()=>{draw();document.getElementById("autoReadout").textContent=T.hover;});
+ cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect();const t=Math.max(0,Math.min(D.dur,(e.clientX-r.left-PADL)/(W-PADL-PADR)*D.dur));if(window.__seek)window.__seek(t);});
+ PH.push(t=>draw(xOf(t)));
+ window.addEventListener("resize",resize);
+ const ev=document.getElementById("evidence");if(ev)ev.addEventListener("toggle",()=>{if(ev.open)resize();});
+ resize();
+})();
 
 (function(){
  const M=D.stemmap,P=document.getElementById("mapPanel");
@@ -1774,14 +1842,20 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const N=D.notes,P=document.getElementById("notePanel");
  if(!N||!N.notes||!N.notes.length){P.style.display="none";return;}
  const lo=N.pitch_min,hi=N.pitch_max,span=Math.max(1,hi-lo);
- document.getElementById("noteTitle").textContent=T.note_title.replace("{label}",N.label);
+ // "other" is the raw Demucs catch-all stem name — meaningless to a producer. Show a friendly
+ // label + explain what it actually is (where the melody/chords live). See note_label_other.
+ const nlabel=N.label==="other"?(T.note_label_other||N.label):N.label;
+ const nextra=N.label==="other"?(T.note_hint_other||""):"";
+ document.getElementById("noteTitle").textContent=T.note_title.replace("{label}",nlabel);
  document.getElementById("noteHint").textContent=T.note_hint
-  .replace("{label}",N.label).replace("{lo}",noteName(lo)).replace("{hi}",noteName(hi)).replace("{n}",N.n_notes);
+  .replace("{label}",nlabel).replace("{lo}",noteName(lo)).replace("{hi}",noteName(hi)).replace("{n}",N.n_notes)+nextra;
  function noteName(p){const NM=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];return NM[((p%12)+12)%12]+(Math.floor(p/12)-1);}
  const cv=document.getElementById("note"),ctx=cv.getContext("2d");
  const PADL=46,PADR=14,PADT=10,PADB=22;let W,H;const xOf=t=>PADL+(t/D.dur)*(W-PADL-PADR);
  const yOf=p=>PADT+(1-(p-lo)/span)*(H-PADT-PADB);
- function resize(){W=cv.clientWidth;H=cv.clientHeight;cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;
+ // Pin a fixed height (like the other canvases). Reading clientHeight back into cv.height with
+ // a width:100% canvas and no CSS height made the roll's height run away (260→…→900px). Set it.
+ function resize(){W=cv.clientWidth;H=260;cv.style.height=H+"px";cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;
   ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw();}
  function draw(hx){ctx.clearRect(0,0,W,H);
   // octave gridlines (C notes)

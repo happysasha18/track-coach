@@ -58,11 +58,61 @@ class SimpleViewContract(unittest.TestCase):
         self.assertNotRegex(TPL, r"body\.simple\s+#recs[^{]*nth-of-type",
                             "regression: recommendation cards are capped/hidden in Simple view")
 
-    def test_simple_only_gates_the_evidence_drawer(self):
-        # whatever Simple DOES hide, it must be only the deep evidence drawer
-        hidden = re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE_SELECTORS)
-        self.assertEqual(set(hidden), {"evidence"},
-                         f"Simple view hides unexpected panels: {sorted(set(hidden))}")
+    def test_simple_hides_only_evidence_and_the_demux_stems(self):
+        # What Simple may hide via CSS is a SMALL fixed set: the deep evidence drawer, plus the
+        # demux stem visualisation (#stemlanes + its #seqKey) — Detailed-only per Sasha (L982).
+        # It must NOT creep to hide the player transport, the read, the chips, or the recs.
+        # (The component-lane change is JS lane-filtering, not a panel hide, so it's not here.)
+        hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE_SELECTORS))
+        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey"},
+                         f"Simple view hides an unexpected set: {sorted(hidden)}")
+
+    def test_player_transport_visible_in_simple(self):
+        # Sasha 2026-06-19 "плеер в обоих норм": only the stem-lane viz is gated, never the transport.
+        for keep in ("#playBtn", "#playerControls"):
+            self.assertNotIn(keep, SIMPLE_HIDE_SELECTORS,
+                             f"regression: Simple hides the transport ({keep})")
+
+    def test_story_graph_reacts_to_the_toggle(self):
+        # Sasha's call (2026-06-19, JOURNAL.md): the Track-Story component lanes change with the view.
+        # Simple = the 2 named lanes (energy+brightness) drawn full-size; Detailed = all. The 0.5.14→
+        # 0.6 code flattened pickComps to "always ALLCOMPS", so the toggle did nothing to the graph.
+        self.assertIn('document.body.classList.contains("simple")', TPL,
+                      "pickComps must branch on the simple class")
+        self.assertIn("SIMPLE_LANES.includes(c.key)", TPL,
+                      "Simple must filter the graph to the named SIMPLE_LANES")
+        self.assertRegex(TPL, r'SIMPLE_LANES\s*=\s*\[\s*"energy"\s*,\s*"brightness"\s*\]',
+                         "Simple lanes must be energy + brightness")
+
+    def test_demux_stems_hidden_in_simple(self):
+        # Sasha, repeatedly (transcript L982): the per-stem demux visualisation must NOT show in
+        # Simple. The transport stays; only #stemlanes (+ its #seqKey) are gated.
+        self.assertRegex(TPL, r"body\.simple\s+#stemlanes",
+                         "regression: the demux stem visualisation is not hidden in Simple")
+
+
+class AutomationPanel(unittest.TestCase):
+    """The 'intention vs result' automation chart was dropped in the 0.6 declutter while its
+    data kept riding in the payload (a silent regression). Guard that it's wired back."""
+
+    def test_automation_panel_present_in_template(self):
+        for el in ('id="autoPanel"', 'id="auto"', 'id="autoTitle"', 'id="autoHint"'):
+            self.assertIn(el, TPL, f"automation panel lost the element: {el}")
+
+    def test_automation_is_actually_wired(self):
+        # the draw code must read the envelopes from the payload, not just declare an empty div
+        self.assertIn("A.automations", TPL,
+                      "automation chart has no data binding (ALS.automations) in the script")
+
+    def test_automation_strings_referenced(self):
+        for s in ("auto_title", "auto_hint"):
+            self.assertTrue(build_widget.STRINGS["ui"].get(s), f"missing the {s} string")
+            self.assertIn(s, TPL, f"JS doesn't reference the {s} string")
+
+    def test_automation_lives_inside_evidence_drawer(self):
+        # the panel sits in the deep drawer, so Simple gating it via #evidence is expected
+        self.assertLess(TPL.index('id="evidence"'), TPL.index('id="autoPanel"'),
+                        "automation panel must sit inside the Evidence drawer")
 
 
 class ModeLabel(unittest.TestCase):

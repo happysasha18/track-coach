@@ -5,6 +5,55 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.6.9] — 2026-06-19
+
+### Fixed
+- **Transcribed-notes panel rendered broken/empty.** Its canvas height ran away (260 → ~900px)
+  because `resize()` read `clientHeight` back into `cv.height` on a `width:100%` canvas with no CSS
+  height. Pinned a fixed 260px height like the other canvases — the piano roll (3354 notes here)
+  now draws correctly.
+- **"Transcribed notes — other" was meaningless.** "other" is Demucs's raw catch-all stem name.
+  Relabelled to **"the melodic layer (synths / keys / pads)"** with a hint explaining it's the
+  Demucs "other" stem (everything that isn't drums/bass/vocals — where chords & leads live).
+
+### Changed
+- Removed the verbose "Callouts on the timeline — tap a triangle…" header above the callout chips.
+- Removed "(click to open)" from the Evidence drawer summary (the ▸ marker already says it).
+
+## [0.6.8] — 2026-06-19
+
+### Changed
+- **View toggle, corrected to what Sasha actually asked for** (see JOURNAL): the **demux/per-stem
+  visualisation** (`#stemlanes` + its key) is now **Detailed-only** — hidden in Simple — while the
+  play/seek transport stays usable in both. The Track-Story component lanes: **Simple = 2 full-size
+  (Energy + Brightness), Detailed = all 5**. (0.6.7 had set 3/5 on a wrong reading of the history.)
+- Tests (58 → 60): `test_demux_stems_hidden_in_simple`, `test_player_transport_visible_in_simple`;
+  reworked the Simple-gating + graph-reacts contracts.
+
+## [0.6.7] — 2026-06-19
+
+### Changed
+- **The Track-Story graph reacts to the Simple/Detailed toggle again.** (Superseded by 0.6.8's
+  2/5 split.) One line in `pickComps` — restored the 0.5.13 behaviour the 0.6 refactor left flat.
+- Tests (57 → 58): `test_widget_contract.py::SimpleViewContract::test_story_graph_reacts_to_the_toggle`.
+- Started a per-project decision **`JOURNAL.md`** (engineering/design diary, with the WHY) — seeded
+  with the reconstructed Simple/Detailed history so intent isn't lost again.
+
+## [0.6.6] — 2026-06-19
+
+### Added
+- **Restored the "Intention vs result" automation chart** (regressed out in the 0.6 declutter
+  while its data kept riding in the payload). New `#autoPanel` in the Evidence drawer plots the
+  real project envelopes (`ALS.automations`, up to 8, filter/gain/pitch/sends prioritised) as
+  small-multiple lanes — each scaled to its own range, on the same time axis as the arrangement,
+  with locator gridlines, a shared playhead, and a per-time hover readout. The measured
+  **Brightness** arc is ghosted (faint dashed) into every lane so a flat automation against a
+  still-rising sound reads at a glance — the visual the existing `intention_result` rec describes.
+  Wires the dormant `auto_title`/`auto_hint` strings.
+- Tests (53 → 57): `tests/test_widget_contract.py::AutomationPanel` — panel + canvas present,
+  bound to `ALS.automations`, strings referenced, and nested inside the Evidence drawer.
+- Docs: regenerated `docs/automation.png`; restored the README "Intention vs. result" showcase.
+
 ## [0.6.5] — 2026-06-18
 
 ### Added
