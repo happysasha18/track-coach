@@ -58,14 +58,19 @@ class SimpleViewContract(unittest.TestCase):
         self.assertNotRegex(TPL, r"body\.simple\s+#recs[^{]*nth-of-type",
                             "regression: recommendation cards are capped/hidden in Simple view")
 
-    def test_simple_hides_only_evidence_and_the_demux_stems(self):
-        # What Simple may hide via CSS is a SMALL fixed set: the deep evidence drawer, plus the
-        # demux stem visualisation (#stemlanes + its #seqKey) — Detailed-only per Sasha (L982).
-        # It must NOT creep to hide the player transport, the read, the chips, or the recs.
-        # (The component-lane change is JS lane-filtering, not a panel hide, so it's not here.)
+    def test_simple_gating_is_a_small_known_set(self):
+        # What Simple touches via display:none is a SMALL fixed set: the evidence drawer; the demux
+        # stem viz (#stemlanes + #seqKey, Detailed-only per Sasha L982); and a CAP on the callout
+        # cards (#storyCues shows the first 3 in Simple, all in Detailed — Sasha "в детальном больше").
+        # It must NOT creep to hide the transport, the read, or the recs panel.
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE_SELECTORS))
-        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey"},
-                         f"Simple view hides an unexpected set: {sorted(hidden)}")
+        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey", "storyCues"},
+                         f"Simple view gates an unexpected set: {sorted(hidden)}")
+
+    def test_callout_cards_capped_in_simple_not_detailed(self):
+        # the cap must be Simple-only and target the cards under the graph
+        self.assertRegex(TPL, r"body\.simple\s+#storyCues\s+\.cue:nth-of-type",
+                         "the callout cards are not capped in Simple")
 
     def test_player_transport_visible_in_simple(self):
         # Sasha 2026-06-19 "плеер в обоих норм": only the stem-lane viz is gated, never the transport.

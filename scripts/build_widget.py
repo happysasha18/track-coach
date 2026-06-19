@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.6.9"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.6.10"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1070,6 +1070,9 @@ body.simple #evidence{display:none!important}
    "в симпл не должно быть этих стемов"). The transport (play/seek/time) stays usable in both;
    only the stem-lane canvas + its key are hidden in Simple. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
+/* The callout cards under the graph: Simple shows the first 3 (calm); Detailed shows them all
+   (Sasha: "карточки под графиком, в детальном больше"). */
+body.simple #storyCues .cue:nth-of-type(n+4){display:none!important}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1281,14 +1284,16 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
  <div class="recs" id="recs"></div>
 </div>
 
-<details class="more" id="evidence">
- <summary>Evidence &amp; detail — tonal balance, the project arrangement, stem↔track map, rhythm and transcribed notes</summary>
+<!-- Tonal balance — pulled OUT of the Evidence drawer (Sasha: "он прикольный") so it's always
+     visible, sitting last before the collapsible. -->
+<div class="panel" id="tonalPanel">
+ <h2>Tonal balance — average spectrum of the mix</h2>
+ <p class="hint">Each bar is one octave band's level across the whole track (0 dB = loudest band). A band that sticks out from its neighbours is a resonance (boxy/harsh); a dip is a hole (dull/thin).</p>
+ <canvas id="tonal" height="170"></canvas>
+</div>
 
- <div class="panel" id="tonalPanel">
-  <h2>Tonal balance — average spectrum of the mix</h2>
-  <p class="hint">Each bar is one octave band's level across the whole track (0 dB = loudest band). A band that sticks out from its neighbours is a resonance (boxy/harsh); a dip is a hole (dull/thin).</p>
-  <canvas id="tonal" height="170"></canvas>
- </div>
+<details class="more" id="evidence">
+ <summary>Evidence &amp; detail — the project arrangement, automation, stem↔track map, rhythm and transcribed notes</summary>
 
  <div class="panel" id="arrPanel">
   <h2 id="arrTitle"></h2><p class="hint" id="arrHint"></p>

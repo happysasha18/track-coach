@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.6.10] — 2026-06-19
+
+### Changed
+- **Callout cards under the graph**: Simple shows the first 3 (calm), Detailed shows all
+  ("в детальном больше"). CSS cap on `#storyCues` in Simple only.
+- **Tonal balance moved OUT of the Evidence drawer** into a standalone panel, placed last before
+  the collapsible — always visible in both views (Sasha: "он прикольный"). The Evidence drawer is
+  now arrangement + automation + stem↔track map + rhythm + transcribed notes (no tonal).
+- Default view confirmed Simple. Tests 60 → 61.
+
 ## [0.6.9] — 2026-06-19
 
 ### Fixed
