@@ -58,8 +58,10 @@ python3 "$SKILL_DIR/scripts/track_analyzer.py" analyze "<AUDIO>" \
 # 2) INTERPRET (you): read the result_*.json, write your Producer's Read to <run_dir>/narrative.md.
 
 # 3) RENDER (cheap, one pass): build the widget WITH the read + the cross-version catalog.
+#    Set the catalog's mood/style tags here too — override the heuristic draft with your real read.
 python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
-    --title "<Track name + version>" --verdict "<1–2 sentence calm headline>"
+    --title "<Track name + version>" --verdict "<1–2 sentence calm headline>" \
+    --mood-tags "dark,driving" --style-tags "melodic techno"   # genre is YOUR call; '' clears
 ```
 
 `--mode quick` = fast analysis only (`/tc-quick`); `full` (default, `/tc`) = stems + player +
@@ -78,11 +80,17 @@ to skip). Manage it with `scripts/library.py`:
 ```bash
 python3 "$SKILL_DIR/scripts/library.py" path           # where the library lives
 python3 "$SKILL_DIR/scripts/library.py" list [--track T]
+python3 "$SKILL_DIR/scripts/library.py" catalog --open  # (re)build + open the global Catalog page
 python3 "$SKILL_DIR/scripts/library.py" clean --dry-run [--older-than DAYS] \
     [--keep-per-track N] [--track T] [--missing]        # add --yes to actually delete
 ```
-The library archives the self-contained HTML only (never stems/audio). This is separate from the
-in-widget **Library** panel (the cross-version catalog rendered at the bottom of each widget).
+The library archives the self-contained HTML only (never stems/audio). Every `build` also
+regenerates the **global Catalog** — a standalone `~/.track-coach/library/index.html`: a flat,
+sortable, searchable table of every track→version (versions grouped by audio sha256; per-row
+**signature** = spectral ribbon over a 9-band tonal strip, fully visible by tap + mood/style tags +
+BPM/key/length/LUFS + cross-version deltas; "open →" into each widget). Show it to
+Sasha with `library.py catalog --open` (opens a new window). This is separate from the in-widget
+**Library** panel (the per-widget cross-version catalog rendered at the bottom of each widget).
 
 ---
 

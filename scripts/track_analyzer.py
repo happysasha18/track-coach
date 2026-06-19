@@ -28,7 +28,7 @@ to `tc_uv.sh <profile> <script>` so dependency profiles (core/fast/deep/bp) stay
 and the run is shell-agnostic. A single `$STEMS` var feeds every deep step — the path-class
 bug cannot recur. `--dry-run` prints the plan without running anything.
 """
-import argparse, json, os, re, shlex, subprocess, sys
+import argparse, hashlib, json, os, re, shlex, subprocess, sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -109,6 +109,11 @@ def build_widget(rn: Runner, out_dir: Path, *, title, src_audio, src_als, track_
     if (out_dir / "stems_web").is_dir(): args += ["--audio-stems-rel", "stems_web"]
     if strings:                     args += ["--strings", strings]
     if catalog:                     args += ["--catalog", catalog]
+    try:  # the global library index → wires the always-present ← Library back button
+        import library as _lib
+        args += ["--back-href", (_lib.library_root() / "index.html").resolve().as_uri()]
+    except Exception:
+        pass
     nar = narrative or (out_dir / "narrative.md" if have("narrative.md") else None)
     if nar:                         args += ["--narrative", nar]
     rn.step("fast", "build_widget.py", *args)
@@ -173,6 +178,22 @@ def cmd_analyze(args):
         # record the offset AND how it was found, so the run is self-documenting
         if offset is not None and not args.dry_run:
             _update_meta(out_dir, {"als_offset_s": float(offset), "als_offset_source": offset_source})
+    # VERSION IDENTITY + DRAFT TAGS — content hash keys the catalog's "versions" (same audio = same
+    # version, even across re-analyses); heuristic mood/style tags seed the catalog so a track is
+    # never tagless. Both are best-effort and never block the measure. The agent overrides the tags
+    # later via `build --mood-tags/--style-tags` (tags_source flips heuristic→agent).
+    if not args.dry_run:
+        _update_meta(out_dir, _audio_fingerprint(audio))
+        try:
+            import tags as _tags
+            draft = _tags.derive_tags(json.loads(j("result_core.json").read_text()))
+            _update_meta(out_dir, {"energy_level": draft["energy_level"],
+                                   "mood_tags": draft["mood_tags"],
+                                   "style_tags": draft["style_tags"],
+                                   "tags_source": "heuristic"})
+        except Exception as e:  # noqa: BLE001 — draft tags are a convenience, not a hard dep
+            print(f"  · draft tags skipped: {e}", file=sys.stderr)
+
     # STRUCTURE — repeats/form (full mix; no stems/als needed; cheap, always run)
     rn.step("fast", "self_similarity.py", audio, "--out", j("result_selfsim.json"))
 
@@ -233,6 +254,22 @@ def default_render_offset(als_json: Path):
              for key in ("audio_clips", "midi_clips")
              for c in tr.get(key, []) if isinstance(c.get("start_s"), (int, float))]
     return (round(min(clips), 3), "earliest_clip") if clips else (None, None)
+
+
+def _audio_fingerprint(audio: Path) -> dict:
+    """Content hash + mtime/size of the source audio. The sha256 is the VERSION identity in the
+    catalog: a different bounce ⇒ different hash ⇒ a new version; the same bounce re-analysed keeps
+    the same version. mtime gives a human timestamp/sort. Best-effort (returns {} on error)."""
+    h = hashlib.sha256()
+    try:
+        with open(audio, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        st = audio.stat()
+        return {"audio_sha256": h.hexdigest(), "audio_mtime": int(st.st_mtime),
+                "audio_size": st.st_size}
+    except OSError:
+        return {}
 
 
 def _update_meta(out_dir: Path, fields: dict):
@@ -372,6 +409,14 @@ def cmd_build(args):
         keep = {}
         if title:   keep["title"] = title
         if verdict: keep["verdict"] = verdict
+        # Agent-authored tags override the heuristic draft (flips tags_source → agent). Comma-split,
+        # trimmed; an explicit empty string clears that list. Only the given list is touched.
+        if args.mood_tags is not None or args.style_tags is not None:
+            if args.mood_tags is not None:
+                keep["mood_tags"] = [t.strip() for t in args.mood_tags.split(",") if t.strip()]
+            if args.style_tags is not None:
+                keep["style_tags"] = [t.strip() for t in args.style_tags.split(",") if t.strip()]
+            keep["tags_source"] = "agent"
         if keep:    _update_meta(out_dir, keep)
     src_audio = args.src_audio or meta.get("audio")
     src_als = args.src_als or meta.get("als")
@@ -406,6 +451,12 @@ def cmd_build(args):
             print(f"  · library: {library.library_root() / 'widgets' / entry['widget']}", file=sys.stderr)
         except Exception as e:  # noqa: BLE001 — library is a convenience, not a hard dep
             print(f"  · library deposit skipped: {e}", file=sys.stderr)
+        # Regenerate the global catalog page so it's always current (the front-end of the library).
+        try:
+            import catalog
+            print(f"  · catalog: {catalog.build_catalog()}", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001 — catalog is a convenience, not a hard dep
+            print(f"  · catalog skipped: {e}", file=sys.stderr)
     print(str(widget))
 
 
@@ -438,6 +489,10 @@ def main():
     b.add_argument("--verdict", default=None)
     b.add_argument("--narrative", default=None, help="read file (default: <run-dir>/narrative.md if present)")
     b.add_argument("--title", default=None)
+    b.add_argument("--mood-tags", default=None,
+                   help="comma-separated mood tags (overrides the heuristic draft; '' clears)")
+    b.add_argument("--style-tags", default=None,
+                   help="comma-separated style/genre tags (overrides the heuristic draft; '' clears)")
     b.add_argument("--src-audio", default=None)
     b.add_argument("--src-als", default=None)
     b.add_argument("--track-version", default=None)

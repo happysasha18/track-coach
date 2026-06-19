@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.6.11"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.7.3"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -98,6 +98,7 @@ STRINGS = {
         "view_simple": "Simple",
         "view_full": "Detailed",
         "view_aria": "Detail level",
+        "back_to_library": "← Library",
         "verdict_lead": "In short",
         "src_audio": "Audio",
         "src_project": "Project",
@@ -839,7 +840,8 @@ def build_story(core, als_overlay):
 
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
-               narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full"):
+               narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
+               back_href=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -996,6 +998,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "meta": meta or {},
         "verdict": _verdict_text(verdict, narrative_md),
         "catalog": catalog or None,
+        "backHref": back_href or None,  # absolute file:// to the library index → the ← Library button
         "t": S["ui"],
     }
     title = title or f'{core.get("tempo","?")} BPM · {dur:.0f}s'
@@ -1041,6 +1044,10 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
 .wrap{max-width:1120px;margin:0 auto}
 .brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--wob);font-weight:700;margin:0 0 3px}
+.backlink{display:inline-block;margin:0 0 8px;padding:4px 11px;border:1px solid var(--line);border-radius:20px;
+ color:var(--muted);text-decoration:none;font-size:12px;font-weight:600}
+.backlink:hover{color:var(--ink);border-color:var(--wob)}
+.backlink[hidden]{display:none}
 h1{font-size:22px;margin:0 0 2px;font-weight:650}
 .sub{color:var(--muted);font-size:13px;margin-bottom:4px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
@@ -1066,9 +1073,9 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
    Detailed adds ONE thing on top: the raw "Evidence & detail" drawer. That's the only panel
    gated by Simple now. */
 body.simple #evidence{display:none!important}
-/* Demux / per-stem visualisation stays in Detailed only — Sasha, repeatedly (transcript L982:
-   "в симпл не должно быть этих стемов"). The transport (play/seek/time) stays usable in both;
-   only the stem-lane canvas + its key are hidden in Simple. */
+/* Demux / per-stem visualisation (#stemlanes + its #seqKey) shows in DETAILED ONLY — Sasha,
+   repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
+   The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
@@ -1226,7 +1233,8 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 </style></head><body><div class="wrap">
 <div class="ctip" id="ctip"></div>
 <div class="topbar">
- <div><div class="brandkick">Track Coach</div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+ <div><a id="backLink" class="backlink" href="#" hidden></a>
+   <div class="brandkick">Track Coach</div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
  <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
       embedded in this file. It never calls the network, never costs anything. -->
  <div class="viewtoggle" id="viewToggle"></div>
@@ -1346,6 +1354,14 @@ function flashRec(letter){if(!letter)return;const el=document.querySelector('#re
 // H1 leads with the TRACK name (from --title); the brand lives in the .brandkick
 // eyebrow above + the footer + the browser tab, not stealing the track-name slot.
 document.getElementById("title").textContent=document.title.replace(/^Track Coach · /,"");
+// ── Back to the Library/Catalog. Prefer the catalog page embedded at build time (D.backHref) so the
+// button is ALWAYS there however the widget was opened; otherwise fall back to history.back() when
+// the catalog navigated here in place. Hidden only if neither is available (standalone widget).
+(function(){const b=document.getElementById("backLink");if(!b)return;
+ b.textContent=T.back_to_library||"← Library";
+ if(D.backHref){b.href=D.backHref;b.hidden=false;}
+ else if(history.length>1){b.hidden=false;
+  b.addEventListener("click",e=>{e.preventDefault();history.back();});}})();
 document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${D.mode==="quick"?(T.subtitle_quick||"quick read"):T.subtitle}`;
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
@@ -1541,15 +1557,17 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // 0.5.13 behaviour that 0.5.19 wrongly removed — see JOURNAL.md). Simple = the 3 power-driving
  // lanes only (energy/brightness/density = in_power); Detailed = all lanes (+modulation, +stereo
  // width). apply() dispatches a resize on toggle, so resize()→pickComps() relayouts live.
- const ALLCOMPS=ST.components||[];let compLaneH=20;
- // Simple = the 2 lanes Sasha named (energy + brightness, transcript L80), drawn FULL-SIZE;
- // Detailed = all lanes at the compact small-multiple height. (Sasha 2026-06-19: "в кратком эти
- // же две но полноразмерные, а в детальном все 5".)
- const SIMPLE_LANES=["energy","brightness"];
+ const ALLCOMPS=ST.components||[];const compLaneH=20;  // CONSTANT per lane in both views, so the
+ // total curve-area height = (#lanes × compLaneH) is PROPORTIONAL TO THE LANE COUNT. That makes
+ // Simple (4 lanes) shorter than Detailed (5) automatically. Sasha, session 0b5ab53e:
+ //   L186 "стерео или плотность тоже оставить в симпл" → Simple = energy+brightness+density+stereo;
+ //   L402 "в симпле вью общая высота для их площади должна быть МЕНЬШЕ" → area ∝ count (4<5).
+ // (Supersedes the older 2-full-size reading from L542 of a prior session. DON'T revert to that.)
+ const SIMPLE_LANES=["energy","brightness","density","stereo"];
  let comps=ALLCOMPS,ncomp=comps.length;
  const pickComps=()=>{const simple=document.body.classList.contains("simple");
    comps=simple?ALLCOMPS.filter(c=>SIMPLE_LANES.includes(c.key)):ALLCOMPS;
-   ncomp=comps.length;compLaneH=simple?40:20;};
+   ncomp=comps.length;};
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
  let famTop=compTop+ncomp*compLaneH+gap;
  let W,H;const xOf=t=>PADL+(t/ST.dur)*(W-PADL-PADR);
@@ -2051,6 +2069,8 @@ def main():
     p.add_argument("--catalog", default=None,
                    help="catalog.json from run_dir.py — embeds the all-tracks/all-versions index "
                         "(collapsible, with past verdicts + relative links) at the bottom of the widget")
+    p.add_argument("--back-href", default=None,
+                   help="URL of the library index page — wires the ← Library back button")
     args = p.parse_args()
 
     if args.dump_strings:
@@ -2090,7 +2110,7 @@ def main():
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
-               mode=args.mode)
+               mode=args.mode, back_href=args.back_href)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

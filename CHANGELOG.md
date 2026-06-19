@@ -5,6 +5,67 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.7.3] — 2026-06-19
+
+### Added
+- **Catalog row signature** — each library row now shows a rich per-track signature instead of a plain
+  energy sparkline: a spectral *ribbon* (height = energy, colour = brightness, line weight = density)
+  over a 9-band *tonal strip* (the spectrum, in the widget's low-red→mid-green→high-blue colours,
+  flagged bands brightened). Fully visible by tap — no hover needed. Degrades to ribbon-only, then to
+  the old sparkline, for older library entries that lack the data.
+- **Favicon on the Library page** — the catalog page now carries the same Track Coach bar-chart icon
+  as the per-track widgets.
+- **"← Library" back button** in each widget — returns to the catalog you came from (shown only when
+  there's somewhere to go back to; portable, no hard-coded path).
+
+### Changed
+- **Catalog rows are shorter and responsive** — verdict clamped to two lines, mood/style chips pack
+  horizontally instead of one-per-line, tighter row padding; the table now scrolls horizontally on
+  narrow screens instead of squishing.
+
+### Fixed
+- **Simple graph set to its agreed form** — Simple shows **four** lanes (energy + brightness + density
+  + stereo); Detailed shows all five (+ modulation). The curve-area height is now **proportional to the
+  lane count** (a constant per-lane height in both views), so Simple's area is smaller than Detailed's.
+  The widget tests pin the lane set *and* the proportional-height rule with the source citations, so
+  the suite fails loudly on any future drift. (Nothing in 0.7.x had shipped; this is the corrected
+  end-state after the lane set flip-flopped during the session.)
+
+## [0.7.1] — 2026-06-19
+
+### Fixed
+- **Player no longer dies when opening a track from the Catalog.** The catalog's "open →" now opens the
+  original widget in its run folder (where the stems live), not the stem-less library copy — so the
+  multi-stem player actually plays. Old catalog entries fall back to the copy as before.
+
+### Tests
+- **New render-level tests** (`tests/test_widget_render.py`): build a widget from a fixture and assert
+  on the real output — all five curves reach the payload, each view draws the right curve set, and the
+  player is wired to one source per stem. The previous tests only checked the static template, so a
+  broken render could still pass. Template tests kept; suite 85 → 95.
+
+## [0.7.0] — 2026-06-19
+
+### Added
+- **Global Catalog page** — a standalone, offline, always-current `index.html` at
+  `~/.track-coach/library/`: the front-end of the library store. A FLAT, sortable, searchable table;
+  each row is a **version** of a track, with a coloured mini-arc (energy sparkline), BPM/key/length/
+  LUFS, mood + style tags, mode, and a relative "open →" into the archived widget. Regenerated
+  automatically after every `build`, or on demand via `library.py catalog [--open]` /
+  `catalog.py build [--open]`. New module `scripts/catalog.py` (the VIEW); `library.py` stays the store.
+- **Versions keyed by audio content hash** — `analyze` records `audio_sha256` + `audio_mtime`; the
+  catalog groups a track's runs by hash (re-analyses of the same bounce collapse to the newest run),
+  numbers them v1..vN by mtime (explicit `--track-version` wins), and shows LUFS/length/BPM deltas vs
+  the previous version.
+- **Mood + style tags** — heuristic draft (`scripts/tags.py`, a valence–arousal model over
+  tempo/key/brightness/energy/wobble) written at `analyze` time; the agent overrides via
+  `build --mood-tags/--style-tags`. Heuristic-only tags are marked "draft" in the catalog.
+
+### Notes
+- Research informing the tag model: DJ-library conventions (genre/energy-level/mood) and the
+  valence–arousal model used by tools like Cyanite/Mixed In Key.
+- Tests 61 → 85. MINOR bumped (0.6.11 → 0.7.0) as the catalog milestone.
+
 ## [0.6.11] — 2026-06-19
 
 ### Changed

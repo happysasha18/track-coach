@@ -79,6 +79,14 @@ Collapsed by default at the bottom of the Detailed view, one drawer holds everyt
 
 <sub>**The full drawer:** the mix's average spectrum (**tonal balance**), the real **arrangement** from the `.als`, the **stem ↔ track map** (does separation match the project?), per-stem **rhythm & separation quality**, and the **transcribed notes**. Nothing interpreted here — just the measurements the read is built on.</sub>
 
+### Your whole catalog, one page
+
+Every analysis is deposited into a global **Library** — a standalone, offline `index.html` that lists every track and every version you've bounced, sortable and searchable, with a jump straight into each widget.
+
+![The Library — one sortable row per track/version, each with a spectral-signature thumbnail, tags, and the spec numbers](docs/catalog.png)
+
+<sub>**One row per version** (re-analyses of the same bounce collapse automatically, numbered v1…vN with LUFS/length/BPM deltas). Each row carries a **signature** thumbnail — a spectral ribbon (height = energy, colour = brightness, weight = density) over a 9-band tonal strip — plus mood/style tags, BPM/key/length/LUFS, and **open ↗** into the full widget. Regenerated after every build; browse it offline. Inside a widget, **← Library** brings you back.</sub>
+
 ---
 
 ## Install
@@ -109,7 +117,17 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.6** (latest) — a substantial re-architecture:
+**v0.7** (latest) — the **Library / Catalog**:
+
+- **A page for your whole body of work.** A standalone, offline `~/.track-coach/library/index.html`
+  lists every track → version → run, sortable and searchable, regenerated after every build.
+- **A signature per row.** Each version shows a spectral-ribbon + 9-band tonal thumbnail (not a bare
+  sparkline), so you can read a track's shape and spectrum at a glance — fully visible, no hover.
+- **Versions by content hash.** Re-analyses of the same bounce collapse to the newest run, numbered
+  v1…vN, with LUFS/length/BPM deltas between versions.
+- **Round-trip navigation.** "open ↗" jumps into the full widget; **← Library** brings you back.
+
+**v0.6** — a substantial re-architecture:
 
 - **One command runs the pipeline.** `track_analyzer.py analyze` measures (audio → `.als` → stems →
   masking/rhythm/drums/notes), then `build` renders the widget — a strict *measure → interpret →
@@ -122,7 +140,8 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
   forward; quick runs are labelled "quick read" (not "deep mode").
 - **Global library.** Every build deposits its self-contained widget into `~/.track-coach/library/`;
   `library.py list` / `clean` browse and prune across projects.
-- Backed by a **53-test suite** that guards against panels disappearing and reads being dropped.
+- Backed by a **108-test suite** (template + render-level) that guards against panels disappearing,
+  curves/lanes drifting from spec, and reads being dropped.
 
 → **Full history in [CHANGELOG.md](CHANGELOG.md).**
 

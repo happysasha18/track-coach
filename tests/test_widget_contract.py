@@ -41,6 +41,18 @@ class PanelsExist(unittest.TestCase):
         self.assertIn('getElementById("readPanel")', TPL,
                       "producer's-read reveal (readPanel) is missing")
 
+    def test_back_to_library_link_exists_and_wired(self):
+        # Sasha 2026-06-19/20: "нет кнопки как вернуться из трека в каталог" / "пропала кнопка бэк на
+        # страницу каталога". A back link must exist, carry the translatable label, and link to the
+        # library page embedded at build time (D.backHref) so it's ALWAYS present however the widget
+        # was opened — with history.back() as the fallback when no href was baked in.
+        self.assertIn('id="backLink"', TPL, "the back-to-Library link is missing")
+        self.assertTrue(build_widget.STRINGS["ui"].get("back_to_library"),
+                        "missing the back_to_library string")
+        self.assertIn("back_to_library", TPL, "JS doesn't reference the back_to_library label")
+        self.assertIn("D.backHref", TPL, "back link doesn't use the embedded catalog href (D.backHref)")
+        self.assertIn("history.back()", TPL, "back link has no history.back() fallback")
+
 
 class SimpleViewContract(unittest.TestCase):
     """Simple must not silently swallow the things users expect to see."""
@@ -60,10 +72,9 @@ class SimpleViewContract(unittest.TestCase):
 
     def test_simple_gating_is_a_small_known_set(self):
         # What Simple touches via display:none is a SMALL fixed set: the evidence drawer; the demux
-        # stem viz (#stemlanes + #seqKey, Detailed-only per Sasha L982); and the recs panel filtered
-        # to ONLY the timecoded cards (#recs — Simple shows the ones with a triangle on the graph,
-        # Detailed shows all). It must NOT creep to hide the transport, the read, or the recs panel
-        # wholesale. (Sasha 2026-06-19: recs moved under the graph, callout list removed.)
+        # stem viz (#stemlanes + #seqKey, Detailed-only); and the recs panel filtered to ONLY the
+        # timecoded cards (#recs — Simple shows the cards with a triangle on the graph, Detailed shows
+        # all). It must NOT creep to hide the transport, the read, or the recs panel wholesale.
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE_SELECTORS))
         self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey", "recs"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
@@ -91,14 +102,40 @@ class SimpleViewContract(unittest.TestCase):
                       "pickComps must branch on the simple class")
         self.assertIn("SIMPLE_LANES.includes(c.key)", TPL,
                       "Simple must filter the graph to the named SIMPLE_LANES")
-        self.assertRegex(TPL, r'SIMPLE_LANES\s*=\s*\[\s*"energy"\s*,\s*"brightness"\s*\]',
-                         "Simple lanes must be energy + brightness")
+        # ── SETTLED SPEC (session 0b5ab53e, supersedes the older 2-lane L542) ───────────────────
+        # Simple = energy + brightness + density + stereo (4). PRIMARY SOURCES:
+        #   L186 "ты уверен что … стерео или плотность может тоже оставить в симпл?" (add them) and
+        #   L7  "в симпл недостаёт линий" (Simple needs MORE lines, not fewer).
+        # Modulation (wobble) is the ONLY Detailed-only lane. If this is to change, change it HERE
+        # first with the new citation.
+        m = re.search(r"SIMPLE_LANES\s*=\s*\[([^\]]*)\]", TPL)
+        self.assertIsNotNone(m, "SIMPLE_LANES array not found")
+        self.assertEqual(set(re.findall(r'"([^"]+)"', m.group(1))),
+                         {"energy", "brightness", "density", "stereo"},
+                         "Simple lanes must be energy + brightness + density + stereo (L186/L7)")
+
+    def test_curve_area_height_is_proportional_to_lane_count(self):
+        # Sasha, session 0b5ab53e L402: "в симпле вью общая высота для их площади должна быть МЕНЬШЕ".
+        # The fix is structural: compLaneH is a CONSTANT (same in both views), so the total area
+        # height = #lanes × compLaneH is PROPORTIONAL to the lane count → Simple (4) is automatically
+        # shorter than Detailed (5). Guard that compLaneH does NOT branch on the view (a per-view
+        # height was the 0.7.1/0.7.2 mistake) and is a single constant.
+        self.assertNotRegex(TPL, r"compLaneH\s*=\s*simple\s*\?",
+                            "compLaneH must NOT depend on the view — area must scale with lane count")
+        self.assertRegex(TPL, r"const\s+compLaneH\s*=\s*\d+",
+                         "compLaneH must be a single constant (area ∝ lane count)")
 
     def test_demux_stems_hidden_in_simple(self):
-        # Sasha, repeatedly (transcript L982): the per-stem demux visualisation must NOT show in
-        # Simple. The transport stays; only #stemlanes (+ its #seqKey) are gated.
+        # Demux / per-stem viz (#stemlanes + #seqKey) is DETAILED-ONLY — Sasha, repeatedly (L982) and
+        # confirmed 2026-06-20: "демуксы мы договорились показывать только в детальном виде, не в
+        # кратком". The transport stays in both; only the stem-lane canvas + its key are gated. (The
+        # "show in Simple too" experiment was reverted — Simple keeps just the transport.)
         self.assertRegex(TPL, r"body\.simple\s+#stemlanes",
-                         "regression: the demux stem visualisation is not hidden in Simple")
+                         "regression: the demux stem visualisation must be hidden in Simple")
+        self.assertRegex(TPL, r"body\.simple\s+#seqKey",
+                         "regression: the demux sequencer key must be hidden in Simple")
+        for keep in ('id="playerControls"', 'id="playBtn"', 'id="stemlanes"'):
+            self.assertIn(keep, TPL, f"player element missing from the template: {keep}")
 
 
 class AutomationPanel(unittest.TestCase):

@@ -92,6 +92,99 @@ def clean_plan(entries, *, now=None, exists=None, older_than_days=None,
     return keep, remove
 
 
+# ── catalog data: metrics, arc sparkline, version grouping (all PURE, tested) ────────────
+def downsample_curve(arr, n=40):
+    """Downsample a 0..1 curve to ~n points by bucket-averaging — the catalog's mini-arc. Pure."""
+    vals = [float(x) for x in (arr or []) if isinstance(x, (int, float))]
+    if not vals:
+        return []
+    if len(vals) <= n:
+        return [round(v, 3) for v in vals]
+    out = []
+    for i in range(n):
+        lo = i * len(vals) // n
+        hi = max(lo + 1, (i + 1) * len(vals) // n)
+        seg = vals[lo:hi]
+        out.append(round(sum(seg) / len(seg), 3))
+    return out
+
+
+def run_metrics(core: dict, meta: dict) -> dict:
+    """Catalog-facing fields for an index entry, from already-loaded core + run_meta. Pure.
+
+    Pulls the spec numbers (bpm/key/lufs/dr/length), a downsampled energy arc (the mini-diagram),
+    the agent/heuristic tags, the title, and the audio content hash (the version identity).
+
+    Also stores the catalog ROW SIGNATURE: energy/brightness/density curves (downsampled to a common
+    length so they align point-for-point in the row's spectral ribbon) + the 9-band `tonal_balance`
+    (band, rel_db, dev_db) for the row's tonal strip. Old entries lacking these degrade to the
+    ribbon-only / legacy `arc` sparkline in the catalog view (see catalog.signature_svg)."""
+    core = core or {}
+    meta = meta or {}
+    v = core.get("vitals", {}) or {}
+    return {
+        "bpm": v.get("tempo_bpm") or core.get("tempo"),
+        "key": v.get("key"),
+        "lufs": v.get("lufs"),
+        "dr": v.get("dynamic_range_db"),
+        "length_s": v.get("duration_s") or core.get("duration_s"),
+        "arc": downsample_curve(core.get("energy"), 40),
+        # row signature — three curves at a shared length (ribbon: height=energy, colour=brightness,
+        # weight=density) + the spectrum (tonal strip). ~48 pts keeps the SVG small but still shaped.
+        "energy": downsample_curve(core.get("energy"), 48),
+        "brightness": downsample_curve(core.get("brightness"), 48),
+        "density": downsample_curve(core.get("density"), 48),
+        "tonal_balance": [
+            {"band": b.get("band"), "rel_db": b.get("rel_db"), "dev_db": b.get("dev_db")}
+            for b in (core.get("tonal_balance") or []) if isinstance(b, dict)
+        ],
+        "energy_level": meta.get("energy_level"),
+        "mood_tags": meta.get("mood_tags") or [],
+        "style_tags": meta.get("style_tags") or [],
+        "tags_source": meta.get("tags_source"),
+        "title": meta.get("title"),
+        "audio_sha": meta.get("audio_sha256"),
+    }
+
+
+def group_versions(entries: list) -> dict:
+    """Group index entries into tracks → versions for the catalog. PURE — no filesystem.
+
+    A "version" = a distinct audio bounce, keyed by `audio_sha` (entries lacking a hash fall back to
+    their widget name, so each stands alone — backward-compatible). Runs that share a hash (e.g.
+    quick→full, or a rebuild) collapse to the NEWEST run. Versions are numbered v1..vN oldest→newest
+    (by `audio_mtime`, else `stamp`); an explicit entry `version` wins. Cross-version deltas
+    (lufs/length_s/bpm) compare each version to the chronologically previous one. Returns
+    {track: [version, … newest first]}, each version = {label, rep(entry), n_runs, sha, delta}.
+    """
+    by_track = {}
+    for e in entries:
+        by_track.setdefault(e.get("track", "?"), []).append(e)
+    out = {}
+    for track, es in by_track.items():
+        by_sha = {}
+        for e in es:
+            by_sha.setdefault(e.get("audio_sha") or e.get("widget"), []).append(e)
+        versions = []
+        for sha, grp in by_sha.items():
+            rep = max(grp, key=lambda e: (e.get("stamp", ""), e.get("deposited_at", "")))
+            versions.append({"sha": sha, "rep": rep, "n_runs": len(grp),
+                             "okey": rep.get("audio_mtime") or rep.get("stamp", "")})
+        versions.sort(key=lambda x: (x["okey"] == "", x["okey"]))  # oldest first; unknowns last
+        for i, ver in enumerate(versions):
+            ver["label"] = ver["rep"].get("version") or f"v{i + 1}"
+            ver["delta"] = {}
+            if i > 0:
+                cur, prev = ver["rep"], versions[i - 1]["rep"]
+                for k in ("lufs", "length_s", "bpm"):
+                    a, b = cur.get(k), prev.get(k)
+                    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+                        ver["delta"][k] = round(a - b, 2)
+        versions.reverse()  # newest version first for display
+        out[track] = versions
+    return out
+
+
 # ── index io ───────────────────────────────────────────────────────────────────────────
 def load_index(root: Path) -> dict:
     p = root / "index.json"
@@ -119,8 +212,10 @@ def upsert(entries, entry):
 
 # ── operations ──────────────────────────────────────────────────────────────────────────
 def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version: str,
-            stamp: str, verdict=None, mode="full") -> dict:
-    """Copy a built widget into the library and record it. Best-effort; returns the entry."""
+            stamp: str, verdict=None, mode="full", extra: dict = None) -> dict:
+    """Copy a built widget into the library and record it. Best-effort; returns the entry.
+
+    `extra` carries the catalog fields (metrics/arc/tags/audio_sha from `run_metrics`)."""
     root = Path(root)
     wdir = root / "widgets"
     wdir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +224,12 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
     entry = {"track": track, "version": version, "stamp": stamp, "widget": name,
              "verdict": verdict or "", "mode": mode,
              "deposited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "src_run_dir": str(run_dir)}
+             "src_run_dir": str(run_dir),
+             # the ORIGINAL widget filename in the run dir. The catalog opens THIS (its stems
+             # live next to it), not the stem-less library copy — otherwise the player is dead.
+             "src_widget": widget_path.name}
+    if extra:
+        entry.update(extra)
     idx = load_index(root)
     idx["entries"] = upsert(idx["entries"], entry)
     save_index(root, idx)
@@ -137,14 +237,21 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
 
 
 def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
-    """Convenience wrapper used by track_analyzer: pull fields from run_meta."""
+    """Convenience wrapper used by track_analyzer: pull fields from run_meta + result_core.json."""
     run_dir = Path(run_dir)
-    stamp = meta.get("analyzed_at") or run_dir.name
+    core = {}
+    cp = run_dir / "result_core.json"
+    if cp.exists():
+        try:
+            core = json.loads(cp.read_text())
+        except ValueError:
+            core = {}
+    extra = run_metrics(core, meta)
     return deposit(library_root(), run_dir=run_dir, widget_path=Path(widget_path),
                    track=meta.get("track") or run_dir.parent.name,
                    version=meta.get("track_version") or "",
                    stamp=run_dir.name,  # the dated folder = a stable, sortable stamp
-                   verdict=meta.get("verdict"), mode=meta.get("mode", "full"))
+                   verdict=meta.get("verdict"), mode=meta.get("mode", "full"), extra=extra)
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────────────────
@@ -225,10 +332,19 @@ def _cmd_clean(args):
     print(f"removed {len(remove)}; {len(keep)} left.")
 
 
+def _cmd_catalog(args):
+    """Delegate to catalog.py (the view layer) so `library.py catalog` just works."""
+    import catalog
+    print(catalog.build_catalog(open_browser=args.open))
+
+
 def main():
     p = argparse.ArgumentParser(prog="library", description="track-coach global widget library")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("path", help="print the library root").set_defaults(func=_cmd_path)
+    cat = sub.add_parser("catalog", help="regenerate the library index.html page")
+    cat.add_argument("--open", action="store_true", help="open in a new browser window")
+    cat.set_defaults(func=_cmd_catalog)
     d = sub.add_parser("deposit", help="copy a run's widget into the library")
     d.add_argument("--run-dir", required=True)
     d.add_argument("--widget", default=None, help="widget html (default: newest in run dir)")
