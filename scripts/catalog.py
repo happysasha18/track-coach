@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 import library  # same scripts/ dir; reuses load_index + the pure metric/version helpers
+import build_widget  # for TC_VERSION only (stdlib-only import) — stamp the catalog with its version
 
 PALETTE = {  # slim copy of the build_widget dark theme so the catalog feels like the widgets
     "bg": "#0c0e14", "panel": "#141822", "panel2": "#1b2030", "line": "#2a3142",
@@ -215,9 +216,12 @@ def _row(track, ver, widgets_rel, uid=0):
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
     href = _open_href(e, widgets_rel)
-    verdict = (e.get("verdict") or "").strip()
-    open_cell = (f'<a class="open" href="{html.escape(href)}">open ↗</a>' if href
-                 else '<span class="noarc">—</span>')
+    # The track TITLE is the link into the widget (no separate "open" column any more — Sasha
+    # 2026-06-20: "кнопка опен не нужна если сделать само название кликабл"). Whole row tints on
+    # hover (CSS) so it reads as clickable; falls back to a plain span when there's no widget.
+    ttl = html.escape(str(title))
+    title_cell = (f'<a class="ttl" href="{html.escape(href)}">{ttl}</a>' if href
+                  else f'<span class="ttl">{ttl}</span>')
     # data-* attrs drive client-side sort; numeric ones fall back to -1 so blanks sort last asc
     def num(x):
         return f"{x}" if isinstance(x, (int, float)) else "-1"
@@ -226,7 +230,7 @@ def _row(track, ver, widgets_rel, uid=0):
       data-bpm="{num(e.get('bpm'))}" data-key="{html.escape(str(e.get('key') or ''))}"
       data-len="{num(e.get('length_s'))}" data-lufs="{num(e.get('lufs'))}"
       data-energy="{num(e.get('energy_level'))}">
- <td class="c-track"><span class="ttl">{html.escape(str(title))}</span>
+ <td class="c-track">{title_cell}
    <span class="trk">{html.escape(track)}</span></td>
  <td class="c-ver">{html.escape(str(ver['label']))}{'' if ver['n_runs']<2 else f' <span class=runs>×{ver["n_runs"]}</span>'}</td>
  <td class="c-date">{html.escape(_fmt_date(e.get('stamp')))}</td>
@@ -237,16 +241,18 @@ def _row(track, ver, widgets_rel, uid=0):
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
- <td class="c-open">{open_cell}</td>
- <td class="c-verdict">{html.escape(verdict)}</td>
 </tr>"""
 
 
+# The one-line "verdict" was dropped from the catalog (Sasha 2026-06-20: "колонка вердикт реально
+# нужна? она там всё ломает") — it was the widest, most variable column and forced the table off the
+# screen. The verdict still lives inside each track's widget; the catalog stays scannable.
 _HEADERS = [
     ("track", "Track"), ("version", "Version"), ("date", "Date"), (None, "Signature"),
     ("bpm", "BPM"), ("key", "Key"), ("len", "Length"), ("lufs", "LUFS"),
-    (None, "Mood / style"), ("mode", "Mode"), (None, ""), (None, "Verdict"),
+    (None, "Mood / style"), ("mode", "Mode"),
 ]
+_NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the header count
 
 
 def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library") -> str:
@@ -261,7 +267,7 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
             body_rows.append(_row(track, ver, widgets_rel, uid))  # uid → unique ribbon gradient ids
             uid += 1
     rows_html = "\n".join(body_rows) or (
-        '<tr><td colspan="12" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
+        f'<tr><td colspan="{_NCOLS}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
     ths = "".join(
         (f'<th class="sortable" data-key="{k}">{html.escape(label)}<span class="ar"></span></th>'
          if k else f'<th>{html.escape(label)}</th>')
@@ -294,9 +300,15 @@ th.sortable{{cursor:pointer;user-select:none}}th.sortable:hover{{color:var(--ink
 th .ar{{font-size:9px;margin-left:3px;color:var(--wob)}}
 th.asc .ar::after{{content:"▲"}}th.desc .ar::after{{content:"▼"}}
 tbody td{{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:middle}}
-tbody tr:hover{{background:var(--panel)}}
-.tablewrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}  /* responsive: scroll, don't squish */
-.ttl{{display:block;font-weight:600}}.trk{{display:block;color:var(--muted);font-size:10.5px}}
+tbody tr:hover{{background:var(--panel2)}}              /* whole row tints on hover → reads as clickable */
+tbody tr:hover .ttl{{color:var(--wob)}}
+.tablewrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}  /* fallback: scroll, never squish */
+.c-track{{max-width:230px}}  /* cap the title column so long file-name subtitles don't blow the table wide */
+.ttl{{display:block;font-weight:600;color:var(--ink);text-decoration:none;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+a.ttl:hover{{color:var(--wob);text-decoration:underline}}
+.trk{{display:block;color:var(--muted);font-size:10.5px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .c-num{{font-variant-numeric:tabular-nums;white-space:nowrap}}
 .c-ver{{color:var(--bright);font-weight:600;white-space:nowrap}}.runs{{color:var(--muted);font-weight:400;font-size:11px}}
 .c-date,.c-key{{color:var(--muted);white-space:nowrap}}
@@ -310,13 +322,15 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .tag.draft{{background:transparent;border:1px dashed var(--line);color:var(--muted);font-style:italic}}
 .mode{{font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}}
 .mode.full{{background:rgba(70,211,154,.14);color:var(--good)}}.mode.quick{{background:rgba(255,209,102,.14);color:var(--bright)}}
-a.open{{display:inline-block;color:var(--wob);text-decoration:none;font-weight:600;font-size:12px;
- white-space:nowrap;border:1px solid var(--line);border-radius:20px;padding:4px 11px}}
-a.open:hover{{border-color:var(--wob);background:rgba(167,139,250,.10)}}
-.c-verdict{{color:var(--muted);font-size:12px;max-width:280px;
- display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
-.ttl,.trk{{white-space:nowrap}}
-@media(max-width:900px){{.wrap{{padding:18px 12px 48px}}tbody td,thead th{{padding:6px 8px}}}}
+/* Responsive columns: on a non-maximised window the 10-col table doesn't fit, and nowrap cells
+   would force an ugly horizontal-scroll clip (Sasha 2026-06-20: "если не на полный экран таблица
+   странно показывается"). Progressively drop the least-important columns — mood/style + mode → date —
+   keeping the core spec (signature, BPM, key, length, LUFS). overflow-x:auto is the last-resort
+   fallback below the smallest breakpoint. */
+@media(max-width:1100px){{thead th:nth-child(9),tbody td:nth-child(9),
+ thead th:nth-child(10),tbody td:nth-child(10){{display:none}}}}                              /* mood/style + mode */
+@media(max-width:880px){{thead th:nth-child(3),tbody td:nth-child(3){{display:none}};
+ .wrap{{padding:18px 12px 48px}};tbody td,thead th{{padding:6px 8px}}}}                        /* date */
 .empty{{text-align:center;color:var(--muted);padding:40px}}
 .foot{{color:var(--muted);font-size:11px;margin-top:18px;text-align:center}}
 tr.hide{{display:none}}
@@ -341,7 +355,7 @@ tr.hide{{display:none}}
  <div class="tablewrap"><table><thead><tr>{ths}</tr></thead><tbody id="rows">
 {rows_html}
  </tbody></table></div>
- <div class="foot">Track Coach library · generated offline · links are relative to <code>{html.escape(widgets_rel)}/</code></div>
+ <div class="foot">Track Coach library · generated offline · v{html.escape(build_widget.TC_VERSION)} · links are relative to <code>{html.escape(widgets_rel)}/</code></div>
 </div>
 <script>
 const tbody=document.getElementById("rows");

@@ -5,6 +5,27 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.7.4] — 2026-06-20
+
+### Changed
+- **Library table: the track name is the link.** The separate "open" column is gone — click a track's
+  **title** to open its widget; the whole row highlights on hover so it reads as clickable.
+- **Library table is now genuinely responsive.** On a non-maximised window it sheds its least-important
+  columns (mood/style + mode → date) instead of clipping, keeping the signature and the core spec
+  readable; horizontal scroll remains as a last-resort fallback on very narrow screens. Long file-name
+  subtitles truncate so they can't blow the table wide.
+- **Dropped the "verdict" column** from the Library — it was the widest, most variable column and the
+  main thing knocking the table off-screen. The verdict still lives inside each track's widget.
+- **Library footer now shows the version** that generated the page (e.g. `· v0.7.4 ·`).
+- **README** now shows the Library right after the hero (refreshed screenshot) and explains the
+  measured → interpretation → "up to you" layering in plain language.
+
+### Internal
+- **Test suite reworked for robustness.** Widget tests now assert on the **rendered HTML the skill
+  ships**, not the template source — so cosmetic refactors stop breaking the suite. Behavioural facts
+  (curves, per-view lanes, player/back wiring) live once at the render level; the contract file covers
+  only structure + CSS visibility. Net 108 → 103 tests, de-duplicated, all green.
+
 ## [0.7.3] — 2026-06-19
 
 ### Added

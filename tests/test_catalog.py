@@ -5,6 +5,7 @@ Covers the new 0.7 catalog: arc downsampling, metric extraction, version groupin
 (collapse re-analyses, number v1..vN, deltas), and a render smoke test that the page actually emits
 rows / search / sort / relative links / mini-arc SVG. Pure, no filesystem, no deps.
 """
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -190,10 +191,10 @@ class RenderSmoke(unittest.TestCase):
         self.assertIn('stroke="url(#r0)"', page)  # the row's ribbon (uid 0); exact bar count is unit-tested
 
 
-class OpenLinkPointsAtOriginal(unittest.TestCase):
-    """The 'open →' fix (2026-06-19): the catalog must open the ORIGINAL widget in its run dir —
-    its stems sit next to it, so the player plays. The deposited library copy is stem-less, so
-    opening THAT leaves a dead player (the recurring 'плеер убился' regression). PURE."""
+class LinkPointsAtOriginal(unittest.TestCase):
+    """Where a row links to: the ORIGINAL widget in its run dir — its stems sit next to it, so the
+    player plays. The deposited library copy is stem-less, so opening THAT leaves a dead player
+    (the recurring 'плеер убился' regression). `_open_href` is the shared resolver. PURE."""
 
     def test_prefers_original_widget_in_run_dir(self):
         e = {"src_run_dir": "/runs/Shared Memories/2026-06-18_0748",
@@ -202,8 +203,8 @@ class OpenLinkPointsAtOriginal(unittest.TestCase):
         href = catalog._open_href(e, "widgets")
         self.assertTrue(href.startswith("file://"), f"expected an absolute file URI, got {href}")
         self.assertTrue(href.endswith("analysis_widget_v0.7.1.html"),
-                        "open must point at the ORIGINAL widget (stems live beside it)")
-        self.assertNotIn("widgets/", href, "open must NOT point at the stem-less library copy")
+                        "must point at the ORIGINAL widget (stems live beside it)")
+        self.assertNotIn("widgets/", href, "must NOT point at the stem-less library copy")
         self.assertIn("Shared%20Memories", href, "spaces in the path must be URL-encoded")
 
     def test_falls_back_to_copy_for_old_entries(self):
@@ -218,17 +219,61 @@ class OpenLinkPointsAtOriginal(unittest.TestCase):
         self.assertIn("file://", html)
         self.assertIn("analysis_widget_v0.7.1.html", html)
 
-    def test_open_is_a_styled_pill_button(self):
-        # Sasha 2026-06-19 "вижу опен но он поменялся": the open control must be a BORDERED PILL with
-        # the diagonal ↗ arrow (matching the in-widget "Open ↗" button), not a bare text link. Pins
-        # both the markup (↗) and that the CSS gives a.open a border + radius, so the styling can't
-        # silently regress to a plain link again.
-        e = _e("SM", "h2", "2026-06-18_0748", 2000, bpm=123, arc=[0.1, 1.0],
-               src_run_dir="/runs/SM", src_widget="w.html")
-        html = catalog.render_catalog_html([e])
-        self.assertIn("open ↗", html, "open control lost its ↗ pill label")
-        self.assertRegex(html, r"a\.open\{[^}]*border[^}]*\}", "a.open must be a bordered pill")
-        self.assertRegex(html, r"a\.open\{[^}]*border-radius[^}]*\}", "a.open pill needs a border-radius")
+
+class ClickableTitleNoOpenColumn(unittest.TestCase):
+    """Sasha 2026-06-20: 'кнопка опен не нужна если сделать само название кликабл'. The track TITLE is
+    the link into the widget; the separate 'open' column is gone; the whole row tints on hover so it
+    reads as clickable. PURE — assert on the rendered output."""
+
+    def setUp(self):
+        e = _e("Shared_Memories", "h2", "2026-06-18_0748", 2000, bpm=123, arc=[0.1, 1.0],
+               title="Shared Memories", src_run_dir="/runs/SM/x", src_widget="w.html")
+        self.html = catalog.render_catalog_html([e])
+
+    def test_title_is_the_link(self):
+        # the title text sits inside an <a class="ttl" href="…the widget…">
+        self.assertRegex(self.html, r'<a class="ttl" href="[^"]*w\.html">Shared Memories</a>',
+                         "the track title must be the clickable link into the widget")
+
+    def test_no_open_column_remains(self):
+        self.assertNotIn('class="open"', self.html, "the standalone open control must be gone")
+        self.assertNotIn("c-open", self.html, "the open column cell/class must be gone")
+        self.assertNotIn("open ↗", self.html, "the old 'open ↗' label must be gone")
+
+    def test_row_tints_on_hover(self):
+        # Sasha 'по наводке мышкой чуть фон меняется' — the hover must actually CHANGE the row
+        # background, not just exist as an empty selector. Pin that a background is set.
+        self.assertRegex(self.html, r"tbody tr:hover\{background:[^}]+\}",
+                         "rows must visibly change background on hover (clickable affordance)")
+
+    def test_plain_span_when_no_widget(self):
+        # no resolvable widget → the title is a non-link span, never a dangling empty href
+        html = catalog.render_catalog_html([{"track": "T", "stamp": "s", "arc": [0.1]}])
+        self.assertIn('<span class="ttl">T</span>', html)
+        self.assertNotRegex(html, r'<a class="ttl" href="">')
+
+
+class ResponsiveTable(unittest.TestCase):
+    """Sasha 2026-06-20: 'если не на полный экран таблица странно показывается'. On a narrow window the
+    11-column table must shed its least-important columns (media queries) rather than clip, with an
+    overflow-scroll fallback below the smallest breakpoint. We guard the BEHAVIOUR (several columns are
+    actually hidden, the last/widest one first) not the exact px breakpoints — those are free to tune.
+    nth-child is used in the catalog CSS only for this column-shedding, so counting it is meaningful."""
+
+    def setUp(self):
+        self.html = catalog.render_catalog_html([_e("T", "h", "s", 1, bpm=120, arc=[0.1, 1.0])])
+
+    def test_columns_are_shed_progressively_on_narrow_windows(self):
+        shed = {int(n) for n in re.findall(r"nth-child\((\d+)\)", self.html)}
+        self.assertGreaterEqual(len(shed), 3,
+                                f"responsive table sheds too few columns ({sorted(shed)}); a lone "
+                                "padding @media would pass a weaker check — this must hide real columns")
+        self.assertIn(catalog._NCOLS, shed,
+                      f"the last column (#{catalog._NCOLS}, mode) must be among the first shed on narrow")
+
+    def test_overflow_scroll_is_the_last_resort_fallback(self):
+        self.assertRegex(self.html, r"\.tablewrap\{[^}]*overflow-x:auto",
+                         "below the smallest breakpoint the table must scroll, not clip")
 
 
 if __name__ == "__main__":

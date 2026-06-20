@@ -153,6 +153,9 @@ class BackToLibraryButton(unittest.TestCase):
         # the JS sets b.href = D.backHref and unhides — assert the wiring is present in the output
         self.assertIn("b.href=D.backHref", html.replace(" ", ""),
                       "back button is not wired to the embedded catalog href")
+        # and the history.back() fallback for widgets opened with NO embedded href must remain
+        self.assertIn("history.back()", html,
+                      "back button lost its history.back() fallback for hrefless opens")
 
 
 class PlayerIsWired(unittest.TestCase):

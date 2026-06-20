@@ -6,9 +6,13 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not "energy is low," but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early / unstable (`v0.6.5`). macOS-first. Built and refined hands-on.
+> **Status:** early / unstable (`v0.7.4`). macOS-first. Built and refined hands-on.
 
 ![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
+
+And every analysis lands in one place — a **Library** of your whole body of work, one searchable row per version with a spectral signature, the spec, and a click straight into the widget:
+
+![The Library — one sortable row per track/version, each with a spectral-signature thumbnail, tags, and the spec numbers](docs/catalog.png)
 
 **Two views, one toggle.** It opens calm in **Simple** — the one-line verdict, the vitals spec-sheet, a colour-coded **structure bar** (a returning section keeps its colour *and* its letter, so reprises are obvious) over the power curve broken into its driving lanes (energy, brightness, density, modulation, stereo width), the synced multi-stem player, the Producer's read, and ranked feedback. Flip to **Detailed** to also open the **Evidence drawer** — every raw measurement behind the calls.
 
@@ -18,13 +22,13 @@ Give it a track (and optionally your Ableton project), and it runs the complete 
 
 It started when another AI flat-out hallucinated about one of my tracks — wrong duration, an arc that didn't exist, made-up gear — and the real measurements proved it wrong. So I built a tool that **can't** lie: it reports only what `librosa` and `Demucs` actually measure. The orchestration just conducts; all the real work lives in deterministic scripts, so the same track gives the same answer every time instead of being re-improvised on a whim.
 
-The output is split into three honest layers, and it never crosses the line between them:
+Everything it tells you sits in one of three layers, and it never blurs them together:
 
-```
-measured  →  what it means  →  up to you
-```
+1. **Measured** — exact numbers, straight from `librosa` and `Demucs`. Nothing inferred, nothing rounded into a vibe.
+2. **What it means** — a concrete reading of those numbers. Not *"energy is low,"* but *"bass dominates 250–500 Hz for the first two minutes; the mids are there but buried."*
+3. **Up to you** — the creative call stays yours. It points out patterns it sees; it never tells you what to change. You decide what matters.
 
-*Measured* — exact numbers only. *What it means* — specific, concrete interpretation (not "energy is low," but "bass dominates 250–500 Hz for the first two minutes, mids are present but buried"). *Up to you* — patterns observed, never directives. The author decides.
+So you always know which is which: a fact, an interpretation of that fact, or a question for you — never a machine pretending to have taste.
 
 > Built for my own music as **[Total Reboot](https://totalreboot.com)**. More about me: [github.com/happysasha18](https://github.com/happysasha18).
 
@@ -85,7 +89,7 @@ Every analysis is deposited into a global **Library** — a standalone, offline 
 
 ![The Library — one sortable row per track/version, each with a spectral-signature thumbnail, tags, and the spec numbers](docs/catalog.png)
 
-<sub>**One row per version** (re-analyses of the same bounce collapse automatically, numbered v1…vN with LUFS/length/BPM deltas). Each row carries a **signature** thumbnail — a spectral ribbon (height = energy, colour = brightness, weight = density) over a 9-band tonal strip — plus mood/style tags, BPM/key/length/LUFS, and **open ↗** into the full widget. Regenerated after every build; browse it offline. Inside a widget, **← Library** brings you back.</sub>
+<sub>**One row per version** (re-analyses of the same bounce collapse automatically, numbered v1…vN with LUFS/length/BPM deltas). Each row carries a **signature** thumbnail — a spectral ribbon (height = energy, colour = brightness, weight = density) over a 9-band tonal strip — plus mood/style tags, BPM/key/length/LUFS, and a **click on the track name** to jump into the full widget. The table is responsive (it sheds its least-important columns on a narrow window instead of clipping). Regenerated after every build; browse it offline. Inside a widget, **← Library** brings you back.</sub>
 
 ---
 
@@ -125,7 +129,9 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
   sparkline), so you can read a track's shape and spectrum at a glance — fully visible, no hover.
 - **Versions by content hash.** Re-analyses of the same bounce collapse to the newest run, numbered
   v1…vN, with LUFS/length/BPM deltas between versions.
-- **Round-trip navigation.** "open ↗" jumps into the full widget; **← Library** brings you back.
+- **Scannable, responsive table.** Click a track name to open its widget; the whole row highlights on
+  hover. On a narrow window it sheds its least-important columns instead of clipping, so it stays
+  readable at any size. **← Library** in each widget brings you back.
 
 **v0.6** — a substantial re-architecture:
 
@@ -140,7 +146,8 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
   forward; quick runs are labelled "quick read" (not "deep mode").
 - **Global library.** Every build deposits its self-contained widget into `~/.track-coach/library/`;
   `library.py list` / `clean` browse and prune across projects.
-- Backed by a **108-test suite** (template + render-level) that guards against panels disappearing,
+- Backed by a **103-test suite** (rendered-output contract + data/render-level checks — asserted on
+  the HTML the skill actually ships, not the template source) that guards against panels disappearing,
   curves/lanes drifting from spec, and reads being dropped.
 
 → **Full history in [CHANGELOG.md](CHANGELOG.md).**
