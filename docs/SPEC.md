@@ -97,6 +97,18 @@ matrix cell + test once Sasha confirms the ⟨DECIDE⟩ points):
   the correlation is strong; stay silent / caveat where it isn't. (Base exists: `map_stems`.) Hard —
   flagged for design, not a hard promise yet.
 
+### B.1 Phase-2 resolutions (folded back from `prover_runs/spec_credibility_2026-06-20.md`)
+- **CR-1a (from P2):** mix-level claims (energy/brightness/density/vitals/arc) are INDEPENDENT of stem
+  significance — an all-insignificant-stems run still gives the full arc; only the stem layer is omitted.
+- **CR-2a (from P1):** significance is **per-scene**, not whole-track — a stem that carries only the drop
+  is significant THERE. "Omit + don't parse" applies only to a stem insignificant in EVERY scene.
+- **CR-4a (from P3):** leakage honesty is windowed (bleed varies over time) — caveat rather than globally
+  suppress.
+- **CR-5c (from P4/P5):** using the self-sim segmentation requires it be stable (enough distinct
+  material across `k`); fall back to a coarser bar otherwise. A RETURN to a prior high level after a dip
+  (…C E C…) IS a drop — don't require a new global peak.
+Open ⟨DECIDE⟩ thresholds remain tuning, to settle on fixtures.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are
