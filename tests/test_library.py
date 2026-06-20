@@ -94,6 +94,34 @@ class DepositRoundTrip(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class StoresBuildVersion(unittest.TestCase):
+    """INV-12 option-b / KI-7: the build's TC_VERSION is recorded in the index entry at deposit time
+    (read from the widget's embedded payload), so the stale check no longer depends on the filename —
+    closing the hole where a versionless/musical-versioned filename slipped through unflagged."""
+
+    def test_version_from_widget_reads_the_embedded_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            w = Path(d) / "analysis_widget.html"  # NB: no version in the name
+            w.write_text('<script>const D={"mode":"full","version":"0.4.2","meta":{}};</script>')
+            self.assertEqual(library.version_from_widget(w), "0.4.2")
+            w.write_text("<html>no payload</html>")
+            self.assertIsNone(library.version_from_widget(w))
+
+    def test_deposit_records_tc_version_even_with_a_versionless_filename(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"  # versionless name → must come from the payload
+                w.write_text('<script>const D={"version":"0.7.6","meta":{}};</script>')
+                entry = library.deposit_from_run(run, w, {"track": "T", "mode": "full"})
+                self.assertEqual(entry.get("tc_version"), "0.7.6")
+                idx = json.loads((library.library_root() / "index.json").read_text())
+                self.assertEqual(idx["entries"][0].get("tc_version"), "0.7.6")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 class DepositAtomicity(unittest.TestCase):
     """INV-15 / KI-6: a deposit either targets the run's real track slug or ABORTS without writing a
     partial/junk entry. The KI-1 saga: a build off a run dir one level too shallow resolved the track

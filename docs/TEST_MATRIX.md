@@ -52,7 +52,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-9 | The S2 preview scrubber rides the TIME-axis ribbon only (playhead `y2=RIB_H`), never the frequency strip. | `test_catalog::CatalogRowPlayer` |
 | INV-10 | S2 column count is fixed (play/scrub live inside the existing track/signature cells) ⇒ responsive column-shedding is stable. | `test_catalog::ResponsiveTable` |
 | INV-11 | The in-widget cross-version panel (`#catalog`) carries exactly the build's catalog and hides iff there are no tracks; empty/orphan build ⇒ hidden, not a false panel. | `test_widget_render::CrossVersionPanelData` |
-| INV-12 | A catalog row whose linked widget is built on an OLDER `TC_VERSION` **and whose filename encodes a version** is flagged 'stale'. (Scope hole: unparseable filename ⇒ not flagged — KI-7.) | `test_catalog::StaleWidgetFlag` |
+| INV-12 | A catalog row whose linked widget is built on an OLDER `TC_VERSION` is flagged 'stale'. The version is stored in the index entry at deposit time (`tc_version`, from the widget's embedded payload) so the check is filename-INDEPENDENT (option-b); old entries fall back to the filename, and a version that's unknown by both paths is not flagged (don't cry wolf). | `test_catalog::StaleWidgetFlag`, `test_library::StoresBuildVersion` |
 | INV-13 | `_fmt_date` formats `YYYY-MM-DD_HHMM` and never crashes on odd/multi-underscore stamps. | `test_catalog::FmtDate` |
 | INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other (one shared `cur` + an unconditional `stop()` before `a.play()`). | `test_catalog::CatalogRowPlayer` |
 | INV-15 | A deposit either targets the run's real track slug or aborts (raises `DepositError`) BEFORE any write — no partial widget copy / junk index entry. Junk slug = output root, `*-output`, or a dated stamp. | `test_library::DepositAtomicity` |
@@ -139,9 +139,12 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
   abort-writes-nothing). NOTE: this validates the SLUG, not the literal `<base>/<track>/<stamp>` depth —
   an explicit `meta.track` with any folder name is still valid (the existing round-trip test relies on
   a `run`-named dir + explicit track), which is why the rule keys on the resolved track, not the path.
-- **KI-7 (F3) — INV-12 stale-flag hole:** unparseable widget filename ⇒ never flagged (the very case you
-  most want caught). Fix together with INV-12 option-b: store `TC_VERSION` in the index entry at deposit
-  time so the check stops depending on the filename. (Defer to Phase 5 fixtures.)
+- **KI-7 (F3) — RESOLVED (session 11) via INV-12 option-b.** The stale check no longer depends on the
+  filename: `deposit()` stores the build's `tc_version` (read from the widget's embedded `"version"`
+  payload by `library.version_from_widget`, filename-independent) and `catalog._widget_version` prefers
+  it, falling back to the filename only for pre-existing entries. So a versionless or musical-versioned
+  filename (e.g. `analysis_widget.html` / `…_v2.html`) on an older build is now flagged. Tests:
+  `test_library::StoresBuildVersion` + `test_catalog::StaleWidgetFlag` (stored-version stale cases).
 - **KI-8 (F5, INV-16) — `.als` axis declared but unpinned;** quick+.als unmodeled. Add a §5 grid row +
   invariant: arrangement/automation render iff `.als` data exists, never empty shells.
 - **Ops (F4-prover):** a dead play button gives no feedback — disable it + tooltip "preview unavailable".

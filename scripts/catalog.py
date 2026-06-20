@@ -217,9 +217,14 @@ def _tag_chips(mood, style, source):
 
 
 def _widget_version(e):
-    """The TC_VERSION baked into the linked widget filename (`…_vX.Y.Z.html`), or None if unparseable.
-    Used to flag a STALE catalog row — a link that opens a widget built on an older version (INV-12 /
-    KI-1: the bug where the catalog silently opened pre-fix 0.7.5 widgets). PURE."""
+    """The TC_VERSION the linked widget was built on. Prefer the value stored in the index entry at
+    deposit time (`tc_version`) — filename-INDEPENDENT, so a stale link is caught even when the filename
+    carries no version or a musical one like `v2` (INV-12 option-b / KI-7). Fall back to parsing the
+    widget filename (`…_vX.Y.Z.html`) for entries deposited before that field existed. None when neither
+    is available — don't cry wolf. PURE. Used to flag a STALE catalog row (INV-12 / KI-1)."""
+    tv = (e.get("tc_version") or "").strip()
+    if re.fullmatch(r"\d+\.\d+\.\d+", tv):
+        return tv
     m = re.search(r"_v(\d+\.\d+\.\d+)\.html$", str(e.get("src_widget") or ""))
     return m.group(1) if m else None
 

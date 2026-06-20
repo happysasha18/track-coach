@@ -321,8 +321,23 @@ class StaleWidgetFlag(unittest.TestCase):
 
     def test_unparseable_widget_name_is_not_flagged(self):
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
-               src_widget="analysis_widget.html")  # no _vX.Y.Z → unknown, don't cry wolf
+               src_widget="analysis_widget.html")  # no _vX.Y.Z, no stored version → unknown, don't cry wolf
         self.assertNotIn(">stale<", catalog.render_catalog_html([e]))
+
+    def test_stored_tc_version_flags_stale_even_with_unparseable_filename(self):
+        # KI-7 / INV-12 option-b: the hole — a versionless filename used to slip through. A version
+        # stored at deposit time closes it: the row is flagged stale regardless of the filename.
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
+               src_run_dir="/r", src_widget="analysis_widget.html", tc_version="0.0.1")
+        html = catalog.render_catalog_html([e])
+        self.assertIn(">stale<", html, "a stored older version must be flagged even with no version in the name")
+
+    def test_stored_tc_version_is_preferred_over_the_filename(self):
+        # the deposit-time version is authoritative: a current-looking filename can't mask an older build
+        cur = catalog.build_widget.TC_VERSION
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0], src_run_dir="/r",
+               src_widget=f"analysis_widget_v{cur}.html", tc_version="0.0.1")
+        self.assertIn(">stale<", catalog.render_catalog_html([e]))
 
 
 class FmtDate(unittest.TestCase):

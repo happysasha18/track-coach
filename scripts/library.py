@@ -20,6 +20,7 @@ CLI:
 The naming + clean policy live in PURE functions (canonical_widget_name, clean_plan) so they're
 unit-tested without touching the filesystem.
 """
+from __future__ import annotations
 import argparse, json, os, re, shutil, sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,6 +61,18 @@ def looks_like_output_sentinel(slug: str) -> bool:
     if not s or s.lower() in {"track-coach-output", "output"} or s.lower().endswith("-output"):
         return True
     return bool(_STAMP_RE.fullmatch(s))
+
+
+def version_from_widget(widget_path) -> str | None:
+    """The TC_VERSION the widget was built on, read from its embedded payload (`"version":"X.Y.Z"`).
+    Filename-INDEPENDENT (INV-12 option-b / KI-7) so a stale link is caught even when the widget file
+    has no version in its name. None when the file is unreadable or carries no version. Touches the FS."""
+    try:
+        text = Path(widget_path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    m = re.search(r'"version"\s*:\s*"(\d+\.\d+\.\d+)"', text)
+    return m.group(1) if m else None
 
 
 def _age_days(deposited_at: str, now: datetime) -> float:
@@ -231,7 +244,7 @@ def upsert(entries, entry):
 
 # ── operations ──────────────────────────────────────────────────────────────────────────
 def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version: str,
-            stamp: str, verdict=None, mode="full", extra: dict = None) -> dict:
+            stamp: str, verdict=None, mode="full", extra: dict = None, tc_version: str = None) -> dict:
     """Copy a built widget into the library and record it. Best-effort; returns the entry.
 
     `extra` carries the catalog fields (metrics/arc/tags/audio_sha from `run_metrics`)."""
@@ -252,6 +265,8 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
              # the ORIGINAL widget filename in the run dir. The catalog opens THIS (its stems
              # live next to it), not the stem-less library copy — otherwise the player is dead.
              "src_widget": widget_path.name}
+    if tc_version:  # the build's TC_VERSION, stored so the stale check (INV-12) is filename-independent
+        entry["tc_version"] = tc_version
     if extra:
         entry.update(extra)
     idx = load_index(root)
@@ -271,11 +286,13 @@ def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
         except ValueError:
             core = {}
     extra = run_metrics(core, meta)
+    tcv = meta.get("tc_version") or version_from_widget(widget_path)  # filename-independent (KI-7)
     return deposit(library_root(), run_dir=run_dir, widget_path=Path(widget_path),
                    track=meta.get("track") or run_dir.parent.name,
                    version=meta.get("track_version") or "",
                    stamp=run_dir.name,  # the dated folder = a stable, sortable stamp
-                   verdict=meta.get("verdict"), mode=meta.get("mode", "full"), extra=extra)
+                   verdict=meta.get("verdict"), mode=meta.get("mode", "full"), extra=extra,
+                   tc_version=tcv)
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────────────────
