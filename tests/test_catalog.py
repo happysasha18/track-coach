@@ -276,5 +276,91 @@ class ResponsiveTable(unittest.TestCase):
                          "below the smallest breakpoint the table must scroll, not clip")
 
 
+class StaleWidgetFlag(unittest.TestCase):
+    """INV-12 (KI-1): a catalog row whose linked widget was built on an OLDER TC_VERSION than the current
+    one is flagged 'stale' — so an out-of-date deposit is visible, never silently opened (the bug where
+    the catalog quietly opened pre-fix 0.7.5 widgets). Parsed from the widget filename; no schema change."""
+
+    def test_current_version_is_not_flagged(self):
+        cur = catalog.build_widget.TC_VERSION
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
+               src_run_dir="/r", src_widget=f"analysis_widget_v{cur}.html")
+        self.assertNotIn(">stale<", catalog.render_catalog_html([e]))
+
+    def test_older_version_is_flagged(self):
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
+               src_run_dir="/r", src_widget="analysis_widget_v0.0.1.html")
+        html = catalog.render_catalog_html([e])
+        self.assertIn(">stale<", html, "an out-of-date deposit must be flagged stale")
+        self.assertIn("re-analyse to refresh", html, "the stale chip must explain what to do")
+
+    def test_unparseable_widget_name_is_not_flagged(self):
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
+               src_widget="analysis_widget.html")  # no _vX.Y.Z → unknown, don't cry wolf
+        self.assertNotIn(">stale<", catalog.render_catalog_html([e]))
+
+
+class FmtDate(unittest.TestCase):
+    """`_fmt_date` must format a normal `YYYY-MM-DD_HHMM` stamp AND never crash on a stamp that carries
+    extra underscores (a malformed deposit once did → 'too many values to unpack', broke the catalog)."""
+
+    def test_normal_stamp(self):
+        self.assertEqual(catalog._fmt_date("2026-06-18_0748"), "2026-06-18 07:48")
+
+    def test_extra_underscores_do_not_crash(self):
+        # last token isn't a 4-digit time → passes through unchanged, no exception
+        self.assertEqual(catalog._fmt_date("Shared_Memories_2026x"), "Shared_Memories_2026x")
+        self.assertEqual(catalog._fmt_date("a_b_c_0748"), "a_b_c 07:48")  # robust rsplit, no crash
+
+    def test_no_underscore_passthrough(self):
+        self.assertEqual(catalog._fmt_date("whatever"), "whatever")
+
+
+class CatalogRowPlayer(unittest.TestCase):
+    """Session 10: each row with a playable web mix gets a one-button preview player + a scrubber that
+    rides the TIME-axis ribbon (not the frequency strip). Rows without a mix render no control at all
+    (graceful). The audio source = the ORIGINAL run's mix (file:// in data-mix). PURE on the render."""
+
+    SIG = {"energy": [0.1, 0.5, 1.0], "brightness": [0.2, 0.6, 0.9], "density": [0.3, 0.5, 0.7],
+           "tonal_balance": [{"band": f"b{i}", "rel_db": -i, "dev_db": 0} for i in range(9)]}
+
+    def _row_html(self, mix_uri):
+        e = _e("Deep", "h7", "2026-06-19_1000", 3000, bpm=128, title="Deep",
+               src_run_dir="/runs/Deep/x", src_widget="w.html", mix_uri=mix_uri, **self.SIG)
+        return catalog.render_catalog_html([e])
+
+    def test_play_button_and_scrubber_when_a_mix_exists(self):
+        html = self._row_html("file:///runs/Deep/x/mix_web/mix.m4a")
+        self.assertIn('class="cplay"', html, "a playable row must show the one-button player")
+        self.assertIn('data-mix="file:///runs/Deep/x/mix_web/mix.m4a"', html,
+                      "the row must carry the original run's web-mix URI")
+        self.assertIn('class="sig play"', html, "the signature must become a scrubber when playable")
+        self.assertIn('class="ph"', html, "the playhead line must be present on a playable row")
+        self.assertIn('y2="30"', html, "the playhead must ride the ribbon (RIB_H=30, time axis), not the strip")
+
+    def test_no_control_when_no_mix(self):
+        html = self._row_html(None)
+        self.assertNotIn('class="cplay"', html, "a row with no mix must NOT show a play button")
+        self.assertNotIn("data-mix=", html, "a row with no mix must NOT carry a data-mix")
+        self.assertNotIn('class="sig play"', html, "the signature must stay non-interactive without a mix")
+
+    def test_player_js_is_wired(self):
+        html = self._row_html("file:///runs/Deep/x/mix_web/mix.m4a")
+        self.assertIn("tr.dataset.mix", html, "player JS must read the row's mix source")
+        self.assertIn("new Audio(src)", html, "player JS must create the audio from the mix source")
+        self.assertIn("getBoundingClientRect", html, "ribbon click-to-seek must be wired")
+
+    def test_mix_uri_for_probes_the_run_dir(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(catalog._mix_uri_for({}), "no src_run_dir → no mix")
+            self.assertIsNone(catalog._mix_uri_for({"src_run_dir": d}), "no mix file → None (graceful)")
+            mix = Path(d) / "mix_web" / "mix.m4a"
+            mix.parent.mkdir()
+            mix.write_bytes(b"\x00")
+            self.assertEqual(catalog._mix_uri_for({"src_run_dir": d}), mix.as_uri(),
+                             "an existing web mix → its file:// URI")
+
+
 if __name__ == "__main__":
     unittest.main()

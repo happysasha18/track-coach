@@ -72,10 +72,15 @@ class PanelsExist(unittest.TestCase):
                    'id="story"', 'id="evidence"', 'id="autoPanel"', 'id="backLink"'):
             self.assertIn(el, HTML, f"rendered widget is missing the panel: {el}")
 
-    def test_producer_read_is_revealed_when_a_narrative_exists(self):
-        # we rendered WITH a narrative, so the read panel's reveal wiring must be present
-        self.assertIn("if(D.narrative)", HTML, "producer's-read narrative gate is missing")
-        self.assertIn('getElementById("readPanel")', HTML, "producer's-read reveal is missing")
+    def test_producer_read_is_rendered_server_side_when_a_narrative_exists(self):
+        # The read is now rendered SERVER-SIDE (session 10): #readBody ships filled in the markup and
+        # the panel is visible — not built by JS. We rendered WITH a narrative, so assert the body is
+        # non-empty real HTML and the panel isn't hidden.
+        m = re.search(r'<div id="readBody">(.*?)</div>', HTML, re.S)
+        self.assertIsNotNone(m, "rendered widget has no #readBody")
+        self.assertTrue(m.group(1).strip(), "producer's read was not rendered into #readBody server-side")
+        self.assertNotRegex(HTML, r'id="readPanel"[^>]*style="display:none"',
+                            "read panel must be visible when a narrative exists")
 
     def test_back_link_carries_its_label(self):
         # the ← Library link must reference its translatable label (the wiring/href is render-tested)

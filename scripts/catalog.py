@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -38,11 +39,14 @@ def _fmt_len(s):
 
 
 def _fmt_date(stamp):
-    """`2026-06-18_0748` → `2026-06-18 07:48`; anything else passes through."""
+    """`2026-06-18_0748` → `2026-06-18 07:48`; anything else passes through. Uses rsplit on the LAST
+    underscore so a stamp that happens to carry more underscores (malformed deposit) formats instead
+    of crashing — `d, t = s.split('_')` used to raise 'too many values to unpack'."""
     s = str(stamp or "")
-    if "_" in s and len(s.split("_")[-1]) == 4 and s.split("_")[-1].isdigit():
-        d, t = s.split("_")
-        return f"{d} {t[:2]}:{t[2:]}"
+    if "_" in s:
+        d, t = s.rsplit("_", 1)
+        if len(t) == 4 and t.isdigit():
+            return f"{d} {t[:2]}:{t[2:]}"
     return s
 
 
@@ -175,17 +179,27 @@ def _tonal_strip(tonal):
     return out
 
 
-def signature_svg(e, uid=0):
+def signature_svg(e, uid=0, playable=False):
     """Full catalog row signature for index entry `e`: spectral ribbon over a 9-band tonal strip.
 
     Degrades gracefully: ribbon-only when there's no `tonal_balance` (e.g. older entries that still
-    have curves); legacy `arc` sparkline when there are no curves at all; '—' when nothing. PURE."""
+    have curves); legacy `arc` sparkline when there are no curves at all; '—' when nothing. PURE.
+
+    `playable` (a web mix exists for this row) overlays a click-to-seek area + a playhead line on
+    the TIME axis (the ribbon, top) only — never the frequency strip — so the row doubles as a
+    one-button preview scrubber (Sasha 2026-06-20: 'ползунок вдоль графика но не вдоль частотной')."""
     energy = e.get("energy") or []
     rib = _ribbon(energy, e.get("brightness") or [], e.get("density") or [], uid)
     if not rib:
         return arc_svg(e.get("arc"))  # no per-curve data → legacy sparkline (or '—')
     strip = _tonal_strip(e.get("tonal_balance") or [])
     h = SIG_H if strip else RIB_H
+    if playable:
+        scrub = (f'<rect class="scrub" x="0" y="0" width="{SIG_W}" height="{RIB_H}" fill="transparent"/>'
+                 f'<line class="ph" x1="0" y1="0" x2="0" y2="{RIB_H}" stroke="{PALETTE["ink"]}" '
+                 f'stroke-width="1.4" visibility="hidden"/>')
+        return (f'<svg class="sig play" viewBox="0 0 {SIG_W} {h}" preserveAspectRatio="none">'
+                f'{rib}{strip}{scrub}</svg>')
     return (f'<svg class="sig" viewBox="0 0 {SIG_W} {h}" preserveAspectRatio="none" aria-hidden="true">'
             f'{rib}{strip}</svg>')
 
@@ -200,6 +214,25 @@ def _tag_chips(mood, style, source):
     return chips
 
 
+def _widget_version(e):
+    """The TC_VERSION baked into the linked widget filename (`…_vX.Y.Z.html`), or None if unparseable.
+    Used to flag a STALE catalog row — a link that opens a widget built on an older version (INV-12 /
+    KI-1: the bug where the catalog silently opened pre-fix 0.7.5 widgets). PURE."""
+    m = re.search(r"_v(\d+\.\d+\.\d+)\.html$", str(e.get("src_widget") or ""))
+    return m.group(1) if m else None
+
+
+def _stale_chip(e):
+    """A small 'stale' marker when the row's linked widget was built on an older TC_VERSION than the
+    current one — so an out-of-date deposit is visible, not silently opened (INV-12). '' when current
+    or unknown."""
+    wv = _widget_version(e)
+    if wv and wv != build_widget.TC_VERSION:
+        return (f'<span class="stale" title="opens a v{wv} widget; current is '
+                f'v{build_widget.TC_VERSION} — re-analyse to refresh">stale</span>')
+    return ""
+
+
 def _open_href(e, widgets_rel):
     """Where 'open →' points. Prefer the ORIGINAL widget in its run dir — its stems sit next to
     it, so the player actually plays. The library copy is stem-less (a deposit is a single .html),
@@ -212,7 +245,7 @@ def _open_href(e, widgets_rel):
     return f"{widgets_rel}/{widget}" if widget else ""
 
 
-def _row(track, ver, widgets_rel, uid=0):
+def _row(track, ver, widgets_rel, uid=0, mix_uri=None):
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
     href = _open_href(e, widgets_rel)
@@ -222,19 +255,24 @@ def _row(track, ver, widgets_rel, uid=0):
     ttl = html.escape(str(title))
     title_cell = (f'<a class="ttl" href="{html.escape(href)}">{ttl}</a>' if href
                   else f'<span class="ttl">{ttl}</span>')
+    # One-button preview player: only when the original run has a web mix (mix_uri). The button
+    # sits left of the title; the scrubber rides the signature ribbon (wired in JS by data-mix).
+    play_btn = ('<button class="cplay" type="button" aria-label="Play preview">▶</button>'
+                if mix_uri else "")
     # data-* attrs drive client-side sort; numeric ones fall back to -1 so blanks sort last asc
     def num(x):
         return f"{x}" if isinstance(x, (int, float)) else "-1"
-    return f"""<tr data-track="{html.escape(track.lower())}" data-mode="{html.escape(e.get('mode',''))}"
+    mix_attr = f' data-mix="{html.escape(mix_uri)}"' if mix_uri else ""
+    return f"""<tr data-track="{html.escape(track.lower())}" data-mode="{html.escape(e.get('mode',''))}"{mix_attr}
       data-version="{html.escape(str(ver['label']))}" data-date="{html.escape(str(e.get('stamp','')))}"
       data-bpm="{num(e.get('bpm'))}" data-key="{html.escape(str(e.get('key') or ''))}"
       data-len="{num(e.get('length_s'))}" data-lufs="{num(e.get('lufs'))}"
       data-energy="{num(e.get('energy_level'))}">
- <td class="c-track">{title_cell}
-   <span class="trk">{html.escape(track)}</span></td>
- <td class="c-ver">{html.escape(str(ver['label']))}{'' if ver['n_runs']<2 else f' <span class=runs>×{ver["n_runs"]}</span>'}</td>
+ <td class="c-track"><div class="tcell">{play_btn}<span class="tmeta">{title_cell}
+   <span class="trk">{html.escape(track)}</span></span></div></td>
+ <td class="c-ver">{html.escape(str(ver['label']))}{'' if ver['n_runs']<2 else f' <span class=runs>×{ver["n_runs"]}</span>'}{_stale_chip(e)}</td>
  <td class="c-date">{html.escape(_fmt_date(e.get('stamp')))}</td>
- <td class="c-sig">{signature_svg(e, uid)}</td>
+ <td class="c-sig">{signature_svg(e, uid, playable=bool(mix_uri))}</td>
  <td class="c-num">{_fmt_num(e.get('bpm'))}{_delta_html(ver.get('delta'),'bpm')}</td>
  <td class="c-key">{html.escape(str(e.get('key') or '—'))}</td>
  <td class="c-num">{_fmt_len(e.get('length_s'))}</td>
@@ -264,7 +302,8 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
     uid = 0
     for track in sorted(groups, key=str.lower):
         for ver in groups[track]:
-            body_rows.append(_row(track, ver, widgets_rel, uid))  # uid → unique ribbon gradient ids
+            body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
+                                  mix_uri=ver["rep"].get("mix_uri")))
             uid += 1
     rows_html = "\n".join(body_rows) or (
         f'<tr><td colspan="{_NCOLS}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
@@ -303,7 +342,17 @@ tbody td{{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:mi
 tbody tr:hover{{background:var(--panel2)}}              /* whole row tints on hover → reads as clickable */
 tbody tr:hover .ttl{{color:var(--wob)}}
 .tablewrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}  /* fallback: scroll, never squish */
-.c-track{{max-width:230px}}  /* cap the title column so long file-name subtitles don't blow the table wide */
+/* The td stays a normal table-cell (so every column shares one vertical-align baseline and rows can't
+   skew); the play button + title live in an INNER flex container, never on the <td> itself. */
+.c-track{{max-width:250px}}
+.tcell{{display:flex;align-items:center;gap:8px}}
+.tmeta{{min-width:0;flex:1}}  /* min-width:0 lets the title ellipsis-truncate inside the flex row */
+.cplay{{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
+ background:var(--panel2);color:var(--ink);cursor:pointer;font-size:10px;line-height:1;padding:0;text-align:center}}
+.cplay:hover{{border-color:var(--wob);color:var(--wob)}}
+.cplay.playing{{background:var(--wob);color:#0c0e14;border-color:var(--wob)}}
+svg.sig.play{{cursor:pointer}}  /* the ribbon doubles as a click-to-seek scrubber when playable */
+svg.sig .ph{{pointer-events:none}}
 .ttl{{display:block;font-weight:600;color:var(--ink);text-decoration:none;
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 a.ttl:hover{{color:var(--wob);text-decoration:underline}}
@@ -311,6 +360,8 @@ a.ttl:hover{{color:var(--wob);text-decoration:underline}}
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .c-num{{font-variant-numeric:tabular-nums;white-space:nowrap}}
 .c-ver{{color:var(--bright);font-weight:600;white-space:nowrap}}.runs{{color:var(--muted);font-weight:400;font-size:11px}}
+.stale{{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.04em;padding:1px 6px;border-radius:20px;background:rgba(255,180,84,.16);color:var(--warn);cursor:help}}
 .c-date,.c-key{{color:var(--muted);white-space:nowrap}}
 svg.arc{{width:130px;height:30px;display:block}}.noarc{{color:var(--muted)}}
 svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
@@ -388,15 +439,58 @@ document.querySelectorAll("th.sortable").forEach(th=>th.addEventListener("click"
  }});
  sorted.forEach(tr=>tbody.appendChild(tr));
 }}));
+// ── row preview player: one <audio> per playable row (the original run's web mix). Play/pause from
+// the round button; the playhead rides the TIME-axis ribbon; click the ribbon to seek. Offline.
+(function(){{
+ const SIG_W={SIG_W};
+ let cur=null;
+ function stop(){{ if(!cur)return; cur.audio.pause(); cur.btn.classList.remove("playing");
+   cur.btn.textContent="▶"; cur.ph.setAttribute("visibility","hidden"); cur=null; }}
+ function place(o){{ const d=o.audio.duration; if(!d||!isFinite(d))return;
+   const x=(o.audio.currentTime/d)*SIG_W; o.ph.setAttribute("x1",x.toFixed(1));
+   o.ph.setAttribute("x2",x.toFixed(1)); o.ph.setAttribute("visibility","visible"); }}
+ rows().forEach(tr=>{{
+  const src=tr.dataset.mix; if(!src)return;
+  const btn=tr.querySelector(".cplay"), svg=tr.querySelector("svg.sig.play");
+  const ph=svg&&svg.querySelector(".ph"); if(!btn||!svg||!ph)return;
+  let audio=null;
+  const ensure=()=>{{ if(!audio){{ audio=new Audio(src);
+    audio.addEventListener("timeupdate",()=>{{ if(cur&&cur.audio===audio)place(cur); }});
+    audio.addEventListener("ended",stop); }} return audio; }};
+  btn.addEventListener("click",e=>{{ e.preventDefault(); e.stopPropagation();
+   const a=ensure(); if(cur&&cur.audio===a){{ stop(); return; }} stop();
+   a.play().then(()=>{{ cur={{tr,audio:a,btn,ph,svg}}; btn.classList.add("playing");
+     btn.textContent="❚❚"; }}).catch(()=>{{}}); }});
+  svg.addEventListener("click",e=>{{ e.stopPropagation(); const a=ensure();
+   if(!a.duration||!isFinite(a.duration))return; const r=svg.getBoundingClientRect();
+   const f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); a.currentTime=f*a.duration;
+   if(cur&&cur.audio===a)place(cur); }});
+ }});
+}})();
 apply();
 </script></body></html>"""
+
+
+def _mix_uri_for(e) -> str | None:
+    """Absolute file:// URI of the original run's web mix (`<src_run_dir>/mix_web/mix.m4a`) when it
+    exists — the one-button catalog player source. None when there's no playable mix (the row then
+    renders without a play button — graceful, never a dead control). Touches the filesystem, so it
+    lives in the build wrapper, not the pure renderer."""
+    sd = e.get("src_run_dir")
+    if not sd:
+        return None
+    mix = Path(sd) / "mix_web" / "mix.m4a"
+    return mix.as_uri() if mix.exists() else None
 
 
 def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     """Read index.json, write index.html into the library root. Returns the path."""
     root = Path(root) if root else library.library_root()
     idx = library.load_index(root)
-    html_str = render_catalog_html(idx.get("entries", []))
+    entries = idx.get("entries", [])
+    for e in entries:                      # probe each run for a playable web mix (graceful if none)
+        e["mix_uri"] = _mix_uri_for(e)
+    html_str = render_catalog_html(entries)
     out = root / "index.html"
     root.mkdir(parents=True, exist_ok=True)
     out.write_text(html_str, encoding="utf-8")

@@ -65,6 +65,14 @@ class FullMode(unittest.TestCase):
         # skipping it = a deep analysis with no player and no stem lanes (the old regression)
         self.assertGreaterEqual(step_index(self.lines, "make_web_stems.py"), 0)
 
+    def test_full_also_encodes_a_web_mix_for_the_catalog(self):
+        # the widget uses the per-stem player, but the catalog's one-button preview needs a single
+        # mix → full ALSO encodes make_web_stems --audio into mix_web/ (session 10). Without it, full
+        # rows in the catalog would never get a play button.
+        mixes = [ln for ln in self.lines if "make_web_stems.py" in ln and "--audio" in ln]
+        self.assertTrue(mixes, "full mode must encode a web mix (mix_web) for the catalog player")
+        self.assertTrue(any("mix_web" in ln for ln in mixes), "the web mix must land in mix_web/")
+
     def test_separation_before_its_consumers(self):
         sep = step_index(self.lines, "separate.py")
         for consumer in ("masking.py", "make_web_stems.py", "drum_breakdown.py"):

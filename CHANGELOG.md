@@ -5,6 +5,25 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.7.6] — 2026-06-20
+
+### Fixed
+- **Quick read — the Producer's read no longer shows stray "#" or giant-heading text.** The write-up is
+  now rendered properly (headings, bold, bullets) regardless of how the markdown was wrapped.
+- **Quick read — no more empty Simple/Detailed switch.** A quick run has nothing extra to reveal (no
+  stems), so the switch is replaced by a hint ("run a full analysis for stem-by-stem detail"), and the
+  evidence drawer + all recommendations are shown by default.
+- **Quick read — the Track Story graph opens in the same calm view as every other widget** (no longer
+  the busier detailed graph).
+- **Structure bar (the coloured scene strip) no longer shows a part as a row of slivers with gaps** —
+  adjacent identical scenes are merged and the bar runs edge to edge. Applies to every track.
+
+### Added
+- **Play a track straight from the Library.** Each row now has a one-button preview player; the
+  signature ribbon doubles as a scrubber — click along it to seek. (Full runs become playable after a
+  re-analysis.)
+- **`docs/TEST_MATRIX.md`** — a complete map of what every page shows in every state, backing the tests.
+
 ## [0.7.5] — 2026-06-20
 
 ### Added

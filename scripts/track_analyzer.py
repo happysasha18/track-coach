@@ -225,6 +225,9 @@ def cmd_analyze(args):
                     "--out", j("result_notes_other.json"))
         # E — web stems: MANDATORY, makes the player + per-stem lanes appear
         rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
+        # …and the mix too → mix_web/mix.m4a, so the catalog's one-button preview player works on FULL
+        # runs as well (the widget itself still uses the per-stem player; this is just for the catalog).
+        rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
     elif args.mode == "quick":
         # Quick has no Demucs stems, but it DOES have the mix — encode a compressed copy so the widget
         # still gets a single-track player (transport + seek; no per-stem mute/solo). Sasha 2026-06-20:

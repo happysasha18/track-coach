@@ -234,5 +234,140 @@ class SectionLeadsReachTheBar(unittest.TestCase):
         self.assertIn("Operator Pad", html, "the lead label must be embedded in the output")
 
 
+class ProducerReadRendersServerSide(unittest.TestCase):
+    """The Producer's read is rendered to HTML in Python (`_read_html`) and shipped in the markup, so
+    it's directly testable. Session 10 bug (B1): the old JS parser handled `## `/`### ` only, so a
+    quick narrative starting `# Title` leaked a literal `#` as muted body text, and a heading with its
+    body on a SINGLE newline dumped the whole body inside the <h3>. These guards pin the fix."""
+
+    def test_h1_heading_is_not_leaked_as_literal_hash(self):
+        out = build_widget._read_html("# Total Reboot — Fragile\n\nbody text")
+        self.assertIn("<h3>Total Reboot — Fragile</h3>", out, "a '# ' heading must render as a heading")
+        self.assertNotIn("<p>#", out, "B1 regression: literal '#' leaked into the read body")
+        self.assertNotIn("# Total", out, "the literal hash+title must never appear as text")
+
+    def test_heading_with_single_newline_body_does_not_swallow_the_body(self):
+        out = build_widget._read_html("## What kind of track this is\nA long-form piece.")
+        self.assertIn("<h3>What kind of track this is</h3>", out, "heading must be just its first line")
+        self.assertIn("<p>A long-form piece.</p>", out, "body after a heading must become a paragraph")
+
+    def test_wellformed_read_is_unchanged(self):
+        out = build_widget._read_html("## Head\n\nBody with **bold** and *em*.\n\n- one\n- two")
+        self.assertIn("<h3>Head</h3>", out)
+        self.assertIn("<strong>bold</strong>", out)
+        self.assertIn("<em>em</em>", out)
+        self.assertIn("<ul><li>one</li><li>two</li></ul>", out)
+
+    def test_empty_narrative_renders_nothing_and_hides_the_panel(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_noread_"))
+        out = tmp / "w.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "No Read",
+                                build_widget.STRINGS, narrative_md=None)
+        html = out.read_text(encoding="utf-8")
+        m = re.search(r'<div id="readBody">(.*?)</div>', html, re.S)
+        self.assertEqual(m.group(1).strip(), "", "readBody must be empty with no narrative")
+        self.assertRegex(html, r'id="readPanel"[^>]*style="display:none"',
+                         "read panel must stay hidden when there's no narrative")
+
+    def test_rendered_widget_embeds_the_read_html(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_read_"))
+        out = tmp / "w.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Read",
+                                build_widget.STRINGS,
+                                narrative_md="# Title\n\n## Section\nThe mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        body = re.search(r'<div id="readBody">(.*?)</div>', html, re.S).group(1)
+        self.assertIn("<h3>Title</h3>", body)
+        self.assertIn("<h3>Section</h3>", body)
+        self.assertNotIn("<p>#", body, "no literal hash may reach the shipped read body")
+
+
+class CrossVersionPanelData(unittest.TestCase):
+    """INV-11: the in-widget #catalog cross-version panel carries exactly the catalog the build supplied,
+    and hides itself when there are no tracks. KI-2 was an empty D.catalog (orphan build) that hid the
+    panel in full while quick still showed one — so pin the data path + the hide guard."""
+
+    def test_supplied_catalog_reaches_the_payload(self):
+        cat = {"n_runs": 2, "tracks": [{"track": "T", "self": True,
+                                        "runs": [{"version": "v1", "self": True}]}]}
+        tmp = Path(tempfile.mkdtemp(prefix="tc_cat_"))
+        out = tmp / "w.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "X",
+                                build_widget.STRINGS, catalog=cat, narrative_md="x")
+        html = out.read_text(encoding="utf-8")
+        payload, _ = json.JSONDecoder().raw_decode(html.split("const D=", 1)[1])
+        self.assertEqual(payload.get("catalog"), cat, "the build's catalog must reach D.catalog intact")
+        self.assertIn("C.tracks.length", html, "the panel must keep its hide-when-empty guard")
+
+    def test_no_catalog_is_none(self):
+        _, payload = _render()  # _render passes no catalog
+        self.assertIsNone(payload.get("catalog"), "no catalog supplied → D.catalog must be null, not empty")
+
+
+class QuickHasNoToggleButAHint(unittest.TestCase):
+    """Session 10 (B2): a quick read has no stems, so the Simple/Detailed toggle is meaningless. Quick
+    renders a hint where the toggle was, and the toggle JS bails on quick so the body never enters
+    Simple — keeping the evidence drawer and all recommendations visible."""
+
+    def test_quick_renders_a_hint_not_the_toggle(self):
+        html, _ = _render(stems=(), mix=True, mode="quick")
+        self.assertIn('<div class="viewhint" id="viewToggle">', html, "quick must show the view hint")
+        self.assertNotIn('<div class="viewtoggle" id="viewToggle">', html, "quick must NOT show the toggle")
+        m = re.search(r'<div class="viewhint" id="viewToggle">([^<]+)</div>', html)
+        self.assertTrue(m and m.group(1).strip(), "the quick hint text must be present")
+
+    def test_quick_toggle_js_bails_so_body_never_enters_simple(self):
+        html, _ = _render(stems=(), mix=True, mode="quick")
+        self.assertRegex(html, r'if\(D\.mode===?"quick"\)return;',
+                         "the toggle must bail on quick so evidence + recs stay visible")
+
+    def test_full_still_renders_the_toggle_control(self):
+        html, _ = _render(stems=("drums", "bass"), mode="full")
+        self.assertIn('<div class="viewtoggle" id="viewToggle"></div>', html, "full must keep the toggle")
+        self.assertNotIn('class="viewhint"', html, "full must NOT show the quick hint")
+
+    def test_quick_draws_the_calm_four_lane_graph_like_the_others(self):
+        # Quick has no toggle, so its graph must open in the SAME calm 4-lane view the other widgets
+        # default to — not the 5-lane Detailed graph. The lane picker treats quick like Simple.
+        html, _ = _render(stems=(), mix=True, mode="quick")
+        self.assertRegex(html, r'contains\("simple"\)\s*\|\|\s*D\.mode===?"quick"',
+                         "quick must select the Simple (4-lane) lane set on the graph")
+
+
+class StructureBarIsTidy(unittest.TestCase):
+    """The structure bar must not show one continuous part as a row of same-letter slivers with holes
+    (worst on rough tracks: four consecutive 'D' slivers + a dropped sub-2s segment leaving a gap).
+    `_coalesce_scenes` merges adjacent same-letter scenes, closes gaps, and spans the whole track —
+    while preserving the A/B/A recurrence scheme (non-adjacent repeats stay distinct). Session 10."""
+
+    def test_merges_adjacent_same_letter_and_closes_gaps(self):
+        raw = [{"name": "x", "t0": 0.0, "t1": 48.0, "letter": "A"},
+               {"name": "x", "t0": 48.0, "t1": 144.0, "letter": "A"},
+               {"name": "x", "t0": 146.0, "t1": 214.0, "letter": "B"},   # gap 144→146
+               {"name": "x", "t0": 214.0, "t1": 242.0, "letter": "C"},
+               {"name": "x", "t0": 242.0, "t1": 303.0, "letter": "C"}]
+        out = build_widget._coalesce_scenes(raw, 303.0)
+        self.assertEqual([s["letter"] for s in out], ["A", "B", "C"], "adjacent same-letters must merge")
+        for i in range(1, len(out)):
+            self.assertEqual(out[i]["t0"], out[i - 1]["t1"], "bar must be contiguous (no gaps)")
+        self.assertEqual(out[0]["t0"], 0.0)
+        self.assertEqual(out[-1]["t1"], 303.0, "bar must span the whole track")
+
+    def test_preserves_non_adjacent_recurrence(self):
+        # A B A: the second A is NOT adjacent to the first → must stay a distinct returning scene
+        raw = [{"t0": 0, "t1": 30, "letter": "A", "name": "x"},
+               {"t0": 30, "t1": 60, "letter": "B", "name": "x"},
+               {"t0": 60, "t1": 90, "letter": "A", "name": "x"}]
+        out = build_widget._coalesce_scenes(raw, 90)
+        self.assertEqual([s["letter"] for s in out], ["A", "B", "A"], "non-adjacent repeats must survive")
+
+    def test_structure_bar_is_mode_independent(self):
+        # the bar must be identical full vs quick for the same data (it's a track property, not a mode)
+        full, pf = _render(stems=("drums", "bass", "vocals"), mode="full")
+        quick, pq = _render(stems=(), mix=True, mode="quick")
+        sig = lambda p: [(s["t0"], s["t1"], s["letter"]) for s in p["story"]["scenes"]]
+        self.assertEqual(sig(pf), sig(pq), "structure bar differs between full and quick — it must not")
+
+
 if __name__ == "__main__":
     unittest.main()

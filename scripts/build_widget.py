@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.7.5"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.7.6"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -45,6 +45,7 @@ STRINGS = {
         "mode_badge_full": "Full analysis",
         "mode_badge_quick": "Quick read",
         "quick_explainer": "Analysed from the mix only. A full run adds stem separation — the per-instrument player, masking, drum/note breakdown, and the section instrument labels on the structure bar.",
+        "quick_view_hint": "Run a full analysis for stem-by-stem detail.",
         "play_note_mix": "Playing the full mix. Click anywhere on the chart to jump; the white line is the playhead. Run a full analysis for per-stem play / mute / solo.",
         "arc_title": "Arrangement map",
         "arc_hint": "Energy / brightness / density / wobble over time. Grey bars = section boundaries. Hover for a shared cursor.",
@@ -842,6 +843,39 @@ def build_story(core, als_overlay):
             "components": components}
 
 
+def _coalesce_scenes(scenes, dur):
+    """Tidy the structure bar: merge adjacent scenes that share a letter (the same musical part
+    continuing — the selfsim letter-remap, or build_story dropping sub-2s segments, can shatter one
+    part into slivers and leave gaps), close any gaps, and span the whole track 0..dur. Clean tracks
+    (no adjacent same-letter, no gaps) pass through with only the end-snap. Mode-independent: the bar
+    is built identically for full and quick, so this changes neither relative to the other."""
+    if not scenes:
+        return scenes
+    sc = sorted((dict(s) for s in scenes), key=lambda s: s.get("t0", 0.0))
+    out = [sc[0]]
+    for s in sc[1:]:
+        prev = out[-1]
+        if s.get("letter") == prev.get("letter"):
+            # same part continuing → swallow into prev (bridging any gap); keep the longer span's name
+            if (s["t1"] - s["t0"]) > (prev["t1"] - prev["t0"]):
+                prev["name"] = s.get("name", prev.get("name"))
+                prev["tier"] = s.get("tier", prev.get("tier"))
+            prev["t1"] = max(prev["t1"], s["t1"])
+            if s.get("lead") and not prev.get("lead"):
+                prev["lead"] = s["lead"]
+        else:
+            s["t0"] = prev["t1"]                       # close any gap → contiguous bar
+            if s["t1"] > s["t0"] + 0.01:
+                out.append(s)
+            else:                                       # sliver fully inside prev → fold in
+                prev["t1"] = max(prev["t1"], s["t1"])
+    out[0]["t0"] = 0.0                                  # fill the ends so the bar spans the track
+    out[-1]["t1"] = round(float(dur), 2)
+    for s in out:
+        s["t0"], s["t1"] = round(s["t0"], 2), round(s["t1"], 2)
+    return out
+
+
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
@@ -949,6 +983,12 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                 if best.get("lead"):
                     sc["lead"] = best["lead"]
 
+    # Tidy the structure bar AFTER the letter remap: merge adjacent same-letter scenes and close gaps
+    # so one continuous part doesn't show as a row of slivers with holes (worst on rough tracks — e.g.
+    # four consecutive 'D' slivers + a dropped sub-2s segment). Mode-independent; clean tracks unchanged.
+    if story and story.get("scenes"):
+        story["scenes"] = _coalesce_scenes(story["scenes"], dur)
+
     recs = build_recommendations(core, detail, masking, S,
                                  als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm)
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
@@ -1008,7 +1048,6 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "drums": drums,
         "player": player,
         "presence_threshold": presence_threshold,
-        "narrative": narrative_md,
         "story": story,
         "mode": mode,
         "version": TC_VERSION,
@@ -1027,9 +1066,21 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     _badge_txt = _ui.get("mode_badge_quick", "Quick read") if _q else _ui.get("mode_badge_full", "Full analysis")
     badge_html = f'<span class="modebadge {"quick" if _q else "full"}" id="modeBadge">{_esc(_badge_txt)}</span>'
     note_html = f'<p class="modenote" id="modeNote">{_esc(_ui.get("quick_explainer", ""))}</p>' if _q else ""
+    # Producer's read — rendered to HTML here (server-side) so it ships in the markup, not built by JS.
+    read_body = _read_html(narrative_md)
+    read_title = _esc(_ui.get("read_title", "")) if read_body else ""
+    read_panel_style = "" if read_body else ' style="display:none"'
+    # View toggle: full gets the (JS-wired) Simple/Detailed control; quick gets a hint in its place,
+    # and the toggle JS bails on quick so the body never enters Simple → evidence + recs stay visible.
+    view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
+                   if _q else '<div class="viewtoggle" id="viewToggle"></div>')
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
             .replace("__MODEBADGE__", badge_html)
             .replace("__MODENOTE__", note_html)
+            .replace("__VIEWTOGGLE__", view_toggle)
+            .replace("__READTITLE__", read_title)
+            .replace("__READPANELSTYLE__", read_panel_style)
+            .replace("__READBODY__", read_body)
             .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False)))
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved: {out_path}  (Track Coach v{TC_VERSION})")
@@ -1058,6 +1109,55 @@ def _verdict_text(verdict, narrative_md):
         out = " ".join(parts[:2]).strip()
         return out[:320]
     return ""
+
+
+def _read_html(narrative_md):
+    """Render the Producer's read (a small markdown subset) to HTML **server-side**, so `#readBody`
+    is a real, testable artifact in the shipped file — no client-side parsing. This MIRRORS the old
+    JS mini-parser (headings → <h3>, **bold**, *italic*, '- '/'* ' bullets, soft-wrap collapse) and
+    FIXES two things that JS got wrong on quick reads (B1, session 10):
+      • it never handled a top-level '# ' heading → a quick narrative starting '# Title' rendered the
+        literal '#' as muted body text;
+      • a block whose first line was a heading but whose body followed on a SINGLE newline dumped the
+        whole body inside the <h3>. Here a heading is ONLY its first line; the rest becomes a <p>.
+    Well-formed reads (headings on their own blank-line-separated block) render byte-identically."""
+    if not narrative_md:
+        return ""
+
+    def esc(s):
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def inline(s):
+        s = esc(s)
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"\*(.+?)\*", r"<em>\1</em>", s)
+        return s
+
+    def para(s):                      # soft wraps → space; a real '  \n' hard break → <br>
+        s = inline(s)
+        s = re.sub(r" {2,}\n", "<br>", s)
+        return s.replace("\n", " ")
+
+    def block(t):
+        t = t.strip()
+        if not t:
+            return ""
+        first, _, rest = t.partition("\n")
+        m = re.match(r"^(#{1,6})\s+(.*)$", first)
+        if m:                          # ANY heading level → <h3>; trailing lines fold into a <p>
+            return f"<h3>{inline(m.group(2).strip())}</h3>" + (block(rest) if rest.strip() else "")
+        if re.match(r"^\s*[-*]\s+", t):
+            items = []
+            for ln in t.split("\n"):
+                mm = re.match(r"^\s*[-*]\s+(.*)$", ln)
+                if mm:
+                    items.append(mm.group(1))
+                elif items:
+                    items[-1] += "\n" + ln
+            return "<ul>" + "".join(f"<li>{para(it)}</li>" for it in items) + "</ul>"
+        return f"<p>{para(t)}</p>"
+
+    return "".join(block(b) for b in re.split(r"\n{2,}", narrative_md))
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -1099,6 +1199,8 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
  font:600 12.5px/1 inherit;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .12s}
 .viewtoggle button.on{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
 .viewtoggle button:hover:not(.on){color:var(--ink)}
+/* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
+.viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
 /* verdict — the calm one-glance headline */
 .verdict{background:linear-gradient(180deg,rgba(167,139,250,.10),rgba(167,139,250,.03));
  border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:14px;
@@ -1274,8 +1376,9 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
    <div class="brandkick">Track Coach __MODEBADGE__</div>
    <h1 id="title"></h1><div class="sub" id="sub"></div></div>
  <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
-      embedded in this file. It never calls the network, never costs anything. -->
- <div class="viewtoggle" id="viewToggle"></div>
+      embedded in this file. It never calls the network, never costs anything. On a QUICK read
+      there are no stems to reveal, so the toggle is replaced server-side by a hint. -->
+ __VIEWTOGGLE__
 </div>
 <div class="srcmeta" id="srcmeta"></div>
 <!-- Run-mode note: only on a quick read, spell out what a full run would add (Sasha 2026-06-20). -->
@@ -1316,10 +1419,11 @@ __MODENOTE__
  <div class="recs" id="recs"></div>
 </div>
 
-<!-- 3. THE READ: the diagnosis in prose, the Producer's view. -->
-<div class="panel read" id="readPanel" style="display:none">
- <h2 id="readTitle"></h2>
- <div id="readBody"></div>
+<!-- 3. THE READ: the diagnosis in prose, the Producer's view. Rendered SERVER-SIDE (markdown→HTML
+     in Python) so #readBody is a real, testable artifact and headings never leak a literal '#'. -->
+<div class="panel read" id="readPanel"__READPANELSTYLE__>
+ <h2 id="readTitle">__READTITLE__</h2>
+ <div id="readBody">__READBODY__</div>
 </div>
 
 <!-- Tonal balance — pulled OUT of the Evidence drawer (Sasha: "он прикольный") so it's always
@@ -1419,6 +1523,10 @@ const META=D.meta||{};
 // ── Simple⇄Detailed toggle. PURE presentation: flips a body class that hides/shows
 // already-embedded panels and re-filters the story lanes. No network, no recompute.
 (function(){const tg=document.getElementById("viewToggle");if(!tg)return;
+ // Quick reads have no Simple/Detailed view (no stems to reveal): the server rendered a hint in
+ // #viewToggle instead of the control, and we bail here so the body never gets `.simple` — the
+ // evidence drawer and all recommendations stay visible.
+ if(D.mode==="quick")return;
  tg.setAttribute("aria-label",T.view_aria||"Detail level");
  tg.innerHTML=`<button data-v="simple">${T.view_simple||"Simple"}</button>`+
   `<button data-v="full">${T.view_full||"Detailed"}</button>`;
@@ -1435,28 +1543,8 @@ const META=D.meta||{};
  let init="simple";const h=(location.hash||"").toLowerCase();
  if(h.indexOf("full")>=0||h.indexOf("detail")>=0)init="full";
  apply(init);})();
-if(D.narrative){
- const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
- const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>");
- // Source narrative is hard-wrapped (~80 chars/line). Treat single newlines as soft
- // wraps -> collapse to a space so the browser reflows; only a real markdown hard break
- // (line ending in 2+ trailing spaces) stays a <br>.
- const para=s=>inline(s).replace(/ {2,}\n/g,"<br>").replace(/\n/g," ");
- const html=D.narrative.split(/\n{2,}/).map(blk=>{const t=blk.trim();if(!t)return"";
-  if(t.startsWith("### "))return `<h3>${inline(t.slice(4))}</h3>`;
-  if(t.startsWith("## "))return `<h3>${inline(t.slice(3))}</h3>`;
-  // Bullet list ("- " / "* "): each bullet is an <li>; non-bullet continuation lines
-  // fold into the current item. Without this the whole list collapses into one run-on
-  // paragraph (dashes inline) — the main cause of the "wall of text" read.
-  if(/^\s*[-*]\s+/.test(t)){const items=[];
-   t.split("\n").forEach(ln=>{const m=ln.match(/^\s*[-*]\s+(.*)$/);
-    if(m)items.push(m[1]);else if(items.length)items[items.length-1]+="\n"+ln;});
-   return `<ul>${items.map(it=>`<li>${para(it)}</li>`).join("")}</ul>`;}
-  return `<p>${para(t)}</p>`;}).join("");
- document.getElementById("readTitle").textContent=T.read_title;
- document.getElementById("readBody").innerHTML=html;
- document.getElementById("readPanel").style.display="";
-}
+// The Producer's read (#readTitle/#readBody) is rendered SERVER-SIDE (see _read_html in
+// build_widget.py) and already present in the markup — no client-side markdown parsing here.
 document.getElementById("arrTitle").textContent=T.arr_title;
 document.getElementById("arrReadout").textContent=T.hover;
 document.getElementById("recsTitle").textContent=T.recs_title;
@@ -1606,7 +1694,11 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // (Supersedes the older 2-full-size reading from L542 of a prior session. DON'T revert to that.)
  const SIMPLE_LANES=["energy","brightness","density","stereo"];
  let comps=ALLCOMPS,ncomp=comps.length;
- const pickComps=()=>{const simple=document.body.classList.contains("simple");
+ // A quick read has no Simple/Detailed toggle, so it draws the SAME calm 4-lane graph the other
+ // widgets open with (the full Detailed 5th lane = modulation is a deep-detail thing). We treat
+ // quick like Simple for LANE SELECTION only — without putting `.simple` on <body>, so the
+ // evidence drawer and all recommendations stay visible in quick.
+ const pickComps=()=>{const simple=document.body.classList.contains("simple")||D.mode==="quick";
    comps=simple?ALLCOMPS.filter(c=>SIMPLE_LANES.includes(c.key)):ALLCOMPS;
    ncomp=comps.length;};
  const curveTop=PADT+RIB+MOM,compTop=curveTop+CUR+10,famBot=()=>famTop+nf*rowH;
