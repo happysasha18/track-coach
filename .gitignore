@@ -23,6 +23,11 @@ stems/
 *.flac
 *.als
 
+# …EXCEPT committed test fixtures: derived analysis JSON + the model's read (no music), and ONE tiny
+# synthetic clip for the analyze→json smoke test. These travel with the repo so tests run anywhere.
+!tests/fixtures/
+!tests/fixtures/**
+
 # Logs / temp
 *.log
 *.tmp
