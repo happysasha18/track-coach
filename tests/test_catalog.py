@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import library  # noqa: E402
 import catalog  # noqa: E402
+import build_widget  # noqa: E402  (cross-page tests render the widget surface too)
 
 
 class Downsample(unittest.TestCase):
@@ -279,11 +280,12 @@ class ClickableTitleNoOpenColumn(unittest.TestCase):
 
 
 class ResponsiveTable(unittest.TestCase):
-    """Sasha 2026-06-20: 'если не на полный экран таблица странно показывается'. On a narrow window the
-    11-column table must shed its least-important columns (media queries) rather than clip, with an
-    overflow-scroll fallback below the smallest breakpoint. We guard the BEHAVIOUR (several columns are
-    actually hidden, the last/widest one first) not the exact px breakpoints — those are free to tune.
-    nth-child is used in the catalog CSS only for this column-shedding, so counting it is meaningful."""
+    """INV-10. Sasha 2026-06-20: 'если не на полный экран таблица странно показывается'. On a narrow
+    window the 11-column table must shed its least-important columns (media queries) rather than clip,
+    with an overflow-scroll fallback below the smallest breakpoint. We guard the BEHAVIOUR (several
+    columns are actually hidden, the last/widest one first) not the exact px breakpoints — those are
+    free to tune. nth-child is used in the catalog CSS only for this column-shedding, so counting it
+    is meaningful."""
 
     def setUp(self):
         self.html = catalog.render_catalog_html([_e("T", "h", "s", 1, bpm=120, arc=[0.1, 1.0])])
@@ -341,8 +343,9 @@ class StaleWidgetFlag(unittest.TestCase):
 
 
 class FmtDate(unittest.TestCase):
-    """`_fmt_date` must format a normal `YYYY-MM-DD_HHMM` stamp AND never crash on a stamp that carries
-    extra underscores (a malformed deposit once did → 'too many values to unpack', broke the catalog)."""
+    """INV-13. `_fmt_date` must format a normal `YYYY-MM-DD_HHMM` stamp AND never crash on a stamp
+    that carries extra underscores (a malformed deposit once did → 'too many values to unpack', broke
+    the catalog)."""
 
     def test_normal_stamp(self):
         self.assertEqual(catalog._fmt_date("2026-06-18_0748"), "2026-06-18 07:48")
@@ -357,9 +360,10 @@ class FmtDate(unittest.TestCase):
 
 
 class CatalogRowPlayer(unittest.TestCase):
-    """Session 10: each row with a playable web mix gets a one-button preview player + a scrubber that
-    rides the TIME-axis ribbon (not the frequency strip). Rows without a mix render no control at all
-    (graceful). The audio source = the ORIGINAL run's mix (file:// in data-mix). PURE on the render."""
+    """INV-8, INV-9. Session 10: each row with a playable web mix gets a one-button preview player +
+    a scrubber that rides the TIME-axis ribbon (not the frequency strip). Rows without a mix render
+    no control at all (graceful). The audio source = the ORIGINAL run's mix (file:// in data-mix).
+    PURE on the render."""
 
     SIG = {"energy": [0.1, 0.5, 1.0], "brightness": [0.2, 0.6, 0.9], "density": [0.3, 0.5, 0.7],
            "tonal_balance": [{"band": f"b{i}", "rel_db": -i, "dev_db": 0} for i in range(9)]}
@@ -425,6 +429,75 @@ class CatalogRowPlayer(unittest.TestCase):
             mix.write_bytes(b"\x00")
             self.assertEqual(catalog._mix_uri_for({"src_run_dir": d}), mix.as_uri(),
                              "an existing web mix → its file:// URI")
+
+
+class NoResidualPlaceholder(unittest.TestCase):
+    """INV-21 — the catalog page must also ship zero unsubstituted __PLACEHOLDER__ tokens."""
+
+    def test_catalog_html_has_no_uppercase_placeholder(self):
+        html = catalog.render_catalog_html([_e("T", "h", "2026-06-18_0748", 1, arc=[0.1, 0.5, 1.0])])
+        leftovers = sorted(set(re.findall(r"__[A-Z][A-Z0-9_]*__", html)))
+        self.assertEqual(leftovers, [], f"INV-21: catalog shipped placeholder(s): {leftovers}")
+
+
+def _mini_core(n=24, dur=48.0):
+    tb = [round(i * dur / n, 3) for i in range(n)]
+    return {"duration_s": dur, "time_bins": tb, "tempo": 123,
+            "energy": [round(0.2 + 0.6 * i / n, 3) for i in range(n)],
+            "brightness": [round(0.5 + 0.2 * (i % 4), 3) for i in range(n)],
+            "density": [round(0.3 + 0.1 * (i % 5), 3) for i in range(n)],
+            "wobble_rate": [round(1.0 + (i % 4), 3) for i in range(n)],
+            "stereo_width": [round(0.4 + 0.1 * (i % 3), 3) for i in range(n)],
+            "energy_trend": 0.4, "brightness_trend": -0.1, "density_trend": 0.2,
+            "stereo_width_trend": 0.1, "wobble_rate_start_hz": 1.0, "wobble_rate_end_hz": 3.0,
+            "section_bounds_s": [round(dur * 0.5, 2)]}
+
+
+class CrossPageModeAgreement(unittest.TestCase):
+    """INV-20 (§7 X1) — the S2 catalog mode pill (.mode.{m}) and the S1 widget mode badge
+    (.modebadge.{m}) use the SAME word and SAME colour token per mode, so a run shown 'Quick' in the
+    catalog never opens a 'Full' widget. Asserted on BOTH rendered surfaces."""
+
+    @staticmethod
+    def _widget_html(mode):
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="tc_xpage_"))
+        if mode == "quick":
+            (tmp / "mix_web").mkdir(); (tmp / "mix_web" / "mix.m4a").write_bytes(b"\x00")
+            kw = dict(audio_mix_rel="mix_web", mode="quick")
+        else:
+            (tmp / "stems_web").mkdir()
+            for s in ("drums", "bass"):
+                (tmp / "stems_web" / f"{s}.m4a").write_bytes(b"\x00")
+            kw = dict(audio_stems_rel="stems_web", mode="full")
+        out = tmp / "w.html"
+        build_widget.build_html(_mini_core(), {}, None, None, str(out), "X", build_widget.STRINGS, **kw)
+        return out.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _colour(css, selector):
+        # the colour var declared for a `selector{...color:var(--x)...}` rule
+        m = re.search(re.escape(selector) + r"\s*\{[^}]*color:var\((--[a-z]+)\)", css)
+        return m.group(1) if m else None
+
+    def test_word_matches_across_pages(self):
+        for mode in ("full", "quick"):
+            cat = catalog.render_catalog_html([_e("T", "h", "2026-06-18_0748", 1, mode=mode, arc=[0.1, 1.0])])
+            self.assertIn(f'class="mode {mode}"', cat, f"catalog pill missing for mode={mode}")
+            self.assertIn(f'class="modebadge {mode}"', self._widget_html(mode),
+                          f"widget badge word disagrees with catalog for mode={mode}")
+
+    def test_colour_token_matches_across_pages(self):
+        cat = catalog.render_catalog_html([_e("T", "h", "2026-06-18_0748", 1, arc=[0.1, 1.0])])
+        wid_full = self._widget_html("full")
+        wid_quick = self._widget_html("quick")
+        for mode, wid in (("full", wid_full), ("quick", wid_quick)):
+            cat_col = self._colour(cat, f".mode.{mode}")
+            wid_col = self._colour(wid, f".modebadge.{mode}")
+            self.assertIsNotNone(cat_col, f"catalog .mode.{mode} colour not found")
+            self.assertIsNotNone(wid_col, f"widget .modebadge.{mode} colour not found")
+            self.assertEqual(cat_col, wid_col,
+                             f"INV-20: mode={mode} colour differs — catalog {cat_col} vs widget {wid_col}")
 
 
 if __name__ == "__main__":

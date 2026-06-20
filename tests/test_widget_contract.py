@@ -73,9 +73,9 @@ class PanelsExist(unittest.TestCase):
             self.assertIn(el, HTML, f"rendered widget is missing the panel: {el}")
 
     def test_producer_read_is_rendered_server_side_when_a_narrative_exists(self):
-        # The read is now rendered SERVER-SIDE (session 10): #readBody ships filled in the markup and
-        # the panel is visible — not built by JS. We rendered WITH a narrative, so assert the body is
-        # non-empty real HTML and the panel isn't hidden.
+        # INV-2: The read is now rendered SERVER-SIDE (session 10): #readBody ships filled in the
+        # markup and the panel is visible — not built by JS. We rendered WITH a narrative, so assert
+        # the body is non-empty real HTML and the panel isn't hidden.
         m = re.search(r'<div id="readBody">(.*?)</div>', HTML, re.S)
         self.assertIsNotNone(m, "rendered widget has no #readBody")
         self.assertTrue(m.group(1).strip(), "producer's read was not rendered into #readBody server-side")
@@ -134,6 +134,16 @@ class SimpleViewGating(unittest.TestCase):
         # the per-stem canvas + its key are Detailed-only; the transport stays in both views
         self.assertRegex(HTML, r"body\.simple\s+#stemlanes", "demux stem viz must be hidden in Simple")
         self.assertRegex(HTML, r"body\.simple\s+#seqKey", "demux sequencer key must be hidden in Simple")
+
+
+class NoResidualPlaceholder(unittest.TestCase):
+    """INV-21 — every `__PLACEHOLDER__` the L-py template declares must be substituted before the
+    widget reaches the producer. A new template slot wired into the HTML but not into the Python emits
+    a literal `__NEWTHING__` — visible garbage, caught by nothing else. One regex over the real output."""
+
+    def test_no_uppercase_double_underscore_token_survives(self):
+        leftovers = sorted(set(re.findall(r"__[A-Z][A-Z0-9_]*__", HTML)))
+        self.assertEqual(leftovers, [], f"INV-21: unsubstituted template placeholder(s) shipped: {leftovers}")
 
 
 class ModeLabel(unittest.TestCase):

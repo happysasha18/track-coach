@@ -26,9 +26,21 @@ trace to it. Written/updated FIRST; code follows.
   ORIGINAL run dir (`src_run_dir`/`src_widget`).
 
 ## §2 — States & transitions
-States: **mode** {full, quick} × **view** {simple, detailed} (view is full-only ⇒ quick is one state)
-× **.als present** {yes, no} (only changes the Evidence drawer's arrangement/automation/stem-map).
-Effective: **F-S** (full+simple), **F-D** (full+detailed), **Q** (quick, no view).
+The state space is **3-dimensional**: a view-state × the run's data-states. A flat (element × view)
+grid hides the data axis, so it is named here and folded into §5.
+
+**View axis** — **mode** {full, quick} × **view** {simple, detailed} (view is full-only ⇒ quick is one
+state). Effective view-states: **F-S** (full+simple), **F-D** (full+detailed), **Q** (quick, no view).
+
+**Data axis** (independent of view; each toggles whether an element has anything to show):
+- **stems** {none, present, empty} — `none` = quick run (no separation); `present` = full run with real
+  material; `empty` = full run where separation returned near-silence for a stem (the KI-1 class).
+  Drives: stem lanes, per-stem player, stem-map / rhythm / notes, empty-stem caveat.
+- **.als** {none, present} — drives ONLY the Evidence drawer's arrangement + automation panels.
+- **web mix** {none, present} — drives the S1 single-track player (quick) and the S2 row preview.
+
+A cell in §5 is `(element × view-state × data-state)`; an element that doesn't depend on a data-state
+is constant across it.
 
 Transitions:
 - **toggle** (full only): S→D reveals the deep layer (stem lanes, Evidence drawer, global recs);
@@ -42,7 +54,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | # | Invariant | Owning test |
 |---|---|---|
 | INV-1 | The Producer's read never emits a literal leading `#`; every `#…`/`##…`/`###…` line is a heading; body after a heading is a `<p>`, never swallowed. | `test_widget_render::ProducerReadRendersServerSide` |
-| INV-2 | The read is rendered SERVER-SIDE; `#readBody` ships filled iff a narrative exists, else the panel is hidden. | `…::ProducerReadRendersServerSide`, `test_widget_contract` |
+| INV-2 | The read is rendered SERVER-SIDE; `#readBody` ships filled iff a narrative exists, else the panel is hidden. | `…::ProducerReadRendersServerSide`, `test_widget_contract::PanelsExist::test_producer_read_is_rendered_server_side_when_a_narrative_exists` |
 | INV-3 | **Quick has no Simple/Detailed toggle** — a hint sits in its place; the toggle JS bails on quick. Quick is the LADDER FLOOR: it shows BRIEF recs (timecoded only, like the calm view) via `body.quick`, not all. Evidence is always visible (INV-18). | `…::QuickHasNoToggleButAHint` |
 | INV-4 | The Track Story graph opens at the **calm 4-lane** set in quick and full-simple; full-detailed = 5 (+modulation). Lane height constant ⇒ area ∝ count. | `…::PerViewLaneSets`, `…::QuickHasNoToggleButAHint::…four_lane` |
 | INV-5 | The structure bar is **contiguous** (no gaps), has **no adjacent same-letter slivers**, spans 0..dur, and **preserves non-adjacent recurrence** (A/B/A). | `…::StructureBarIsTidy` |
@@ -59,6 +71,10 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells (no project ⇒ `D.als` null ⇒ each panel self-hides). Same gate in full and quick. | `test_widget_render::AlsPanelsGateOnData` |
 | INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
 | INV-18 | The Evidence drawer is present and visible in EVERY view — Simple, Detailed, and quick (never CSS-hidden by `.simple`). Only its inner panels gate on data (arr/auto need `.als` — INV-16; map/rhythm/notes need stems). The Simple view hides ONLY `#stemlanes`/`#seqKey` (deep stem viz) and the non-timecoded `#recs`. | `test_widget_contract::SimpleViewGating` |
+| INV-19 | **View ladder is monotonic: `quick ⊆ full-Simple ⊆ full-Detailed`.** For every element, if it is visible at a lower tier it is visible at every higher tier (a lower-but-not-higher visibility is a bug). The §5 grid is the enumerated source; the property must hold over ALL rows, so a NEW element can't re-introduce the inversion INV-3 fixed. | `test_view_ladder::LadderIsMonotonic` |
+| INV-20 | **Cross-page mode agreement:** the S2 catalog mode pill (`.mode.{m}`) and the S1 widget mode badge (`.modebadge.{m}`) use the **same word** and the **same colour token** for the same mode (`full`→`--good`, `quick`→`--bright`). A run shown "Quick" in the catalog never opens a "Full" widget. | `test_catalog::CrossPageModeAgreement` |
+| INV-21 | **No residual template placeholder.** The shipped S1 and S2 HTML contain zero `__[A-Z][A-Z0-9_]*__` tokens — every `__PLACEHOLDER__` the L-py template declares is substituted before the artifact reaches the producer. | `test_widget_contract::NoResidualPlaceholder`, `test_catalog::NoResidualPlaceholder` |
+| INV-22 | **CSS gating contract = the ladder's mechanism.** Visibility tiers are realised by a single positive body class `simple` (and `quick`); **there is no `body.detailed` class** — Detailed is the absence of `.simple`, so it hides nothing and shows the full set. The Simple hide-set is exactly `{#stemlanes,#seqKey,#recs .rec:not([data-t])}`; quick withholds the same stem viz by DATA absence (no stems), not a CSS rule — both honour INV-19. | `test_view_ladder::CssGatingContract` |
 
 ## §4 — Surfaces & layers
 - **S1 widget** (`build_widget.py`): **L-py** server template + substitutions (`__MODEBADGE__`,
@@ -67,37 +83,71 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 - **S2 catalog** (`catalog.py` + pure `library.py`): one server-rendered table; **L-js** for
   filter/sort + the row preview player.
 
-## §5 — S1 widget: element grid (show? per state · how · layer)
-`✓`=visible `—`=hidden `n/a`=not produced.
+### §4b — Style layer (CSS visibility contract — the historically-fragile axis)
+View gating is CSS, asserted on the RENDERED stylesheet (INV-22). Body classes set by L-py
+(`__BODYCLASS__` = `"quick"` on a quick run, else empty) and L-js (toggle adds/removes `simple`).
 
-| Element (id) | F-S | F-D | Q | How · layer |
-|---|:--:|:--:|:--:|---|
-| `modeBadge` | ✓ | ✓ | ✓ | green "Full analysis" / amber "Quick read" · L-py |
-| `modeNote` (quick explainer) | — | — | ✓ | one muted line · L-py |
-| `viewToggle` | toggle | toggle | **hint** | full: Simple/Detailed; quick: `.viewhint` text, no buttons · L-py |
-| `vitals` / `verdict` | ✓ | ✓ | ✓ | spec row · calm headline · L-js |
-| Track Story `story` | ✓ (4) | ✓ (5) | ✓ (4) | INV-4 · L-js |
-| └ structure bar (scenes) | ✓ | ✓ | ✓ | INV-5/6; leads need stems (full) · L-py `_coalesce_scenes` + L-js |
-| player transport | ✓ | ✓ | ✓ | play/seek/time · L-js |
-| `stemlanes`+`seqKey` | — | ✓ | n/a | detailed + full only · L-js |
-| `recs` | timecoded | all | timecoded | ladder: quick=calm ⊆ detailed; quick filters via `body.quick`, Simple via `body.simple` · INV-3 · L-js + CSS |
-| `readPanel`/`readBody` | ✓ | ✓ | ✓ | INV-1/2 · **L-py** |
-| `tonalPanel` | ✓ | ✓ | ✓ | always · L-js |
-| `evidence` (arr/auto/map/rhythm/notes) | ✓ | ✓ | ✓ | ALWAYS visible in every view (INV-18); arr/auto need .als (INV-16), map/rhythm/notes need stems · L-js |
-| `#catalog` cross-version panel | ✓ | ✓ | ✓ | INV-11 · L-js |
-| footer `TC_VERSION` | ✓ | ✓ | ✓ | L-py |
+| body class | who sets it | hides (selector → effect) |
+|---|---|---|
+| _(none)_ = **Detailed** | default for full (no `.simple`) | nothing — full element set visible |
+| `simple` | L-js toggle (`apply("simple")`) | `#stemlanes`, `#seqKey` → `display:none`; `#recs .rec:not([data-t])` → `display:none` |
+| `quick` | L-py at render (`__BODYCLASS__`) | `#recs .rec:not([data-t])` → `display:none` (stem viz withheld by DATA absence, not CSS) |
+
+Contract: **no `body.detailed` / `.detailed` selector exists** (Detailed = absence of `simple`). Adding
+one is a new tier mechanism ⇒ update INV-22 + §5 first. The quick stem-viz hole (a quick run that
+somehow emitted `#stemlanes` would not be CSS-hidden) is closed by data, not style — so if quick ever
+gains stem data, INV-22/§5 must add a `body.quick #stemlanes` rule.
+
+## §5 — S1 widget: element grid (show? per view-state × data-state · how · layer)
+`✓`=visible `—`=hidden(CSS) `n/a`=not produced(data). The **data gate** column names the data-state an
+element depends on (§2 data axis); where it says "—", visibility is view-only and constant across data.
+
+| Element (id) | F-S | F-D | Q | data gate | How · layer |
+|---|:--:|:--:|:--:|---|---|
+| `modeBadge` | ✓ | ✓ | ✓ | — | green "Full analysis" / amber "Quick read" · L-py |
+| `modeNote` (quick explainer) | — | — | ✓ | — | one muted line · L-py |
+| `viewToggle` | toggle | toggle | **hint** | — | full: Simple/Detailed; quick: `.viewhint` text, no buttons · L-py |
+| `vitals` / `verdict` | ✓ | ✓ | ✓ | — | spec row · calm headline · L-js |
+| Track Story `story` | ✓ (4) | ✓ (5) | ✓ (4) | — | INV-4 · L-js |
+| └ structure bar (scenes) | ✓ | ✓ | ✓ | scene leads need stems=present | INV-5/6; bare bar always, lead labels only full · L-py `_coalesce_scenes` + L-js |
+| player transport | ✓ | ✓ | ✓ | needs web mix OR stems (else absent) | per-stem if stems=present, mix if web mix; no audio ⇒ no player (INV-7) · L-js |
+| `stemlanes`+`seqKey` | — | ✓ | n/a | stems=present | hidden in Simple (CSS); quick has stems=none ⇒ not produced · L-js + CSS |
+| `recs` | timecoded | all | timecoded | — | ladder INV-3/19: quick filters via `body.quick`, Simple via `body.simple` · L-js + CSS |
+| `readPanel`/`readBody` | ✓ | ✓ | ✓ | hidden if no narrative (INV-2) | server-rendered; panel self-hides when empty · INV-1/2 · **L-py** |
+| `tonalPanel` | ✓ | ✓ | ✓ | — | always · L-js |
+| `evidence` drawer | ✓ | ✓ | ✓ | — | ALWAYS visible in every view (INV-18) · L-js |
+| └ arr/auto panels | ✓ | ✓ | ✓ | .als=present | each self-hides with no `.als` (INV-16) · L-js |
+| └ map/rhythm/notes panels | ✓ | ✓ | n/a | stems=present | self-hide without stems; quick=none · L-js |
+| └ empty-stem caveat | ✓ | ✓ | n/a | stems=empty | shown only when a stem came back near-silent (KI-1 class) · L-js |
+| `#catalog` cross-version panel | ✓ | ✓ | ✓ | hides if 0 tracks (INV-11) | INV-11 · L-js |
+| footer `TC_VERSION` | ✓ | ✓ | ✓ | — | L-py |
+
+> This grid is mirrored by the `GRID` dict in `test_view_ladder::LadderIsMonotonic::test_grid_visibility_is_monotonic`
+> (the monotonicity property test). **Change both together** (change protocol). The companion checks in
+> that file read CSS hide-sets off the rendered HTML and are drift-proof on their own.
 
 ## §6 — S2 catalog: element grid
-| Element | full row | quick row | How · layer |
-|---|:--:|:--:|---|
-| title link `a.ttl` | ✓ | ✓ | → CURRENT original widget (`_open_href`); INV-12 · catalog.py |
-| play button `.cplay` + scrubber | ✓‡ | ✓‡ | INV-8/9; ‡ only when web mix exists · catalog.py + L-js |
-| signature `c-sig` | ✓ | ✓ | ribbon (time) over 9-band tonal strip (freq) · catalog.py |
-| spec cols / `mode` pill / `modeseg` filter / search / responsive / footer ver | ✓ | ✓ | INV-10 · catalog.py |
+| Element | full row | quick row | data gate | How · layer |
+|---|:--:|:--:|---|---|
+| title link `a.ttl` | ✓ | ✓ | — | → CURRENT original widget (`_open_href`); INV-12 · catalog.py |
+| play button `.cplay` + scrubber | ✓‡ | ✓‡ | web mix=present | ‡ control omitted with no mix (INV-8); scrubber rides ribbon (INV-9) · catalog.py + L-js |
+| signature `c-sig` | ✓ | ✓ | curves present (else dash) | ribbon (time) over 9-band tonal strip (freq) · catalog.py |
+| spec cols (bpm/key/len/LUFS/…) | ✓ | ✓ | per-metric dash if absent | INV-13 date fmt · catalog.py |
+| `mode` pill `.mode.{m}` | ✓ | ✓ | — | word+colour agree with S1 badge (INV-20) · catalog.py |
+| `stale` chip | ‡ | ‡ | linked widget < TC_VERSION | INV-12 · catalog.py |
+| `modeseg` filter / search box | ✓ | ✓ | — | client filter/sort · L-js |
+| responsive column-shed | ✓ | ✓ | — | fixed col count, progressive shed (INV-10) · catalog.py |
+| footer version | ✓ | ✓ | — | catalog.py |
 
-## §7 — Cross-page links (same run, two surfaces)
-mode badge (S1) ↔ mode pill (S2) same word+colour · title link opens the matching-badge widget ·
-Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 one-button preview (same mix).
+## §7 — Cross-page correspondences (same run, two surfaces) — each row is an invariant
+A flat per-surface grid can't see drift BETWEEN the two pages; these are the cross-page rules.
+
+| # | S1 widget source | S2 catalog source | rule | owning test |
+|---|---|---|---|---|
+| X1 | mode badge `.modebadge.{m}` | mode pill `.mode.{m}` | same word + same colour token (`full`→`--good`, `quick`→`--bright`) | INV-20 · `test_catalog::CrossPageModeAgreement` |
+| X2 | the widget a title link opens | row title link `_open_href` | the link opens THAT run's CURRENT widget; stale ⇒ flagged, not silently old | INV-12/17 · `test_catalog::StaleWidgetFlag`, `CatalogIsLocalIndex` |
+| X3 | Track Story arc (`story` curves) | signature ribbon `c-sig` | same underlying run curves (ribbon = downsample of the arc source) | `test_catalog::RunMetrics`, `Signature` |
+| X4 | S1 player (per-stem / mix) | S2 one-button preview | both play the SAME run's web mix; absent mix ⇒ no control on either (INV-7/8) | `test_catalog::CatalogRowPlayer` |
 
 ## §8 — Coverage status
 - **INV-11 — CLOSED.** `CrossVersionPanelData` pins the `D.catalog` passthrough + the hide-when-empty
@@ -106,7 +156,15 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
   `TC_VERSION` with a 'stale' chip (`_stale_chip`, parsed from the widget filename — no schema change),
   pinned by `StaleWidgetFlag`. So staleness is visible at a glance instead of silently opening an old
   widget. (Option b — an integration test that every deposit == `TC_VERSION` — is deferred to fixtures,
-  Phase 5.) Every invariant INV-1…INV-13 now has an owning test.
+  Phase 5.)
+- **Traceability is now BIDIRECTIONAL (session 12).** Every invariant **INV-1…INV-22** has an owning
+  test that exists and asserts it (audited by deed, s12), and each owning test back-references its own
+  `INV-N` token so a grep finds the guard from the rule and vice-versa. INV-2's owner is named precisely
+  (`test_widget_contract::PanelsExist::test_producer_read_is_rendered_server_side_when_a_narrative_exists`).
+- **Completeness pass (session 12).** §2 gained the data axis (stems/.als/web-mix); §5 is now
+  (element × view × data-state) with a `data gate` column; §4b adds the Style layer; §6 split into
+  per-element rows; §7 is a cross-page invariant grid. New invariants: INV-19 (ladder monotonicity),
+  INV-20 (cross-page mode), INV-21 (no residual placeholder), INV-22 (CSS gating contract).
 
 ## §9 — Known issues
 - **KI-1 (INV-12) + KI-2 (INV-11) — ROOT CAUSE FOUND, resolved operationally.** Both came from showing/

@@ -101,11 +101,11 @@ class StoryCurvesReachThePayload(unittest.TestCase):
 
 
 class PerViewLaneSets(unittest.TestCase):
-    """The whole point of the Simple/Detailed toggle: which curves each view shows. Simple = the two
-    named lanes drawn full-size, Detailed = all (settled spec, transcript L542). We pin the exact
-    sets + the full-size requirement here so any change must be a deliberate, test-updating change
-    with a fresh citation — not a silent widening like 0.7.1's (which this suite failed to catch
-    because the expectation was edited to match the regression)."""
+    """INV-4. The whole point of the Simple/Detailed toggle: which curves each view shows. Simple =
+    the two named lanes drawn full-size, Detailed = all (settled spec, transcript L542). We pin the
+    exact sets + the full-size requirement here so any change must be a deliberate, test-updating
+    change with a fresh citation — not a silent widening like 0.7.1's (which this suite failed to
+    catch because the expectation was edited to match the regression)."""
 
     @classmethod
     def setUpClass(cls):
@@ -168,8 +168,8 @@ class BackToLibraryButton(unittest.TestCase):
 
 
 class PlayerIsWired(unittest.TestCase):
-    """A full widget must produce a per-stem player bound to the real stem sources — the 'dead
-    player' regression was a player div with no sources behind it."""
+    """INV-7. A full widget must produce a per-stem player bound to the real stem sources — the
+    'dead player' regression was a player div with no sources behind it."""
 
     def test_player_has_one_src_per_stem(self):
         _, payload = _render(stems=("drums", "bass", "vocals", "other"))
@@ -188,9 +188,10 @@ class PlayerIsWired(unittest.TestCase):
 
 
 class QuickRunGivesAMixPlayer(unittest.TestCase):
-    """Sasha 2026-06-20 ("плеер какая разница быстрый прогон?"): a quick run has no stems but still
-    has the mix, so it MUST get a single-track player — and be clearly badged as a quick read, while
-    keeping the full Track-Story graph + structure bar (only the stem-dependent panels drop out)."""
+    """INV-7. Sasha 2026-06-20 ("плеер какая разница быстрый прогон?"): a quick run has no stems
+    but still has the mix, so it MUST get a single-track player — and be clearly badged as a quick
+    read, while keeping the full Track-Story graph + structure bar (only the stem-dependent panels
+    drop out)."""
 
     @classmethod
     def setUpClass(cls):
@@ -235,10 +236,11 @@ class SectionLeadsReachTheBar(unittest.TestCase):
 
 
 class ProducerReadRendersServerSide(unittest.TestCase):
-    """The Producer's read is rendered to HTML in Python (`_read_html`) and shipped in the markup, so
-    it's directly testable. Session 10 bug (B1): the old JS parser handled `## `/`### ` only, so a
-    quick narrative starting `# Title` leaked a literal `#` as muted body text, and a heading with its
-    body on a SINGLE newline dumped the whole body inside the <h3>. These guards pin the fix."""
+    """INV-1, INV-2. The Producer's read is rendered to HTML in Python (`_read_html`) and shipped in
+    the markup, so it's directly testable. Session 10 bug (B1): the old JS parser handled `## `/`### `
+    only, so a quick narrative starting `# Title` leaked a literal `#` as muted body text, and a
+    heading with its body on a SINGLE newline dumped the whole body inside the <h3>. These guards pin
+    the fix."""
 
     def test_h1_heading_is_not_leaked_as_literal_hash(self):
         out = build_widget._read_html("# Total Reboot — Fragile\n\nbody text")
@@ -305,10 +307,11 @@ class CrossVersionPanelData(unittest.TestCase):
 
 
 class QuickHasNoToggleButAHint(unittest.TestCase):
-    """Session 10 (B2): a quick read has no stems, so the Simple/Detailed toggle is meaningless. Quick
-    renders a hint where the toggle was, and the toggle JS bails on quick so the body never enters
-    Simple. Quick is the LADDER FLOOR (Sasha, 2026-06-20): the Evidence drawer stays visible (INV-18)
-    but recs are BRIEF — timecoded only, like the calm view — gated by a `body.quick` CSS rule."""
+    """INV-3, INV-4. Session 10 (B2): a quick read has no stems, so the Simple/Detailed toggle is
+    meaningless. Quick renders a hint where the toggle was, and the toggle JS bails on quick so the
+    body never enters Simple. Quick is the LADDER FLOOR (Sasha, 2026-06-20): the Evidence drawer
+    stays visible (INV-18) but recs are BRIEF — timecoded only, like the calm view — gated by a
+    `body.quick` CSS rule."""
 
     def test_quick_renders_a_hint_not_the_toggle(self):
         html, _ = _render(stems=(), mix=True, mode="quick")
@@ -350,10 +353,11 @@ class QuickHasNoToggleButAHint(unittest.TestCase):
 
 
 class StructureBarIsTidy(unittest.TestCase):
-    """The structure bar must not show one continuous part as a row of same-letter slivers with holes
-    (worst on rough tracks: four consecutive 'D' slivers + a dropped sub-2s segment leaving a gap).
-    `_coalesce_scenes` merges adjacent same-letter scenes, closes gaps, and spans the whole track —
-    while preserving the A/B/A recurrence scheme (non-adjacent repeats stay distinct). Session 10."""
+    """INV-5. The structure bar must not show one continuous part as a row of same-letter slivers
+    with holes (worst on rough tracks: four consecutive 'D' slivers + a dropped sub-2s segment
+    leaving a gap). `_coalesce_scenes` merges adjacent same-letter scenes, closes gaps, and spans
+    the whole track — while preserving the A/B/A recurrence scheme (non-adjacent repeats stay
+    distinct). Session 10."""
 
     def test_merges_adjacent_same_letter_and_closes_gaps(self):
         raw = [{"name": "x", "t0": 0.0, "t1": 48.0, "letter": "A"},
@@ -377,7 +381,7 @@ class StructureBarIsTidy(unittest.TestCase):
         self.assertEqual([s["letter"] for s in out], ["A", "B", "A"], "non-adjacent repeats must survive")
 
     def test_structure_bar_is_mode_independent(self):
-        # the bar must be identical full vs quick for the same data (it's a track property, not a mode)
+        # INV-6: the bar must be identical full vs quick for the same data (it's a track property, not a mode)
         full, pf = _render(stems=("drums", "bass", "vocals"), mode="full")
         quick, pq = _render(stems=(), mix=True, mode="quick")
         sig = lambda p: [(s["t0"], s["t1"], s["letter"]) for s in p["story"]["scenes"]]
