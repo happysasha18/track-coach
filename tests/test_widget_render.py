@@ -307,7 +307,8 @@ class CrossVersionPanelData(unittest.TestCase):
 class QuickHasNoToggleButAHint(unittest.TestCase):
     """Session 10 (B2): a quick read has no stems, so the Simple/Detailed toggle is meaningless. Quick
     renders a hint where the toggle was, and the toggle JS bails on quick so the body never enters
-    Simple — keeping the evidence drawer and all recommendations visible."""
+    Simple. Quick is the LADDER FLOOR (Sasha, 2026-06-20): the Evidence drawer stays visible (INV-18)
+    but recs are BRIEF — timecoded only, like the calm view — gated by a `body.quick` CSS rule."""
 
     def test_quick_renders_a_hint_not_the_toggle(self):
         html, _ = _render(stems=(), mix=True, mode="quick")
@@ -319,7 +320,21 @@ class QuickHasNoToggleButAHint(unittest.TestCase):
     def test_quick_toggle_js_bails_so_body_never_enters_simple(self):
         html, _ = _render(stems=(), mix=True, mode="quick")
         self.assertRegex(html, r'if\(D\.mode===?"quick"\)return;',
-                         "the toggle must bail on quick so evidence + recs stay visible")
+                         "the toggle must bail on quick so it uses the calm 4-lane graph + keeps evidence")
+
+    def test_quick_shows_brief_timecoded_recs_only(self):
+        # ladder floor (Sasha 2026-06-20): quick shows the SAME brief recs as the calm view — the
+        # timecoded ones — via a body.quick rule, never all of them. The body must carry the class.
+        html, _ = _render(stems=(), mix=True, mode="quick")
+        self.assertRegex(html, r"<body[^>]*\bclass=\"[^\"]*\bquick\b",
+                         "quick read must tag the body so its recs can be filtered")
+        self.assertRegex(html, r"body\.quick\s+#recs\s+\.rec:not\(\[data-t\]\)",
+                         "quick must hide non-timecoded recs (brief, like the calm view)")
+
+    def test_full_body_is_not_tagged_quick(self):
+        html, _ = _render(stems=("drums", "bass"), mode="full")
+        self.assertNotRegex(html, r"<body[^>]*\bclass=\"[^\"]*\bquick\b",
+                            "a full read must NOT carry the quick body class")
 
     def test_full_still_renders_the_toggle_control(self):
         html, _ = _render(stems=("drums", "bass"), mode="full")

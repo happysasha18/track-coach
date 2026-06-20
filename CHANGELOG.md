@@ -5,6 +5,27 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.7.7] — 2026-06-20
+
+The three views are now a clear **information ladder**: the quick read shows the least, the calm
+(Simple) view adds to it, and the detailed view adds the most — nothing visible in a lighter view ever
+disappears in a heavier one.
+
+### Fixed
+- **The "Evidence & detail" drawer is now available in every view** — including the calm view, where it
+  used to vanish. It stays a collapsed, opt-in drawer, so the calm view stays calm; the deep per-stem
+  visualisation remains detailed-only.
+- **The quick read now shows brief recommendations** (only the ones pinned to a moment on the graph),
+  matching the calm view, instead of dumping the full list — so the quick read is genuinely the lightest.
+
+### Changed
+- The catalog's preview player gives feedback when a track's audio has moved since it was filed: the
+  play button is disabled with a "preview unavailable" tooltip instead of doing nothing.
+
+### Internal
+- Library deposits now refuse a malformed run dir instead of writing a junk entry; the "out of date"
+  flag no longer depends on the widget's filename; new invariants INV-14…18 with tests (154 total).
+
 ## [0.7.6] — 2026-06-20
 
 ### Fixed

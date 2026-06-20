@@ -6,7 +6,7 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not *"energy is low,"* but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early / unstable (`v0.7.6`). macOS-first. Built and refined hands-on.
+> **Status:** early / unstable (`v0.7.7`). macOS-first. Built and refined hands-on.
 
 ![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
 
@@ -54,15 +54,21 @@ Your automation is what you *meant* to happen; the audio is what *did*. Track Co
 
 ### Evidence & detail
 
-Collapsed by default at the bottom of the Detailed view, one drawer holds everything it measured — the receipts behind every call above:
+Collapsed by default at the bottom of every view, one drawer holds everything it measured — the receipts behind every call above:
 
 ![Evidence drawer — tonal balance, the project arrangement, stem↔track map, rhythm and separation quality, transcribed notes](docs/evidence.png)
 
 <sub>**The full drawer:** the mix's average spectrum (**tonal balance**), the real **arrangement** from the `.als`, the **stem ↔ track map** (does separation match the project?), per-stem **rhythm & separation quality**, and the **transcribed notes**. Nothing interpreted here — just the measurements the read is built on.</sub>
 
-### Two views, one toggle
+### Three views, one ladder
 
-A full analysis opens calm in **Simple** — the verdict, the vitals, the structure bar + power curve, the player, the read, and the ranked feedback. Flip to **Detailed** to also open the **Evidence drawer** and the per-stem lanes. A **quick read** (fast, no stem separation) skips the toggle entirely — it just shows its calm view and a note that a full run adds the stem detail.
+The views stack — each adds to the one below, so nothing visible in a lighter view ever disappears in a heavier one:
+
+- **Quick read** (fast, no stem separation) — the lightest: the verdict, vitals, structure bar + power curve, the player, the read, and the **brief** recommendations (the ones pinned to a moment on the graph). No toggle (there's no stem detail to reveal), just a note that a full run adds it.
+- **Simple** (the calm view of a full analysis) — the same calm overview, with the full per-stem player and the **Evidence drawer** (collapsed, opt-in) available at the bottom.
+- **Detailed** — adds the heavy layer on top: the per-stem visualisation lanes, the extra **modulation** curve on the graph, and the full (not just timecoded) recommendation list.
+
+The **Evidence drawer is reachable in every view** — it's a collapsed, opt-in drawer, so it never clutters the calm read; only the genuinely dense per-stem visualisation is detailed-only.
 
 ---
 
@@ -106,13 +112,14 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.7.6** (latest) — quick-read polish + a playable Library:
+**v0.7.7** (latest) — the **view ladder**: quick → calm → detailed, each adding to the last:
 
-- **Play a track from the Library.** Each catalog row gets a one-button preview player; the signature ribbon doubles as a scrubber — click along it to seek.
-- **A cleaner quick read.** The fast, stem-free run drops the (meaningless) Simple/Detailed toggle for a one-line hint, keeps the read and recommendations in view, and renders the read correctly however the text is wrapped.
-- **A tidier structure bar.** A returning part is one clean block, edge to edge — no slivers, no gaps.
-- **Out-of-date entries are flagged.** A catalog row whose widget was built on an older version shows a small *stale* chip, so nothing silently opens an old page.
-- Backed by a **136-test suite** asserted on the real shipped HTML, with a living spec/test matrix (`docs/TEST_MATRIX.md`) behind it.
+- **The Evidence drawer is now in every view**, including the calm view, where it used to vanish — a collapsed, opt-in drawer, so the calm view stays calm.
+- **The quick read shows brief recommendations** (only the ones pinned to a moment on the graph), matching the calm view, so the quick read is genuinely the lightest.
+- **The Library preview player gives feedback** when a track's audio has moved since it was filed — the play button disables with a "preview unavailable" tooltip instead of doing nothing.
+- Backed by a **154-test suite** on the real shipped HTML, with new invariants (the view ladder, deposit atomicity, a filename-independent stale flag) in `docs/TEST_MATRIX.md`.
+
+**v0.7.6** — quick-read polish + a playable Library: a one-button preview player on every catalog row (the signature ribbon doubles as a scrubber), a cleaner stem-free quick read, a tidier structure bar, and *stale* chips on out-of-date entries.
 
 **v0.7** — the **Library / Catalog**: a standalone, offline page listing every track → version → run, sortable and searchable, each row with a spectral signature and a jump into the widget; versions collapsed by content hash with LUFS/length/BPM deltas.
 

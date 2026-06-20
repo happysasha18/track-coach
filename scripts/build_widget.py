@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.7.6"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.7.7"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1075,6 +1075,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
                    if _q else '<div class="viewtoggle" id="viewToggle"></div>')
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
+            .replace("__BODYCLASS__", "quick" if _q else "")
             .replace("__MODEBADGE__", badge_html)
             .replace("__MODENOTE__", note_html)
             .replace("__VIEWTOGGLE__", view_toggle)
@@ -1207,11 +1208,11 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
  padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:#eef1f8;max-width:840px}
 .verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
-/* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, and all
-   recommendation cards stay visible in BOTH views (hiding them just read as "things vanished").
-   Detailed adds ONE thing on top: the raw "Evidence & detail" drawer. That's the only panel
-   gated by Simple now. */
-body.simple #evidence{display:none!important}
+/* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, the EVIDENCE
+   drawer, and the timecoded recs all stay visible in BOTH views (hiding them just read as "things
+   vanished"). The Evidence drawer is ALWAYS shown now (Sasha 2026-06-20, INV-18) — it used to be
+   Simple-hidden, which meant full-Simple uniquely buried it while quick + full-Detailed showed it.
+   Detailed adds only the DEEP stem layer on top: the #stemlanes canvas + its #seqKey. */
 /* Demux / per-stem visualisation (#stemlanes + its #seqKey) shows in DETAILED ONLY — Sasha,
    repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
    The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
@@ -1221,6 +1222,10 @@ body.simple #stemlanes,body.simple #seqKey{display:none!important}
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
    just however many recs are timecoded. (Sasha 2026-06-19.) */
 body.simple #recs .rec:not([data-t]){display:none!important}
+/* Quick is the view-ladder FLOOR (Sasha 2026-06-20): it shows the SAME brief recs as the calm view —
+   the timecoded ones — so quick ⊆ Simple ⊆ Detailed holds. Quick has no toggle, so it gets its own
+   body.quick gate (it never enters .simple). Evidence stays visible (INV-18); only the recs are brief. */
+body.quick #recs .rec:not([data-t]){display:none!important}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -1369,7 +1374,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .cattrack[open]>summary::before{content:"▾ "}
 .cattrack>summary .cvn{color:var(--muted);font-weight:500;font-size:12px;margin-left:6px}
 .cattrack .catinner{padding:0 14px 10px}
-</style></head><body><div class="wrap">
+</style></head><body class="__BODYCLASS__"><div class="wrap">
 <div class="ctip" id="ctip"></div>
 <div class="topbar">
  <div><a id="backLink" class="backlink" href="#" hidden></a>

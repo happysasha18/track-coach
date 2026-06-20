@@ -95,7 +95,8 @@ class PanelsExist(unittest.TestCase):
             self.assertIn(s, HTML, f"output doesn't reference the {s} string")
 
     def test_automation_sits_inside_the_evidence_drawer(self):
-        # so Simple gating it via #evidence is enough to hide it; if it floated out, Simple would leak it
+        # structural: the automation panel lives inside the Evidence drawer, so it appears/collapses
+        # with it (and its data gate INV-16 hides it when there are no envelopes)
         self.assertLess(HTML.index('id="evidence"'), HTML.index('id="autoPanel"'),
                         "automation panel must sit inside the Evidence drawer")
 
@@ -104,13 +105,17 @@ class SimpleViewGating(unittest.TestCase):
     """What the Simple view hides via CSS — the one thing the JSON payload can't tell us. The recurring
     incident was panels (player, read) silently CSS-hidden in Simple while their data still shipped."""
 
-    def test_gated_set_is_exactly_the_known_four(self):
-        # Simple hides ONLY: the evidence drawer; the demux stem viz (#stemlanes + #seqKey); and the
-        # recs panel filtered to non-timecoded cards (#recs). It must never creep to the transport,
-        # the read, or the recs wholesale.
+    def test_gated_set_is_exactly_the_known_three(self):
+        # INV-18 (Sasha, 2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
+        # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey) and the recs panel filtered to
+        # non-timecoded cards (#recs). It must never creep to the transport, the read, or evidence.
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE))
-        self.assertEqual(hidden, {"evidence", "stemlanes", "seqKey", "recs"},
+        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
+
+    def test_evidence_drawer_is_always_visible(self):
+        # INV-18: the Evidence drawer must NOT be among the Simple-hidden selectors (it used to be).
+        self.assertNotIn("#evidence", SIMPLE_HIDE, "regression: Simple hides the Evidence drawer")
 
     def test_player_and_read_stay_visible_in_simple(self):
         for keep in ("#playerControls", "#playBtn", "#readPanel"):

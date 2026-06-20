@@ -43,7 +43,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 |---|---|---|
 | INV-1 | The Producer's read never emits a literal leading `#`; every `#…`/`##…`/`###…` line is a heading; body after a heading is a `<p>`, never swallowed. | `test_widget_render::ProducerReadRendersServerSide` |
 | INV-2 | The read is rendered SERVER-SIDE; `#readBody` ships filled iff a narrative exists, else the panel is hidden. | `…::ProducerReadRendersServerSide`, `test_widget_contract` |
-| INV-3 | **Quick has no Simple/Detailed toggle** — a hint sits in its place; the toggle JS bails on quick so the body never enters `.simple` ⇒ evidence drawer + ALL recs visible. | `…::QuickHasNoToggleButAHint` |
+| INV-3 | **Quick has no Simple/Detailed toggle** — a hint sits in its place; the toggle JS bails on quick. Quick is the LADDER FLOOR: it shows BRIEF recs (timecoded only, like the calm view) via `body.quick`, not all. Evidence is always visible (INV-18). | `…::QuickHasNoToggleButAHint` |
 | INV-4 | The Track Story graph opens at the **calm 4-lane** set in quick and full-simple; full-detailed = 5 (+modulation). Lane height constant ⇒ area ∝ count. | `…::PerViewLaneSets`, `…::QuickHasNoToggleButAHint::…four_lane` |
 | INV-5 | The structure bar is **contiguous** (no gaps), has **no adjacent same-letter slivers**, spans 0..dur, and **preserves non-adjacent recurrence** (A/B/A). | `…::StructureBarIsTidy` |
 | INV-6 | The structure bar / story is **identical full vs quick** for the same data (a track property, not a mode). | `…::StructureBarIsTidy::test_structure_bar_is_mode_independent` |
@@ -58,6 +58,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-15 | A deposit either targets the run's real track slug or aborts (raises `DepositError`) BEFORE any write — no partial widget copy / junk index entry. Junk slug = output root, `*-output`, or a dated stamp. | `test_library::DepositAtomicity` |
 | INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells (no project ⇒ `D.als` null ⇒ each panel self-hides). Same gate in full and quick. | `test_widget_render::AlsPanelsGateOnData` |
 | INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
+| INV-18 | The Evidence drawer is present and visible in EVERY view — Simple, Detailed, and quick (never CSS-hidden by `.simple`). Only its inner panels gate on data (arr/auto need `.als` — INV-16; map/rhythm/notes need stems). The Simple view hides ONLY `#stemlanes`/`#seqKey` (deep stem viz) and the non-timecoded `#recs`. | `test_widget_contract::SimpleViewGating` |
 
 ## §4 — Surfaces & layers
 - **S1 widget** (`build_widget.py`): **L-py** server template + substitutions (`__MODEBADGE__`,
@@ -79,10 +80,10 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | └ structure bar (scenes) | ✓ | ✓ | ✓ | INV-5/6; leads need stems (full) · L-py `_coalesce_scenes` + L-js |
 | player transport | ✓ | ✓ | ✓ | play/seek/time · L-js |
 | `stemlanes`+`seqKey` | — | ✓ | n/a | detailed + full only · L-js |
-| `recs` | timecoded | all | all | INV-3 · L-js + CSS |
+| `recs` | timecoded | all | timecoded | ladder: quick=calm ⊆ detailed; quick filters via `body.quick`, Simple via `body.simple` · INV-3 · L-js + CSS |
 | `readPanel`/`readBody` | ✓ | ✓ | ✓ | INV-1/2 · **L-py** |
 | `tonalPanel` | ✓ | ✓ | ✓ | always · L-js |
-| `evidence` (arr/auto/map/rhythm/notes) | — | ✓ | ✓ (always) | full-detailed; in quick always shown (no `.simple`); arr/auto need .als (INV-16), map/rhythm/notes need stems · L-js |
+| `evidence` (arr/auto/map/rhythm/notes) | ✓ | ✓ | ✓ | ALWAYS visible in every view (INV-18); arr/auto need .als (INV-16), map/rhythm/notes need stems · L-js |
 | `#catalog` cross-version panel | ✓ | ✓ | ✓ | INV-11 · L-js |
 | footer `TC_VERSION` | ✓ | ✓ | ✓ | L-py |
 
