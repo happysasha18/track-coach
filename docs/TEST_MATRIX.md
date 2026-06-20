@@ -57,6 +57,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other. | _gap → KI-5_ |
 | INV-15 | A deposit either targets the run's real track slug or aborts without writing a partial/junk entry. | _gap → KI-6_ |
 | INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells. | _gap → KI-8_ |
+| INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
 
 ## §4 — Surfaces & layers
 - **S1 widget** (`build_widget.py`): **L-py** server template + substitutions (`__MODEBADGE__`,
@@ -116,11 +117,14 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
 - **KI-3 — `_fmt_date` crash — FIXED + tested** (INV-13). Junk "track-coach-output" entry cleaned.
 
 **Prover findings (product-prover, 2026-06-20) — queued, fix in order (don't jump ahead):**
-- **KI-4 (F1, must-fix-before-publish) — catalog play audio is an ABSOLUTE `file://`.** Title links are
-  relative ("works offline / on GitHub Pages") but `_mix_uri_for` emits `mix.as_uri()`. Publish/copy the
-  library ⇒ every play button silently 404s while links still work. Decide: (a) local-only + state it +
-  invariant, or (b) copy the web mix next to the deposit and reference relatively. Lean (a) now, (b) if
-  ever published. → owns INV-8 portability scope.
+- **KI-4 (F1) — RESOLVED (a): catalog is a LOCAL index, pinned by INV-17.** The finding's premise was
+  WRONG against the code: title links are NOT relative — `_open_href` has emitted an absolute `file://`
+  into the original run dir since **0.7.3** (`git 746e1af`), deliberately (stems/mix sit beside the
+  original; the deposited library copy is stem-less ⇒ its player is dead). So the play button's absolute
+  `file://` is *consistent* with open→, not a bug beside it. Decision **(a) local-only**: declared +
+  test-enforced (INV-17 = both links absolute `file://` in the SAME run dir). NOT a Pages/publishable
+  artifact. Re-open as (b) — copy web mix + re-home stems relatively — only if the library is ever
+  published. → owns INV-8 portability scope.
 - **KI-5 (F2, INV-14) — exclusive playback (one row at a time) has no test.** Lives only in the JS
   `cur`/`stop()` wiring; a player refactor can regress to all-play-at-once, suite stays green. Add a
   `test_catalog` guard the shared-`cur` wiring ships.

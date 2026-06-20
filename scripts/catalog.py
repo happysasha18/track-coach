@@ -5,8 +5,10 @@
 front-end: it reads `index.json` and renders ONE self-contained, offline `index.html` — the home base
 for a producer's whole body of work. Flat, sortable, searchable table; each row is a VERSION (a
 distinct audio bounce, runs collapsed by content hash), with a coloured mini-arc, the spec numbers,
-mood/style tags, and cross-version deltas. Links into each archived widget are relative so the page
-works offline and on GitHub Pages.
+mood/style tags, and cross-version deltas. The catalog is a LOCAL index (INV-17): both the title link
+(`_open_href`) and the play button (`_mix_uri_for`) resolve to an absolute `file://` in the ORIGINAL
+run dir, where the widget's stems/mix live — the deposited library copy is stem-less. NOT a publishable
+/ GitHub Pages artifact; revisit (KI-4 option b) only if the library is ever published.
 
   catalog.py build [--open]      # regenerate ~/.track-coach/library/index.html
 

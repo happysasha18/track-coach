@@ -220,6 +220,31 @@ class LinkPointsAtOriginal(unittest.TestCase):
         self.assertIn("analysis_widget_v0.7.1.html", html)
 
 
+class CatalogIsLocalIndex(unittest.TestCase):
+    """INV-17 / KI-4: the catalog is a LOCAL index — BOTH the title link (`_open_href`) and the play
+    button (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir (where the
+    widget + its stems/mix live). Portability scope = local filesystem, NOT GitHub Pages. This guards
+    against a refactor silently making one absolute and the other relative (the false premise behind
+    KI-4: open→ was already absolute since 0.7.3, not relative)."""
+
+    def test_open_and_play_are_both_absolute_file_in_the_same_run_dir(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            run = Path(d) / "Shared Memories" / "2026-06-18_0748"
+            (run / "mix_web").mkdir(parents=True)
+            (run / "mix_web" / "mix.m4a").write_bytes(b"\x00")
+            (run / "analysis_widget_v0.7.1.html").write_text("<html></html>")
+            e = {"src_run_dir": str(run), "src_widget": "analysis_widget_v0.7.1.html",
+                 "widget": "SM__v0__2026-06-18_0748.html"}
+            open_href = catalog._open_href(e, "widgets")
+            mix_uri = catalog._mix_uri_for(e)
+            run_uri = run.as_uri()
+            self.assertTrue(open_href.startswith("file://"), f"open href not absolute: {open_href}")
+            self.assertTrue(mix_uri.startswith("file://"), f"mix uri not absolute: {mix_uri}")
+            self.assertTrue(open_href.startswith(run_uri), "open href must live under the run dir")
+            self.assertTrue(mix_uri.startswith(run_uri), "play mix must live under the SAME run dir")
+
+
 class ClickableTitleNoOpenColumn(unittest.TestCase):
     """Sasha 2026-06-20: 'кнопка опен не нужна если сделать само название кликабл'. The track TITLE is
     the link into the widget; the separate 'open' column is gone; the whole row tints on hover so it
