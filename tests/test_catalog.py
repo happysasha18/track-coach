@@ -403,6 +403,18 @@ class CatalogRowPlayer(unittest.TestCase):
         self.assertIn("if(cur&&cur.audio===a){ stop(); return; } stop(); a.play(", js,
                       "before playing a row, the handler must stop() whatever is currently playing")
 
+    def test_dead_play_button_gives_feedback(self):
+        """Ops (prover F4): the mix can exist at build time but be gone/moved at view time. Instead of
+        a silently dead button, the player must disable it + tooltip 'preview unavailable' on a play
+        failure OR an audio `error` event — never a control that does nothing with no explanation."""
+        html = self._row_html("file:///runs/Deep/x/mix_web/mix.m4a")
+        js = re.sub(r"\s+", " ", html)
+        self.assertIn('btn.disabled=true', js, "a failed preview must disable the button")
+        self.assertIn('btn.title="preview unavailable"', js, "and explain why via a tooltip")
+        self.assertIn('addEventListener("error",dead)', js, "an audio load error must trigger the feedback")
+        self.assertIn('.catch(dead)', js, "a failed play() must trigger the feedback (not be swallowed)")
+        self.assertIn(".cplay.dead", html, "a disabled/dead play button must be styled as such")
+
     def test_mix_uri_for_probes_the_run_dir(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:

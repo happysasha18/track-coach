@@ -369,5 +369,21 @@ class StructureBarIsTidy(unittest.TestCase):
         self.assertEqual(sig(pf), sig(pq), "structure bar differs between full and quick — it must not")
 
 
+class AlsPanelsGateOnData(unittest.TestCase):
+    """INV-16 / KI-8: the arrangement + automation panels render iff `.als` data exists — never as
+    empty shells. With no project, `build_als_overlay(None,…)` ⇒ `D.als` is null and each panel's
+    init hides itself (`P.style.display="none"`). Pins the gate so a refactor can't ship a blank
+    Arrangement/Automation panel when there's nothing to draw. Same gate in full and quick."""
+
+    def test_no_als_payload_and_both_panels_self_hide(self):
+        for mode, kw in (("full", dict(stems=("drums", "bass"))), ("quick", dict(stems=(), mix=True))):
+            html, payload = _render(mode=mode, **kw)
+            self.assertIsNone(payload.get("als"), f"[{mode}] no project ⇒ D.als must be null")
+            self.assertIn('if(!A||!A.lanes||!A.lanes.length){P.style.display="none";return;}', html,
+                          f"[{mode}] arrangement panel must self-hide when there are no .als lanes")
+            self.assertIn('if(!A||!A.automations||!A.automations.length){if(P)P.style.display="none";return;}',
+                          html, f"[{mode}] automation panel must self-hide when there are no envelopes")
+
+
 if __name__ == "__main__":
     unittest.main()

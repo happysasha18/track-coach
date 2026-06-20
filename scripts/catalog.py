@@ -358,6 +358,8 @@ tbody tr:hover .ttl{{color:var(--wob)}}
  background:var(--panel2);color:var(--ink);cursor:pointer;font-size:10px;line-height:1;padding:0;text-align:center}}
 .cplay:hover{{border-color:var(--wob);color:var(--wob)}}
 .cplay.playing{{background:var(--wob);color:#0c0e14;border-color:var(--wob)}}
+.cplay.dead,.cplay:disabled{{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--muted)}}
+.cplay.dead:hover,.cplay:disabled:hover{{border-color:var(--line);color:var(--muted)}}
 svg.sig.play{{cursor:pointer}}  /* the ribbon doubles as a click-to-seek scrubber when playable */
 svg.sig .ph{{pointer-events:none}}
 .ttl{{display:block;font-weight:600;color:var(--ink);text-decoration:none;
@@ -461,13 +463,17 @@ document.querySelectorAll("th.sortable").forEach(th=>th.addEventListener("click"
   const btn=tr.querySelector(".cplay"), svg=tr.querySelector("svg.sig.play");
   const ph=svg&&svg.querySelector(".ph"); if(!btn||!svg||!ph)return;
   let audio=null;
+  // the mix existed when the catalog was built but may be gone/moved at view time — give feedback
+  // instead of a silently dead button (disable + tooltip), per the Ops finding.
+  const dead=()=>{{ if(cur&&cur.audio===audio)stop(); btn.disabled=true;
+    btn.classList.add("dead"); btn.title="preview unavailable"; btn.textContent="▶"; }};
   const ensure=()=>{{ if(!audio){{ audio=new Audio(src);
     audio.addEventListener("timeupdate",()=>{{ if(cur&&cur.audio===audio)place(cur); }});
-    audio.addEventListener("ended",stop); }} return audio; }};
+    audio.addEventListener("ended",stop); audio.addEventListener("error",dead); }} return audio; }};
   btn.addEventListener("click",e=>{{ e.preventDefault(); e.stopPropagation();
    const a=ensure(); if(cur&&cur.audio===a){{ stop(); return; }} stop();
    a.play().then(()=>{{ cur={{tr,audio:a,btn,ph,svg}}; btn.classList.add("playing");
-     btn.textContent="❚❚"; }}).catch(()=>{{}}); }});
+     btn.textContent="❚❚"; }}).catch(dead); }});
   svg.addEventListener("click",e=>{{ e.stopPropagation(); const a=ensure();
    if(!a.duration||!isFinite(a.duration))return; const r=svg.getBoundingClientRect();
    const f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); a.currentTime=f*a.duration;

@@ -56,7 +56,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-13 | `_fmt_date` formats `YYYY-MM-DD_HHMM` and never crashes on odd/multi-underscore stamps. | `test_catalog::FmtDate` |
 | INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other (one shared `cur` + an unconditional `stop()` before `a.play()`). | `test_catalog::CatalogRowPlayer` |
 | INV-15 | A deposit either targets the run's real track slug or aborts (raises `DepositError`) BEFORE any write — no partial widget copy / junk index entry. Junk slug = output root, `*-output`, or a dated stamp. | `test_library::DepositAtomicity` |
-| INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells. | _gap → KI-8_ |
+| INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells (no project ⇒ `D.als` null ⇒ each panel self-hides). Same gate in full and quick. | `test_widget_render::AlsPanelsGateOnData` |
 | INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
 
 ## §4 — Surfaces & layers
@@ -82,7 +82,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | `recs` | timecoded | all | all | INV-3 · L-js + CSS |
 | `readPanel`/`readBody` | ✓ | ✓ | ✓ | INV-1/2 · **L-py** |
 | `tonalPanel` | ✓ | ✓ | ✓ | always · L-js |
-| `evidence` (arr/auto/map/rhythm/notes) | — | ✓ | ✓ (always) | full-detailed; in quick always shown (no `.simple`); arr/auto need .als, map/rhythm/notes need stems · L-js |
+| `evidence` (arr/auto/map/rhythm/notes) | — | ✓ | ✓ (always) | full-detailed; in quick always shown (no `.simple`); arr/auto need .als (INV-16), map/rhythm/notes need stems · L-js |
 | `#catalog` cross-version panel | ✓ | ✓ | ✓ | INV-11 · L-js |
 | footer `TC_VERSION` | ✓ | ✓ | ✓ | L-py |
 
@@ -145,9 +145,16 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
   it, falling back to the filename only for pre-existing entries. So a versionless or musical-versioned
   filename (e.g. `analysis_widget.html` / `…_v2.html`) on an older build is now flagged. Tests:
   `test_library::StoresBuildVersion` + `test_catalog::StaleWidgetFlag` (stored-version stale cases).
-- **KI-8 (F5, INV-16) — `.als` axis declared but unpinned;** quick+.als unmodeled. Add a §5 grid row +
-  invariant: arrangement/automation render iff `.als` data exists, never empty shells.
-- **Ops (F4-prover):** a dead play button gives no feedback — disable it + tooltip "preview unavailable".
+- **KI-8 (F5, INV-16) — RESOLVED (session 11).** The `.als` axis is now pinned: §5 cites INV-16 on the
+  evidence row, and `test_widget_render::AlsPanelsGateOnData` asserts that with no project `D.als` is
+  null and BOTH panels self-hide (`P.style.display="none"`) — in full AND quick. The gate already lived
+  in the panel init JS; this stops a refactor shipping a blank Arrangement/Automation shell. (Behaviour
+  is client-side hide, matching the existing render; no server-side change ⇒ no version bump.)
+- **Ops (F4-prover) — RESOLVED (session 11).** A preview that fails at view time (mix gone/moved since
+  the catalog was built) no longer dies silently: the play handler's `.catch` and an audio `error`
+  listener both call `dead()`, which disables the button + sets a "preview unavailable" tooltip +
+  styles it `.cplay.dead`. Test: `test_catalog::CatalogRowPlayer::test_dead_play_button_gives_feedback`.
+  (Changes the catalog RENDER output — see the version-bump note in JOURNAL.)
 
 - **Process:** every demo I OPEN must be a real, COMPLETE `build` render (playbook + memory). Two partial
   hand-fed renders this session read as real bugs.
