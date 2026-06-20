@@ -1,9 +1,26 @@
 # Changelog
 
-All notable changes to **track-coach** are documented here. The project is early/unstable;
+All notable changes to **track-coach** are documented here. The project is early;
 versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
+
+## [0.8.0] — 2026-06-20
+
+Milestone: the project grew up. The spec/test matrix now covers **every dimension** the product has —
+the three views, both pages, all the data states, and styling — so changes can't quietly break quality.
+Status drops "unstable": it's **early**, not fragile.
+
+### Changed
+- Status is now **early** (was "early / unstable"). The widget footer reads `v0.8.0`.
+
+### Internal
+- The spec + test matrix (`docs/TEST_MATRIX.md`) completed to all dimensions: an explicit data axis
+  (stems present/empty/none, project file, web mix), a 3-D element grid, a styling-contract layer, and a
+  cross-page (catalog ↔ track) invariant grid. New invariants INV-19…22 (view-ladder monotonicity,
+  cross-page mode agreement, no leftover template placeholders, the CSS gating contract). Every
+  invariant (INV-1…22) now has a test that names it, both ways. Tests: 154 → 166.
+- A product-prover A/B (before vs after the completeness pass) is kept under `docs/prover_runs/`.
 
 ## [0.7.7] — 2026-06-20
 
