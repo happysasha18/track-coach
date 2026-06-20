@@ -54,7 +54,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-11 | The in-widget cross-version panel (`#catalog`) carries exactly the build's catalog and hides iff there are no tracks; empty/orphan build ⇒ hidden, not a false panel. | `test_widget_render::CrossVersionPanelData` |
 | INV-12 | A catalog row whose linked widget is built on an OLDER `TC_VERSION` **and whose filename encodes a version** is flagged 'stale'. (Scope hole: unparseable filename ⇒ not flagged — KI-7.) | `test_catalog::StaleWidgetFlag` |
 | INV-13 | `_fmt_date` formats `YYYY-MM-DD_HHMM` and never crashes on odd/multi-underscore stamps. | `test_catalog::FmtDate` |
-| INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other. | _gap → KI-5_ |
+| INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other (one shared `cur` + an unconditional `stop()` before `a.play()`). | `test_catalog::CatalogRowPlayer` |
 | INV-15 | A deposit either targets the run's real track slug or aborts without writing a partial/junk entry. | _gap → KI-6_ |
 | INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells. | _gap → KI-8_ |
 | INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
@@ -125,9 +125,11 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
   test-enforced (INV-17 = both links absolute `file://` in the SAME run dir). NOT a Pages/publishable
   artifact. Re-open as (b) — copy web mix + re-home stems relatively — only if the library is ever
   published. → owns INV-8 portability scope.
-- **KI-5 (F2, INV-14) — exclusive playback (one row at a time) has no test.** Lives only in the JS
-  `cur`/`stop()` wiring; a player refactor can regress to all-play-at-once, suite stays green. Add a
-  `test_catalog` guard the shared-`cur` wiring ships.
+- **KI-5 (F2, INV-14) — RESOLVED (session 11).** Exclusive playback (one row at a time) now has a
+  guard: `test_catalog::CatalogRowPlayer::test_exclusive_playback_one_row_at_a_time` asserts the
+  rendered JS ships (1) exactly ONE shared `let cur=null` and (2) `if(cur&&cur.audio===a){ stop();
+  return; } stop(); a.play(` — i.e. an unconditional `stop()` before play. A refactor to per-row
+  state or a dropped `stop()` now turns the suite RED instead of silently going all-play-at-once.
 - **KI-6 (F4, INV-15) — `build`/deposit has no atomicity rule.** A build off a wrong-shaped run dir made a
   junk track + a half-failed catalog regen (the KI-1 saga). Validate the run-dir shape
   (`<base>/<track>/<stamp>`) before depositing; reject malformed, don't write partial. Add a test.

@@ -375,6 +375,19 @@ class CatalogRowPlayer(unittest.TestCase):
         self.assertIn("new Audio(src)", html, "player JS must create the audio from the mix source")
         self.assertIn("getBoundingClientRect", html, "ribbon click-to-seek must be wired")
 
+    def test_exclusive_playback_one_row_at_a_time(self):
+        """INV-14 / KI-5: at most ONE preview plays at a time. Guaranteed by (1) a SINGLE shared
+        `cur` across all rows and (2) an unconditional `stop()` before `a.play()` in the click
+        handler (it silences whatever else is playing). A refactor to per-row state, or a dropped
+        stop(), would regress to all-play-at-once while the suite stayed green — this guards it."""
+        html = self._row_html("file:///runs/Deep/x/mix_web/mix.m4a")
+        self.assertEqual(html.count("let cur=null"), 1,
+                         "exactly ONE shared player-state var (per-row state ⇒ all-play-at-once)")
+        self.assertIn("function stop()", html, "a shared stop() must exist to silence the active row")
+        js = re.sub(r"\s+", " ", html)
+        self.assertIn("if(cur&&cur.audio===a){ stop(); return; } stop(); a.play(", js,
+                      "before playing a row, the handler must stop() whatever is currently playing")
+
     def test_mix_uri_for_probes_the_run_dir(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
