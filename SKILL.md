@@ -64,7 +64,8 @@ python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
     --mood-tags "dark,driving" --style-tags "melodic techno"   # genre is YOUR call; '' clears
 ```
 
-`--mode quick` = fast analysis only (`/tc-quick`); `full` (default, `/tc`) = stems + player +
+`--mode quick` = fast analysis (`/tc-quick`): no Demucs stems, but it DOES encode a `mix_web/mix.m4a`
+so the widget still gets a single-track mix player. `full` (default, `/tc`) = stems + per-stem player +
 everything. Localising? Pass `--strings <file>` (build the schema with `build_widget.py
 --dump-strings`, translate the values). Add `--dry-run` to print the plan without running.
 The per-step sections below explain WHAT each stage measures — read them for the methodology,
@@ -214,9 +215,12 @@ like a lot. So there are two depths AND a calm default view:
 
 - **`full`** (default, `/tc`): everything — Demucs stems, masking, sequencer, player,
   evidence. Minutes of compute.
-- **`quick`** (`/tc-quick`): Fast analysis ONLY (core + detail, + .als if given). No
-  Demucs/stems/player. Seconds, cheap. Build the widget with just `--core/--detail`
-  (+ `--als`, `--selfsim` if you ran it) — every stem-dependent panel auto-omits.
+- **`quick`** (`/tc-quick`): Fast analysis (core + detail + self-similarity, + .als if given). No
+  Demucs, so no per-stem panels — BUT it encodes a compressed `mix_web/mix.m4a` so the widget still
+  has a **single-track mix player** (transport + seek). Seconds, cheap. `analyze --mode quick` runs
+  `make_web_stems.py --audio <mix> --out-dir mix_web`; `build` auto-passes `--audio-mix-rel mix_web`.
+  The widget is clearly badged "Quick read" with a note on what a full run adds; every stem-dependent
+  panel (and the per-section instrument labels) auto-omits.
 
 Independently of mode, the widget opens in a **calm "Simple" view** (verdict + vitals +
 power curve + repeats + top-3 recs); a **Detailed** toggle reveals the rest. That toggle

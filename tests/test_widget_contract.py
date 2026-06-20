@@ -136,5 +136,29 @@ class ModeLabel(unittest.TestCase):
             self.assertTrue(build_widget.STRINGS["ui"].get(s), f"missing the {s} string")
 
 
+class ModeBadge(unittest.TestCase):
+    """Sasha 2026-06-20: the run mode must be unmistakable ON THE PAGE — a badge near the brand, and
+    on a quick read a one-line explainer of what a full run adds. (The catalog carries it too, via the
+    MODE column.) HTML above is a FULL render; render a quick one here for the quick case."""
+
+    def test_full_render_shows_the_full_badge_and_no_quick_note(self):
+        # HTML is a full render: green "full" badge, and NO quick explainer line (that's mode-gated).
+        self.assertIn('class="modebadge full"', HTML, "full widget must carry the full badge")
+        self.assertNotIn('class="modenote"', HTML, "full widget must NOT show the quick explainer")
+
+    def test_quick_render_shows_quick_badge_and_explainer(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_qbadge_"))
+        mdir = tmp / "mix_web"
+        mdir.mkdir()
+        (mdir / "mix.m4a").write_bytes(b"\x00")
+        out = tmp / "w.html"
+        build_widget.build_html(_core(), {}, None, None, str(out), "Quick", build_widget.STRINGS,
+                                audio_mix_rel="mix_web", mode="quick")
+        h = out.read_text(encoding="utf-8")
+        self.assertIn('class="modebadge quick"', h, "quick badge (amber) missing")
+        self.assertIn(build_widget.STRINGS["ui"]["mode_badge_quick"], h, "quick badge label missing")
+        self.assertRegex(h, r'<p class="modenote" id="modeNote">[^<]+</p>', "quick explainer line missing")
+
+
 if __name__ == "__main__":
     unittest.main()

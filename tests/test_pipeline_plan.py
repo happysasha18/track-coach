@@ -80,10 +80,21 @@ class QuickMode(unittest.TestCase):
     def setUpClass(cls):
         cls.lines = plan("--mode", "quick")
 
-    def test_no_demucs_or_stems(self):
-        for s in ("separate.py", "masking.py", "make_web_stems.py", "drum_breakdown.py"):
+    def test_no_demucs(self):
+        # quick never separates or runs any stem-dependent analysis
+        for s in ("separate.py", "masking.py", "drum_breakdown.py", "map_stems.py",
+                  "rhythm_quality.py", "transcribe.py"):
             self.assertEqual(step_index(self.lines, s), -1,
                              f"quick mode must not run {s}")
+
+    def test_encodes_a_web_mix_for_the_player(self):
+        # quick has no stems but DOES compress the mix → the single-track player (Sasha 2026-06-20:
+        # "плеер какая разница быстрый прогон?"). It reuses make_web_stems.py in --audio (mix) mode,
+        # NOT --stems-dir (there are no stems).
+        i = step_index(self.lines, "make_web_stems.py")
+        self.assertGreaterEqual(i, 0, "quick must encode a web mix so the widget has a player")
+        self.assertIn("--audio", self.lines[i], "quick mix-encode must use --audio (the mix)")
+        self.assertNotIn("--stems-dir", self.lines[i], "quick has no stems dir to encode")
 
     def test_still_runs_core_detail_selfsim(self):
         for s in ("analyze_core.py", "analyze_detail.py", "self_similarity.py"):

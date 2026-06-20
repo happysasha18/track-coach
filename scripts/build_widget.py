@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.7.4"   # Track Coach analyzer version (early/unstable; bump as it matures)
+TC_VERSION = "0.7.5"   # Track Coach analyzer version (early/unstable; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -42,6 +42,10 @@ STRINGS = {
     "ui": {
         "subtitle": "deep mode",
         "subtitle_quick": "quick read",
+        "mode_badge_full": "Full analysis",
+        "mode_badge_quick": "Quick read",
+        "quick_explainer": "Analysed from the mix only. A full run adds stem separation — the per-instrument player, masking, drum/note breakdown, and the section instrument labels on the structure bar.",
+        "play_note_mix": "Playing the full mix. Click anywhere on the chart to jump; the white line is the playhead. Run a full analysis for per-stem play / mute / solo.",
         "arc_title": "Arrangement map",
         "arc_hint": "Energy / brightness / density / wobble over time. Grey bars = section boundaries. Hover for a shared cursor.",
         "arr_title": "Arrangement — from the project (.als)",
@@ -841,7 +845,7 @@ def build_story(core, als_overlay):
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
-               back_href=None):
+               back_href=None, audio_mix_rel=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -970,6 +974,19 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                 srcs.append({"name": n, "src": hit})
         if srcs:
             player = {"srcs": srcs}
+    # Quick runs have no Demucs stems, but they DO have the mix — give them a single-track player
+    # (transport + seek, no per-stem mute/solo). The widget reads player.kind=="mix" and skips the
+    # stem-lane grid. (Sasha 2026-06-20: "плеер какая разница быстрый прогон?")
+    if player is None and audio_mix_rel:
+        rel = audio_mix_rel.rstrip("/")
+        adir = Path(out_path).parent / rel
+        EXT_PREF = (".m4a", ".mp3", ".ogg", ".opus", ".wav", ".flac")
+        hit = next((f"{rel}/mix{e}" for e in EXT_PREF if (adir / f"mix{e}").exists()), None)
+        if not hit:  # accept any single audio file in the dir as the mix
+            files = sorted(p for p in adir.glob("*") if p.suffix.lower() in EXT_PREF)
+            hit = f"{rel}/{files[0].name}" if files else None
+        if hit:
+            player = {"srcs": [{"name": "mix", "src": hit}], "kind": "mix"}
 
     payload = {
         "dur": dur, "tempo": core.get("tempo"), "bins": tb,
@@ -1002,7 +1019,18 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "t": S["ui"],
     }
     title = title or f'{core.get("tempo","?")} BPM · {dur:.0f}s'
-    html = TEMPLATE.replace("__TITLE__", _esc(title)).replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False))
+    # Run-mode badge + (quick-only) explainer, rendered SERVER-SIDE from `mode` so it's deterministic
+    # in the HTML (testable, no JS needed): quick = amber "Quick read" + a line on what full adds;
+    # full = green "Full analysis". (Sasha 2026-06-20: метка должна быть видна на странице.)
+    _ui = S.get("ui", {})
+    _q = (mode == "quick")
+    _badge_txt = _ui.get("mode_badge_quick", "Quick read") if _q else _ui.get("mode_badge_full", "Full analysis")
+    badge_html = f'<span class="modebadge {"quick" if _q else "full"}" id="modeBadge">{_esc(_badge_txt)}</span>'
+    note_html = f'<p class="modenote" id="modeNote">{_esc(_ui.get("quick_explainer", ""))}</p>' if _q else ""
+    html = (TEMPLATE.replace("__TITLE__", _esc(title))
+            .replace("__MODEBADGE__", badge_html)
+            .replace("__MODENOTE__", note_html)
+            .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False)))
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved: {out_path}  (Track Coach v{TC_VERSION})")
     print(f"  arc lanes: {len(arc_lanes)}  stems: {len((masking or {}).get('stems_analysed', []))}  recs: {len(recs)}")
@@ -1044,6 +1072,15 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
 .wrap{max-width:1120px;margin:0 auto}
 .brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--wob);font-weight:700;margin:0 0 3px}
+/* Run-mode badge: a pill next to the brand so it's obvious whether this is a full or quick read
+   (Sasha 2026-06-20: метка должна быть и на странице, и в каталоге). Quick = amber, full = green. */
+.modebadge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:20px;font-size:9.5px;
+ font-weight:700;letter-spacing:.06em;vertical-align:middle}
+.modebadge[hidden]{display:none}
+.modebadge.full{background:rgba(70,211,154,.16);color:var(--good)}
+.modebadge.quick{background:rgba(255,209,102,.16);color:var(--bright)}
+.modenote{color:var(--muted);font-size:12px;margin:-12px 0 20px;max-width:760px;line-height:1.5}
+.modenote[hidden]{display:none}
 .backlink{display:inline-block;margin:0 0 8px;padding:4px 11px;border:1px solid var(--line);border-radius:20px;
  color:var(--muted);text-decoration:none;font-size:12px;font-weight:600}
 .backlink:hover{color:var(--ink);border-color:var(--wob)}
@@ -1234,12 +1271,15 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 <div class="ctip" id="ctip"></div>
 <div class="topbar">
  <div><a id="backLink" class="backlink" href="#" hidden></a>
-   <div class="brandkick">Track Coach</div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+   <div class="brandkick">Track Coach __MODEBADGE__</div>
+   <h1 id="title"></h1><div class="sub" id="sub"></div></div>
  <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
       embedded in this file. It never calls the network, never costs anything. -->
  <div class="viewtoggle" id="viewToggle"></div>
 </div>
 <div class="srcmeta" id="srcmeta"></div>
+<!-- Run-mode note: only on a quick read, spell out what a full run would add (Sasha 2026-06-20). -->
+__MODENOTE__
 
 <!-- VITALS — the credible spec-sheet, read in one glance, builds trust.
      Single authoritative numbers about the finished mix (no time axis). -->
@@ -1363,6 +1403,7 @@ document.getElementById("title").textContent=document.title.replace(/^Track Coac
  else if(history.length>1){b.hidden=false;
   b.addEventListener("click",e=>{e.preventDefault();history.back();});}})();
 document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${D.mode==="quick"?(T.subtitle_quick||"quick read"):T.subtitle}`;
+// (The run-mode badge + quick explainer are rendered server-side into the markup — see build_html.)
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
 (function(){const el=document.getElementById("srcmeta");if(!el)return;const bits=[];
@@ -1880,7 +1921,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
 (function(){
  const PL=D.player,P=document.getElementById("playerControls");
  if(!PL||!PL.srcs||!PL.srcs.length){if(P)P.style.display="none";return;}
- document.getElementById("playNote").textContent=T.play_note;
+ const isMix=PL.kind==="mix";   // quick run: ONE mix source, transport only — no per-stem lane grid
  const wrap=document.getElementById("playAudios");
  const auds=PL.srcs.map(s=>{const a=new Audio();a.src=s.src;a.preload="auto";wrap.appendChild(a);
   return {name:s.name,a:a,mute:false,solo:false};});
@@ -1888,6 +1929,17 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const btn=document.getElementById("playBtn"),tEl=document.getElementById("playTime");
  btn.textContent=T.play_play;
  const dur=()=>master.duration||D.dur;
+ let drawL=()=>{},lresize=()=>{};   // the per-stem lane grid is built below in FULL mode only
+ const PN=document.getElementById("playNote");
+ if(isMix){   // mix player: hide the per-stem grid + its key; seeking happens via the charts (window.__seek)
+  const sl=document.getElementById("stemlanes");if(sl)sl.style.display="none";
+  const sk=document.getElementById("seqKey");if(sk)sk.style.display="none";
+  if(PN)PN.textContent=T.play_note_mix||"";
+ }else{
+  if(PN)PN.textContent=T.play_note;
+  buildStemGrid();
+ }
+ function buildStemGrid(){   // FULL only — everything stem-lane lives in here; drawL/lresize get assigned
  function gains(){const anySolo=auds.some(s=>s.solo);
   auds.forEach(s=>{s.a.muted=anySolo?!s.solo:s.mute;});drawL(lxOf(window.__pht||0));}  // keep the playhead put
  // ── sequencer lanes: one playable lane per stem, with mute/solo + envelope ──
@@ -1987,7 +2039,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    lx.lineTo(lxOf(E.bins[E.bins.length-1]),base);lx.closePath();
    lx.globalAlpha=active?.5:.16;lx.fillStyle=L.col;lx.fill();
    lx.globalAlpha=active?1:.3;lx.strokeStyle=L.col;lx.lineWidth=1;lx.stroke();lx.globalAlpha=1;}}
- function drawL(hx){if(!LW)return;lx.clearRect(0,0,LW,LH);
+ drawL=function(hx){if(!LW)return;lx.clearRect(0,0,LW,LH);
   const anySolo=auds.some(a=>a.solo);
   lanes.forEach(L=>{const active=anySolo?L.s.solo:!L.s.mute;
    lx.fillStyle="rgba(255,255,255,.02)";lx.fillRect(PADL,L.y,LW-PADL-PADR,L.h);
@@ -2002,7 +2054,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lx.fillStyle=getCss("--muted");lx.font="10px sans-serif";lx.textAlign="center";
   for(let t=0;t<=dur();t+=60)lx.fillText(fmtT(t),lxOf(t),LH-5);
   if(hx!=null){lx.strokeStyle="rgba(255,255,255,.6)";lx.lineWidth=1;lx.beginPath();lx.moveTo(hx,LPT);lx.lineTo(hx,LH-LPB);lx.stroke();}}
- function lresize(){LW=lcv.clientWidth;LH=layout()+LPB;lcv.style.height=LH+"px";
+ lresize=function(){LW=lcv.clientWidth;LH=layout()+LPB;lcv.style.height=LH+"px";
   lcv.width=LW*devicePixelRatio;lcv.height=LH*devicePixelRatio;lx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);drawL();}
  lcv.addEventListener("click",e=>{const r=lcv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   for(let i=0;i<lanes.length;i++){const L=lanes[i];
@@ -2011,6 +2063,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   if(x>=PADL)seekTo(Math.max(0,Math.min(dur(),(x-PADL)/(LW-PADL-PADR)*dur())));});  // gutter clicks don't seek to 0
  window.addEventListener("resize",lresize);
  PH.push(t=>drawL(lxOf(t)));
+ }  // ── end buildStemGrid (FULL only) ──
  function paint(t){window.__pht=t;
   tEl.textContent=fmtT(t)+" / "+fmtT(dur());PH.forEach(f=>f(t));}
  function loop(){if(!master.paused){paint(master.currentTime);requestAnimationFrame(loop);}}
@@ -2043,6 +2096,10 @@ def main():
     p.add_argument("--audio-stems-rel", default=None,
                    help="directory (relative to the output HTML) holding the stem .wav files, "
                         "e.g. 'stems_6s'. Enables the in-page stem player (Part E).")
+    p.add_argument("--audio-mix-rel", default=None,
+                   help="directory (relative to the output HTML) holding a single mix audio file "
+                        "(e.g. 'mix_web'). Used by QUICK runs that have no stems — gives a single-track "
+                        "player (transport + seek). Ignored when --audio-stems-rel has stems.")
     p.add_argument("--presence-threshold", type=float, default=0.3,
                    help="0..1 cutoff on each stem's normalised loudness for the 'playing' "
                         "presence strip and active-%% readout (default 0.3). Not hardcoded.")
@@ -2110,7 +2167,7 @@ def main():
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
-               mode=args.mode, back_href=args.back_href)
+               mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

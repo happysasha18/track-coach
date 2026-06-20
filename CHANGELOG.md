@@ -5,6 +5,29 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.7.5] — 2026-06-20
+
+### Added
+- **Quick runs now have a player.** A quick read keeps no Demucs stems, but it still has the mix — so
+  the widget now offers a **single-track player** (play / seek, synced to the charts). Per-instrument
+  mute/solo and the stem lanes remain a full-run feature.
+- **Clear run-mode badge.** Every widget shows a badge by the title — green **Full analysis** or amber
+  **Quick read** — and a quick read adds a one-line note of what a full run would add (stem player,
+  masking, drum/note breakdown, section instrument labels). The Library already tags each row Full/Quick.
+- **The Library footer shows the version** that generated the page.
+
+### Changed
+- **What a quick read shows is now intentional and signposted.** It keeps the vitals, verdict, the
+  Producer's read, the full Track-Story graph + A/B/C structure bar, the mix player, recommendations
+  and tonal balance; the stem-dependent panels (per-stem lanes, masking, rhythm, drums, notes,
+  stem↔track map, per-section instrument labels) appear only in a full run — and the badge says so.
+
+### Internal
+- Re-rendered the deposited widgets to the current version from their cached analysis (no re-separation)
+  and pruned the old per-version widget copies, so the Library and the widgets agree on the version.
+- Tests: added render-level coverage for the quick widget (mix player, badge, graph/sections), the
+  section-lead data path, and the quick mix-encode step; 104 → 111, all green.
+
 ## [0.7.4] — 2026-06-20
 
 ### Changed

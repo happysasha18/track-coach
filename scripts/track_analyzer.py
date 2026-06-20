@@ -107,6 +107,7 @@ def build_widget(rn: Runner, out_dir: Path, *, title, src_audio, src_als, track_
     if have("result_drums.json"):   args += ["--drums-breakdown", out_dir / "result_drums.json"]
     if have("result_selfsim.json"): args += ["--selfsim", out_dir / "result_selfsim.json"]
     if (out_dir / "stems_web").is_dir(): args += ["--audio-stems-rel", "stems_web"]
+    elif (out_dir / "mix_web").is_dir(): args += ["--audio-mix-rel", "mix_web"]  # quick → single-mix player
     if strings:                     args += ["--strings", strings]
     if catalog:                     args += ["--catalog", catalog]
     try:  # the global library index → wires the always-present ← Library back button
@@ -224,6 +225,11 @@ def cmd_analyze(args):
                     "--out", j("result_notes_other.json"))
         # E — web stems: MANDATORY, makes the player + per-stem lanes appear
         rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
+    elif args.mode == "quick":
+        # Quick has no Demucs stems, but it DOES have the mix — encode a compressed copy so the widget
+        # still gets a single-track player (transport + seek; no per-stem mute/solo). Sasha 2026-06-20:
+        # "плеер какая разница быстрый прогон?". No separation, so still fast.
+        rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
 
     # MEASURING DONE — no render here. The widget is rendered ONCE, by `build`, AFTER the read.
     # Order is forced by the anti-hallucination design: measure → interpret → render. Building a
@@ -473,7 +479,8 @@ def main():
     a.add_argument("--als-offset-s", type=float, default=None,
                    help="project time (s) where the render starts (default: first locator / first clip)")
     a.add_argument("--mode", default="full", choices=["quick", "full"],
-                   help="quick = fast analysis only (no stems/player); full = everything")
+                   help="quick = fast analysis; single-mix player only (no Demucs stems → no per-stem "
+                        "lanes/masking/section instrument labels); full = everything")
     a.add_argument("--model", default="htdemucs_6s", help="Demucs model (6s gives guitar+piano stems)")
     a.add_argument("--track-version", default=None, help="REAL version from the source name only; never invent")
     a.add_argument("--bpm", type=float, default=None, help="override tempo for rhythm (default: from core)")
