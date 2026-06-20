@@ -43,6 +43,25 @@ def canonical_widget_name(track: str, version: str, stamp: str) -> str:
     return f"{sanitize(track)}__{sanitize(version or 'v0')}__{sanitize(stamp or 'na')}.html"
 
 
+class DepositError(ValueError):
+    """A deposit was refused because the run dir is malformed (INV-15). Subclasses ValueError so
+    existing callers that catch ValueError still handle it; raised BEFORE any write so a bad run
+    dir never leaves a partial widget copy or a junk index entry behind."""
+
+
+_STAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{4}")  # the dated run-folder shape, e.g. 2026-06-18_0748
+
+
+def looks_like_output_sentinel(slug: str) -> bool:
+    """True when `slug` is NOT a real track name but an output root or a stamp grabbed as a track —
+    the KI-1 junk-entry shape. PURE. A well-shaped run dir is `<base>/<track>/<stamp>`; depositing one
+    level too shallow makes the track resolve to `track-coach-output` / `*-output` / a dated stamp."""
+    s = (slug or "").strip()
+    if not s or s.lower() in {"track-coach-output", "output"} or s.lower().endswith("-output"):
+        return True
+    return bool(_STAMP_RE.fullmatch(s))
+
+
 def _age_days(deposited_at: str, now: datetime) -> float:
     try:
         dt = datetime.fromisoformat(deposited_at)
@@ -216,6 +235,11 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
     """Copy a built widget into the library and record it. Best-effort; returns the entry.
 
     `extra` carries the catalog fields (metrics/arc/tags/audio_sha from `run_metrics`)."""
+    if looks_like_output_sentinel(track):  # INV-15: refuse junk BEFORE any write (atomic)
+        raise DepositError(
+            f"refusing to deposit: resolved track '{track}' is not a real track (looks like an "
+            f"output root or a dated stamp). Expected a run dir shaped <base>/<track>/<stamp>; "
+            f"pass a real run dir or set meta.track.")
     root = Path(root)
     wdir = root / "widgets"
     wdir.mkdir(parents=True, exist_ok=True)

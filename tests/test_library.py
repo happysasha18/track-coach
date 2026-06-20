@@ -94,5 +94,34 @@ class DepositRoundTrip(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class DepositAtomicity(unittest.TestCase):
+    """INV-15 / KI-6: a deposit either targets the run's real track slug or ABORTS without writing a
+    partial/junk entry. The KI-1 saga: a build off a run dir one level too shallow resolved the track
+    to `track-coach-output` and left a junk row + a half-failed catalog regen. Guard it BEFORE any
+    write so a malformed run dir leaves the library untouched."""
+
+    def test_slug_sentinel_is_pure_and_catches_the_junk_shapes(self):
+        for bad in ("", "track-coach-output", "Total_Reboot-output", "2026-06-18_0748"):
+            self.assertTrue(library.looks_like_output_sentinel(bad), f"{bad!r} should be rejected")
+        for ok in ("Total_Reboot_Fragile", "Shared Memories", "run"):
+            self.assertFalse(library.looks_like_output_sentinel(ok), f"{ok!r} is a real track")
+
+    def test_malformed_run_dir_aborts_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                # run dir one level too shallow: parent is the output root, no meta.track → junk slug
+                base = Path(d) / "track-coach-output"; base.mkdir()
+                run = base / "2026-06-18_0748"; run.mkdir()
+                w = run / "analysis_widget_v0.7.6.html"; w.write_text("<html>w</html>")
+                with self.assertRaises(library.DepositError):
+                    library.deposit_from_run(run, w, {"mode": "full"})  # no track → parent.name="track-coach-output"
+                root = library.library_root()
+                self.assertFalse((root / "index.json").exists(), "no index written on a refused deposit")
+                self.assertFalse((root / "widgets").exists(), "no widget copied on a refused deposit")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 if __name__ == "__main__":
     unittest.main()

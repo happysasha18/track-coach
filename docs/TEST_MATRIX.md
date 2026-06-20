@@ -55,7 +55,7 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-12 | A catalog row whose linked widget is built on an OLDER `TC_VERSION` **and whose filename encodes a version** is flagged 'stale'. (Scope hole: unparseable filename ⇒ not flagged — KI-7.) | `test_catalog::StaleWidgetFlag` |
 | INV-13 | `_fmt_date` formats `YYYY-MM-DD_HHMM` and never crashes on odd/multi-underscore stamps. | `test_catalog::FmtDate` |
 | INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other (one shared `cur` + an unconditional `stop()` before `a.play()`). | `test_catalog::CatalogRowPlayer` |
-| INV-15 | A deposit either targets the run's real track slug or aborts without writing a partial/junk entry. | _gap → KI-6_ |
+| INV-15 | A deposit either targets the run's real track slug or aborts (raises `DepositError`) BEFORE any write — no partial widget copy / junk index entry. Junk slug = output root, `*-output`, or a dated stamp. | `test_library::DepositAtomicity` |
 | INV-16 | Arrangement/automation panels render iff `.als` data exists — never as empty shells. | _gap → KI-8_ |
 | INV-17 | The catalog is a LOCAL index: BOTH `open→` (`_open_href`) and play (`_mix_uri_for`) resolve to an absolute `file://` rooted in the ORIGINAL run dir. Portability scope = local filesystem, NOT GitHub Pages. | `test_catalog::CatalogIsLocalIndex` |
 
@@ -130,9 +130,15 @@ Track Story arc (S1) ↔ signature ribbon (S2) same source · S1 player ↔ S2 o
   rendered JS ships (1) exactly ONE shared `let cur=null` and (2) `if(cur&&cur.audio===a){ stop();
   return; } stop(); a.play(` — i.e. an unconditional `stop()` before play. A refactor to per-row
   state or a dropped `stop()` now turns the suite RED instead of silently going all-play-at-once.
-- **KI-6 (F4, INV-15) — `build`/deposit has no atomicity rule.** A build off a wrong-shaped run dir made a
-  junk track + a half-failed catalog regen (the KI-1 saga). Validate the run-dir shape
-  (`<base>/<track>/<stamp>`) before depositing; reject malformed, don't write partial. Add a test.
+- **KI-6 (F4, INV-15) — RESOLVED (session 11).** `deposit()` now refuses a malformed run dir BEFORE
+  any write: `looks_like_output_sentinel(track)` rejects a resolved slug that's empty / an output root
+  / `*-output` / a dated stamp (the too-shallow `<base>/<stamp>` case that made the KI-1 junk row),
+  raising `DepositError` (a `ValueError` subclass) so the widget copy + index write never happen. The
+  build wrapper already catches it → "library deposit skipped", build still completes, catalog regen
+  runs off the clean index. Tests: `test_library::DepositAtomicity` (pure sentinel + an end-to-end
+  abort-writes-nothing). NOTE: this validates the SLUG, not the literal `<base>/<track>/<stamp>` depth —
+  an explicit `meta.track` with any folder name is still valid (the existing round-trip test relies on
+  a `run`-named dir + explicit track), which is why the rule keys on the resolved track, not the path.
 - **KI-7 (F3) — INV-12 stale-flag hole:** unparseable widget filename ⇒ never flagged (the very case you
   most want caught). Fix together with INV-12 option-b: store `TC_VERSION` in the index entry at deposit
   time so the check stops depending on the filename. (Defer to Phase 5 fixtures.)
