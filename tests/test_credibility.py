@@ -518,18 +518,20 @@ class G12_StemCharacterLabels(unittest.TestCase):
         self.mask, self.rh = self._setup()
         self.ch = bw.stem_character(self.mask, self.rh, bw.leakage_caveats(self.mask, self.rh))
 
-    def test_low_percussive_is_kick(self):
-        self.assertEqual(self.ch["drums"]["label"], "kick")
+    def test_drums_stem_is_drums_not_kick(self):
+        # s14 (§B.7): the whole `drums` stem is TRUSTED by identity → "drums", not reduced to "kick"
+        # (kick lives in the drum breakdown). Sasha: "kick вместо всего кита" was wrong.
+        self.assertEqual(self.ch["drums"]["label"], "drums")
         self.assertEqual(self.ch["drums"]["confidence"], "clear")
 
     def test_low_sustained_is_bass(self):
         self.assertEqual(self.ch["bass"]["label"], "bass")
         self.assertEqual(self.ch["bass"]["confidence"], "clear")
 
-    def test_mid_sustained_is_tonal_not_melody(self):
-        # "tonal" deliberately does NOT claim melody vs pad — we can't split them without flatness.
+    def test_mid_sustained_no_notes_shows_base_role_not_tonal(self):
+        # s14 (§B.7): the uncertain mid umbrella shows the BASE ROLE ("mid"), never the jargon "tonal".
         self.assertEqual(self.ch["lead"]["role"], "mid")
-        self.assertEqual(self.ch["lead"]["label"], "tonal")
+        self.assertEqual(self.ch["lead"]["label"], "mid")
         self.assertEqual(self.ch["lead"]["confidence"], "approx")
 
     def test_bled_low_excluded_so_guitar_is_not_bass(self):
@@ -605,10 +607,12 @@ class G13_TonalSplit(unittest.TestCase):
         ch = bw.stem_character(mask, _rhythm(onsets={"nz": 1.0}), [], {"nz": _notes([(0, 0.5), (1, 0.5)])})
         self.assertEqual(ch["nz"]["label"], "noise")
 
-    def test_no_notes_keeps_honest_tonal(self):
+    def test_no_notes_shows_base_role_not_tonal(self):
+        # s14 (§B.7): without transcribed notes we can't name the musical role → show the base role
+        # ("mid"), never the jargon "tonal". (CR-1 honesty is kept; the WORD changed.)
         mask = _masking({"x": self.MID})
         ch = bw.stem_character(mask, _rhythm(onsets={"x": 1.0}), [], None)  # no per-stem notes
-        self.assertEqual(ch["x"]["label"], "tonal")
+        self.assertEqual(ch["x"]["label"], "mid")
 
     def test_only_mid_sustained_is_refined(self):
         # G13 refines ONLY mid·sustained — a low·sustained bass must stay "bass" even with notes present.
@@ -640,11 +644,22 @@ def _intermittent(loud_db, n=24, hits=5):
 
 
 class G14_RoleHighPassDrop(unittest.TestCase):
-    def test_bass_collapses_under_highpass(self):
-        mask = _masking({"bass": {"sub": -20, "low": -22, "low_mid": -55, "mid": -60, "hi_mid": -80, "air": -90}})
+    def test_trusted_bass_stem_stays_bass_even_when_highpass_does_not_collapse(self):
+        # s14 (§B.7): the Lazy_Sparks fix. A synth `bass` stem with strong mid harmonics does NOT lose
+        # ≥HP_DROP_DB under the high-pass (it would have fallen to "mid"/"tonal"). Because the `bass`
+        # family is TRUSTED by identity, we skip the high-pass entirely and keep it "bass".
+        mask = _masking({"bass": {"sub": -22, "low": -24, "low_mid": -26, "mid": -28, "hi_mid": -40, "air": -60}})
         ch = bw.stem_character(mask, _rhythm(onsets={"bass": 1.0}), [], None)
-        self.assertEqual(ch["bass"]["role"], "low")
         self.assertEqual(ch["bass"]["label"], "bass")
+        self.assertEqual(ch["bass"]["role"], "low")
+
+    def test_untrusted_low_stem_collapses_under_highpass(self):
+        # the high-pass mechanism still classifies an UNTRUSTED stem name: a low-dominant stem that
+        # collapses under the high-pass reads as low → "bass".
+        mask = _masking({"sub": {"sub": -20, "low": -22, "low_mid": -55, "mid": -60, "hi_mid": -80, "air": -90}})
+        ch = bw.stem_character(mask, _rhythm(onsets={"sub": 1.0}), [], None)
+        self.assertEqual(ch["sub"]["role"], "low")
+        self.assertEqual(ch["sub"]["label"], "bass")
 
     def test_bled_low_stem_is_not_bass(self):
         # loudest single band is low (−24, drum bleed) but real mid content survives the high-pass → NOT bass
@@ -752,6 +767,72 @@ class G16_IndividualMaskingRecs(unittest.TestCase):
         recs = bw.build_recommendations(_core(), {}, self.m, bw.STRINGS, character=None)
         blob = " || ".join(r[1] + " " + r[2] + " " + r[3] for r in recs)
         self.assertIn("of spots", blob)   # no characters → old generic line, never a wrong named claim
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G17 — the late_entry rec names the PART, never the raw Demucs name (SPEC §B.6, Sasha's #2 cont.).
+# late_entry is by definition about a near-silent stem, so a G16 character label is usually ABSENT —
+# the honest naming hierarchy is: character label → stemmap real-track name (only verdict 'clear') →
+# neutral "a new element". The raw Demucs family name ('vocals'/'guitar') must NEVER reach the card.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G17_LateEntryNamesThePart(unittest.TestCase):
+    def _late_masking(self, spike_db=LOUD):
+        """A 'vocals' stem silent everywhere but one spike near the end (tb=110 > 0.8*120), plus a
+        constant-loud 'drums' baseline so nothing else fires. spike_db controls the entering peak:
+        LOUD (−20, real content) → fires; a sub-floor value (−61) → an empty artifact, must NOT fire."""
+        m = _masking({"drums": LOUD, "vocals": SILENT})
+        spike = 22                                   # tb_m[22] = 110.0 (> 96.0)
+        for b in BAND_ORDER:
+            m["band_rms_db"]["vocals"][b] = [SILENT] * 24
+            m["band_rms_db"]["vocals"][b][spike] = spike_db
+        return m
+
+    def _late_rec(self, recs):
+        return next((r for r in recs if "enters right at the end" in r[2] or "appears at" in r[3]), None)
+
+    def _all_text(self, r):
+        return r[1] + " " + r[2] + " " + r[3] + " " + r[4]   # header+title+body+fix
+
+    def test_fires_and_never_uses_raw_demucs_name(self):
+        m = self._late_masking()
+        recs = bw.build_recommendations(_core(), {}, m, bw.STRINGS)   # no character, no stemmap
+        r = self._late_rec(recs)
+        self.assertIsNotNone(r, "late_entry should fire for a stem that only spikes near the end")
+        self.assertNotIn("vocals", self._all_text(r))        # raw Demucs name must never leak
+        self.assertIn("A new element is silent", r[3])       # body uses the neutral phrase, not the stem
+
+    def test_prefers_character_label(self):
+        m = self._late_masking()
+        ch = {"vocals": {"label": "lead", "confidence": "approx"}}
+        r = self._late_rec(bw.build_recommendations(_core(), {}, m, bw.STRINGS, character=ch))
+        self.assertIn("lead", r[3])                           # the measured character names the part
+        self.assertNotIn("vocals", self._all_text(r))
+
+    def test_uses_stemmap_real_name_only_when_clear(self):
+        m = self._late_masking()
+        good = {"stems": {"vocals": {"verdict": "clear",
+                                     "track_matches": [{"track": "Lead Synth", "r": 0.6}]}}}
+        r = self._late_rec(bw.build_recommendations(_core(), {}, m, bw.STRINGS, stemmap=good))
+        self.assertIn("Lead Synth", r[3])                    # the clearly-mapped real track name
+        self.assertNotIn("vocals", self._all_text(r))
+
+    def test_ignores_stemmap_when_not_clear(self):
+        m = self._late_masking()
+        for v in ("mixed", "nomatch", "empty"):
+            sm = {"stems": {"vocals": {"verdict": v,
+                                       "track_matches": [{"track": "Lead Synth", "r": 0.31}]}}}
+            r = self._late_rec(bw.build_recommendations(_core(), {}, m, bw.STRINGS, stemmap=sm))
+            self.assertNotIn("Lead Synth", self._all_text(r), f"verdict {v} can't be trusted to name a part")
+            self.assertIn("A new element is silent", r[3])    # falls through to neutral
+
+    def test_does_not_cry_wolf_on_an_empty_artifact(self):
+        # CR-1 "don't paint silence": a late spike that never clears the −55 dB real-content floor is a
+        # separation artifact (Lazy_Sparks vocals: peak −61 dB, verdict 'empty'), not a musical event.
+        # Per-band −69 → broadband peak ≈ −61 (< STEM_EMPTY_FLOOR_DB) → the card must NOT fire at all.
+        m = self._late_masking(spike_db=-69.0)
+        recs = bw.build_recommendations(_core(), {}, m, bw.STRINGS)
+        self.assertIsNone(self._late_rec(recs),
+                          "late_entry must not fire on a near-silent artifact stem (entering peak below floor)")
 
 
 if __name__ == "__main__":

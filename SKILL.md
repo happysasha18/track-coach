@@ -417,10 +417,16 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" bp "$SKILL_DIR/scripts/transcribe.py" \
     --stem "$STEMS/other.wav" --label other --out "$OUT_DIR/result_notes_other.json"
 ```
 
-**Stem character labels (G13/G14/G15).** build_widget names each significant stem by what it MEASURABLY
-is — `kick`/`bass`/`melody`/`lead`/`chord`/`pad` — from freq-role (high-pass drop, bleed-safe) ×
-polyphony × envelope sustain, never the raw Demucs name ([[track-coach-stem-labels]]). Frequency-clash
-recs name those parts (G16): "the bass buries the lead around 250–600 Hz ~18%, worst around 1:18".
+**Stem character labels (G13/G14/G15; salad-cleanup s14, SPEC §B.7).** build_widget shows ONE plain label
+per significant stem. The reliable low-end families are TRUSTED by identity (`bass`→"bass", `drums`→"drums"
+— bass is NOT run through the G14 high-pass that demoted a synth bass to "tonal"). Other stems are read by
+measurement — freq-role × polyphony × envelope sustain → `melody`/`lead`/`chord`/`pad` when confident,
+else the plain base role (`mid`/`high`); never the jargon "tonal", never a `≈`-uncertain prefix, never the
+raw Demucs name ([[track-coach-stem-labels]]). Empty stems read "near-silent". Frequency-clash
+recs name those parts (G16): "the bass buries the lead around 250–600 Hz ~18%, worst around 1:18". The
+"new element enters at the end" rec also names the part (G17): measured character → clearly-mapped real
+project track → neutral "A new element", never the raw Demucs name (a near-silent stem rarely has a
+character label, so it leans on the stemmap `clear` verdict or the neutral phrase).
 
 ### Web stems for the player (E) — MANDATORY in deep mode, do not skip
 

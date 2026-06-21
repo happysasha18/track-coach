@@ -5,6 +5,43 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.12] — 2026-06-21
+
+### Changed
+- **The tiny line under each stem now shows your real project track, not a Demucs name.** It used to read
+  things like *"guitar · → other"* (two separation labels mashed together) or *"vocals · near-silent"*.
+  Now, when a stem maps confidently to a project part, it shows that real track name (e.g. *Guitar*);
+  near-silent stems just say *near-silent*; otherwise it shows nothing — never a raw *other/vocals/piano*.
+
+## [0.8.11] — 2026-06-21
+
+### Changed
+- **One clear label per stem — no more label salad.** Each stem now shows a single plain name instead of
+  a stack of half-confident markers. The bass stem reads **bass** (it was wrongly showing *tonal*), the
+  drums stem reads **drums** (was *kick*), parts we can't pin down show their plain range (**mid**/**high**)
+  instead of the jargon *tonal*, and the fuzzy *≈* "not sure" prefix is gone. Near-silent stems read
+  *near-silent* and never leak a wrong instrument name (e.g. *vocals*). The tiny stem↔project line now uses
+  *→* for a match so it can't be confused with anything else.
+
+## [0.8.10] — 2026-06-21
+
+### Fixed
+- **The "new element enters at the end" tip no longer fires on near-silent noise.** It was triggering on
+  separation-artifact stems that barely make a sound at the very end (on *Lazy Sparks*: a part peaking at
+  only −61 dB) — flagging silence as a musical event. Now the part has to actually reach real-content
+  loudness when it enters, or the card stays quiet. On *Lazy Sparks* this removes one false card (9 → 8).
+  The point of the 0.8.9 rename only lands once the card stops crying wolf.
+
+## [0.8.9] — 2026-06-21
+
+### Changed
+- **The "new element enters at the end" tip no longer prints a raw Demucs name.** When a part is silent
+  for almost the whole track and only appears near the finale, the card now names it the way you'd
+  recognise it — by its measured character (e.g. *"A part (lead)…"*), or by the real project track when
+  the stem maps cleanly to one (*"Lead Synth…"*), or simply *"A new element…"* when it can't be pinned
+  down — never the wrong `vocals`/`guitar` label. Second step of making recommendations name the actual
+  part instead of a Demucs stem.
+
 ## [0.8.8] — 2026-06-21
 
 ### Changed

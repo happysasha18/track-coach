@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.8"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.12"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -285,10 +285,10 @@ STRINGS = {
         "late_entry": {
             "header": "Event · {t}",
             "title": "A new element enters right at the end",
-            "body": "Stem “{st}” is silent for almost the whole track and only appears at <b>{t}</b>. If it's a lead, vocal "
+            "body": "{part} is silent for almost the whole track and only appears at <b>{t}</b>. If it's a lead, vocal "
                     "or sample, that's a strong accent for the finale. Right now it flies in just before the hard cut: bring it "
                     "in a little earlier and let it play out, so it reads as a resolution, not a stray tail.",
-            "fix": "Bring “{st}” in a bit earlier than <b>{t}</b> and let it play out, so it lands as a resolution rather than a stray tail."},
+            "fix": "Bring it in a bit earlier than <b>{t}</b> and let it play out, so it lands as a resolution rather than a stray tail."},
         # ── from the project + per-stem layers (B/C/G) ──
         "intention_result": {
             "header": "Intention vs result · {param}",
@@ -532,8 +532,9 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
       • G13 — for the mid·sustained case (the old honest 'tonal' umbrella), split into lead/melody/chord/
         pad/noise from polyphony (basic-pitch notes, `per_stem_notes`), per-stem spectral flatness
         (`masking.spectral_flatness`), relative loudness and mean note length. See docs/SPEC.md §B.4.
-    Returns {stem: {label, role, percussive, confidence}}. confidence 'clear' for the low end (kick/bass,
-    which Sasha confirmed we read reliably), 'approx' otherwise (marked ≈ in the UI)."""
+    Returns {stem: {label, role, percussive, confidence}}. confidence 'clear' for the trusted low end
+    (bass/drums), 'approx' otherwise. confidence is no longer shown as a "≈" in the UI (Sasha s14): one
+    plain label per stem, and the uncertain mid umbrella shows its base role ("mid"/"high"), never "tonal"."""
     if not masking:
         return {}
     rmap = (rhythm or {}).get("rhythm", {}) if rhythm else {}
@@ -543,14 +544,25 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     GROUP = {"low": ("sub", "low"), "mid": ("low_mid", "mid"), "high": ("hi_mid", "air")}
     LABEL = {                                            # (role, percussive) → (short label, confidence)
         ("low", True): ("kick", "clear"),  ("low", False): ("bass", "clear"),
-        ("mid", True): ("perc", "approx"), ("mid", False): ("tonal", "approx"),
-        ("high", True): ("hats", "approx"), ("high", False): ("air", "approx"),
+        ("mid", True): ("perc", "approx"), ("mid", False): ("mid", "approx"),
+        ("high", True): ("hats", "approx"), ("high", False): ("high", "approx"),
     }
+    # Sasha's call (2026-06-21 s14, docs/SPEC.md §B.7): TRUST the stem for the reliable low-end families
+    # instead of re-deriving (and sometimes DEMOTING) them. Demucs separates bass & drums cleanly and
+    # Sasha confirmed we read the low end reliably — so a `bass` stem is "bass" (we do NOT run it through
+    # the G14 high-pass, which on a synth bass with mid harmonics wrongly fell to "tonal"), and a `drums`
+    # stem is "drums" (NOT reduced to "kick"). Only these two exact families are trusted by name; every
+    # other (electronic) stem name stays untrusted and is read by measurement ([[track-coach-stem-labels]]).
+    TRUSTED = {"bass": ("bass", "low", False), "drums": ("drums", "low", True)}
     # `leakage` is accepted for signature stability but no longer feeds the ROLE: G14 (high-pass drop)
     # makes the bass-vs-mid call without arguing whether a low band is bleed, so CR-4 stays UI-only.
     out = {}
     mono = {}    # st -> loud_level (dB); resolved into lead (loudest) vs melody after the loop
     for st in significant_stems(masking):
+        if st in TRUSTED:                                # trust bass/drums by identity — no demotion
+            lab, role, perc = TRUSTED[st]
+            out[st] = {"label": lab, "role": role, "percussive": perc, "confidence": "clear"}
+            continue
         # Per-band level = loud_level (85th pct of when it plays), NOT median: an intermittent stem (a
         # bassline that hits some beats) reads as ~silence at the median in every band (verify-by-deed
         # 2026-06-21), which makes any freq-role noise. Judge by the LOUD content (significant_stems' stat).
@@ -585,7 +597,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
             if flat is not None and flat >= FLATNESS_NOISE_MIN:
                 label = "noise"                          # broadband, no clear pitch to call melody vs chord
             elif pf is None:
-                label = "tonal"                          # no transcribed notes → keep the honest umbrella (CR-1)
+                label = "mid"                            # no transcribed notes → show the base role, not jargon (s14)
             elif pf < POLY_FRAC_MONO_MAX:                # monophonic line: lead vs melody decided by loudness below
                 mono[st] = loud_level(stem_broadband_db(masking, st)) or -120
                 label = "melody"                         # provisional; promoted to "lead" if it's the loudest
@@ -698,6 +710,21 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
             return best
         sub_carrier = loudest_in("sub")
 
+        # G17 (SPEC §B.6) — name a stem in a rec by its measured character, else its CLEARLY-mapped
+        # real project track, else a neutral phrase. NEVER the raw Demucs family name
+        # ([[track-coach-stem-labels]]). Used by late_entry, where the stem is near-silent so a G16
+        # character label is usually absent and we must fall through to the stemmap / neutral.
+        def _part_name(st):
+            lbl = ((character or {}).get(st, {}) or {}).get("label")
+            if lbl:
+                return "A part ({})".format(lbl)
+            sm = ((stemmap or {}).get("stems", {}) or {}).get(st, {}) or {}
+            if sm.get("verdict") == "clear":
+                trk = (sm.get("track_matches") or [{}])[0].get("track")
+                if trk:
+                    return "“{}”".format(trk)
+            return "A new element"
+
         # NOTE: separation-quality findings (empty/smeared stems, residual, untrustworthy
         # bass) are NOT surfaced as recommendations — they're tool artefacts, not music
         # advice, and aren't actionable for the producer. They live in the "Stem ↔ project"
@@ -759,8 +786,13 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
             arr = bbs[st]
             mmed = median(arr) or -120
             li = peak_idx(arr)
-            if mmed < -55 and arr[li] > mmed + 20 and tb_m[li] > 0.8 * dur:
-                add("late_entry", _t=tb_m[li], st=st, t=fmt_t(tb_m[li]))
+            # G17/CR-1 ("don't paint silence"): the ENTERING PEAK must clear the real-content floor,
+            # else this is a near-silent separation artifact (Lazy_Sparks vocals: peak −61 dB, verdict
+            # 'empty'), not a musical event. Peak-based, not loud_level: a genuine late accent is silent
+            # most of the track so its 85th-pct is low — only the peak proves it's real.
+            if (mmed < -55 and arr[li] > mmed + 20 and tb_m[li] > 0.8 * dur
+                    and arr[li] >= STEM_EMPTY_FLOOR_DB):
+                add("late_entry", _t=tb_m[li], part=_part_name(st), t=fmt_t(tb_m[li]))
                 break
 
     # ── Intention vs result: a filter/cutoff automation vs the measured brightness ──
@@ -2359,8 +2391,11 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const SM=D.stem,MAP=D.stemmap&&D.stemmap.stems;
  function bridge(name){const sm=MAP&&MAP[name];if(!sm)return{txt:"",col:null};
   if(sm.verdict==="empty")return{txt:"near-silent",col:null};   // Demucs put little here
-  // Only show a project-part guess when the map is actually confident — no more wrong labels.
-  if(sm.verdict==="clear"&&sm.best_family)return{txt:"≈ "+sm.best_family,col:FAMCOL[sm.best_family]||null};
+  // Sasha s14: the tiny sub-line shows the REAL PROJECT TRACK when the map is confident (e.g. "Guitar"),
+  // never the raw Demucs name/family ("guitar · → other" was a salad of two Demucs words). Only when the
+  // verdict is genuinely `clear` — otherwise nothing, no guessing.
+  if(sm.verdict==="clear"){const t=(sm.track_matches&&sm.track_matches[0]&&sm.track_matches[0].track);
+   if(t)return{txt:t,col:(FAMCOL[sm.best_family]||null)};}
   return{txt:"",col:null};}
  const BANDS=(SM&&SM.bands)||["sub","low","low_mid","mid","hi_mid","air"];
  const VIZ=SM&&SM.viz;   // fine-resolution drawing grid (~0.25 s), if present
@@ -2456,17 +2491,21 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lanes.forEach(L=>{const active=anySolo?L.s.solo:!L.s.mute;
    lx.fillStyle="rgba(255,255,255,.02)";lx.fillRect(PADL,L.y,LW-PADL-PADR,L.h);
    box(3,L.y+3,L.s.mute,"#ff6b6b","M");box(3,L.y+L.h-15,L.s.solo,"#46d39a","S");
-   // (g) lane label: the measured CHARACTER ("bass", "≈ melody") is the prominent name, not the raw
-   // Demucs label — which is wrong for electronic music. The raw stem name still shows tiny (with the
-   // project match when clear) so you always know which file/stem it is (G8: know what you're looking at).
+   // (g) lane label: ONE plain label per stem (Sasha s14, docs/SPEC.md §B.7). The measured CHARACTER
+   // ("bass", "lead", "mid") is the prominent name — NOT the raw Demucs label (wrong for electronic
+   // music, [[track-coach-stem-labels]]) and NOT a "≈ uncertain" marker (dropped: if we're not sure we
+   // just show the base role). The raw stem name still shows tiny below (with the project match when
+   // clear) so you always know which file/stem it is (G8). No character ⇒ near-silent, never the raw name.
    const CH=D.stem_character&&D.stem_character[L.name];
-   const mainLbl=CH?((CH.confidence==="approx"?"≈ ":"")+CH.label):L.name;
+   const mainLbl=CH?CH.label:"near-silent";
    lx.globalAlpha=active?1:.45;lx.fillStyle=active?getCss("--ink"):getCss("--muted");
    lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(mainLbl),19,L.y+L.h/2+3);lx.globalAlpha=1;
    if(L.drum){drawDrum(L,active);}
    else if(L.env){drawWave(L,active);}
-   if(!L.drum){const sub=L.name+(L.br.txt?" · "+L.br.txt:"");lx.globalAlpha=active?.7:.35;
-    lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(sub,PADL+4,L.y+9);lx.globalAlpha=1;}});
+   // tiny sub-line: ONLY the real project track (map clear) or "near-silent" — NEVER the raw Demucs
+   // name (Sasha s14: "guitar · → other" was salad). Nothing when we have no confident, real name.
+   if(!L.drum&&L.br.txt){lx.globalAlpha=active?.7:.35;
+    lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(L.br.txt,PADL+4,L.y+9);lx.globalAlpha=1;}});
   drawLocators(lx,lxOf,LPT,LH-LPB,null);
   lx.fillStyle=getCss("--muted");lx.font="10px sans-serif";lx.textAlign="center";
   for(let t=0;t<=dur();t+=60)lx.fillText(fmtT(t),lxOf(t),LH-5);

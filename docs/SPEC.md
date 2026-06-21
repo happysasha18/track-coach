@@ -237,6 +237,62 @@ conflict (`masking_flags`: which low stem buries which mid stem, in which band, 
   Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
   melody 15%"), piano (empty) dropped.
 
+### B.6 The `late_entry` rec — name the part, never the raw Demucs name (G17, 0.8.9, Sasha's #2 cont.)
+Continuing #2 ("wire per-stem character into MORE recs beyond masking"): the `late_entry` rec — fired
+when a stem is silent for almost the whole track and only appears near the end — was the last LIVE rec
+still printing the **raw Demucs stem name** (`Stem "{st}" is silent… bring "{st}" in earlier`). That
+violates the hard requirement [[track-coach-stem-labels]] (Sasha makes electronic music — a `vocals`
+stem is a synth, etc.) exactly as the masking card did before G16.
+- **Wrinkle:** `late_entry` is BY DEFINITION about a near-silent stem, and `stem_character` only labels
+  SIGNIFICANT stems — so the G16 character label is usually ABSENT here. We can't lean on it alone.
+- **Honest naming hierarchy (most → least specific, never the raw name):**
+  1. the measured **character** label (`_lbl`), if the stem happens to be significant enough to have one;
+  2. else the **stemmap real-track name** — `stems[st].track_matches[0].track` — but ONLY when the
+     stemmap verdict is `clear` (a strong, unambiguous match to one project part). `mixed`/`nomatch`/
+     `empty` verdicts are NOT trustworthy enough to name a part, so we don't.
+  3. else a neutral **"a new element"** — never the raw Demucs `{st}`.
+- The template loses `{st}` entirely; it now interpolates `{part}` (the resolved phrase) so the rec reads
+  *"A part (lead) is silent for almost the whole track and only appears at 3:40…"* / *"A new element
+  enters right at the end…"* when unidentifiable. INV: a `late_entry` rec's text never contains a raw
+  Demucs family name unless that name is also the real mapped track name.
+- **The real cleanup wasn't the name — it was DON'T CRY WOLF (0.8.10, found by deed on Lazy_Sparks when
+  Sasha asked "the card existed before — what's the point?").** late_entry was firing on the `vocals`
+  stem whose late spike only reached **−61 dB** (peak), median −81, stemmap verdict `empty` — i.e. a
+  near-silent SEPARATION ARTIFACT at the very end, not a musical event. Renaming it honestly is cosmetic;
+  the card shouldn't fire at all. So late_entry is now GATED: it fires only when the entering peak clears
+  the real-content floor `arr[peak] ≥ STEM_EMPTY_FLOOR_DB` (−55 dB). This is CR-1 "don't paint silence"
+  applied to recs (same floor `significant_stems` uses), and it's peak-based (not `loud_level`/`empties`)
+  on purpose: a GENUINE late accent is silent most of the track so its 85th-pct is low — only its PEAK
+  proves it's real content. On Lazy_Sparks this card now correctly DISAPPEARS. INV: late_entry never
+  fires on a stem whose entering peak is below the empty floor.
+
+### B.7 ONE plain label per stem — kill the label salad (0.8.11, Sasha s14)
+Sasha, looking at the real Lazy_Sparks render: *"что за салат?"* The stem area had THREE overlapping,
+half-confident systems stacked on each stem — (1) measured `character` with a `≈` "uncertain" prefix,
+(2) the stem↔project map verdict (which ALSO used `≈`, meaning the OPPOSITE — "matches a family"), and
+(3) per-stem repetition letters. Worse, the headline character often degraded: on Lazy_Sparks the **bass
+stem read `≈ tonal`** (G14's high-pass drop didn't trip on a synth bass with mid harmonics), the whole
+`drums` stem read `kick`, and empty stems STILL leaked the **raw Demucs name** (`vocals`) into the lane
+label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE plain label per stem:
+- **Trust the stem for the reliable low-end families.** Demucs separates bass & drums cleanly and Sasha
+  confirmed we read the low end reliably, so a `bass` stem is **"bass"** (we do NOT run it through the G14
+  high-pass that demoted it) and a `drums` stem is **"drums"** (not "kick" — kick is a drum-breakdown
+  sub-part). Only these two exact families are trusted by name; every other (electronic) stem name stays
+  untrusted and is read by measurement ([[track-coach-stem-labels]]).
+- **Character only when confident; else the base role.** A confident G13 determination (lead/melody/
+  chord/pad) shows; otherwise the stem shows its plain **base role ("mid"/"high")** — never the jargon
+  "tonal", never a `≈`-uncertain marker (Sasha: *"если не уверен, просто базовая роль"*).
+- **No raw Demucs name in the lane label, ever.** No character ⇒ "near-silent" (the stem is empty),
+  never `L.name`. The raw stem name still appears tiny in the sub-line (with the map match) for "know your
+  source" (G8) — but the map's match marker changed `≈ family` → `→ family` so `≈` isn't overloaded.
+- Verified by deed (Lazy_Sparks 0.8.11): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
+  vocals/piano→"near-silent". INV: a stem lane label is one of {trusted family, confident character,
+  base role, "near-silent"} — never "tonal", never a "≈" prefix, never a raw Demucs family name.
+- **OPEN (asked Sasha):** where the map verdict is genuinely `clear` AND the matched real project track
+  looks meaningful (e.g. guitar→"Guitar"), fold that real name in as the primary label instead of the
+  base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). Also OPEN: per-stem
+  frequency analyzer (Sasha's idea, s14) as finer label-input + a viz — see NEXT_STEPS.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are
