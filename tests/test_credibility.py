@@ -56,10 +56,11 @@ def _core(n=24, dur=120.0, energy=None, density=None, brightness=None, bounds=No
     }
 
 
-def _masking(stems, n=24, dur=120.0, flatness=None, sustain=None):
+def _masking(stems, n=24, dur=120.0, flatness=None, sustain=None, centroid=None):
     """stems: {name: dB-scalar | {band: dB}}. Builds a masking payload with flat per-band dB over time.
     flatness: optional {stem: 0..1} energy-weighted spectral flatness (G13 noise/pitch split).
-    sustain: optional {stem: 0..1} envelope continuity (G13 pad-vs-chord)."""
+    sustain: optional {stem: 0..1} envelope continuity (G13 pad-vs-chord).
+    centroid: optional {stem: Hz} per-stem spectral centroid (G18 freq-role from the frequency analyzer)."""
     tb = [round(i * dur / n, 1) for i in range(n)]
     band = {}
     for st, spec in stems.items():
@@ -73,6 +74,7 @@ def _masking(stems, n=24, dur=120.0, flatness=None, sustain=None):
         "masking_flags": {}, "masking_summary": {},
         "spectral_flatness": dict(flatness or {}),
         "sustain": dict(sustain or {}),
+        "spectral_centroid": dict(centroid or {}),
         "viz": {"win_s": dur / n, "bins": tb, "bb": {}, "band": {}},
     }
 
@@ -724,6 +726,35 @@ class G15_PercussiveByContent(unittest.TestCase):
         mask = _masking({"pc": self.MID})
         ch = bw.stem_character(mask, _rhythm(onsets={"pc": 5.0}), [], None)  # no notes
         self.assertEqual(ch["pc"]["label"], "perc")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G18 — freq-role from the per-stem FREQUENCY ANALYZER's spectral CENTROID (Sasha s14). When the masking
+# carries spectral_centroid, a sustained stem's role follows where its energy sits (low/mid/high) — a
+# robust signal that replaces the crude 6-band high-pass. Falls back to the high-pass when no centroid.
+# An UNTRUSTED stem name is used (bass/drums are trusted by identity and never reach this path).
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G18_CentroidFreqRole(unittest.TestCase):
+    def _ch(self, hz):
+        m = _masking({"syn": -25.0}, centroid=({"syn": hz} if hz is not None else None))
+        return bw.stem_character(m, _rhythm(onsets={"syn": 1.0}), [], None)["syn"]  # sustained, no notes
+
+    def test_low_centroid_is_low_role_bass_label(self):
+        c = self._ch(120.0)                     # like a bass (deed: Lazy_Sparks bass 117 Hz)
+        self.assertEqual(c["role"], "low")
+        self.assertEqual(c["label"], "bass")
+
+    def test_mid_centroid_is_mid(self):
+        self.assertEqual(self._ch(1000.0)["role"], "mid")   # like a guitar/lead (deed: 1007 Hz)
+
+    def test_high_centroid_is_high(self):
+        self.assertEqual(self._ch(6000.0)["role"], "high")  # airy/cymbal-bright
+
+    def test_no_centroid_falls_back_to_highpass(self):
+        # pre-0.8.14 masking (no spectral_centroid) must still produce a role via the high-pass path.
+        c = self._ch(None)
+        self.assertIn(c["role"], ("low", "mid", "high"))
+        self.assertIsNotNone(c["label"])
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────

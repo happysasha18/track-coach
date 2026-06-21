@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.15] — 2026-06-21
+
+### Changed
+- **Stem freq-role now comes from the frequency analyzer (the centroid), not the crude band trick.** A
+  stem's role (low/mid/high) is decided by where its energy actually sits — the spectral centroid from
+  0.8.14 — so a synth bass reads as bass robustly. Verified on *Lazy Sparks* (bass→bass, guitar→mid,
+  lead→lead) with no regression; falls back to the old method on older analyses with no centroid.
+
 ## [0.8.14] — 2026-06-21
 
 ### Added

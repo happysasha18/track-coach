@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.14"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.15"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -485,6 +485,12 @@ HP_DROP_DB         = 15.0  # G14: a sustained stem that LOSES at least this much
 
 HP_BANDS = ("low_mid", "mid", "hi_mid", "air")   # what survives a ~250 Hz high-pass (sub+low removed)
 
+# G18 (s14): per-stem spectral CENTROID thresholds for freq-role (preferred over the high-pass when the
+# masking carries `spectral_centroid`). A bass/sub sits below LOW; air/cymbals/very-bright above HIGH;
+# everything between is "mid". Deed (Lazy_Sparks): bass 117, drums 203, guitar 1007, other 942 Hz.
+LOW_CENTROID_HZ    = 250.0
+HIGH_CENTROID_HZ   = 3500.0
+
 
 def _comb_db(vals):
     """Combine per-band dB levels into one broadband dB (power sum). Bands at/below the −119 sentinel are
@@ -580,16 +586,23 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
             grp = {g: _comb_db([bm[b] for b in bands]) for g, bands in GROUP.items()}
             role = max(grp, key=grp.get)                 # kick (low) / perc (mid) / hats (high) — G12 onset path
         else:
-            # G14 (Sasha's idea): a sustained stem is a genuine low carrier only if HIGH-PASSING it (dropping
-            # sub+low) strips most of its loudness. A bass collapses (drop ≥ HP_DROP_DB); a mid stem with a
-            # bled-in low keeps its real mid content. Uses the relative DROP, not an absolute residue floor
-            # (a loud bass's residue can still sit above the empty-floor yet it still drops ~22–27 dB).
-            full = _comb_db([bm[b] for b in BAND_ORDER])
-            hp = _comb_db([bm[b] for b in HP_BANDS])
-            if full - hp >= HP_DROP_DB:
-                role = "low"
+            cen = (masking.get("spectral_centroid") or {}).get(st)
+            if cen is not None:
+                # G18 (s14, Sasha's per-stem frequency analyzer): the spectral CENTROID — where the stem's
+                # energy actually sits — is a robust freq-role signal that replaces the crude 6-band high-pass
+                # (which mislabeled a synth bass). Bass sits low (~120 Hz), pads/leads mid (~1 kHz), air/
+                # cymbals high (> HIGH_CENTROID_HZ). Verified by deed: bass 117 Hz, guitar 1007 Hz.
+                role = "low" if cen < LOW_CENTROID_HZ else ("high" if cen > HIGH_CENTROID_HZ else "mid")
             else:
-                role = "high" if _comb_db([bm["hi_mid"], bm["air"]]) > _comb_db([bm["low_mid"], bm["mid"]]) else "mid"
+                # Fallback (pre-0.8.14 masking with no centroid): G14 high-pass drop — a sustained stem is a
+                # genuine low carrier only if HIGH-PASSING it (dropping sub+low) strips ≥ HP_DROP_DB of its
+                # loudness (relative drop, not an absolute residue floor).
+                full = _comb_db([bm[b] for b in BAND_ORDER])
+                hp = _comb_db([bm[b] for b in HP_BANDS])
+                if full - hp >= HP_DROP_DB:
+                    role = "low"
+                else:
+                    role = "high" if _comb_db([bm["hi_mid"], bm["air"]]) > _comb_db([bm["low_mid"], bm["mid"]]) else "mid"
         label, conf = LABEL[(role, percussive)]
         # G13: refine ONLY the mid·sustained umbrella; every other G12 label is unchanged.
         if role == "mid" and not percussive:
