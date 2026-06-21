@@ -84,6 +84,36 @@ def load_stem(path: str) -> tuple:
     return y, sr, len(y) / sr
 
 
+# ── per-stem FREQUENCY ANALYZER (Sasha's idea, s14): a real spectral profile per stem, like the mix
+# gets, but per stem. Finer than the 6 coarse bands → feeds a future per-stem spectrum viz + firmer
+# role detection (the crude 6-band high-pass mislabeled a synth bass). Additive: does NOT change labels.
+SPEC_NBINS = 32
+SPEC_FMIN, SPEC_FMAX = 20.0, 16000.0
+SPEC_EDGES = np.logspace(np.log10(SPEC_FMIN), np.log10(SPEC_FMAX), SPEC_NBINS + 1)
+SPEC_CENTERS = [round(float(np.sqrt(SPEC_EDGES[i] * SPEC_EDGES[i + 1])), 1) for i in range(SPEC_NBINS)]
+
+
+def stem_spectrum(y: np.ndarray, sr: int = SR, hop: int = HOP) -> tuple:
+    """Energy-weighted spectral profile of one stem. Returns (centroid_hz, [SPEC_NBINS dB]):
+      • centroid_hz — where the stem's energy sits (a robust, single-number freq-role signal);
+      • spectrum    — a log-frequency magnitude profile (SPEC_NBINS bins, dB, peak-normalised to 0).
+    Frames are POWER-weighted so the profile reflects what the stem sounds like WHEN it plays (matching
+    spectral_flatness/sustain), not its silent gaps. Returns (None, [None]*N) for a silent stem."""
+    S = np.abs(librosa.stft(y, hop_length=hop))                 # [freq, frames]
+    freqs = librosa.fft_frequencies(sr=sr, n_fft=2 * (S.shape[0] - 1))
+    power = S ** 2
+    w = power.sum(axis=0)                                       # per-frame total power (the weight)
+    if w.sum() <= 0:
+        return None, [None] * SPEC_NBINS
+    meanspec = (power * w).sum(axis=1) / (w.sum() + 1e-12)      # energy-weighted mean spectrum [freq]
+    centroid = float((freqs * meanspec).sum() / (meanspec.sum() + 1e-12))
+    binned = np.array([float(meanspec[(freqs >= SPEC_EDGES[i]) & (freqs < SPEC_EDGES[i + 1])].sum())
+                       for i in range(SPEC_NBINS)])
+    db = 10.0 * np.log10(np.maximum(binned, 1e-12))
+    db = db - db.max()                                          # peak-normalise → 0 dB at the loudest bin
+    return round(centroid, 1), [round(float(x), 1) for x in db]
+
+
 def analyse(stems: dict, out_path: str, dur_hint: float = None):
     """
     stems: dict of {role: path}, e.g. {'bass': '...', 'other': '...', ...}
@@ -112,9 +142,14 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
     band_data = {}   # {stem_name: {band_name: [nb floats]}}
     flatness = {}    # {stem_name: float}  energy-weighted mean spectral flatness (0..1); high = noisy/no clear pitch
     sustain  = {}    # {stem_name: float}  continuity of the envelope within its active span (0..1); high = a held drone/pad
+    centroid = {}    # {stem_name: Hz}     energy-weighted spectral centroid; where the stem's energy sits
+    spectrum = {}    # {stem_name: [SPEC_NBINS dB]}  log-freq profile, peak-normalised → per-stem spectrum viz
     for role, y in loaded.items():
         print(f"  Band analysis: {role}...")
         band_data[role] = {}
+        cen, spec = stem_spectrum(y)                 # per-stem frequency analyzer (Sasha s14)
+        centroid[role] = cen
+        spectrum[role] = spec
         # Spectral flatness per stem (G13): feeds the melody/chord vs noise split in stem_character. We
         # ENERGY-WEIGHT the per-frame flatness by that frame's RMS power so silence/near-silence doesn't
         # drag the number — the label should reflect what the stem sounds like WHEN it plays, not its gaps.
@@ -220,6 +255,9 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
         "band_rms_db":      band_data,        # {stem: {band: [nb × dB]}}
         "spectral_flatness": flatness,        # {stem: float 0..1} energy-weighted; G13 noise/pitch split
         "sustain":          sustain,          # {stem: float 0..1} envelope continuity; G13 pad (held) vs chord (stabs)
+        "spectral_centroid": centroid,        # {stem: Hz} energy-weighted centroid (per-stem freq analyzer, s14)
+        "spectrum":         spectrum,         # {stem: [SPEC_NBINS dB]} log-freq profile, peak-normalised → viz
+        "spectrum_freqs":   SPEC_CENTERS,     # [SPEC_NBINS] log-spaced bin centre frequencies (Hz)
         "masking_flags":    masking_flags,
         "masking_summary":  masking_summary,
         "viz": {                              # fine grid for the sequencer waveform only

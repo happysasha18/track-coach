@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.14] — 2026-06-21
+
+### Added
+- **A real frequency analyzer now runs on every stem** (not just the whole mix). Each stem gets a
+  spectral *centroid* — where its energy actually sits — and a full log-frequency spectrum profile. On
+  *Lazy Sparks* this cleanly tells the parts apart (bass ≈117 Hz vs guitar ≈1007 Hz), which is the solid
+  signal needed to stop mislabeling a synth bass. (Data layer; the on-screen per-stem spectrum and using
+  it to firm up the stem labels come next.)
+
 ## [0.8.13] — 2026-06-21
 
 ### Fixed
