@@ -5,6 +5,12 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.13] — 2026-06-21
+
+### Fixed
+- **No more double "near-silent" on empty stems.** The tiny sub-line is now hidden when it would just
+  repeat the big lane label, so a near-silent stem reads it once, not twice.
+
 ## [0.8.12] — 2026-06-21
 
 ### Changed

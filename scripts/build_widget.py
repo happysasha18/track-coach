@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.12"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.13"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -2502,9 +2502,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(mainLbl),19,L.y+L.h/2+3);lx.globalAlpha=1;
    if(L.drum){drawDrum(L,active);}
    else if(L.env){drawWave(L,active);}
-   // tiny sub-line: ONLY the real project track (map clear) or "near-silent" — NEVER the raw Demucs
-   // name (Sasha s14: "guitar · → other" was salad). Nothing when we have no confident, real name.
-   if(!L.drum&&L.br.txt){lx.globalAlpha=active?.7:.35;
+   // tiny sub-line: ONLY the real project track (map clear) — NEVER the raw Demucs name (Sasha s14:
+   // "guitar · → other" was salad). Skip it when it would just repeat the big label (an empty stem
+   // already reads "near-silent" — don't print it twice, Sasha s14 "не критичный" double-label).
+   if(!L.drum&&L.br.txt&&L.br.txt!==mainLbl){lx.globalAlpha=active?.7:.35;
     lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(L.br.txt,PADL+4,L.y+9);lx.globalAlpha=1;}});
   drawLocators(lx,lxOf,LPT,LH-LPB,null);
   lx.fillStyle=getCss("--muted");lx.font="10px sans-serif";lx.textAlign="center";
