@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.15"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.16"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1235,10 +1235,19 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             for key in ("bb", "band"):
                 if isinstance(viz.get(key), dict):
                     viz[key] = {k: v for k, v in viz[key].items() if k not in omitted}
+        # per-stem frequency analyzer (0.8.14): forward the spectral centroid + log-freq spectrum profile
+        # for the significant stems so a future per-stem SPECTRUM VIZ has its data in the payload. Additive
+        # — nothing draws it yet (the canvas draw is the next step, to be added with visual verification).
+        spectrum = {st: masking["spectrum"][st] for st in stems
+                    if (masking.get("spectrum") or {}).get(st)}
+        centroid = {st: masking["spectral_centroid"][st] for st in stems
+                    if (masking.get("spectral_centroid") or {}).get(st) is not None}
         stem_block = {"stems": stems, "bands": BAND_ORDER, "band_labels": BAND_LABEL,
                       "heat": heat, "bb": bb, "time_bins": masking["time_bins"],
                       "viz": viz, "empties": omitted, "omitted": omitted,
-                      "colour_floor_db": STEM_COLOUR_FLOOR_DB}
+                      "colour_floor_db": STEM_COLOUR_FLOOR_DB,
+                      "spectrum": spectrum, "spectrum_freqs": masking.get("spectrum_freqs"),
+                      "centroid": centroid}
         BAND_HZ = {"sub": "20–80 Hz", "low": "80–250 Hz", "low_mid": "250–600 Hz",
                    "mid": "600 Hz–2 kHz", "hi_mid": "2–8 kHz", "air": "8–20 kHz"}
         for zone, s in masking.get("masking_summary", {}).items():

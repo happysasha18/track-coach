@@ -5,6 +5,12 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.16] — 2026-06-21
+
+### Added
+- **The per-stem spectrum + centroid are now carried into the widget** (data only), ready for an on-screen
+  per-stem spectrum display next. Nothing visible changes yet.
+
 ## [0.8.15] — 2026-06-21
 
 ### Changed
