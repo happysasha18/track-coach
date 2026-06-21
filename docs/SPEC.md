@@ -162,20 +162,27 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     of the loudest) → **`lead`**, the quieter ones → **`melody`**. _This loudness split is the WEAKEST
     of the five (relative loudness, not a content measure) — Sasha was shown this when he chose 5 buckets;
     it stays `approx` and the JOURNAL flags it for tuning._
-  - else POLY: mean note duration ≥ `PAD_NOTE_DUR_S` → **`pad`** (held), else → **`chord`** (stabs).
+  - else POLY: envelope CONTINUITY (`masking.sustain`) ≥ `PAD_SUSTAIN_MIN` → **`pad`** (a held drone),
+    else → **`chord`** (rhythmic stabs). `sustain` = sounding-frames ÷ frames-in-active-span (a drone-pad
+    reads ~0.88, a chord/arp ~0.49 on real stems). Was mean note duration — that NEVER fired because
+    basic-pitch fragments held synths into ~0.2 s notes; the envelope holds up where note length didn't.
   - **fallback:** a mid·sustained stem with NO transcribed notes (basic-pitch found nothing, or transcribe
     was skipped) keeps the honest **`tonal`** umbrella — we never invent a melody/chord verdict from
     missing data (CR-1). All five new labels are `approx`.
   - **NO vocabulary / NO ML text-prompts** — Sasha explicitly rejected defining prompt vocabularies
     (he called that "a bit dumb"). Every bucket is a deterministic threshold on a measured quantity.
-  - ⟨DECIDE⟩ thresholds (defaults this pass, to tune on the 3 library tracks): `POLY_FRAC_MONO_MAX`=0.20,
-    `FLATNESS_NOISE_MIN`=0.30, `LEAD_MARGIN_DB`=4.0, `PAD_NOTE_DUR_S`=0.8.
-  - **VERIFY-BY-DEED (2026-06-21, real Fragile stems) — 3 of the 5 buckets NOT yet calibrated, OPEN:**
-    `pad` (mean note dur ≥0.8) never fires — basic-pitch fragments held synths into ~0.2 s notes;
-    `noise` (flatness ≥0.30) never fires — real energy-weighted flatness on harmonic stems is 0.000–0.003;
-    `lead`-vs-`melody` by loudness gave TWO leads. These need better measures (envelope-based held-ness,
-    relative/calibrated flatness, exclusive-loudest lead) before they're defensible. Pending Sasha's scope
-    call. The mono-vs-poly (melody-vs-chord) signal itself IS real (other 0.27 vs vocals 0.06).
+  - ⟨DECIDE⟩ thresholds (tune as more tracks land): `POLY_FRAC_MONO_MAX`=0.20, `PAD_SUSTAIN_MIN`=0.7.
+    `lead` = the single loudest mono line (exclusive; no margin).
+  - **VERIFY-BY-DEED (2026-06-21, real Fragile stems) — status of the 5 buckets:**
+    - `melody`/`lead`/`chord` (polyphony + exclusive-loudest lead): WORKING. Fragile → vocals `melody`,
+      guitar `lead`, other `chord`. (Earlier dual-lead from a loudness margin was fixed → single lead.)
+    - `pad`: now via envelope `sustain` (≥0.7), NOT note length. Mechanism validated on real values
+      (drone-pad piano 0.88 vs chord/arp other 0.49); fires only on a genuinely held poly stem — on
+      Fragile nothing significant sustains that high, so pad correctly doesn't appear. Pad CASE still
+      wants a track with a significant held pad to confirm by deed (calibration backlog).
+    - `noise`: STILL DEFERRED. Real energy-weighted flatness on harmonic stems is 0.000–0.003, so
+      `FLATNESS_NOISE_MIN`=0.30 never fires; can't enable a noise label without a track that has a real
+      noise/riser stem to verify against. Kept inert (never a wrong label) until such a test track exists.
 
 - **G14 (0.8.6, THIS pass) — robust freq-ROLE via a HIGH-PASS drop (Sasha's idea, 2026-06-21).** G12 typed
   the role from the loudest band-group, which broke on real intermittent stems two different ways (found by

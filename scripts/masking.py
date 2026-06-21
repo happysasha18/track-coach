@@ -111,6 +111,7 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
     # ── compute band RMS per stem ────────────────────────────────────────────
     band_data = {}   # {stem_name: {band_name: [nb floats]}}
     flatness = {}    # {stem_name: float}  energy-weighted mean spectral flatness (0..1); high = noisy/no clear pitch
+    sustain  = {}    # {stem_name: float}  continuity of the envelope within its active span (0..1); high = a held drone/pad
     for role, y in loaded.items():
         print(f"  Band analysis: {role}...")
         band_data[role] = {}
@@ -122,6 +123,18 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
         n_f    = min(len(flat_f), len(rms_f))
         w      = rms_f[:n_f] ** 2
         flatness[role] = round(float(np.sum(flat_f[:n_f] * w) / (np.sum(w) + 1e-12)), 4)
+        # Sustain (G13 pad-vs-chord): how CONTINUOUSLY the stem sounds within its active span. A held pad
+        # drones (≈0.85+); rhythmic chord stabs leave gaps (≈0.5). "Sounding" = within 20 dB of the stem's
+        # own 95th-pct RMS; sustain = sounding frames ÷ frames from first-to-last sounding. (Replaces the
+        # broken note-length proxy — basic-pitch fragments held synths, so note duration never reads pad.)
+        peak = float(np.quantile(rms_f, 0.95)) if len(rms_f) else 0.0
+        if peak > 0:
+            sounding = rms_f >= peak * (10 ** (-20 / 20.0))
+            idx = np.where(sounding)[0]
+            span = int(idx[-1] - idx[0] + 1) if len(idx) else 0
+            sustain[role] = round(float(len(idx) / span), 3) if span > 0 else 0.0
+        else:
+            sustain[role] = 0.0
         t_frames = frames_to_time(librosa.feature.rms(y=y, hop_length=HOP)[0])
         frame_pow = {}   # per-frame POWER per band, kept for the fine viz grid
         for bname, brange in BANDS.items():
@@ -206,6 +219,7 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
         "stems_analysed":   list(loaded.keys()),
         "band_rms_db":      band_data,        # {stem: {band: [nb × dB]}}
         "spectral_flatness": flatness,        # {stem: float 0..1} energy-weighted; G13 noise/pitch split
+        "sustain":          sustain,          # {stem: float 0..1} envelope continuity; G13 pad (held) vs chord (stabs)
         "masking_flags":    masking_flags,
         "masking_summary":  masking_summary,
         "viz": {                              # fine grid for the sequencer waveform only

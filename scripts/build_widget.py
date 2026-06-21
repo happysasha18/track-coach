@@ -468,10 +468,10 @@ FLATNESS_NOISE_MIN = 0.30  # energy-weighted spectral flatness at/above this ⇒
                            # INERT on real harmonic stems (their flatness is ~0.000–0.003) — the `noise`
                            # bucket is DEFERRED until a calibrated/relative measure; kept so it never fires
                            # a wrong label rather than claiming noise we can't detect (verify-by-deed 2026-06-21).
-PAD_NOTE_DUR_S     = 0.8   # mean note duration at/above this ⇒ a held PAD; below ⇒ rhythmic CHORD stabs.
-                           # INERT on real data — basic-pitch fragments held synths into ~0.2 s notes, so this
-                           # never fires; the pad-vs-chord split is DEFERRED to an envelope-based held-ness
-                           # measure. Until then every polyphonic tonal stem reads "chord" (honest umbrella).
+PAD_SUSTAIN_MIN    = 0.7   # G13 pad-vs-chord: a polyphonic tonal stem whose envelope CONTINUITY (masking
+                           # `sustain`) is at/above this drones → "pad"; below ⇒ rhythmic "chord" stabs.
+                           # Calibrated on real stems (a drone-pad reads ~0.88, a chord/arp ~0.49 — see
+                           # JOURNAL 2026-06-21). Replaces the broken note-length proxy. Tune as more tracks land.
 HP_DROP_DB         = 15.0  # G14: a sustained stem that LOSES at least this much loudness when high-passed
                            # (sub+low ignored) is a genuine low carrier → "bass". Relative drop, not an
                            # absolute floor: a loud bass keeps a residue above the empty-floor yet still
@@ -511,9 +511,6 @@ def polyphony(notes):
     return round(poly / sounding, 3) if sounding > 0 else None
 
 
-def _mean_note_dur(notes):
-    durs = [float(n["dur"]) for n in (notes or []) if n.get("dur", 0) and float(n["dur"]) > 0]
-    return sum(durs) / len(durs) if durs else None
 
 
 def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
@@ -535,6 +532,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         return {}
     rmap = (rhythm or {}).get("rhythm", {}) if rhythm else {}
     flat_map = masking.get("spectral_flatness") or {}
+    sustain_map = masking.get("sustain") or {}
     notes_map = per_stem_notes or {}
     GROUP = {"low": ("sub", "low"), "mid": ("low_mid", "mid"), "high": ("hi_mid", "air")}
     LABEL = {                                            # (role, percussive) → (short label, confidence)
@@ -580,8 +578,8 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
                 mono[st] = loud_level(stem_broadband_db(masking, st)) or -120
                 label = "melody"                         # provisional; promoted to "lead" if it's the loudest
             else:                                        # polyphonic: held pad vs rhythmic chord stabs
-                md = _mean_note_dur(notes_map.get(st, {}).get("notes") if isinstance(notes_map.get(st), dict) else notes_map.get(st))
-                label = "pad" if (md is not None and md >= PAD_NOTE_DUR_S) else "chord"
+                sus = sustain_map.get(st)                 # envelope continuity (masking); drone ≥ PAD_SUSTAIN_MIN
+                label = "pad" if (sus is not None and sus >= PAD_SUSTAIN_MIN) else "chord"
         out[st] = {"label": label, "role": role, "percussive": percussive, "confidence": conf}
     # The SINGLE most prominent monophonic line is the LEAD; any other mono lines stay "melody". (Was:
     # everyone within LEAD_MARGIN_DB of the loudest → produced TWO "lead"s on real data, 2026-06-21.)

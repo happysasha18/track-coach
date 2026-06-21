@@ -56,9 +56,10 @@ def _core(n=24, dur=120.0, energy=None, density=None, brightness=None, bounds=No
     }
 
 
-def _masking(stems, n=24, dur=120.0, flatness=None):
+def _masking(stems, n=24, dur=120.0, flatness=None, sustain=None):
     """stems: {name: dB-scalar | {band: dB}}. Builds a masking payload with flat per-band dB over time.
-    flatness: optional {stem: 0..1} energy-weighted spectral flatness (G13 noise/pitch split)."""
+    flatness: optional {stem: 0..1} energy-weighted spectral flatness (G13 noise/pitch split).
+    sustain: optional {stem: 0..1} envelope continuity (G13 pad-vs-chord)."""
     tb = [round(i * dur / n, 1) for i in range(n)]
     band = {}
     for st, spec in stems.items():
@@ -71,6 +72,7 @@ def _masking(stems, n=24, dur=120.0, flatness=None):
         "time_bins": tb, "stems_analysed": list(stems), "band_rms_db": band,
         "masking_flags": {}, "masking_summary": {},
         "spectral_flatness": dict(flatness or {}),
+        "sustain": dict(sustain or {}),
         "viz": {"win_s": dur / n, "bins": tb, "bb": {}, "band": {}},
     }
 
@@ -577,16 +579,25 @@ class G13_TonalSplit(unittest.TestCase):
         self.assertEqual(ch["mel"]["label"], "melody")
 
     def test_poly_held_is_pad(self):
-        mask = _masking({"pad": self.MID})
+        # polyphonic AND a continuously-sounding envelope (sustain ≥ PAD_SUSTAIN_MIN) → a held pad
+        mask = _masking({"pad": self.MID}, sustain={"pad": 0.9})
         ch = bw.stem_character(mask, _rhythm(onsets={"pad": 1.0}), [],
-                               {"pad": _notes([(0, 2.0), (0, 2.0), (2, 2.0), (2, 2.0)])})  # stacked + long
+                               {"pad": _notes([(0, 2.0), (0, 2.0), (2, 2.0), (2, 2.0)])})  # stacked
         self.assertEqual(ch["pad"]["label"], "pad")
 
-    def test_poly_short_is_chord(self):
-        mask = _masking({"chd": self.MID})
+    def test_poly_gappy_is_chord(self):
+        # polyphonic but a gappy envelope (low sustain) → rhythmic chord stabs, not a held pad
+        mask = _masking({"chd": self.MID}, sustain={"chd": 0.45})
         ch = bw.stem_character(mask, _rhythm(onsets={"chd": 1.0}), [],
-                               {"chd": _notes([(0, 0.3), (0, 0.3), (1, 0.3), (1, 0.3)])})  # stacked + short
+                               {"chd": _notes([(0, 0.3), (0, 0.3), (1, 0.3), (1, 0.3)])})  # stacked
         self.assertEqual(ch["chd"]["label"], "chord")
+
+    def test_poly_no_sustain_data_defaults_to_chord(self):
+        # missing sustain (older masking) → never invent "pad"; fall back to the honest "chord" umbrella
+        mask = _masking({"x": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"x": 1.0}), [],
+                               {"x": _notes([(0, 0.5), (0, 0.5), (1, 0.5), (1, 0.5)])})
+        self.assertEqual(ch["x"]["label"], "chord")
 
     def test_high_flatness_is_noise(self):
         # broadband/noisy stem: flatness wins even over pitched-looking notes — there's no pitch to call.
