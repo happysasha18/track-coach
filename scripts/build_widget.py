@@ -28,13 +28,22 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.0"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.1"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
     "sub": "Sub 20–80", "low": "Low 80–250", "low_mid": "LowMid 250–600",
     "mid": "Mid 600–2k", "hi_mid": "HiMid 2–8k", "air": "Air 8–20k",
 }
+
+# ── Credibility floors (SPEC docs/SPEC.md §B, CR-2/CR-3). "Don't cry wolf, don't paint silence."
+# STEM_EMPTY_FLOOR_DB: a stem whose representative broadband level sits below this is INSIGNIFICANT —
+#   too little material to read, so it is dropped from per-stem analysis (no per-stem viz computed).
+# STEM_COLOUR_FLOOR_DB: the ABSOLUTE dB at which a per-stem band starts to read as "present" colour.
+#   Per-stem viz scales against this fixed floor, NOT each stem's own max, so a quiet stem cannot
+#   normalise its loudest band up to full colour (CR-3).
+STEM_EMPTY_FLOOR_DB = -55.0
+STEM_COLOUR_FLOOR_DB = -60.0
 
 # ── Canonical text (English). Templates use str.format placeholders. ────────────
 # To localise, dump this with --dump-strings, translate the values, pass --strings.
@@ -359,6 +368,19 @@ def loud_level(arr):
         return None
     a = sorted(arr)
     return a[int(0.85 * (len(a) - 1))]
+
+
+def significant_stems(masking):
+    """The stems with enough material to read as real content (SPEC CR-2/CR-6/CR-7). The inverse of
+    the 'empty' floor: a stem whose representative broadband level (loud_level = 85th-pct of when it
+    plays) sits below STEM_EMPTY_FLOOR_DB is INSIGNIFICANT — Demucs barely filled it (Lazy_Sparks
+    vocals −92 dB / piano −88 dB), so analysing it would be reading noise. Per-stem analysis MUST be
+    gated through this so we never present a number from a silent stem as fact, and so any future
+    per-stem self-similarity (CR-6) runs only on real material. Returns names in masking order."""
+    if not masking:
+        return []
+    return [st for st in masking.get("stems_analysed", [])
+            if (loud_level(stem_broadband_db(masking, st)) or -120) >= STEM_EMPTY_FLOOR_DB]
 
 
 def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None):
@@ -707,10 +729,24 @@ def _merge_iv(ivs):
     return out
 
 
-def build_story(core, als_overlay):
+def _selfsim_stable(selfsim):
+    """CR-5c: only trust the self-similarity segmentation as the structure SOURCE when it carries
+    enough distinct material — ≥3 segments AND ≥2 recurrence labels. A quiet/uniform track that
+    over- or under-segments falls back to the coarse section bar instead."""
+    if not selfsim:
+        return False
+    segs = selfsim.get("segments", [])
+    return len(segs) >= 3 and selfsim.get("n_labels", len({s.get("letter") for s in segs})) >= 2
+
+
+def build_story(core, als_overlay, seg_bounds=None):
     """Synthesise the high-level 'Track Story': scenes (named + pattern letter),
     one intensity/power curve, key moments, and a compact family-presence texture.
-    Combines audio arcs (energy/density/brightness) with the project arrangement."""
+    Combines audio arcs (energy/density/brightness) with the project arrangement.
+
+    seg_bounds: internal segment boundaries (s) to cut scenes on. When given (the self-sim
+    segmentation, CR-5a) the structure follows the music's real recurrence, not the coarse
+    agglomerative `section_bounds_s` that flattened Lazy_Sparks' C E C E C into one blob."""
     dur = core["duration_s"]
     tb = core["time_bins"]
     n = len(tb)
@@ -742,8 +778,10 @@ def build_story(core, als_overlay):
                 on.add(f)
         return on
 
-    # scenes from section boundaries; classify by intensity + arrangement
-    bounds = [x for x in core.get("section_bounds_s", []) if 0 < x < dur]
+    # scenes from segment boundaries; classify by intensity + arrangement. Prefer the self-sim
+    # boundaries (seg_bounds, CR-5a) when supplied; else fall back to the coarse section bar.
+    src_bounds = seg_bounds if seg_bounds is not None else core.get("section_bounds_s", [])
+    bounds = [x for x in src_bounds if 0 < x < dur]
     edges = sorted(set([0.0] + [round(x, 2) for x in bounds] + [round(dur, 2)]))
     segs = [(edges[i], edges[i + 1]) for i in range(len(edges) - 1) if edges[i + 1] - edges[i] > 2]
 
@@ -756,19 +794,25 @@ def build_story(core, als_overlay):
     scenes = []
     sigs = {}          # signature → letter, for pattern detection (A/B/A)
     letters = "ABCDEFGH"
-    dropn = 0
+    LIFT = 0.12        # how much LOWER the preceding section must sit (in tier) for a high section
+                       # to count as a Drop — the required "яма перед поднятием" (CR-5).
     for i, (a, b2) in enumerate(segs):
         ti = seg_t[i]
         tier = ti / mx if mx > 0 else 0.0
         prev = seg_t[i - 1] if i > 0 else None
         nxt = seg_t[i + 1] if i < len(segs) - 1 else None
+        prev_tier = (prev / mx) if (prev is not None and mx > 0) else None
         if i == 0 and tier < 0.55:
             name = "Intro"
         elif i == len(segs) - 1 and tier < 0.6:
             name = "Outro"
+        elif tier >= 0.8 and prev_tier is not None and prev_tier <= tier - LIFT:
+            # a high section that ENTERS after a lower one — the bass drops IN. Numbered AFTER
+            # _coalesce_scenes (build_html) so merges can't leave a gap like "Drop, Drop 3" (CR-5).
+            name = "Drop"
         elif tier >= 0.8:
-            dropn += 1
-            name = "Drop" if dropn == 1 else f"Drop {dropn}"
+            # sustained-high without a preceding dip: loud, but not a drop. ⟨DECIDE settled⟩ → "Main".
+            name = "Main"
         elif prev is not None and nxt is not None and ti < prev and ti < nxt and tier < 0.55:
             name = "Breakdown"
         elif nxt is not None and nxt > ti + 0.05 and tier < 0.8:
@@ -894,14 +938,25 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     masking_cards = []
     flag_times = []
     if masking:
-        stems = masking.get("stems_analysed", [])
+        analysed = masking.get("stems_analysed", [])
+        # CR-2: insignificant (near-silent) stems are DROPPED from per-stem analysis — no heat/bb/viz
+        # computed for them (saves compute, and a silent stem must never paint full-colour). They are
+        # named in `omitted` so the missing rows read as a decision, not a bug (prover P7).
+        stems = significant_stems(masking)
+        omitted = [st for st in analysed if st not in stems]
         heat = {st: {b: masking["band_rms_db"][st].get(b, [-120] * masking["total_windows"]) for b in BAND_ORDER}
                 for st in stems}
-        empties = [st for st in stems if (loud_level(stem_broadband_db(masking, st)) or -120) < -55]
         bb = {st: stem_broadband_db(masking, st) for st in stems}  # broadband dB per bin → "is it playing"
+        viz = masking.get("viz")
+        if viz and omitted:                       # strip omitted stems from the fine drawing grid too
+            viz = dict(viz)
+            for key in ("bb", "band"):
+                if isinstance(viz.get(key), dict):
+                    viz[key] = {k: v for k, v in viz[key].items() if k not in omitted}
         stem_block = {"stems": stems, "bands": BAND_ORDER, "band_labels": BAND_LABEL,
                       "heat": heat, "bb": bb, "time_bins": masking["time_bins"],
-                      "viz": masking.get("viz"), "empties": empties}
+                      "viz": viz, "empties": omitted, "omitted": omitted,
+                      "colour_floor_db": STEM_COLOUR_FLOOR_DB}
         BAND_HZ = {"sub": "20–80 Hz", "low": "80–250 Hz", "low_mid": "250–600 Hz",
                    "mid": "600 Hz–2 kHz", "hi_mid": "2–8 kHz", "air": "8–20 kHz"}
         for zone, s in masking.get("masking_summary", {}).items():
@@ -921,7 +976,12 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                 flag_times.append(f["time_s"])
 
     als_overlay = build_als_overlay(als, als_offset_s, dur)
-    story = build_story(core, als_overlay)
+    # CR-5a: cut scenes on the self-similarity boundaries when that segmentation is trustworthy
+    # (≥3 segments, ≥2 labels — _selfsim_stable); else fall back to the coarse section bar.
+    ss_bounds = None
+    if _selfsim_stable(selfsim):
+        ss_bounds = [s["t0"] for s in selfsim["segments"] if s.get("t0", 0) > 0]
+    story = build_story(core, als_overlay, seg_bounds=ss_bounds)
 
     # Per-section LEAD: which melodic part dominates each self-similarity segment.
     # Answers the user's "some parts one melodic instrument leads, others another".
@@ -988,6 +1048,12 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     # four consecutive 'D' slivers + a dropped sub-2s segment). Mode-independent; clean tracks unchanged.
     if story and story.get("scenes"):
         story["scenes"] = _coalesce_scenes(story["scenes"], dur)
+        # Number the Drops NOW — after coalescing — so the count is gap-free (CR-5/G6). Numbering in
+        # build_story (before merges) caused "Drop, Drop 3, Drop 5" when a middle drop was swallowed.
+        drops = [sc for sc in story["scenes"] if sc.get("name") == "Drop"]
+        if len(drops) > 1:
+            for k, sc in enumerate(drops, 1):
+                sc["name"] = "Drop" if k == 1 else f"Drop {k}"
 
     recs = build_recommendations(core, detail, masking, S,
                                  als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm)
@@ -2052,15 +2118,18 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   return{txt:"",col:null};}
  const BANDS=(SM&&SM.bands)||["sub","low","low_mid","mid","hi_mid","air"];
  const VIZ=SM&&SM.viz;   // fine-resolution drawing grid (~0.25 s), if present
- function normEnv(a,bins){const v=a.filter(x=>x>-119);
-  const lo=v.length?Math.min.apply(null,v):-60,hi=v.length?Math.max.apply(null,v):0;
-  const rng=Math.max(6,hi-lo);return{vals:a.map(x=>Math.max(0,Math.min(1,(x-lo)/rng))),bins:bins};}
+ // CR-3: scale per-stem height/colour against an ABSOLUTE dB floor (a fixed reference: floor → 0 dBFS),
+ // NOT each stem's own min/max. A quiet stem then stays low instead of stretching its loudest band up
+ // to full — it renders as the near-silence it is, never as content. floor..0 dB → 0..1.
+ const CFLOOR=(SM&&SM.colour_floor_db)||-60;
+ function normEnv(a,bins){const rng=Math.max(6,0-CFLOOR);
+  return{vals:a.map(x=>(x==null||x<=CFLOOR)?0:Math.max(0,Math.min(1,(x-CFLOOR)/rng))),bins:bins};}
  function volEnv(name){
   if(VIZ&&VIZ.bb&&VIZ.bb[name])return normEnv(VIZ.bb[name],VIZ.bins);   // fine
   if(SM&&SM.bb&&SM.bb[name]&&SM.time_bins)return normEnv(SM.bb[name],SM.time_bins); // 4 s
   if(MAP&&MAP[name]&&MAP[name].env)return{vals:MAP[name].env,bins:D.stemmap.bins};
   return null;}
- const lin=db=>(db==null||db<=-119)?0:Math.pow(10,db/10);  // dB → linear power
+ const lin=db=>(db==null||db<=CFLOOR)?0:Math.pow(10,db/10);  // dB → linear power, gated at the absolute floor (CR-3)
  // Traktor-style: colour each slice of the waveform by its FREQUENCY content
  // (bass→warm red, mids→green, highs→blue), height by LOUDNESS. Two dimensions at once.
  const FBANDS={low:["sub","low"],mid:["low_mid","mid"],high:["hi_mid","air"]};

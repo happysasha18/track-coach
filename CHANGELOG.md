@@ -5,6 +5,30 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.1] — 2026-06-21
+
+Credibility pass (SPEC `docs/SPEC.md`, Phase 3): the numbers behind the words are now defensible.
+"Don't cry wolf, and don't paint silence."
+
+### Changed
+- **Near-silent stems are omitted, not drawn.** A stem the separation barely filled (e.g. a −90 dB
+  "vocals" or "piano") is dropped from the per-stem view and **named** as omitted — instead of being
+  shown as if it were real content.
+- **Per-stem colour is honest.** Each stem's frequency colour/height is now scaled against a fixed
+  loudness floor, so a quiet stem reads as the near-silence it is — it can no longer "light up" by
+  stretching its own loudest band to full colour.
+- **Structure reads the real form.** Scenes now follow the track's self-similarity (its actual
+  repeats) when that's reliable, instead of a coarse section split that could flatten several distinct
+  sections into one block.
+- **"Drop" means a drop.** A section is only called a **Drop** when a lower section (a build/breakdown)
+  comes right before it. A track that's just loud the whole way is no longer labelled "all drops"; a
+  sustained-loud section with no lift before it reads **Main**. Drop numbering is now always gap-free.
+
+### Internal
+- New credibility guardrail tests G1–G7 (`tests/test_credibility.py`), derived from the SPEC via
+  product-prover. New `significant_stems()` gate; absolute colour floor; self-sim-sourced scenes;
+  contrast-based Drop naming numbered after coalescing. Tests: 166 → 183.
+
 ## [0.8.0] — 2026-06-20
 
 Milestone: the project grew up. The spec/test matrix now covers **every dimension** the product has —
