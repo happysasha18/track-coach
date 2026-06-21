@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.3] — 2026-06-21
+
+### Changed
+- **Player lanes are named by what they SOUND like, not the raw separation label.** Each stem lane now
+  reads `kick` / `bass` / `≈ melody` / `≈ hats` / `≈ air` — derived from measured features (where its
+  energy sits in the spectrum, excluding bleed; and whether it's percussive or sustained), not the
+  Demucs `vocals/guitar/piano` label that means little for electronic music. `≈` marks an approximation;
+  low end (kick/bass) is read confidently. The raw stem name still shows tiny beneath, so you always
+  know which file it is. Same track always yields the same labels (deterministic — no run-to-run drift).
+
+### Internal
+- New `stem_character()` (deterministic, gated to significant stems, reuses CR-4 leakage to avoid typing
+  a stem by another's bleed) + guard G12. Tests 198 → 205.
+
 ## [0.8.2] — 2026-06-21
 
 Credibility, part 2 (SPEC CR-4/CR-6/CR-7).

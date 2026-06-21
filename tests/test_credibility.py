@@ -81,10 +81,11 @@ def _selfsim(edges, letters):
             "labels_per_beat": [], "beat_times": []}
 
 
-def _rhythm(leakage):
-    """A minimal rhythm payload carrying only the pairwise stem leakage CR-4 needs.
-    leakage: list of (a, b, r)."""
-    return {"separation": {"leakage": [{"a": a, "b": b, "r": r} for a, b, r in leakage]}}
+def _rhythm(leakage=(), onsets=None):
+    """A minimal rhythm payload: pairwise stem leakage (for CR-4) + per-stem onset_rate (for (g)).
+    leakage: list of (a, b, r); onsets: {stem: onsets_per_sec}."""
+    return {"separation": {"leakage": [{"a": a, "b": b, "r": r} for a, b, r in leakage]},
+            "rhythm": {st: {"onset_rate": rate} for st, rate in (onsets or {}).items()}}
 
 
 def _render(core, masking=None, selfsim=None, meta=None, title="Cred Test", rhythm=None,
@@ -479,6 +480,65 @@ class G11_PerStemRepetitionGatedToSignificant(unittest.TestCase):
     def test_no_data_means_empty(self):
         _, D = _render(_core(), masking=self.masking, per_stem_selfsim=None)
         self.assertEqual(D.get("stem_repetition"), [], "no per-stem self-sim → nothing to claim")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G12 — (g) stem CHARACTER labels (Sasha, 2026-06-21). Raw Demucs labels (vocals/guitar/…) are wrong
+# for electronic music, so we describe what the SOUND is from MEASURED features: frequency role (which
+# third of the spectrum carries the energy, EXCLUDING bled bands) × percussive-vs-sustained (onset rate).
+# Hard requirements: DETERMINISTIC (same track → same label every run) and gated to significant stems.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G12_StemCharacterLabels(unittest.TestCase):
+    def _setup(self):
+        # drums: low + many onsets → kick/drums. bass: low + few onsets → bass. lead: mid + few → melodic.
+        # gtr: looks low ONLY because of drum bleed (its real energy is mid) → must read melodic, not bass.
+        # piano: silent → excluded.
+        mask = _masking({
+            "drums": {"sub": -16, "low": -18, "low_mid": -34, "mid": -36, "hi_mid": -40, "air": -48},
+            "bass":  {"sub": -20, "low": -24, "low_mid": -40, "mid": -50, "hi_mid": -70, "air": -90},
+            "lead":  {"sub": -80, "low": -70, "low_mid": -30, "mid": -28, "hi_mid": -44, "air": -70},
+            "gtr":   {"sub": -75, "low": -30, "low_mid": -38, "mid": -34, "hi_mid": -58, "air": -85},
+            "piano": -95,
+        })
+        rh = _rhythm(leakage=[("drums", "gtr", 0.4), ("drums", "bass", 0.6)],
+                     onsets={"drums": 5.3, "bass": 1.3, "lead": 1.1, "gtr": 1.6})
+        return mask, rh
+
+    def setUp(self):
+        self.mask, self.rh = self._setup()
+        self.ch = bw.stem_character(self.mask, self.rh, bw.leakage_caveats(self.mask, self.rh))
+
+    def test_low_percussive_is_kick(self):
+        self.assertEqual(self.ch["drums"]["label"], "kick")
+        self.assertEqual(self.ch["drums"]["confidence"], "clear")
+
+    def test_low_sustained_is_bass(self):
+        self.assertEqual(self.ch["bass"]["label"], "bass")
+        self.assertEqual(self.ch["bass"]["confidence"], "clear")
+
+    def test_mid_sustained_is_melody(self):
+        self.assertEqual(self.ch["lead"]["role"], "mid")
+        self.assertEqual(self.ch["lead"]["label"], "melody")
+        self.assertEqual(self.ch["lead"]["confidence"], "approx")
+
+    def test_bled_low_excluded_so_guitar_is_not_bass(self):
+        # gtr's loudest raw band is low (−22), but that's drum bleed → role must come from its own mid.
+        self.assertEqual(self.ch["gtr"]["role"], "mid", "bled low band wasn't excluded from the character role")
+        self.assertNotEqual(self.ch["gtr"]["label"], "bass")
+
+    def test_insignificant_stem_excluded(self):
+        self.assertNotIn("piano", self.ch, "a silent stem must not get a character label")
+
+    def test_deterministic_same_input_same_label(self):
+        # Sasha's hard requirement: the same track must never be relabelled on a re-run.
+        a = bw.stem_character(self.mask, self.rh, bw.leakage_caveats(self.mask, self.rh))
+        m2, r2 = self._setup()
+        b = bw.stem_character(m2, r2, bw.leakage_caveats(m2, r2))
+        self.assertEqual(a, b, "stem_character is not deterministic — labels would drift between runs")
+
+    def test_reaches_payload(self):
+        _, D = _render(_core(), masking=self.mask, rhythm=self.rh)
+        self.assertEqual((D.get("stem_character") or {}).get("bass", {}).get("label"), "bass")
 
 
 if __name__ == "__main__":

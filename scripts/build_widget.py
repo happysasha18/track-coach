@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.2"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.3"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -454,6 +454,49 @@ def stem_repetition(per_stem_selfsim, masking):
         out.append({"stem": st, "segments": n, "labels": labels,
                     "recurrence": round(1 - labels / n, 2),
                     "top_letter": top_letter, "top_count": counts[top_letter]})
+    return out
+
+
+ONSET_PERCUSSIVE = 3.0   # onsets/sec at/above which a stem reads as percussive (transient-driven), else sustained
+
+
+def stem_character(masking, rhythm, leakage=None):
+    """A DETERMINISTIC, honest CHARACTER label per SIGNIFICANT stem, from measured features only — so the
+    same track always yields the same labels (Sasha's hard requirement: no per-run renaming). We describe
+    what the SOUND is, never assert which instrument/synth made it (Demucs labels are approximations;
+    [[track-coach-stem-labels]]). Two measured axes:
+      • frequency role — which third of the spectrum carries the stem's energy (low / mid / high), read
+        from per-band medians but EXCLUDING bands flagged as bleed (CR-4 leakage_caveats), so a stem
+        isn't typed by another stem's energy leaking in (guitar's drum-bled low would mislabel it 'bass').
+      • temporal character — percussive (onset_rate ≥ ONSET_PERCUSSIVE) vs sustained.
+    Returns {stem: {label, role, percussive, confidence}}. confidence 'clear' for the low end (kick/bass,
+    which Sasha confirmed we read reliably), 'approx' otherwise (marked ≈ in the UI). No spectral-flatness
+    yet, so melody/pad/noise aren't split — that's a later sharpening; here mid-sustained reads 'melodic'."""
+    if not masking:
+        return {}
+    leak_bands = {}
+    for c in (leakage or []):
+        leak_bands.setdefault(c["stem"], set()).add(c["band"])
+    rmap = (rhythm or {}).get("rhythm", {}) if rhythm else {}
+    GROUP = {"low": ("sub", "low"), "mid": ("low_mid", "mid"), "high": ("hi_mid", "air")}
+    LABEL = {                                            # (role, percussive) → (short label, confidence)
+        ("low", True): ("kick", "clear"),  ("low", False): ("bass", "clear"),
+        ("mid", True): ("perc", "approx"), ("mid", False): ("melody", "approx"),
+        ("high", True): ("hats", "approx"), ("high", False): ("air", "approx"),
+    }
+    out = {}
+    for st in significant_stems(masking):
+        bm = {b: (median(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
+        bled = leak_bands.get(st, set())
+        grp = {}
+        for g, bands in GROUP.items():
+            grp[g] = sum(10 ** (bm[b] / 10) for b in bands if b not in bled and bm[b] > -119)
+        tot = sum(grp.values())
+        role = max(grp, key=grp.get) if tot > 0 else "mid"
+        onset = (rmap.get(st) or {}).get("onset_rate")
+        percussive = onset is not None and onset >= ONSET_PERCUSSIVE
+        label, conf = LABEL[(role, percussive)]
+        out[st] = {"label": label, "role": role, "percussive": percussive, "confidence": conf}
     return out
 
 
@@ -1131,6 +1174,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
 
     recs = build_recommendations(core, detail, masking, S,
                                  als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm)
+    _leak = leakage_caveats(masking, rhythm)   # CR-4; also feeds (g) stem_character (exclude bled bands)
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
     _rank = {"crit": 0, "do": 1, "concept": 2}
     recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t)
@@ -1184,7 +1228,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "als": als_overlay,
         "stemmap": stemmap,
         "rhythm": rhythm,
-        "leakage_caveats": leakage_caveats(masking, rhythm),  # CR-4: bands that are likely a louder neighbour's bleed
+        "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
+        "stem_character": stem_character(masking, rhythm, _leak),  # (g): deterministic character label per significant stem
         "stem_repetition": stem_repetition(per_stem_selfsim, masking),  # CR-6: per-significant-stem repetition
         "notes": notes,
         "drums": drums,
@@ -2290,12 +2335,17 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lanes.forEach(L=>{const active=anySolo?L.s.solo:!L.s.mute;
    lx.fillStyle="rgba(255,255,255,.02)";lx.fillRect(PADL,L.y,LW-PADL-PADR,L.h);
    box(3,L.y+3,L.s.mute,"#ff6b6b","M");box(3,L.y+L.h-15,L.s.solo,"#46d39a","S");
+   // (g) lane label: the measured CHARACTER ("bass", "≈ melody") is the prominent name, not the raw
+   // Demucs label — which is wrong for electronic music. The raw stem name still shows tiny (with the
+   // project match when clear) so you always know which file/stem it is (G8: know what you're looking at).
+   const CH=D.stem_character&&D.stem_character[L.name];
+   const mainLbl=CH?((CH.confidence==="approx"?"≈ ":"")+CH.label):L.name;
    lx.globalAlpha=active?1:.45;lx.fillStyle=active?getCss("--ink"):getCss("--muted");
-   lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(L.name),19,L.y+L.h/2+3);lx.globalAlpha=1;
+   lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(mainLbl),19,L.y+L.h/2+3);lx.globalAlpha=1;
    if(L.drum){drawDrum(L,active);}
    else if(L.env){drawWave(L,active);}
-   if(L.br.txt&&!L.drum){lx.globalAlpha=active?.8:.4;lx.fillStyle=L.br.col||getCss("--muted");
-    lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(L.br.txt,PADL+4,L.y+9);lx.globalAlpha=1;}});
+   if(!L.drum){const sub=L.name+(L.br.txt?" · "+L.br.txt:"");lx.globalAlpha=active?.7:.35;
+    lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(sub,PADL+4,L.y+9);lx.globalAlpha=1;}});
   drawLocators(lx,lxOf,LPT,LH-LPB,null);
   lx.fillStyle=getCss("--muted");lx.font="10px sans-serif";lx.textAlign="center";
   for(let t=0;t<=dur();t+=60)lx.fillText(fmtT(t),lxOf(t),LH-5);
