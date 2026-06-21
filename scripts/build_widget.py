@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.7"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.8"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -256,6 +256,12 @@ STRINGS = {
                     "Where the mid instrument is simply silent, that's not a conflict — leave it.",
             "fix": "Carve a small 250–600 Hz dip in the bass — or sidechain/duck it under the melody so they don't fight."},
         "masking_line": "bass covers “{mid}” in {pct:.0f}% of spots",
+        "masking_stem": {
+            "header": "Frequencies · the {low_lbl} buries the {mid_lbl}",
+            "title": "Around {band_range} the {low_lbl} is louder than the {mid_lbl} ~{pct:.0f}% of the track",
+            "body": "Worst around {worst_t}. Where it bothers you, carve a small dip in the {low_lbl} in that "
+                    "range, or move them apart in time. Where the {mid_lbl} is simply silent there, that's not a clash.",
+            "fix": "Notch the {low_lbl} around {band_range}, or duck it under the {mid_lbl} so they stop fighting."},
         "masking_clean": {
             "header": "Low end · clean",
             "title": "The bass doesn't clash with anything",
@@ -595,7 +601,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     return out
 
 
-def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None):
+def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None, character=None):
     R = S["recs"]
     recs = []
     dur = core["duration_s"]
@@ -697,10 +703,29 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
         # advice, and aren't actionable for the producer. They live in the "Stem ↔ project"
         # and "rhythm & separation" panels as honest caveats instead.
 
-        real = [(z.split("__")[-1], s) for z, s in masking.get("masking_summary", {}).items()
+        # G16 — INDIVIDUAL masking recs: one card per masked SIGNIFICANT stem, naming both parts by their
+        # measured character (never the raw Demucs name [[track-coach-stem-labels]]), the band's frequency
+        # range, the % masked, and the worst moment. Falls back to the old generic card when we don't have
+        # stem characters (no masking+rhythm → can't name the parts honestly).
+        BAND_RANGE = {"sub": "20–80 Hz", "low": "80–250 Hz", "low_mid": "250–600 Hz",
+                      "mid": "600 Hz–2 kHz", "hi_mid": "2–6 kHz", "air": "6–16 kHz"}
+
+        def _lbl(st):
+            return ((character or {}).get(st, {}) or {}).get("label") or st
+        real = [(z, s) for z, s in masking.get("masking_summary", {}).items()
                 if s["pct_masked"] > 0 and z.split("__")[-1] not in empties]
-        if real:
-            lines = "; ".join(R["masking_line"].format(mid=mid, pct=s["pct_masked"]) for mid, s in real)
+        if real and character:
+            for zone, s in real:
+                band, mid = zone.split("__")[0], zone.split("__")[-1]
+                flags = masking.get("masking_flags", {}).get(zone, [])
+                low_stem = flags[0]["low_stem"] if flags else "bass"
+                worst = max(flags, key=lambda f: f["diff_db"]) if flags else None
+                add("masking_stem", _t=(worst["time_s"] if worst else None),
+                    low_lbl=_lbl(low_stem), mid_lbl=_lbl(mid),
+                    band_range=BAND_RANGE.get(band, band), pct=s["pct_masked"],
+                    worst_t=fmt_t(worst["time_s"]) if worst else "—")
+        elif real:                                          # no characters → old generic line
+            lines = "; ".join(R["masking_line"].format(mid=z.split("__")[-1], pct=s["pct_masked"]) for z, s in real)
             add("masking_real", lines=lines)
         elif not empties:
             add("masking_clean")
@@ -1267,9 +1292,10 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             for k, sc in enumerate(drops, 1):
                 sc["name"] = "Drop" if k == 1 else f"Drop {k}"
 
-    recs = build_recommendations(core, detail, masking, S,
-                                 als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm)
     _leak = leakage_caveats(masking, rhythm)   # CR-4; also feeds (g) stem_character (exclude bled bands)
+    _character = stem_character(masking, rhythm, _leak, per_stem_notes)  # computed once; reused by recs (G16) + payload
+    recs = build_recommendations(core, detail, masking, S,
+                                 als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm, character=_character)
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
     _rank = {"crit": 0, "do": 1, "concept": 2}
     recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t)
@@ -1324,7 +1350,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "stemmap": stemmap,
         "rhythm": rhythm,
         "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
-        "stem_character": stem_character(masking, rhythm, _leak, per_stem_notes),  # (g)/G13: deterministic character label per significant stem
+        "stem_character": _character,  # (g)/G13: deterministic character label per significant stem (computed above)
         "stem_repetition": stem_repetition(per_stem_selfsim, masking),  # CR-6: per-significant-stem repetition
         "notes": notes,
         "drums": drums,

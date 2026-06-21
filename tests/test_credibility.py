@@ -711,5 +711,48 @@ class G15_PercussiveByContent(unittest.TestCase):
         self.assertEqual(ch["pc"]["label"], "perc")
 
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G16 — INDIVIDUAL masking recs (Sasha's #2): name the masked part by its measured character + band +
+# worst time, not a generic template line with the raw Demucs name. Gated to significant stems.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G16_IndividualMaskingRecs(unittest.TestCase):
+    def setUp(self):
+        m = _masking({"bass":  {"sub": -18, "low": -20, "low_mid": -22, "mid": -30, "hi_mid": -50, "air": -70},
+                      "lead":  {"sub": -80, "low": -70, "low_mid": -30, "mid": -28, "hi_mid": -44, "air": -70},
+                      "piano": -95})
+        m["masking_summary"] = {
+            "low_mid__lead":  {"pct_masked": 18.0, "flagged_windows": 4, "total_windows": 24, "mean_diff_db": 10.0},
+            "low_mid__piano": {"pct_masked": 20.0, "flagged_windows": 5, "total_windows": 24, "mean_diff_db": 9.0}}
+        m["masking_flags"] = {
+            "low_mid__lead":  [{"low_stem": "bass", "mid_stem": "lead", "time_s": 78.0,
+                                "low_db": -22.0, "mid_db": -34.0, "diff_db": 12.0, "window_idx": 15}],
+            "low_mid__piano": [{"low_stem": "bass", "mid_stem": "piano", "time_s": 80.0,
+                                "low_db": -22.0, "mid_db": -40.0, "diff_db": 18.0, "window_idx": 16}]}
+        self.m = m
+        ch = {"bass": {"label": "bass", "confidence": "clear"}, "lead": {"label": "lead", "confidence": "approx"}}
+        self.recs = bw.build_recommendations(_core(), {}, m, bw.STRINGS, character=ch)
+        self.blob = " || ".join(r[1] + " " + r[2] + " " + r[3] for r in self.recs)  # header+title+body
+
+    def test_names_both_parts_by_character_and_band(self):
+        self.assertIn("lead", self.blob)
+        self.assertIn("bass", self.blob)
+        self.assertIn("250–600 Hz", self.blob)
+
+    def test_empty_stem_is_not_named(self):
+        self.assertNotIn("piano", self.blob)   # piano is below the floor → never surfaced as a clash
+
+    def test_not_the_generic_raw_name_line(self):
+        self.assertNotIn("of spots", self.blob)   # the old generic template must not fire when characters exist
+
+    def test_pinned_to_worst_moment(self):
+        self.assertTrue([r for r in self.recs if r[5] == 78.0],
+                        "the named masking rec should be anchored to the worst flag's time")
+
+    def test_falls_back_to_generic_without_characters(self):
+        recs = bw.build_recommendations(_core(), {}, self.m, bw.STRINGS, character=None)
+        blob = " || ".join(r[1] + " " + r[2] + " " + r[3] for r in recs)
+        self.assertIn("of spots", blob)   # no characters → old generic line, never a wrong named claim
+
+
 if __name__ == "__main__":
     unittest.main()

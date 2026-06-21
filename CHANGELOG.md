@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.8] — 2026-06-21
+
+### Changed
+- **Frequency-clash advice now names the actual parts.** Instead of one generic card ("bass covers
+  *guitar* in 18% of spots"), you get one card per masked part, named by what it sounds like and pinned
+  to the worst moment — e.g. *"around 250–600 Hz the bass is louder than the lead ~18% of the track,
+  worst around 1:18."* Near-silent parts are never named as a clash. First step of making recommendations
+  track-specific instead of a fixed template.
+
 ## [0.8.7] — 2026-06-21
 
 ### Fixed

@@ -409,11 +409,18 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/drum_breakdown.py" \
 bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/self_similarity.py" \
     "$AUDIO" --out "$OUT_DIR/result_selfsim.json"
 
-# D — transcribe a melodic/bass stem to real notes (basic-pitch, `bp` profile). Run on the
-#     stem that actually carries pitch (usually 'other'); skip on near-empty stems.
+# D — transcribe notes to real pitches (basic-pitch, `bp` profile). track_analyzer runs this on EVERY
+#     SIGNIFICANT non-drum stem (not just 'other') → result_notes_<stem>.json, which build_widget uses to
+#     measure POLYPHONY and split each stem's CHARACTER (G13): mono→melody/lead, polyphonic→chord/pad.
+#     (Manual single-stem form shown; the pipeline loops significant_stems() automatically.)
 bash "$SKILL_DIR/scripts/tc_uv.sh" bp "$SKILL_DIR/scripts/transcribe.py" \
     --stem "$STEMS/other.wav" --label other --out "$OUT_DIR/result_notes_other.json"
 ```
+
+**Stem character labels (G13/G14/G15).** build_widget names each significant stem by what it MEASURABLY
+is — `kick`/`bass`/`melody`/`lead`/`chord`/`pad` — from freq-role (high-pass drop, bleed-safe) ×
+polyphony × envelope sustain, never the raw Demucs name ([[track-coach-stem-labels]]). Frequency-clash
+recs name those parts (G16): "the bass buries the lead around 250–600 Hz ~18%, worst around 1:18".
 
 ### Web stems for the player (E) — MANDATORY in deep mode, do not skip
 

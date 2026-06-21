@@ -218,6 +218,25 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
   - Verify-by-deed (Simon Fava): `other` → `pad` (was `perc`), `vocals` → `melody` (was `perc`); drums
     still `kick`, bass still `bass`.
 
+### B.5 Individual recommendations — name the PART, not a template (G16, 0.8.8, Sasha's #2)
+Sasha's standing complaint (2026-06-20, looking at the Lazy_Sparks render): recommendations "feel samey
+because `build_recommendations` is a FIXED template catalog fired by thresholds — same handful repeats
+track-to-track." The bet: now that we measure each stem, a rec can name the SPECIFIC part, band, and time
+instead of a generic line. First target = the masking/frequency-clash rec, which already has the data per
+conflict (`masking_flags`: which low stem buries which mid stem, in which band, at which times, by how much).
+- **Before:** one generic card — `bass covers "{mid}" in {pct}% of spots` — using the RAW Demucs stem name
+  (`guitar`, `vocals`), which is wrong for electronic music.
+- **After (G16):** one card PER masked significant stem, naming both parts by their measured G13/G14
+  CHARACTER label (the hard requirement [[track-coach-stem-labels]]: real terms, never raw Demucs names):
+  e.g. *"the bass buries the lead around 250–600 Hz ~18% of the track, worst around 1:18"*. Carries the
+  band's frequency range, the `pct_masked`, and the worst flag's time (pinned on the timeline).
+- gated to `significant_stems()` (a near-silent stem like an empty `piano` is never named); the carrier is
+  the masking low stem (`bass`→"bass", `drums`→"kick"). Falls back to the old generic card when stem
+  characters aren't available (no masking/rhythm).
+- **EVALUATION (Sasha's metric):** specificity up = fewer generic-type cards, more named-stem/time cards.
+  Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
+  melody 15%"), piano (empty) dropped.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are
