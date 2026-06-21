@@ -404,5 +404,18 @@ class AlsPanelsGateOnData(unittest.TestCase):
                           html, f"[{mode}] automation panel must self-hide when there are no envelopes")
 
 
+class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
+    """A lane can't be both soloed AND muted — contradictory, and it confused Sasha (2026-06-21:
+    "можно почему-то нажать и соло и мьют сразу"). Enabling one clears the other in the lane click
+    handler. Pinned at source level (plain JS toggle, no DOM needed)."""
+
+    def test_enabling_one_clears_the_other(self):
+        html, _ = _render(stems=("drums", "bass"))
+        self.assertIn("L.s.mute=!L.s.mute;if(L.s.mute)L.s.solo=false", html,
+                      "muting a lane must clear its solo")
+        self.assertIn("L.s.solo=!L.s.solo;if(L.s.solo)L.s.mute=false", html,
+                      "soloing a lane must clear its mute")
+
+
 if __name__ == "__main__":
     unittest.main()

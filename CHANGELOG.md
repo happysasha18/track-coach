@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.4] — 2026-06-21
+
+### Fixed
+- **A lane can no longer be both soloed and muted** — enabling one now clears the other (they were
+  independent toggles, so you could leave both on).
+
+### Changed
+- A sustained pitched layer now reads **`≈ tonal`** instead of `≈ melody`. "Melody" over-claimed — the
+  same measurement can be a pad, lead, or chords, and we can't tell them apart yet (that needs a
+  tonal-vs-noise measure). `tonal` says what we actually know: pitched, sustained, mid-range.
+
 ## [0.8.3] — 2026-06-21
 
 ### Changed

@@ -516,9 +516,10 @@ class G12_StemCharacterLabels(unittest.TestCase):
         self.assertEqual(self.ch["bass"]["label"], "bass")
         self.assertEqual(self.ch["bass"]["confidence"], "clear")
 
-    def test_mid_sustained_is_melody(self):
+    def test_mid_sustained_is_tonal_not_melody(self):
+        # "tonal" deliberately does NOT claim melody vs pad — we can't split them without flatness.
         self.assertEqual(self.ch["lead"]["role"], "mid")
-        self.assertEqual(self.ch["lead"]["label"], "melody")
+        self.assertEqual(self.ch["lead"]["label"], "tonal")
         self.assertEqual(self.ch["lead"]["confidence"], "approx")
 
     def test_bled_low_excluded_so_guitar_is_not_bass(self):

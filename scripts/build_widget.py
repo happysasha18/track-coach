@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.3"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.4"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -481,9 +481,12 @@ def stem_character(masking, rhythm, leakage=None):
     GROUP = {"low": ("sub", "low"), "mid": ("low_mid", "mid"), "high": ("hi_mid", "air")}
     LABEL = {                                            # (role, percussive) → (short label, confidence)
         ("low", True): ("kick", "clear"),  ("low", False): ("bass", "clear"),
-        ("mid", True): ("perc", "approx"), ("mid", False): ("melody", "approx"),
+        ("mid", True): ("perc", "approx"), ("mid", False): ("tonal", "approx"),
         ("high", True): ("hats", "approx"), ("high", False): ("air", "approx"),
     }
+    # NB: mid+sustained = "tonal" (a pitched sustained layer) DELIBERATELY does NOT claim melody vs pad —
+    # we can't split those without spectral flatness (Sasha: "мелодия может быть и пэды"). Honest umbrella
+    # until the flatness sharpening lands. Don't "upgrade" it to "melody" without that measurement.
     out = {}
     for st in significant_stems(masking):
         bm = {b: (median(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
@@ -2354,8 +2357,8 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lcv.width=LW*devicePixelRatio;lcv.height=LH*devicePixelRatio;lx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);drawL();}
  lcv.addEventListener("click",e=>{const r=lcv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   for(let i=0;i<lanes.length;i++){const L=lanes[i];
-   if(x>=3&&x<=15){if(y>=L.y+3&&y<=L.y+15){L.s.mute=!L.s.mute;gains();return;}
-    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){L.s.solo=!L.s.solo;gains();return;}}}
+   if(x>=3&&x<=15){if(y>=L.y+3&&y<=L.y+15){L.s.mute=!L.s.mute;if(L.s.mute)L.s.solo=false;gains();return;}
+    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){L.s.solo=!L.s.solo;if(L.s.solo)L.s.mute=false;gains();return;}}}  // M and S are mutually exclusive
   if(x>=PADL)seekTo(Math.max(0,Math.min(dur(),(x-PADL)/(LW-PADL-PADR)*dur())));});  // gutter clicks don't seek to 0
  window.addEventListener("resize",lresize);
  PH.push(t=>drawL(lxOf(t)));
