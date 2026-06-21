@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.1"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.2"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -76,6 +76,8 @@ STRINGS = {
         "rhy_rate": "{r} hits/s", "rhy_tight": "{ms} ms off-grid", "rhy_sync": "{p}% off-beat",
         "rhy_sep": "Separation confidence", "rhy_leak": "Leakage (stems rising & falling together)",
         "rhy_noleak": "No significant bleed between stems.",
+        "rhy_bleed_title": "Likely bleed — don't read this as the stem's own",
+        "rhy_bleed_line": "“{stem}” looks loudest in {band}, but “{source}” sits {gap} dB louder there and they rise & fall together — so that energy is most likely “{source}” bleeding into “{stem}”, not “{stem}” itself.",
         "note_title": "Transcribed notes — {label}",
         "note_hint": "Pitches pulled straight from the audio of this stem (basic-pitch), not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
         "note_label_other": "the melodic layer (synths / keys / pads)",
@@ -381,6 +383,78 @@ def significant_stems(masking):
         return []
     return [st for st in masking.get("stems_analysed", [])
             if (loud_level(stem_broadband_db(masking, st)) or -120) >= STEM_EMPTY_FLOOR_DB]
+
+
+LEAK_CORR_MIN = 0.2     # min loudness-correlation to call two stems "bleeding" into each other
+LEAK_LOUDER_DB = 10.0   # a band's carrier must be at least this much louder to claim a stem's
+                        # dominant band is really that carrier bleeding in (conservative — protects
+                        # the genuine low-end carrier, which is only a few dB above its neighbours).
+
+
+def leakage_caveats(masking, rhythm):
+    """Bands whose energy is plausibly BLEED from a louder, correlated neighbour, not the stem's own
+    content (SPEC CR-4). Conservative + identity-agnostic: for each SIGNIFICANT stem we check ONLY its
+    single loudest band — the colour a viewer reads as that stem's content. If a DIFFERENT stem carries
+    that band (is loudest in it across the mix), sits ≥ LEAK_LOUDER_DB louder there, AND rises/falls WITH
+    this stem (loudness correlation r ≥ LEAK_CORR_MIN), the band is flagged as likely that carrier's
+    bleed. We CAVEAT, never suppress (CR-4a: bleed is time-varying, so don't delete the band — just warn
+    against attributing it). A naive 'any louder correlated neighbour' rule over-flags (a loud broadband
+    stem becomes the culprit for everything), so we deliberately take only the dominant band + a wide
+    margin. Returns a list of caveat dicts (empty when separation is clean)."""
+    if not masking or not rhythm:
+        return []
+    leaks = (rhythm.get("separation") or {}).get("leakage") or []
+    rmap = {}
+    for d in leaks:
+        rmap[(d["a"], d["b"])] = d["r"]
+        rmap[(d["b"], d["a"])] = d["r"]
+    stems = masking.get("stems_analysed", [])
+    if not stems:
+        return []
+    bm = {st: {b: (median(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
+          for st in stems}
+    carrier = {b: max(stems, key=lambda s: bm[s][b]) for b in BAND_ORDER}
+    out = []
+    for st in significant_stems(masking):
+        b = max(BAND_ORDER, key=lambda bb: bm[st][bb])   # the stem's dominant band
+        c = carrier[b]
+        if c == st:
+            continue                                     # the stem owns its dominant band → no bleed
+        r = rmap.get((st, c), 0.0)
+        if bm[c][b] >= bm[st][b] + LEAK_LOUDER_DB and r >= LEAK_CORR_MIN:
+            out.append({"stem": st, "band": b, "band_label": BAND_LABEL.get(b, b), "source": c,
+                        "stem_db": round(bm[st][b], 1), "source_db": round(bm[c][b], 1),
+                        "gap_db": round(bm[c][b] - bm[st][b], 1), "r": round(r, 2)})
+    return out
+
+
+def stem_repetition(per_stem_selfsim, masking):
+    """Per-SIGNIFICANT-stem repetition, read from each stem's OWN self-similarity (SPEC CR-6: "this part
+    returns" must be grounded in the stem's real recurring material, not only the mix). Gated through
+    significant_stems() so a near-silent stem is never read for repetition (CR-2 + the G7 contract).
+    `recurrence` ∈ 0..1: 0 = every section distinct (the part keeps evolving), →1 = the same few sections
+    recur. `top_count` = how many times the most-recurring section appears (a returning hook/motif).
+    Returns [] when there's no per-stem data yet (the pipeline computes it only for significant stems)."""
+    if not per_stem_selfsim:
+        return []
+    sig = set(significant_stems(masking)) if masking else set(per_stem_selfsim)
+    out = []
+    for st in per_stem_selfsim:
+        if st not in sig:
+            continue                                   # never read repetition off an insignificant stem
+        segs = (per_stem_selfsim[st] or {}).get("segments", [])
+        n = len(segs)
+        if n < 2:
+            continue
+        labels = per_stem_selfsim[st].get("n_labels") or len({s.get("letter") for s in segs})
+        counts = {}
+        for s in segs:
+            counts[s.get("letter")] = counts.get(s.get("letter"), 0) + 1
+        top_letter = max(counts, key=counts.get)
+        out.append({"stem": st, "segments": n, "labels": labels,
+                    "recurrence": round(1 - labels / n, 2),
+                    "top_letter": top_letter, "top_count": counts[top_letter]})
+    return out
 
 
 def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None):
@@ -923,7 +997,7 @@ def _coalesce_scenes(scenes, dur):
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
-               back_href=None, audio_mix_rel=None):
+               back_href=None, audio_mix_rel=None, per_stem_selfsim=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -1110,6 +1184,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "als": als_overlay,
         "stemmap": stemmap,
         "rhythm": rhythm,
+        "leakage_caveats": leakage_caveats(masking, rhythm),  # CR-4: bands that are likely a louder neighbour's bleed
+        "stem_repetition": stem_repetition(per_stem_selfsim, masking),  # CR-6: per-significant-stem repetition
         "notes": notes,
         "drums": drums,
         "player": player,
@@ -2032,6 +2108,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const lbody=leaks.length?leaks.map(l=>`${l.a} ↔ ${l.b}: <b>${l.r.toFixed(2)}</b>`).join(" · "):T.rhy_noleak;
  html+=`<div class="rec ${leaks.length?"concept":"do"}" style="margin-top:12px"><div class="when">${T.rhy_leak}</div>
    <p style="margin-top:2px">${lbody}</p></div>`;
+ // CR-4: bands that are most likely a louder, correlated neighbour bleeding in — caveat, don't attribute.
+ const bleed=D.leakage_caveats||[];
+ if(bleed.length){html+=`<div class="rec crit" style="margin-top:12px"><div class="when">${T.rhy_bleed_title}</div>`+
+   bleed.map(b=>`<p style="margin:4px 0 0">${T.rhy_bleed_line.replace(/{stem}/g,b.stem).replace(/{source}/g,b.source).replace("{band}",b.band_label).replace("{gap}",b.gap_db)}</p>`).join("")+`</div>`;}
  document.getElementById("rhySep").innerHTML=html;
 })();
 
@@ -2320,6 +2400,16 @@ def main():
     notes = json.loads(Path(args.notes).read_text()) if args.notes else None
     drums = json.loads(Path(args.drums_breakdown).read_text()) if args.drums_breakdown else None
     selfsim = json.loads(Path(args.selfsim).read_text()) if args.selfsim else None
+    # CR-6: per-stem self-similarity — discover result_selfsim_<stem>.json beside the mix self-sim (the
+    # pipeline writes one per SIGNIFICANT stem). stem_repetition() re-checks significance, so a stray
+    # file for an insignificant stem is ignored.
+    per_stem_selfsim = {}
+    if args.selfsim:
+        for p in Path(args.selfsim).resolve().parent.glob("result_selfsim_*.json"):
+            try:
+                per_stem_selfsim[p.stem.replace("result_selfsim_", "")] = json.loads(p.read_text())
+            except Exception:
+                pass
     narrative_md = Path(args.narrative).read_text(encoding="utf-8") if args.narrative else None
     from datetime import datetime
     meta = {
@@ -2333,7 +2423,8 @@ def main():
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
-               mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel)
+               mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel,
+               per_stem_selfsim=per_stem_selfsim or None)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

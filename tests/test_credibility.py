@@ -81,11 +81,19 @@ def _selfsim(edges, letters):
             "labels_per_beat": [], "beat_times": []}
 
 
-def _render(core, masking=None, selfsim=None, meta=None, title="Cred Test"):
+def _rhythm(leakage):
+    """A minimal rhythm payload carrying only the pairwise stem leakage CR-4 needs.
+    leakage: list of (a, b, r)."""
+    return {"separation": {"leakage": [{"a": a, "b": b, "r": r} for a, b, r in leakage]}}
+
+
+def _render(core, masking=None, selfsim=None, meta=None, title="Cred Test", rhythm=None,
+            per_stem_selfsim=None):
     tmp = Path(tempfile.mkdtemp(prefix="tc_cred_"))
     out = tmp / "widget.html"
     bw.build_html(core, {}, masking, None, str(out), title, bw.STRINGS,
-                  selfsim=selfsim, meta=meta, mode="full")
+                  selfsim=selfsim, meta=meta, rhythm=rhythm, per_stem_selfsim=per_stem_selfsim,
+                  mode="full")
     html = out.read_text(encoding="utf-8")
     payload, _ = json.JSONDecoder().raw_decode(html.split("const D=", 1)[1])
     return html, payload
@@ -347,6 +355,130 @@ class G8_WidgetAnnouncesItsSource(unittest.TestCase):
 
     def test_srcmeta_element_exists(self):
         self.assertIn('id="srcmeta"', self.html, "the header source-line element is missing")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G9 — CR-4: bled energy is not attributed to the wrong stem. A stem whose DOMINANT band is really a
+# louder, correlated neighbour bleeding in must be CAVEATED (named), not presented as that stem's own.
+# Conservative + identity-agnostic: only the stem's single loudest band, only when the carrier is
+# ≥10 dB louder AND correlated. The real Lazy_Sparks case: guitar's loudest band is low, but drums
+# carries low 19 dB louder and they correlate — guitar's "low" is drum bleed.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G9_BledEnergyIsCaveatedNotAttributed(unittest.TestCase):
+    def _mask(self):
+        # drums: loud broadband → carries low. bass: owns sub. guitar: loudest band = low (−40) but
+        # that's drum bleed. piano: silent (insignificant → must never get a caveat).
+        return _masking({
+            "drums":  {"sub": -18, "low": -20, "low_mid": -22, "mid": -22, "hi_mid": -24, "air": -30},
+            "bass":   {"sub": -22, "low": -28, "low_mid": -34, "mid": -44, "hi_mid": -60, "air": -80},
+            "guitar": {"sub": -75, "low": -40, "low_mid": -50, "mid": -48, "hi_mid": -58, "air": -90},
+            "piano":  -95,
+        })
+
+    def test_dominant_bled_band_is_flagged_and_names_the_source(self):
+        rh = _rhythm([("drums", "guitar", 0.35), ("drums", "bass", 0.6)])
+        _, D = _render(_core(), masking=self._mask(), rhythm=rh)
+        cav = D.get("leakage_caveats") or []
+        gtr = [c for c in cav if c["stem"] == "guitar"]
+        self.assertTrue(gtr, "guitar's dominant 'low' (drum bleed) was not caveated (CR-4)")
+        self.assertEqual(gtr[0]["band"], "low")
+        self.assertEqual(gtr[0]["source"], "drums", "the bleed source must be named")
+
+    def test_caveat_is_rendered_with_the_names(self):
+        rh = _rhythm([("drums", "guitar", 0.35)])
+        html, _ = _render(_core(), masking=self._mask(), rhythm=rh)
+        self.assertIn("guitar", html)
+        self.assertRegex(html, r"guitar[^<]{0,160}(bleed|drums)", "the bleed caveat isn't rendered for the producer")
+
+    def test_carrier_owning_its_band_is_not_flagged(self):
+        # bass's loudest band is sub and nothing is ≥10 dB louder there → bass must NOT be flagged.
+        rh = _rhythm([("drums", "bass", 0.6)])
+        _, D = _render(_core(), masking=self._mask(), rhythm=rh)
+        self.assertFalse([c for c in (D.get("leakage_caveats") or []) if c["stem"] == "bass"],
+                         "bass owns its sub — flagging it as bleed is a false attribution (CR-4)")
+
+    def test_insignificant_stem_never_caveated(self):
+        rh = _rhythm([("drums", "piano", 0.9)])  # even with high correlation
+        _, D = _render(_core(), masking=self._mask(), rhythm=rh)
+        self.assertFalse([c for c in (D.get("leakage_caveats") or []) if c["stem"] == "piano"],
+                         "a silent/omitted stem must not get a bleed caveat (CR-2 + CR-4)")
+
+    def test_no_rhythm_means_no_caveats(self):
+        _, D = _render(_core(), masking=self._mask(), rhythm=None)
+        self.assertEqual(D.get("leakage_caveats"), [], "without leakage data there is nothing to attribute")
+
+    def test_low_correlation_is_not_flagged(self):
+        # same levels but the neighbour does NOT rise/fall with guitar (r below threshold) → no claim.
+        rh = _rhythm([("drums", "guitar", 0.05)])
+        _, D = _render(_core(), masking=self._mask(), rhythm=rh)
+        self.assertFalse([c for c in (D.get("leakage_caveats") or []) if c["stem"] == "guitar"],
+                         "uncorrelated stems shouldn't be called bleed (CR-4)")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G10 — CR-7: a stem↔project correspondence is stated only where DEFENSIBLE. The map panel asserts a
+# project family (“matches X”) ONLY for a "clear" verdict; "mixed"/"nomatch"/"empty"/"weak" must not
+# name a family at all. This is structurally guaranteed: only the map_clear string carries the {fam}
+# slot. Locking it here so a future edit can't start asserting a family for an uncertain match (which
+# would be exactly the wrong-label problem [[track-coach-stem-labels]] — Sasha makes electronic, so a
+# Demucs "vocals"/"guitar" label is an approximation, never an identity).
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G10_StemProjectMatchStatedOnlyWhenClear(unittest.TestCase):
+    def test_only_clear_verdict_can_name_a_family(self):
+        S = bw.STRINGS["ui"]
+        self.assertIn("{fam}", S["map_clear"], "a clear match must name the family")
+        for k in ("map_mixed", "map_nomatch", "map_empty", "map_weak"):
+            self.assertNotIn("{fam}", S[k], f"'{k}' must not assert a project family — the match isn't clear (CR-7)")
+
+    def test_head_builder_feeds_family_only_to_clear(self):
+        # source invariant: in the map-panel HEAD map, best_family is interpolated ONLY in the clear arm.
+        _, _ = None, None
+        src = (Path(__file__).resolve().parent.parent / "scripts" / "build_widget.py").read_text()
+        m = re.search(r"const HEAD=\{(.*?)\};", src, re.S)
+        self.assertTrue(m, "map-panel HEAD builder not found")
+        head = m.group(1)
+        # the clear arm runs from "clear:" up to the next verdict key (",mixed:")
+        clear_arm = re.search(r"clear:.*?(?=,\s*mixed:)", head, re.S).group(0)
+        self.assertIn("best_family", clear_arm, "clear arm should name the family")
+        self.assertEqual(head.count("best_family"), 1,
+                         "best_family is interpolated outside the clear arm — a non-clear verdict could "
+                         "assert a project family it can't defend (CR-7)")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G11 — CR-6: per-stem repetition is read from each stem's OWN self-similarity, and ONLY for
+# significant stems. "This part returns" must be grounded in the stem's real recurring material, and a
+# near-silent stem must never be read for repetition (the G7 gate, made live). recurrence ∈ 0..1.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G11_PerStemRepetitionGatedToSignificant(unittest.TestCase):
+    def setUp(self):
+        # drums+bass significant, piano silent (insignificant). Per-stem self-sim: bass evolves
+        # (all-distinct → recurrence 0), drums repeats (ABCABC → recurrence 0.5), piano has data too
+        # but must be IGNORED because it's insignificant.
+        self.masking = _masking({"drums": LOUD, "bass": LOUD, "piano": SILENT})
+        self.pss = {
+            "drums": _selfsim([0, 20, 40, 60, 80, 100, 120], "ABCABC"),
+            "bass":  _selfsim([0, 20, 40, 60, 80, 100, 120], "ABCDEF"),
+            "piano": _selfsim([0, 60, 120], "AA"),
+        }
+        _, self.D = _render(_core(), masking=self.masking, per_stem_selfsim=self.pss)
+        self.rep = {r["stem"]: r for r in (self.D.get("stem_repetition") or [])}
+
+    def test_insignificant_stem_excluded(self):
+        self.assertNotIn("piano", self.rep, "a silent stem must not be read for repetition (CR-6/G7)")
+
+    def test_significant_stems_present(self):
+        self.assertIn("drums", self.rep)
+        self.assertIn("bass", self.rep)
+
+    def test_recurrence_metric(self):
+        self.assertEqual(self.rep["bass"]["recurrence"], 0.0, "an all-distinct part should read as evolving (0)")
+        self.assertEqual(self.rep["drums"]["recurrence"], 0.5, "ABCABC = 3 labels / 6 segs → recurrence 0.5")
+        self.assertEqual(self.rep["drums"]["top_count"], 2, "each of A/B/C recurs twice in ABCABC")
+
+    def test_no_data_means_empty(self):
+        _, D = _render(_core(), masking=self.masking, per_stem_selfsim=None)
+        self.assertEqual(D.get("stem_repetition"), [], "no per-stem self-sim → nothing to claim")
 
 
 if __name__ == "__main__":

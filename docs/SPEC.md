@@ -122,6 +122,18 @@ before it) — encoded that + a positive "real drops still detected" test instea
 STILL OPEN (not in the G1–G7 layer-1 set): **CR-4** leakage honesty (windowed caveat), **CR-6** the actual
 per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-7** Ableton↔stem.
 
+### B.3 Phase-3 cont. (0.8.2, 2026-06-21 — CR-4/CR-6/CR-7, guards G9–G11)
+- **CR-4 (G9) DONE:** `leakage_caveats()` flags a SIGNIFICANT stem's single loudest band as likely bleed
+  when a carrier owns that band ≥ `LEAK_LOUDER_DB` (10) louder AND r ≥ `LEAK_CORR_MIN` (0.2). Conservative
+  + identity-agnostic (a naive "any louder neighbour" rule over-flags); rendered in the separation panel.
+  Layer-1 uses per-band MEDIANS, not windows — CR-4a's time-windowing is a later refinement.
+- **CR-7 (G10) DONE (as a lock):** the map panel already states a project family only on a `clear` verdict
+  (only `map_clear` carries `{fam}`); G10 prevents a non-clear verdict from ever naming one. No new UI.
+- **CR-6 (G11) COMPUTED, SURFACING OPEN:** `stem_repetition()` reads each significant stem's own self-sim
+  (recurrence 0..1), gated by `significant_stems()`; the pipeline writes `result_selfsim_<stem>.json` for
+  significant stems and build_widget auto-discovers them. Worded surfacing deferred — it must use
+  stem→real-name mapping (never raw Demucs labels) and is Sasha's design call.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are

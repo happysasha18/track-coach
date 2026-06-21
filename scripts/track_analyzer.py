@@ -204,6 +204,19 @@ def cmd_analyze(args):
         rn.step("deep", "separate.py", audio, "--model", args.model, "--out-dir", stems)
         manifest = stems / "stems_manifest.json"
         rn.step("fast", "masking.py", "--manifest", manifest, "--out", j("result_masking.json"))
+        # CR-6 — per-stem self-similarity, ONLY for SIGNIFICANT stems (don't waste compute reading a
+        # near-silent stem for repetition; build_widget.stem_repetition re-checks the gate). Written as
+        # result_selfsim_<stem>.json beside the mix self-sim, where build_widget auto-discovers them.
+        if not args.dry_run and j("result_masking.json").exists():
+            try:
+                import build_widget as _bw
+                _msk = json.loads(j("result_masking.json").read_text())
+                for _st in _bw.significant_stems(_msk):
+                    _wav = stems / f"{_st}.wav"
+                    if _wav.exists():
+                        rn.step("fast", "self_similarity.py", _wav, "--out", j(f"result_selfsim_{_st}.json"))
+            except Exception as e:  # noqa: BLE001 — per-stem repetition is an enrichment, never a hard dep
+                print(f"  · per-stem self-sim skipped: {e}", file=sys.stderr)
         # B — stem<->project map: needs the .als AND the render offset (defaulted above)
         if als and offset is not None:
             rn.step("fast", "map_stems.py", "--stems-dir", stems, "--als", j("result_als.json"),

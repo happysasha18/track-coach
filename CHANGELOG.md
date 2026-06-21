@@ -5,6 +5,25 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.2] — 2026-06-21
+
+Credibility, part 2 (SPEC CR-4/CR-6/CR-7).
+
+### Changed
+- **Bled energy isn't blamed on the wrong instrument.** When a stem's loudest frequency band is really a
+  louder, correlated neighbour bleeding in, the separation panel now says so ("guitar's low is likely
+  drums bleed") instead of letting you read it as that stem's own — conservatively, only the clearest case.
+
+### Added
+- **Per-part repetition** (computed): each real (non-silent) stem's own self-similarity → how much that
+  part repeats vs. evolves (e.g. on one track the drums/melody lean on a returning section while the bass
+  barely repeats — it's doing the development). In the data now; how it's shown is still being decided.
+
+### Internal
+- New guardrails G9 (leakage attribution), G10 (stem↔project family asserted only on a "clear" match —
+  locks existing honesty), G11 (per-stem repetition gated to significant stems). `track_analyzer` runs
+  per-stem self-similarity for significant stems only. Tests 186 → 198.
+
 ## [0.8.1] — 2026-06-21
 
 Credibility pass (SPEC `docs/SPEC.md`, Phase 3): the numbers behind the words are now defensible.
