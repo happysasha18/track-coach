@@ -6,7 +6,7 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not *"energy is low,"* but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early (`v0.8.0`). macOS-first. Built and refined hands-on.
+> **Status:** early (`v0.8.7`). macOS-first. Built and refined hands-on.
 
 ![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
 
@@ -112,7 +112,14 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.7.7** (latest) — the **view ladder**: quick → calm → detailed, each adding to the last:
+**v0.8.7** (latest) — **stems named by what they SOUND like, and a credibility pass on every number:**
+
+- **Each stem gets a measured character label** — `kick` · `bass` · `melody` · `lead` · `chord` · `pad` — read from the audio (polyphony from transcribed notes + envelope shape), never guessed from the Demucs track name (which is wrong for electronic music). A held layer reads `pad`, a single moving line `lead`, stacked notes `chord`.
+- **No more frequency-bleed mislabels.** Deciding "is this a bass?" now high-passes the stem and checks how much loudness it loses — so a real bass reads `bass`, but a guitar with the kick bleeding into its low end is no longer called `bass`.
+- **A pitched part that plays rhythmically isn't called percussion** — a stabby pad or a choppy vocal stays melodic/harmonic, not "perc".
+- **Honest by default:** a number computed from too little signal (a near-silent stem, frequency bleed) is omitted or caveated rather than presented as fact. Backed by a **225-test suite** on the real shipped output.
+
+**v0.7.7** — the **view ladder**: quick → calm → detailed, each adding to the last:
 
 - **The Evidence drawer is now in every view**, including the calm view, where it used to vanish — a collapsed, opt-in drawer, so the calm view stays calm.
 - **The quick read shows brief recommendations** (only the ones pinned to a moment on the graph), matching the calm view, so the quick read is genuinely the lightest.

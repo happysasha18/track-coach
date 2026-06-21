@@ -203,6 +203,21 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
   - **Leaves CR-4 `leakage_caveats` UNTOUCHED** — role no longer depends on it (it stays only for the
     separation-panel UI). ⟨DECIDE⟩ default `HP_DROP_DB`=15 (clean gap between 8 and 22 on the two tracks).
 
+- **G15 (0.8.7) — percussive-vs-tonal by CONTENT, not onset alone (found by deed on track 2).** G12 set
+  `percussive = onset_rate ≥ ONSET_PERCUSSIVE`(3.0) and a percussive stem short-circuits to kick/perc/hats
+  BEFORE the G13 tonal split runs. On *Simon Fava — Ta Bueno Ya* this mislabeled two clearly PITCHED mid
+  stems as `perc`: `other` (onset 3.18, polyphony 0.49, sustain 0.73 — a real pad/chord layer) and
+  `vocals` (onset 3.72, monophonic — a vocal line), both just over the 3.0 gate. Same family as G14: judge
+  by CONTENT. A stem with real pitched content — basic-pitch transcribed notes, so `polyphony()` returns
+  a value — is TONAL even when rhythmic; `perc` is reserved for transient stems with NO pitched content.
+  - rule: `percussive = (onset_rate ≥ ONSET_PERCUSSIVE) AND NOT pitched`, where `pitched` = the stem has
+    transcribed notes (polyphony measurable). Drums have no transcribed notes → still `kick`. A pitched
+    rhythmic synth → routes to the G13 split (melody/lead/chord/pad) instead of `perc`.
+  - **Safe fallback:** with no per-stem notes (a render without transcription) `pitched` is false → the
+    old onset-only behaviour, so nothing regresses when notes are absent.
+  - Verify-by-deed (Simon Fava): `other` → `pad` (was `perc`), `vocals` → `melody` (was `perc`); drums
+    still `kick`, bass still `bass`.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are

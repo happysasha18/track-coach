@@ -673,5 +673,43 @@ class G14_RoleHighPassDrop(unittest.TestCase):
                          bw.stem_character(mask, rh, [{"stem": "gtr", "band": "low"}], None)["gtr"]["role"])
 
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G15 — percussive-vs-tonal by CONTENT, not onset alone (found by deed on track 2 "Simon Fava"). The G12
+# onset gate (>=3.0) short-circuited two PITCHED mid stems (a stabby pad, a choppy vocal) to "perc" before
+# the tonal split ran. Same family as G14: a stem with transcribed notes is tonal even when rhythmic;
+# "perc" is reserved for transient stems with NO pitched content (drums, which aren't transcribed).
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G15_PercussiveByContent(unittest.TestCase):
+    MID = {"sub": -80, "low": -70, "low_mid": -22, "mid": -20, "hi_mid": -44, "air": -70}
+    LOW = {"sub": -16, "low": -18, "low_mid": -34, "mid": -36, "hi_mid": -40, "air": -48}
+
+    def test_pitched_rhythmic_stem_is_tonal_not_perc(self):
+        # onset 3.5 (> ONSET_PERCUSSIVE) BUT it has notes → pitched → routed to the tonal split, not "perc"
+        mask = _masking({"rp": self.MID}, sustain={"rp": 0.9})
+        ch = bw.stem_character(mask, _rhythm(onsets={"rp": 3.5}), [],
+                               {"rp": _notes([(0, 2.0), (0, 2.0), (2, 2.0), (2, 2.0)])})  # polyphonic + held
+        self.assertFalse(ch["rp"]["percussive"])
+        self.assertEqual(ch["rp"]["label"], "pad")
+
+    def test_pitched_rhythmic_mono_is_melody_not_perc(self):
+        mask = _masking({"vox": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"vox": 3.7}), [],
+                               {"vox": _notes([(0, 0.4), (1, 0.4), (2, 0.4)])})  # monophonic, rhythmic
+        self.assertFalse(ch["vox"]["percussive"])
+        self.assertEqual(ch["vox"]["label"], "lead")   # single mono → loudest → lead
+
+    def test_transient_without_notes_stays_kick(self):
+        # no transcribed notes → not pitched → onset alone governs → still percussion
+        mask = _masking({"dr": self.LOW})
+        ch = bw.stem_character(mask, _rhythm(onsets={"dr": 5.0}), [], None)
+        self.assertTrue(ch["dr"]["percussive"])
+        self.assertEqual(ch["dr"]["label"], "kick")
+
+    def test_mid_transient_without_notes_is_perc(self):
+        mask = _masking({"pc": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"pc": 5.0}), [], None)  # no notes
+        self.assertEqual(ch["pc"]["label"], "perc")
+
+
 if __name__ == "__main__":
     unittest.main()

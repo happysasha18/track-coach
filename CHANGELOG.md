@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.7] — 2026-06-21
+
+### Fixed
+- **A pitched part that plays rhythmically is no longer mislabelled as percussion.** A stem the program
+  could transcribe into notes (a stabby pad/arp, a choppy vocal line) is now treated as melodic/harmonic
+  even when it's busy — it gets a melody/chord/pad label instead of "perc". Percussion labels are kept for
+  transient stems with no pitched content (the drum kit). Confirmed on a second track: a pad layer and a
+  vocal that previously read "perc" now read "pad" and "lead".
+
 ## [0.8.6] — 2026-06-21
 
 ### Added

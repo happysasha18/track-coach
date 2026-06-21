@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.6"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.7"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -550,7 +550,14 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         # 2026-06-21), which makes any freq-role noise. Judge by the LOUD content (significant_stems' stat).
         bm = {b: (loud_level(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
         onset = (rmap.get(st) or {}).get("onset_rate")
-        percussive = onset is not None and onset >= ONSET_PERCUSSIVE
+        _n = notes_map.get(st, {})
+        pf = polyphony(_n.get("notes") if isinstance(_n, dict) else _n)
+        # G15: a stem counts as PERCUSSION only if it's transient AND not pitched. `pf is not None` means
+        # basic-pitch transcribed real notes → the stem carries pitch, so it's tonal even when rhythmic
+        # (a stabby pad/arp or a choppy vocal). Without notes (pf is None) we fall back to onset alone, so
+        # drums (no transcription) stay percussive and nothing regresses when notes are absent.
+        pitched = pf is not None
+        percussive = (onset is not None and onset >= ONSET_PERCUSSIVE) and not pitched
         if percussive:
             grp = {g: _comb_db([bm[b] for b in bands]) for g, bands in GROUP.items()}
             role = max(grp, key=grp.get)                 # kick (low) / perc (mid) / hats (high) — G12 onset path
@@ -569,7 +576,6 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         # G13: refine ONLY the mid·sustained umbrella; every other G12 label is unchanged.
         if role == "mid" and not percussive:
             flat = flat_map.get(st)
-            pf = polyphony(notes_map.get(st, {}).get("notes") if isinstance(notes_map.get(st), dict) else notes_map.get(st))
             if flat is not None and flat >= FLATNESS_NOISE_MIN:
                 label = "noise"                          # broadband, no clear pitch to call melody vs chord
             elif pf is None:
