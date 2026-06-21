@@ -135,9 +135,16 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
   stem→real-name mapping (never raw Demucs labels) and is Sasha's design call.
 
 ### B.4 Stem CHARACTER labels (0.8.3 → 0.8.6, 2026-06-21 — G12, G13)
+> ⚠ **SUPERSEDED FOR THE DISPLAYED LABEL by §B.7 (0.8.11) + §B.8/G18 (0.8.15).** The displayed label no
+> longer uses `tonal` (→ base role `mid`), no longer uses `air` (→ `high`), and shows NO `≈` marker; the
+> freq-role is taken from the per-stem spectral CENTROID (§B.8), with the G14 high-pass kept only as a
+> no-centroid fallback. B.4 is retained as the G12–G15 DERIVATION HISTORY (how the buckets are computed),
+> not as the current label vocabulary. Read B.4 for mechanism; read §B.7 for what the user actually sees.
+
 Raw Demucs labels (`vocals`/`guitar`/…) are wrong for electronic music ([[track-coach-stem-labels]]): Sasha
-makes synths, not a band. So we name a SIGNIFICANT stem by what its SOUND measurably IS — never by which
-instrument made it — and the label must be DETERMINISTIC (same track → same label every run; no per-run
+makes synths, not a band. So we name a SIGNIFICANT stem by what its SOUND measurably IS — **never by which
+instrument made it, EXCEPT the `bass` and `drums` families, which Demucs separates reliably and which Sasha
+confirmed we read reliably (the low-end exception, §B.7)** — and the label must be DETERMINISTIC (same track → same label every run; no per-run
 renaming) and gated to `significant_stems()`. Same credibility family as CR-1: a label is a claim, so it
 must be backed by a measurement, marked `approx` (shown `≈`) when the measurement is indicative not certain.
 
@@ -283,15 +290,55 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   chord/pad) shows; otherwise the stem shows its plain **base role ("mid"/"high")** — never the jargon
   "tonal", never a `≈`-uncertain marker (Sasha: *"если не уверен, просто базовая роль"*).
 - **No raw Demucs name in the lane label, ever.** No character ⇒ "near-silent" (the stem is empty),
-  never `L.name`. The raw stem name still appears tiny in the sub-line (with the map match) for "know your
-  source" (G8) — but the map's match marker changed `≈ family` → `→ family` so `≈` isn't overloaded.
-- Verified by deed (Lazy_Sparks 0.8.11): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
-  vocals/piano→"near-silent". INV: a stem lane label is one of {trusted family, confident character,
-  base role, "near-silent"} — never "tonal", never a "≈" prefix, never a raw Demucs family name.
+  never `L.name`.
+- **Sub-line = the REAL project track, never the raw Demucs name (0.8.12/0.8.13, updated from the 0.8.11
+  text above).** The tiny line under each lane now shows the real project track name when the stemmap
+  verdict is `clear` (e.g. guitar→"Guitar"), "near-silent" for empty stems, and NOTHING otherwise — the
+  raw Demucs name and the `→ family` marker are both GONE (0.8.11's "guitar · → other" salad is removed).
+  The sub-line is also suppressed when it would merely repeat the main label (0.8.13 — no double
+  "near-silent").
+- **Three surfaces name a stem differently ON PURPOSE** (cross-ref §B.6): the late_entry rec needs one
+  best single guess (character → clear track-name → "a new element"); the lane shows the measured ROLE as
+  the headline and the real track-name as supporting sub-text. Same data, different jobs.
+- Verified by deed (Lazy_Sparks 0.8.11–0.8.15): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
+  vocals/piano→"near-silent"; guitar sub-line→"Guitar".
+- **INV (label set).** The displayed lane label is EXACTLY one of:
+  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `noise` (inert — never fires
+  until a real noise/riser stem exists, §B.4/G13), `mid`, `high`, `near-silent`. **Never** `tonal`, never a
+  `≈` prefix, never a raw Demucs family name. Note: `bass` is reachable two ways — the trusted `bass`
+  family, AND an UNTRUSTED stem whose centroid is < `LOW_CENTROID_HZ` (§B.8, role `low`); the latter is
+  intentional (it occupies the bass range) but see the OPEN question below on whether to split that word.
 - **OPEN (asked Sasha):** where the map verdict is genuinely `clear` AND the matched real project track
   looks meaningful (e.g. guitar→"Guitar"), fold that real name in as the primary label instead of the
-  base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). Also OPEN: per-stem
-  frequency analyzer (Sasha's idea, s14) as finer label-input + a viz — see NEXT_STEPS.
+  base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). NOTE: 0.8.12 already put the
+  real name in the SUB-line, so if it's ever promoted to PRIMARY, drop the sub-line duplicate (else
+  "Guitar / Guitar").
+
+### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Sasha's idea, s14)
+Sasha (s14): *"ты ж можешь и частотный анализатор гонять на каждый стем."* We already run full spectral
+analysis on the MIX; per stem we only had 6 coarse bands + flatness. So `masking.py:stem_spectrum(y)` now
+computes, per stem (reusing the loaded audio, one extra STFT):
+- **spectral centroid** (Hz) — energy-weighted "centre of gravity" of the spectrum = where the stem's
+  energy sits (≈ perceived brightness). Power-weighted across frames (reflects "when it plays").
+- a **32-bin log-frequency spectrum** profile (dB, peak-normalised) — emitted as `spectrum`/`spectrum_freqs`
+  for a future per-stem spectrum VIZ (data is forwarded into the widget payload at 0.8.16; the canvas draw
+  is deferred until it can be visually verified).
+- **G18 — freq-role now from the centroid (supersedes G14's high-pass for the role).** A SUSTAINED
+  (non-trusted) stem's role = `low` if `centroid < LOW_CENTROID_HZ` (250), `high` if `> HIGH_CENTROID_HZ`
+  (3500), else `mid`. This is the robust signal Sasha asked for — it fixes the synth-bass-→-`tonal`
+  failure at the root (a 6-band high-pass drop was a poor proxy for "where the energy is"). The **G14
+  high-pass drop is kept ONLY as the fallback** when the masking carries no centroid (pre-0.8.14 jsons),
+  so nothing regresses. Trusted `bass`/`drums` (§B.7) still short-circuit before any role computation.
+- VERIFY-BY-DEED (Lazy_Sparks, regenerated masking): centroids bass 117 / drums 203 / piano 602 /
+  vocals 633 / other 942 / guitar 1008 Hz; resulting labels bass→bass, drums→drums, guitar→mid, other→
+  lead — identical to 0.8.11 but now centroid-derived, no regression. Unit tests: `G18_CentroidFreqRole`.
+- INV: when `spectral_centroid[st]` is present, a non-trusted sustained stem's role is a pure function of
+  it (deterministic); `< LOW_CENTROID_HZ` ⇒ role `low` ⇒ label `bass`.
+- ⟨DECIDE⟩ thresholds: `LOW_CENTROID_HZ`=250, `HIGH_CENTROID_HZ`=3500 (tune as tracks land). **OPEN (F5,
+  asked Sasha):** should an UNTRUSTED low-centroid stem read `bass`, or a neutral `low` so "bass" stays
+  identity-only? Currently it reads `bass` (honest about the frequency range it occupies).
+- IDEA (Sasha s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
+  the bass") — see NEXT_STEPS.
 
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
