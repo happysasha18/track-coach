@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.4"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.5"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -2357,8 +2357,11 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lcv.width=LW*devicePixelRatio;lcv.height=LH*devicePixelRatio;lx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);drawL();}
  lcv.addEventListener("click",e=>{const r=lcv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   for(let i=0;i<lanes.length;i++){const L=lanes[i];
-   if(x>=3&&x<=15){if(y>=L.y+3&&y<=L.y+15){L.s.mute=!L.s.mute;if(L.s.mute)L.s.solo=false;gains();return;}
-    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){L.s.solo=!L.s.solo;if(L.s.solo)L.s.mute=false;gains();return;}}}  // M and S are mutually exclusive
+   // M and S are mutually exclusive — and across the WHOLE player: muting puts you in "mute mode"
+   // (clears every solo), soloing puts you in "solo mode" (clears every mute). So you can never have a
+   // mute on one stem AND a solo on another at the same time (Sasha, 2026-06-21: "это неправильно").
+   if(x>=3&&x<=15){if(y>=L.y+3&&y<=L.y+15){L.s.mute=!L.s.mute;if(L.s.mute)auds.forEach(a=>a.solo=false);gains();return;}
+    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){L.s.solo=!L.s.solo;if(L.s.solo)auds.forEach(a=>a.mute=false);gains();return;}}}
   if(x>=PADL)seekTo(Math.max(0,Math.min(dur(),(x-PADL)/(LW-PADL-PADR)*dur())));});  // gutter clicks don't seek to 0
  window.addEventListener("resize",lresize);
  PH.push(t=>drawL(lxOf(t)));

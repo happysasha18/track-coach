@@ -5,6 +5,13 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.5] — 2026-06-21
+
+### Fixed
+- **Mute and solo are now mutually exclusive across the whole player.** You could mute one stem while
+  soloing another (a contradictory state). Now muting clears every solo and soloing clears every mute —
+  the player is always in one coherent mode.
+
 ## [0.8.4] — 2026-06-21
 
 ### Fixed

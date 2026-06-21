@@ -405,16 +405,20 @@ class AlsPanelsGateOnData(unittest.TestCase):
 
 
 class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
-    """A lane can't be both soloed AND muted — contradictory, and it confused Sasha (2026-06-21:
-    "можно почему-то нажать и соло и мьют сразу"). Enabling one clears the other in the lane click
-    handler. Pinned at source level (plain JS toggle, no DOM needed)."""
+    """Mute and solo are mutually exclusive across the WHOLE player, not just per lane (Sasha,
+    2026-06-21: same lane can't be both, AND you can't mute one stem while soloing another — "это
+    неправильно"). Muting clears every solo; soloing clears every mute → the player is always in one
+    coherent mode. Pinned at source level (plain JS toggle, no DOM needed)."""
 
-    def test_enabling_one_clears_the_other(self):
+    def test_muting_clears_all_solos(self):
         html, _ = _render(stems=("drums", "bass"))
-        self.assertIn("L.s.mute=!L.s.mute;if(L.s.mute)L.s.solo=false", html,
-                      "muting a lane must clear its solo")
-        self.assertIn("L.s.solo=!L.s.solo;if(L.s.solo)L.s.mute=false", html,
-                      "soloing a lane must clear its mute")
+        self.assertIn("L.s.mute=!L.s.mute;if(L.s.mute)auds.forEach(a=>a.solo=false)", html,
+                      "muting any lane must clear every solo")
+
+    def test_soloing_clears_all_mutes(self):
+        html, _ = _render(stems=("drums", "bass"))
+        self.assertIn("L.s.solo=!L.s.solo;if(L.s.solo)auds.forEach(a=>a.mute=false)", html,
+                      "soloing any lane must clear every mute")
 
 
 if __name__ == "__main__":
