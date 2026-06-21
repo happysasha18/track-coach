@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.5"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.6"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -459,47 +459,135 @@ def stem_repetition(per_stem_selfsim, masking):
 
 ONSET_PERCUSSIVE = 3.0   # onsets/sec at/above which a stem reads as percussive (transient-driven), else sustained
 
+# ── G13: split the honest "tonal" umbrella → melody / lead / chord / pad / noise (Sasha, 2026-06-21) ──
+# All four are ⟨DECIDE⟩ defaults to tune on the 3 library tracks (see docs/SPEC.md §B.4); every one is a
+# threshold on a MEASURED quantity (polyphony, loudness, note length, spectral flatness) — no vocabulary,
+# no ML prompts (Sasha rejected those). Each resulting label is `approx`.
+POLY_FRAC_MONO_MAX = 0.20  # poly_frac (share of sounding-time with ≥2 notes) below this ⇒ MONOPHONIC
+FLATNESS_NOISE_MIN = 0.30  # energy-weighted spectral flatness at/above this ⇒ broadband NOISE, no clear pitch.
+                           # INERT on real harmonic stems (their flatness is ~0.000–0.003) — the `noise`
+                           # bucket is DEFERRED until a calibrated/relative measure; kept so it never fires
+                           # a wrong label rather than claiming noise we can't detect (verify-by-deed 2026-06-21).
+PAD_NOTE_DUR_S     = 0.8   # mean note duration at/above this ⇒ a held PAD; below ⇒ rhythmic CHORD stabs.
+                           # INERT on real data — basic-pitch fragments held synths into ~0.2 s notes, so this
+                           # never fires; the pad-vs-chord split is DEFERRED to an envelope-based held-ness
+                           # measure. Until then every polyphonic tonal stem reads "chord" (honest umbrella).
+HP_DROP_DB         = 15.0  # G14: a sustained stem that LOSES at least this much loudness when high-passed
+                           # (sub+low ignored) is a genuine low carrier → "bass". Relative drop, not an
+                           # absolute floor: a loud bass keeps a residue above the empty-floor yet still
+                           # drops ~22–27 dB; non-bass stems drop 0–8 dB (verify-by-deed, 2 tracks).
 
-def stem_character(masking, rhythm, leakage=None):
+HP_BANDS = ("low_mid", "mid", "hi_mid", "air")   # what survives a ~250 Hz high-pass (sub+low removed)
+
+
+def _comb_db(vals):
+    """Combine per-band dB levels into one broadband dB (power sum). Bands at/below the −119 sentinel are
+    treated as silence. Returns −120.0 when nothing is present."""
+    p = sum(10 ** (v / 10.0) for v in vals if v is not None and v > -119)
+    return round(10 * math.log10(p), 1) if p > 0 else -120.0
+
+
+def polyphony(notes):
+    """Share of a stem's SOUNDING time during which ≥2 transcribed notes overlap (0..1). A monophonic
+    line (melody/lead) plays ~one note at a time → ~0; stacked chords/pads → high. Deterministic interval
+    sweep over the basic-pitch note events; returns None when there's nothing to measure (so the caller
+    keeps the honest "tonal" umbrella rather than inventing a verdict from no data — CR-1)."""
+    evs = [(float(n["t"]), float(n["t"]) + float(n["dur"])) for n in (notes or [])
+           if n.get("dur", 0) and float(n["dur"]) > 0]
+    if not evs:
+        return None
+    pts = sorted([(s, 1) for s, _ in evs] + [(e, -1) for _, e in evs])
+    sounding = poly = 0.0
+    depth = 0
+    prev = pts[0][0]
+    for t, d in pts:
+        span = t - prev
+        if depth >= 1:
+            sounding += span
+        if depth >= 2:
+            poly += span
+        depth += d
+        prev = t
+    return round(poly / sounding, 3) if sounding > 0 else None
+
+
+def _mean_note_dur(notes):
+    durs = [float(n["dur"]) for n in (notes or []) if n.get("dur", 0) and float(n["dur"]) > 0]
+    return sum(durs) / len(durs) if durs else None
+
+
+def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     """A DETERMINISTIC, honest CHARACTER label per SIGNIFICANT stem, from measured features only — so the
     same track always yields the same labels (Sasha's hard requirement: no per-run renaming). We describe
     what the SOUND is, never assert which instrument/synth made it (Demucs labels are approximations;
-    [[track-coach-stem-labels]]). Two measured axes:
-      • frequency role — which third of the spectrum carries the stem's energy (low / mid / high), read
-        from per-band medians but EXCLUDING bands flagged as bleed (CR-4 leakage_caveats), so a stem
-        isn't typed by another stem's energy leaking in (guitar's drum-bled low would mislabel it 'bass').
+    [[track-coach-stem-labels]]). Measured axes:
+      • frequency role — low / mid / high. Percussive stems: which third (by loud-level) carries the energy.
+        Sustained stems (G14, Sasha's idea): "low/bass" ONLY if HIGH-PASSING (dropping sub+low) strips
+        ≥ HP_DROP_DB of loudness — so a bass collapses but a mid stem with bled-in low (guitar) keeps its
+        real mid content and is NOT mislabeled 'bass'. Sidesteps the bleed question, so CR-4 stays UI-only.
       • temporal character — percussive (onset_rate ≥ ONSET_PERCUSSIVE) vs sustained.
+      • G13 — for the mid·sustained case (the old honest 'tonal' umbrella), split into lead/melody/chord/
+        pad/noise from polyphony (basic-pitch notes, `per_stem_notes`), per-stem spectral flatness
+        (`masking.spectral_flatness`), relative loudness and mean note length. See docs/SPEC.md §B.4.
     Returns {stem: {label, role, percussive, confidence}}. confidence 'clear' for the low end (kick/bass,
-    which Sasha confirmed we read reliably), 'approx' otherwise (marked ≈ in the UI). No spectral-flatness
-    yet, so melody/pad/noise aren't split — that's a later sharpening; here mid-sustained reads 'melodic'."""
+    which Sasha confirmed we read reliably), 'approx' otherwise (marked ≈ in the UI)."""
     if not masking:
         return {}
-    leak_bands = {}
-    for c in (leakage or []):
-        leak_bands.setdefault(c["stem"], set()).add(c["band"])
     rmap = (rhythm or {}).get("rhythm", {}) if rhythm else {}
+    flat_map = masking.get("spectral_flatness") or {}
+    notes_map = per_stem_notes or {}
     GROUP = {"low": ("sub", "low"), "mid": ("low_mid", "mid"), "high": ("hi_mid", "air")}
     LABEL = {                                            # (role, percussive) → (short label, confidence)
         ("low", True): ("kick", "clear"),  ("low", False): ("bass", "clear"),
         ("mid", True): ("perc", "approx"), ("mid", False): ("tonal", "approx"),
         ("high", True): ("hats", "approx"), ("high", False): ("air", "approx"),
     }
-    # NB: mid+sustained = "tonal" (a pitched sustained layer) DELIBERATELY does NOT claim melody vs pad —
-    # we can't split those without spectral flatness (Sasha: "мелодия может быть и пэды"). Honest umbrella
-    # until the flatness sharpening lands. Don't "upgrade" it to "melody" without that measurement.
+    # `leakage` is accepted for signature stability but no longer feeds the ROLE: G14 (high-pass drop)
+    # makes the bass-vs-mid call without arguing whether a low band is bleed, so CR-4 stays UI-only.
     out = {}
+    mono = {}    # st -> loud_level (dB); resolved into lead (loudest) vs melody after the loop
     for st in significant_stems(masking):
-        bm = {b: (median(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
-        bled = leak_bands.get(st, set())
-        grp = {}
-        for g, bands in GROUP.items():
-            grp[g] = sum(10 ** (bm[b] / 10) for b in bands if b not in bled and bm[b] > -119)
-        tot = sum(grp.values())
-        role = max(grp, key=grp.get) if tot > 0 else "mid"
+        # Per-band level = loud_level (85th pct of when it plays), NOT median: an intermittent stem (a
+        # bassline that hits some beats) reads as ~silence at the median in every band (verify-by-deed
+        # 2026-06-21), which makes any freq-role noise. Judge by the LOUD content (significant_stems' stat).
+        bm = {b: (loud_level(masking["band_rms_db"][st].get(b, [-120])) or -120) for b in BAND_ORDER}
         onset = (rmap.get(st) or {}).get("onset_rate")
         percussive = onset is not None and onset >= ONSET_PERCUSSIVE
+        if percussive:
+            grp = {g: _comb_db([bm[b] for b in bands]) for g, bands in GROUP.items()}
+            role = max(grp, key=grp.get)                 # kick (low) / perc (mid) / hats (high) — G12 onset path
+        else:
+            # G14 (Sasha's idea): a sustained stem is a genuine low carrier only if HIGH-PASSING it (dropping
+            # sub+low) strips most of its loudness. A bass collapses (drop ≥ HP_DROP_DB); a mid stem with a
+            # bled-in low keeps its real mid content. Uses the relative DROP, not an absolute residue floor
+            # (a loud bass's residue can still sit above the empty-floor yet it still drops ~22–27 dB).
+            full = _comb_db([bm[b] for b in BAND_ORDER])
+            hp = _comb_db([bm[b] for b in HP_BANDS])
+            if full - hp >= HP_DROP_DB:
+                role = "low"
+            else:
+                role = "high" if _comb_db([bm["hi_mid"], bm["air"]]) > _comb_db([bm["low_mid"], bm["mid"]]) else "mid"
         label, conf = LABEL[(role, percussive)]
+        # G13: refine ONLY the mid·sustained umbrella; every other G12 label is unchanged.
+        if role == "mid" and not percussive:
+            flat = flat_map.get(st)
+            pf = polyphony(notes_map.get(st, {}).get("notes") if isinstance(notes_map.get(st), dict) else notes_map.get(st))
+            if flat is not None and flat >= FLATNESS_NOISE_MIN:
+                label = "noise"                          # broadband, no clear pitch to call melody vs chord
+            elif pf is None:
+                label = "tonal"                          # no transcribed notes → keep the honest umbrella (CR-1)
+            elif pf < POLY_FRAC_MONO_MAX:                # monophonic line: lead vs melody decided by loudness below
+                mono[st] = loud_level(stem_broadband_db(masking, st)) or -120
+                label = "melody"                         # provisional; promoted to "lead" if it's the loudest
+            else:                                        # polyphonic: held pad vs rhythmic chord stabs
+                md = _mean_note_dur(notes_map.get(st, {}).get("notes") if isinstance(notes_map.get(st), dict) else notes_map.get(st))
+                label = "pad" if (md is not None and md >= PAD_NOTE_DUR_S) else "chord"
         out[st] = {"label": label, "role": role, "percussive": percussive, "confidence": conf}
+    # The SINGLE most prominent monophonic line is the LEAD; any other mono lines stay "melody". (Was:
+    # everyone within LEAD_MARGIN_DB of the loudest → produced TWO "lead"s on real data, 2026-06-21.)
+    # Loudness is the weakest signal of the set, so this stays `approx`; deterministic via stem order on ties.
+    if mono:
+        out[max(mono, key=mono.get)]["label"] = "lead"
     return out
 
 
@@ -1043,7 +1131,7 @@ def _coalesce_scenes(scenes, dur):
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
-               back_href=None, audio_mix_rel=None, per_stem_selfsim=None):
+               back_href=None, audio_mix_rel=None, per_stem_selfsim=None, per_stem_notes=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -1232,7 +1320,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "stemmap": stemmap,
         "rhythm": rhythm,
         "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
-        "stem_character": stem_character(masking, rhythm, _leak),  # (g): deterministic character label per significant stem
+        "stem_character": stem_character(masking, rhythm, _leak, per_stem_notes),  # (g)/G13: deterministic character label per significant stem
         "stem_repetition": stem_repetition(per_stem_selfsim, masking),  # CR-6: per-significant-stem repetition
         "notes": notes,
         "drums": drums,
@@ -2466,6 +2554,17 @@ def main():
                 per_stem_selfsim[p.stem.replace("result_selfsim_", "")] = json.loads(p.read_text())
             except Exception:
                 pass
+    # G13: per-stem notes — discover result_notes_<stem>.json beside --notes (or --masking), one per
+    # SIGNIFICANT non-drum stem (the pipeline writes them). Feeds polyphony → melody/chord/pad split.
+    # stem_character only reads the significant stems, so a stray file is harmless.
+    per_stem_notes = {}
+    _notes_dir = next((Path(a).resolve().parent for a in (args.notes, args.masking, args.selfsim) if a), None)
+    if _notes_dir:
+        for p in _notes_dir.glob("result_notes_*.json"):
+            try:
+                per_stem_notes[p.stem.replace("result_notes_", "")] = json.loads(p.read_text())
+            except Exception:
+                pass
     narrative_md = Path(args.narrative).read_text(encoding="utf-8") if args.narrative else None
     from datetime import datetime
     meta = {
@@ -2480,7 +2579,7 @@ def main():
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
                mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel,
-               per_stem_selfsim=per_stem_selfsim or None)
+               per_stem_selfsim=per_stem_selfsim or None, per_stem_notes=per_stem_notes or None)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

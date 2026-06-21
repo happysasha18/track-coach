@@ -56,8 +56,9 @@ def _core(n=24, dur=120.0, energy=None, density=None, brightness=None, bounds=No
     }
 
 
-def _masking(stems, n=24, dur=120.0):
-    """stems: {name: dB-scalar | {band: dB}}. Builds a masking payload with flat per-band dB over time."""
+def _masking(stems, n=24, dur=120.0, flatness=None):
+    """stems: {name: dB-scalar | {band: dB}}. Builds a masking payload with flat per-band dB over time.
+    flatness: optional {stem: 0..1} energy-weighted spectral flatness (G13 noise/pitch split)."""
     tb = [round(i * dur / n, 1) for i in range(n)]
     band = {}
     for st, spec in stems.items():
@@ -69,8 +70,15 @@ def _masking(stems, n=24, dur=120.0):
         "duration_s": dur, "total_windows": n, "masking_threshold_db": -6.0,
         "time_bins": tb, "stems_analysed": list(stems), "band_rms_db": band,
         "masking_flags": {}, "masking_summary": {},
+        "spectral_flatness": dict(flatness or {}),
         "viz": {"win_s": dur / n, "bins": tb, "bb": {}, "band": {}},
     }
+
+
+def _notes(events):
+    """events: list of (start, dur) → a result_notes-style payload for one stem (pitch irrelevant here)."""
+    return {"notes": [{"t": float(s), "dur": float(d), "pitch": 60, "name": "C4", "amp": 0.5}
+                      for s, d in events]}
 
 
 def _selfsim(edges, letters):
@@ -523,8 +531,9 @@ class G12_StemCharacterLabels(unittest.TestCase):
         self.assertEqual(self.ch["lead"]["confidence"], "approx")
 
     def test_bled_low_excluded_so_guitar_is_not_bass(self):
-        # gtr's loudest raw band is low (−22), but that's drum bleed → role must come from its own mid.
-        self.assertEqual(self.ch["gtr"]["role"], "mid", "bled low band wasn't excluded from the character role")
+        # gtr's loudest raw band is low (−22), but that's drum bleed. As of G14 the role no longer EXCLUDES
+        # the bled band — instead the high-pass drop is small (its real mid survives) so it's not 'bass'.
+        self.assertEqual(self.ch["gtr"]["role"], "mid", "guitar with bled low should read mid, not bass")
         self.assertNotEqual(self.ch["gtr"]["label"], "bass")
 
     def test_insignificant_stem_excluded(self):
@@ -540,6 +549,117 @@ class G12_StemCharacterLabels(unittest.TestCase):
     def test_reaches_payload(self):
         _, D = _render(_core(), masking=self.mask, rhythm=self.rh)
         self.assertEqual((D.get("stem_character") or {}).get("bass", {}).get("label"), "bass")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G13 — split the honest mid·sustained "tonal" umbrella (Sasha, 2026-06-21: "аккорд или мелодия — я
+# думал это просто", and it IS: polyphony). MEASURED buckets only, no vocabulary: monophonic → lead
+# (loudest) / melody (quieter); polyphonic → pad (held) / chord (stabs); high spectral flatness → noise.
+# Every G13 label is `approx`; with NO transcribed notes we keep the honest "tonal" (CR-1). SPEC §B.4.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G13_TonalSplit(unittest.TestCase):
+    MID = {"sub": -80, "low": -70, "low_mid": -22, "mid": -20, "hi_mid": -44, "air": -70}  # mid·sustained, loud
+
+    def _mid(self, shift=0.0):  # same shape, quieter in its carrying bands
+        return {b: (v + shift if b in ("low_mid", "mid") else v) for b, v in self.MID.items()}
+
+    def test_polyphony_helper(self):
+        self.assertEqual(bw.polyphony([{"t": 0, "dur": 1}, {"t": 1, "dur": 1}, {"t": 2, "dur": 1}]), 0.0)
+        self.assertEqual(bw.polyphony([{"t": 0, "dur": 2}, {"t": 0, "dur": 2}]), 1.0)
+        self.assertIsNone(bw.polyphony([]))   # nothing to measure → caller keeps the honest umbrella
+
+    def test_mono_loudest_is_lead_quieter_is_melody(self):
+        mask = _masking({"lead": self.MID, "mel": self._mid(-12)})
+        rh = _rhythm(onsets={"lead": 1.0, "mel": 1.0})
+        seq = _notes([(0, 0.5), (1, 0.5), (2, 0.5), (3, 0.5)])  # non-overlapping → monophonic
+        ch = bw.stem_character(mask, rh, [], {"lead": seq, "mel": seq})
+        self.assertEqual(ch["lead"]["label"], "lead")
+        self.assertEqual(ch["mel"]["label"], "melody")
+
+    def test_poly_held_is_pad(self):
+        mask = _masking({"pad": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"pad": 1.0}), [],
+                               {"pad": _notes([(0, 2.0), (0, 2.0), (2, 2.0), (2, 2.0)])})  # stacked + long
+        self.assertEqual(ch["pad"]["label"], "pad")
+
+    def test_poly_short_is_chord(self):
+        mask = _masking({"chd": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"chd": 1.0}), [],
+                               {"chd": _notes([(0, 0.3), (0, 0.3), (1, 0.3), (1, 0.3)])})  # stacked + short
+        self.assertEqual(ch["chd"]["label"], "chord")
+
+    def test_high_flatness_is_noise(self):
+        # broadband/noisy stem: flatness wins even over pitched-looking notes — there's no pitch to call.
+        mask = _masking({"nz": self.MID}, flatness={"nz": 0.5})
+        ch = bw.stem_character(mask, _rhythm(onsets={"nz": 1.0}), [], {"nz": _notes([(0, 0.5), (1, 0.5)])})
+        self.assertEqual(ch["nz"]["label"], "noise")
+
+    def test_no_notes_keeps_honest_tonal(self):
+        mask = _masking({"x": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"x": 1.0}), [], None)  # no per-stem notes
+        self.assertEqual(ch["x"]["label"], "tonal")
+
+    def test_only_mid_sustained_is_refined(self):
+        # G13 refines ONLY mid·sustained — a low·sustained bass must stay "bass" even with notes present.
+        mask = _masking({"bass": {"sub": -20, "low": -22, "low_mid": -50, "mid": -60, "hi_mid": -80, "air": -90}})
+        ch = bw.stem_character(mask, _rhythm(onsets={"bass": 1.0}), [], {"bass": _notes([(0, 0.5), (1, 0.5)])})
+        self.assertEqual(ch["bass"]["label"], "bass")
+
+    def test_g13_labels_are_approx(self):
+        mask = _masking({"lead": self.MID})
+        ch = bw.stem_character(mask, _rhythm(onsets={"lead": 1.0}), [], {"lead": _notes([(0, 0.5), (1, 0.5)])})
+        self.assertEqual(ch["lead"]["confidence"], "approx")
+
+    def test_deterministic(self):
+        mask = _masking({"lead": self.MID, "mel": self._mid(-12)})
+        rh = _rhythm(onsets={"lead": 1.0, "mel": 1.0})
+        notes = {"lead": _notes([(0, 0.5), (1, 0.5)]), "mel": _notes([(0, 0.5), (1, 0.5)])}
+        self.assertEqual(bw.stem_character(mask, rh, [], notes), bw.stem_character(mask, rh, [], notes))
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G14 — robust freq-ROLE via a HIGH-PASS drop (Sasha's idea, 2026-06-21). Decide "is this a low/bass
+# stem?" by how much loudness it LOSES when high-passed (sub+low dropped), not by which band is loudest.
+# Fixes two real-data failures found by deed: an intermittent bass read as ~silence at the median →
+# mislabeled mid; and a guitar's bled-in (loud) low → mislabeled bass. Relative drop, leakage-free.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+def _intermittent(loud_db, n=24, hits=5):
+    """A band series silent at the median but loud in its top `hits` bins — an intermittent stem."""
+    return [-120.0] * (n - hits) + [float(loud_db)] * hits
+
+
+class G14_RoleHighPassDrop(unittest.TestCase):
+    def test_bass_collapses_under_highpass(self):
+        mask = _masking({"bass": {"sub": -20, "low": -22, "low_mid": -55, "mid": -60, "hi_mid": -80, "air": -90}})
+        ch = bw.stem_character(mask, _rhythm(onsets={"bass": 1.0}), [], None)
+        self.assertEqual(ch["bass"]["role"], "low")
+        self.assertEqual(ch["bass"]["label"], "bass")
+
+    def test_bled_low_stem_is_not_bass(self):
+        # loudest single band is low (−24, drum bleed) but real mid content survives the high-pass → NOT bass
+        mask = _masking({"gtr": {"sub": -70, "low": -24, "low_mid": -30, "mid": -34, "hi_mid": -58, "air": -85}})
+        ch = bw.stem_character(mask, _rhythm(onsets={"gtr": 1.0}), [], None)
+        self.assertEqual(ch["gtr"]["role"], "mid")
+        self.assertNotEqual(ch["gtr"]["label"], "bass")
+
+    def test_intermittent_bass_typed_by_loud_content_not_median(self):
+        # bass plays only a few beats: median is silence in every band, but its loud low hits keep it 'bass'.
+        band = {"sub": _intermittent(-18), "low": _intermittent(-20)}
+        for b in ("low_mid", "mid", "hi_mid", "air"):
+            band[b] = [-120.0] * 24
+        mask = {"duration_s": 120.0, "total_windows": 24, "masking_threshold_db": -6.0,
+                "time_bins": [i * 5.0 for i in range(24)], "stems_analysed": ["bass"],
+                "band_rms_db": {"bass": band}, "masking_flags": {}, "masking_summary": {},
+                "spectral_flatness": {}, "viz": {"win_s": 5.0, "bins": [], "bb": {}, "band": {}}}
+        ch = bw.stem_character(mask, _rhythm(onsets={"bass": 1.0}), [], None)
+        self.assertEqual(ch.get("bass", {}).get("label"), "bass")
+
+    def test_role_is_leakage_free(self):
+        # G14 made the role independent of CR-4 leakage — passing caveats must not change it.
+        mask = _masking({"gtr": {"sub": -70, "low": -24, "low_mid": -30, "mid": -34, "hi_mid": -58, "air": -85}})
+        rh = _rhythm(onsets={"gtr": 1.0})
+        self.assertEqual(bw.stem_character(mask, rh, [], None)["gtr"]["role"],
+                         bw.stem_character(mask, rh, [{"stem": "gtr", "band": "low"}], None)["gtr"]["role"])
 
 
 if __name__ == "__main__":

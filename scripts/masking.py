@@ -110,9 +110,18 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
 
     # ── compute band RMS per stem ────────────────────────────────────────────
     band_data = {}   # {stem_name: {band_name: [nb floats]}}
+    flatness = {}    # {stem_name: float}  energy-weighted mean spectral flatness (0..1); high = noisy/no clear pitch
     for role, y in loaded.items():
         print(f"  Band analysis: {role}...")
         band_data[role] = {}
+        # Spectral flatness per stem (G13): feeds the melody/chord vs noise split in stem_character. We
+        # ENERGY-WEIGHT the per-frame flatness by that frame's RMS power so silence/near-silence doesn't
+        # drag the number — the label should reflect what the stem sounds like WHEN it plays, not its gaps.
+        flat_f = librosa.feature.spectral_flatness(y=y, hop_length=HOP)[0]
+        rms_f  = librosa.feature.rms(y=y, hop_length=HOP)[0]
+        n_f    = min(len(flat_f), len(rms_f))
+        w      = rms_f[:n_f] ** 2
+        flatness[role] = round(float(np.sum(flat_f[:n_f] * w) / (np.sum(w) + 1e-12)), 4)
         t_frames = frames_to_time(librosa.feature.rms(y=y, hop_length=HOP)[0])
         frame_pow = {}   # per-frame POWER per band, kept for the fine viz grid
         for bname, brange in BANDS.items():
@@ -196,6 +205,7 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
         "time_bins":        [round(float(x), 1) for x in tb],
         "stems_analysed":   list(loaded.keys()),
         "band_rms_db":      band_data,        # {stem: {band: [nb × dB]}}
+        "spectral_flatness": flatness,        # {stem: float 0..1} energy-weighted; G13 noise/pitch split
         "masking_flags":    masking_flags,
         "masking_summary":  masking_summary,
         "viz": {                              # fine grid for the sequencer waveform only

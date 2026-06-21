@@ -134,12 +134,88 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
   significant stems and build_widget auto-discovers them. Worded surfacing deferred — it must use
   stem→real-name mapping (never raw Demucs labels) and is Sasha's design call.
 
+### B.4 Stem CHARACTER labels (0.8.3 → 0.8.6, 2026-06-21 — G12, G13)
+Raw Demucs labels (`vocals`/`guitar`/…) are wrong for electronic music ([[track-coach-stem-labels]]): Sasha
+makes synths, not a band. So we name a SIGNIFICANT stem by what its SOUND measurably IS — never by which
+instrument made it — and the label must be DETERMINISTIC (same track → same label every run; no per-run
+renaming) and gated to `significant_stems()`. Same credibility family as CR-1: a label is a claim, so it
+must be backed by a measurement, marked `approx` (shown `≈`) when the measurement is indicative not certain.
+
+- **G12 (0.8.3) — the two coarse axes.** freq-role (which third of the spectrum carries the energy,
+  EXCLUDING CR-4-bled bands) × percussive-vs-sustained (`onset_rate ≥ ONSET_PERCUSSIVE`). Gives:
+  low·perc=`kick`, low·sus=`bass` (both `clear` — Sasha confirmed we read the low end reliably), mid·perc=
+  `perc`, high·perc=`hats`, high·sus=`air`. mid·sustained was the honest umbrella **`tonal`** (`approx`) —
+  it DELIBERATELY did not claim melody-vs-pad, because freq+onset can't split those.
+
+- **G13 (0.8.6, THIS pass) — split the `tonal` umbrella into 5 measured buckets** (Sasha's call,
+  2026-06-21: he wants to tell a chord from a melody, and it IS measurable — polyphony). Only the mid·sustained
+  (old `tonal`) case is refined; every other G12 label is unchanged. Two new MEASURES per significant stem:
+  1. **polyphony** — run `basic-pitch` (`transcribe.py`) on each significant non-drum stem →
+     `result_notes_<stem>.json`; `poly_frac` = fraction of the stem's SOUNDING time during which ≥2 notes
+     overlap (interval sweep; deterministic). mono = `poly_frac < POLY_FRAC_MONO_MAX`.
+  2. **per-stem spectral flatness** — `masking.py` computes an energy-weighted mean
+     `librosa.feature.spectral_flatness` per stem (audio already in RAM; one number, no extra audio pass).
+     High flatness = broadband/noisy = no clear pitch.
+  Decision (only on a mid·sustained stem):
+  - flatness ≥ `FLATNESS_NOISE_MIN` → **`noise/air`** (broadband, no pitch to call melody vs chord).
+  - else MONO (`poly_frac < POLY_FRAC_MONO_MAX`): the loudest mono-tonal stem (within `LEAD_MARGIN_DB`
+    of the loudest) → **`lead`**, the quieter ones → **`melody`**. _This loudness split is the WEAKEST
+    of the five (relative loudness, not a content measure) — Sasha was shown this when he chose 5 buckets;
+    it stays `approx` and the JOURNAL flags it for tuning._
+  - else POLY: mean note duration ≥ `PAD_NOTE_DUR_S` → **`pad`** (held), else → **`chord`** (stabs).
+  - **fallback:** a mid·sustained stem with NO transcribed notes (basic-pitch found nothing, or transcribe
+    was skipped) keeps the honest **`tonal`** umbrella — we never invent a melody/chord verdict from
+    missing data (CR-1). All five new labels are `approx`.
+  - **NO vocabulary / NO ML text-prompts** — Sasha explicitly rejected defining prompt vocabularies
+    (he called that "a bit dumb"). Every bucket is a deterministic threshold on a measured quantity.
+  - ⟨DECIDE⟩ thresholds (defaults this pass, to tune on the 3 library tracks): `POLY_FRAC_MONO_MAX`=0.20,
+    `FLATNESS_NOISE_MIN`=0.30, `LEAD_MARGIN_DB`=4.0, `PAD_NOTE_DUR_S`=0.8.
+  - **VERIFY-BY-DEED (2026-06-21, real Fragile stems) — 3 of the 5 buckets NOT yet calibrated, OPEN:**
+    `pad` (mean note dur ≥0.8) never fires — basic-pitch fragments held synths into ~0.2 s notes;
+    `noise` (flatness ≥0.30) never fires — real energy-weighted flatness on harmonic stems is 0.000–0.003;
+    `lead`-vs-`melody` by loudness gave TWO leads. These need better measures (envelope-based held-ness,
+    relative/calibrated flatness, exclusive-loudest lead) before they're defensible. Pending Sasha's scope
+    call. The mono-vs-poly (melody-vs-chord) signal itself IS real (other 0.27 vs vocals 0.06).
+
+- **G14 (0.8.6, THIS pass) — robust freq-ROLE via a HIGH-PASS drop (Sasha's idea, 2026-06-21).** G12 typed
+  the role from the loudest band-group, which broke on real intermittent stems two different ways (found by
+  deed): typing by per-band **median** makes a bass that only hits some beats read as ~silence in every band
+  (its role becomes noise → it got mislabeled mid/"melody"); typing by **loud-level** (85th pct) instead
+  picks up a guitar's loud kick-BLEED in the low and mislabels the guitar "bass" (the exact CR-4 failure).
+  Sasha's fix sidesteps the bleed argument entirely: **high-pass the stem (ignore `sub`+`low`) and ask how
+  much energy it LOSES.** A genuine low/bass stem loses almost everything; a mid stem with bled low keeps
+  its real mid content.
+  - measure (no extra audio pass — reuse the per-band loud-levels): `hp_drop` = full loud-level −
+    high-passed loud-level (combining `low_mid`+`mid`+`hi_mid`+`air`).
+  - rule: a SUSTAINED stem with `hp_drop ≥ HP_DROP_DB` → **`bass`** (low carrier); otherwise it's a mid/high
+    part (→ G13 split, or `air` if its surviving energy sits in `hi_mid`+`air`). Percussive stems keep the
+    G12 onset path (kick/perc/hats).
+  - Use the **relative drop, NOT an absolute residue floor** — verify-by-deed track 2: a loud bass dropped
+    27 dB yet its residue (−42.6) was still above the −55 empty-floor, so a floor rule would have missed it.
+    The drop self-normalizes: bass dropped 22–27 dB on both tracks; every non-bass stem 0–8 dB.
+  - **Leaves CR-4 `leakage_caveats` UNTOUCHED** — role no longer depends on it (it stays only for the
+    separation-panel UI). ⟨DECIDE⟩ default `HP_DROP_DB`=15 (clean gap between 8 and 22 on the two tracks).
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are
 "significant" for repetition. With those, I run product-prover on this SPEC, then derive the §-grids +
 tests, then fix the code (bug → spec → test → code).
 
-## Glossary (his words ↔ internal)
-"красное" = high energy shown on the per-stem band strip · "дроп" = a `Drop`-named scene · "пустой стем"
-= a stem below the validity floor · "синты, не вокал" = the Demucs label ≠ the mapped identity.
+## Glossary (plain-language definitions; expand it whenever a term needed explaining)
+- **red on the band strip** = high energy shown on the per-stem band strip.
+- **drop** = a `Drop`-named scene.
+- **empty stem** = a stem below the validity floor (near-silent; omitted from per-stem analysis).
+- **Demucs label vs identity** = the raw Demucs stem name (`vocals`/`guitar`/…) is NOT the real
+  instrument — Sasha makes electronic music, so a `vocals` stem is usually a synth. We label by measured
+  character, never by the raw name.
+- **bleed** (2026-06-21) = leakage BETWEEN stems. Demucs separation isn't perfect, so a loud part still
+  shows up faintly inside another stem's file — e.g. the kick bleeds into the `guitar` stem's low band.
+  It is NOT audio clipping / "going over the edge"; the levels are small (often only a few dB of a band).
+  Why it matters: a stem can look like it lives in a frequency range that isn't really its own. CR-4
+  (`leakage_caveats`) flags it for the UI; G14 sidesteps it for the freq-role via a high-pass.
+- **high-pass** = ignore the bottom frequencies (sub+low) and look at what's left. We don't filter audio —
+  we already have per-band energy, so "high-pass" = "don't count the bottom bands". Used by G14 to ask
+  "is this really a bass?" by how much loudness vanishes when the bottom is dropped.
+- **polyphony** = how many notes sound at once. ~1 at a time = a melody/lead (monophonic); stacked =
+  chords/pad (polyphonic). Measured from the transcribed notes (basic-pitch).

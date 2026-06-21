@@ -5,6 +5,22 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.6] — 2026-06-21
+
+### Added
+- **Stem character now tells melody from chords.** A sustained mid-range part used to read as the vague
+  "tonal"; it's now labelled from its **polyphony** (notes played one-at-a-time = `melody`, the loudest
+  such line = `lead`; stacked notes = `chord`). Pulled from per-stem note transcription (basic-pitch now
+  runs on every significant non-drum stem, not just `other`). The `pad` and `noise` buckets are scaffolded
+  but intentionally inert until they get a trustworthy measure (note length and spectral flatness don't
+  hold up on real stems yet).
+
+### Fixed
+- **A stem is no longer mislabelled by frequency bleed.** Deciding "is this a bass?" now high-passes the
+  stem and checks how much loudness it loses — a real bass collapses, a mid part with a kick bleeding into
+  its low end keeps its real content. Fixes an intermittent bass reading as "melody" and a guitar (with
+  drum bleed) reading as "bass".
+
 ## [0.8.5] — 2026-06-21
 
 ### Fixed

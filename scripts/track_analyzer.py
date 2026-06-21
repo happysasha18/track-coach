@@ -234,8 +234,27 @@ def cmd_analyze(args):
         rn.step("fast", "drum_breakdown.py", "--drums", stems / "drums.wav",
                 "--out", j("result_drums.json"))
         if not args.skip_transcribe:
+            # `other` is always transcribed (the note panel + the plan all expect result_notes_other.json).
             rn.step("bp", "transcribe.py", "--stem", stems / "other.wav", "--label", "other",
                     "--out", j("result_notes_other.json"))
+            # G13: ALSO transcribe every OTHER significant non-drum stem → build_widget reads the per-stem
+            # notes to measure POLYPHONY and split the honest "tonal" umbrella into melody/lead/chord/pad.
+            # Drums skipped (basic-pitch on percussion is meaningless). Gated through significant_stems()
+            # so we never waste basic-pitch on a near-silent stem (CR-2). Each → result_notes_<stem>.json,
+            # auto-discovered by build_widget. Real runs only (needs masking + the actual wavs on disk).
+            if not args.dry_run and j("result_masking.json").exists():
+                try:
+                    import build_widget as _bw
+                    _msk = json.loads(j("result_masking.json").read_text())
+                    for _st in _bw.significant_stems(_msk):
+                        if _st in ("drums", "other"):
+                            continue
+                        _wav = stems / f"{_st}.wav"
+                        if _wav.exists():
+                            rn.step("bp", "transcribe.py", "--stem", _wav, "--label", _st,
+                                    "--out", j(f"result_notes_{_st}.json"))
+                except Exception as e:  # noqa: BLE001 — per-stem transcription is enrichment, never a hard dep
+                    print(f"  · per-stem transcribe (G13) skipped: {e}", file=sys.stderr)
         # E — web stems: MANDATORY, makes the player + per-stem lanes appear
         rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
         # …and the mix too → mix_web/mix.m4a, so the catalog's one-button preview player works on FULL
