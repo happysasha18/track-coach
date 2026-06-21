@@ -238,8 +238,8 @@ conflict (`masking_flags`: which low stem buries which mid stem, in which band, 
   e.g. *"the bass buries the lead around 250–600 Hz ~18% of the track, worst around 1:18"*. Carries the
   band's frequency range, the `pct_masked`, and the worst flag's time (pinned on the timeline).
 - gated to `significant_stems()` (a near-silent stem like an empty `piano` is never named); the carrier is
-  the masking low stem (`bass`→"bass", `drums`→"kick"). Falls back to the old generic card when stem
-  characters aren't available (no masking/rhythm).
+  the masking low stem named by its character label (`bass`→"bass", `drums`→"drums" since §B.7 — was "kick").
+  Falls back to the old generic card when stem characters aren't available (no masking/rhythm).
 - **EVALUATION (Sasha's metric):** specificity up = fewer generic-type cards, more named-stem/time cards.
   Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
   melody 15%"), piano (empty) dropped.
