@@ -866,5 +866,230 @@ class G17_LateEntryNamesThePart(unittest.TestCase):
                           "late_entry must not fire on a near-silent artifact stem (entering peak below floor)")
 
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G19 — PRECISE masking frequency (Sasha s14, idea a): the coarse band only says THAT the bass buries a
+# part; the per-stem spectra say WHERE inside the band they fight, so the rec names a cut frequency
+# ("≈380 Hz") instead of the whole "250–600 Hz". Defensible: the spot = worst spectral OVERLAP, and we
+# only name it when the buried part actually has energy there; otherwise None → keep the band range.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# A small synthetic log-freq spectrum grid (numpy-free), like masking's SPEC_CENTERS but local to the
+# test so it doesn't pull the numpy-dependent masking module. 8 bins spanning the low_mid band + edges.
+SPEC_FREQS = [60.0, 120.0, 200.0, 300.0, 380.0, 480.0, 700.0, 1200.0]
+LOW_MID = (250, 600)
+
+
+def _flat_spec(db=-40.0):
+    return [float(db)] * len(SPEC_FREQS)
+
+
+def _in_band_idx(band, freqs=SPEC_FREQS):
+    lo, hi = band
+    return [i for i, f in enumerate(freqs) if lo <= f < hi]
+
+
+class G19_PreciseMaskingFreq(unittest.TestCase):
+    def test_picks_the_worst_overlap_bin_in_band(self):
+        idxs = _in_band_idx(LOW_MID)
+        target = idxs[len(idxs) // 2]                         # some bin inside 250–600 Hz
+        masker, maskee = _flat_spec(), _flat_spec()
+        masker[target], maskee[target] = 0.0, -5.0           # both loud here → max min-overlap
+        hz = bw.mask_collision_freq(masker, maskee, LOW_MID, SPEC_FREQS)
+        self.assertEqual(hz, SPEC_FREQS[target])
+
+    def test_freq_lands_inside_the_band(self):
+        idxs = _in_band_idx(LOW_MID)
+        masker, maskee = _flat_spec(-50.0), _flat_spec(-50.0)
+        for i in idxs:                                        # plenty of in-band energy
+            masker[i], maskee[i] = -3.0, -3.0
+        hz = bw.mask_collision_freq(masker, maskee, LOW_MID, SPEC_FREQS)
+        self.assertIsNotNone(hz)
+        self.assertTrue(LOW_MID[0] <= hz < LOW_MID[1])
+
+    def test_ignores_out_of_band_overlap(self):
+        # a loud overlap OUTSIDE the band must not be chosen — only in-band bins count.
+        masker, maskee = _flat_spec(-50.0), _flat_spec(-50.0)
+        masker[0], maskee[0] = 0.0, 0.0                      # 60 Hz — below the band
+        masker[4], maskee[4] = -2.0, -2.0                    # 380 Hz — in band, the only legit pick
+        hz = bw.mask_collision_freq(masker, maskee, LOW_MID, SPEC_FREQS)
+        self.assertEqual(hz, 380.0)
+
+    def test_none_when_a_spectrum_is_silent(self):
+        self.assertIsNone(bw.mask_collision_freq(None, _flat_spec(), LOW_MID, SPEC_FREQS))
+        self.assertIsNone(bw.mask_collision_freq([None] * len(SPEC_FREQS), _flat_spec(), LOW_MID, SPEC_FREQS))
+
+    def test_none_when_buried_part_is_barely_present(self):
+        # the best in-band overlap bin still has the maskee well below its own peak → don't over-claim.
+        target = _in_band_idx(LOW_MID)[0]
+        masker, maskee = _flat_spec(-60.0), _flat_spec(-60.0)
+        masker[target], maskee[target] = 0.0, bw.MASK_FREQ_MIN_LEVEL_DB - 6.0   # below the floor
+        self.assertIsNone(bw.mask_collision_freq(masker, maskee, LOW_MID, SPEC_FREQS))
+
+    def _rec_blob(self, with_spectrum):
+        m = _masking({"bass": {"sub": -18, "low": -20, "low_mid": -22, "mid": -30, "hi_mid": -50, "air": -70},
+                      "lead": {"sub": -80, "low": -70, "low_mid": -30, "mid": -28, "hi_mid": -44, "air": -70}})
+        m["masking_summary"] = {"low_mid__lead": {"pct_masked": 18.0, "flagged_windows": 4,
+                                                  "total_windows": 24, "mean_diff_db": 10.0}}
+        m["masking_flags"] = {"low_mid__lead": [{"low_stem": "bass", "mid_stem": "lead", "time_s": 78.0,
+                                                 "low_db": -22.0, "mid_db": -34.0, "diff_db": 12.0,
+                                                 "window_idx": 15}]}
+        if with_spectrum:
+            bass, lead = _flat_spec(-50.0), _flat_spec(-50.0)
+            bass[4], lead[4] = 0.0, -3.0                      # overlap peak at 380 Hz (index 4)
+            m["spectrum"] = {"bass": bass, "lead": lead}
+            m["spectrum_freqs"] = SPEC_FREQS
+        ch = {"bass": {"label": "bass", "confidence": "clear"},
+              "lead": {"label": "lead", "confidence": "approx"}}
+        recs = bw.build_recommendations(_core(), {}, m, bw.STRINGS, character=ch)
+        return " || ".join(r[1] + " " + r[2] + " " + r[3] + " " + r[4] for r in recs)
+
+    def test_rec_names_precise_freq_when_spectra_pinpoint_it(self):
+        blob = self._rec_blob(with_spectrum=True)
+        self.assertIn("≈380 Hz", blob)
+
+    def test_rec_falls_back_to_band_without_spectra(self):
+        blob = self._rec_blob(with_spectrum=False)
+        self.assertIn("250–600 Hz", blob)
+        self.assertNotIn("≈", blob)
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G20 — per-stem repetition SURFACED as words (CR-6, credibility item (e), 0.8.18). The recurrence number
+# was computed + carried but never spoken. Now one card contrasts the part that EVOLVES (low recurrence,
+# carrying the development) with the ones that LOOP — named by character, never the raw Demucs name, and
+# only when there's a real spread (someone clearly evolves AND someone clearly loops).
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G20_RepetitionSurfacing(unittest.TestCase):
+    def setUp(self):
+        self.m = _masking({"bass": -20, "drums": -22, "guitar": -24})
+        self.ch = {"bass": {"label": "bass", "confidence": "clear"},
+                   "drums": {"label": "drums", "confidence": "clear"},
+                   "guitar": {"label": "guitar", "confidence": "approx"}}
+
+    def _blob(self, repetition, character="default"):
+        ch = self.ch if character == "default" else character
+        recs = bw.build_recommendations(_core(), {}, self.m, bw.STRINGS,
+                                        character=ch, repetition=repetition)
+        return " || ".join(r[1] + " " + r[2] + " " + r[3] + " " + r[4] for r in recs)
+
+    def test_recurrence_computed_from_each_stems_own_selfsim(self):
+        pss = {"bass": _selfsim([0, 20, 40, 60, 80, 100], "ABCDE"),     # all distinct → evolves
+               "drums": _selfsim([0, 20, 40, 60, 80, 100], "ABABA")}    # 2 labels / 5 segs → loops
+        rep = {r["stem"]: r["recurrence"] for r in bw.stem_repetition(pss, self.m)}
+        self.assertEqual(rep["bass"], 0.0)
+        self.assertGreater(rep["drums"], 0.5)
+
+    def test_card_fires_on_a_real_spread_and_names_parts(self):
+        rep = [{"stem": "bass", "recurrence": 0.14}, {"stem": "drums", "recurrence": 0.55},
+               {"stem": "guitar", "recurrence": 0.60}]
+        blob = self._blob(rep)
+        self.assertIn("carrying the development", blob)
+        self.assertIn("bass", blob)        # the evolver
+        self.assertIn("drums", blob)       # a looper
+        self.assertIn("guitar", blob)      # a looper
+        self.assertIn("0.14", blob)        # the measured recurrence is shown
+
+    def test_no_card_when_everything_loops(self):
+        rep = [{"stem": "bass", "recurrence": 0.52}, {"stem": "drums", "recurrence": 0.55},
+               {"stem": "guitar", "recurrence": 0.60}]
+        self.assertNotIn("carrying the development", self._blob(rep))
+
+    def test_no_card_when_nothing_loops(self):
+        rep = [{"stem": "bass", "recurrence": 0.05}, {"stem": "drums", "recurrence": 0.10}]
+        self.assertNotIn("carrying the development", self._blob(rep))
+
+    def test_never_names_a_stem_without_a_character_label(self):
+        # the would-be evolver has no character label → must be skipped, not named by its raw stem key.
+        rep = [{"stem": "bass", "recurrence": 0.10}, {"stem": "drums", "recurrence": 0.55},
+               {"stem": "guitar", "recurrence": 0.60}]
+        ch = {"drums": {"label": "drums"}, "guitar": {"label": "guitar"}}   # no 'bass' label
+        self.assertNotIn("carrying the development", self._blob(rep, character=ch))
+
+    def test_no_card_without_character(self):
+        rep = [{"stem": "bass", "recurrence": 0.14}, {"stem": "drums", "recurrence": 0.55}]
+        self.assertNotIn("carrying the development", self._blob(rep, character=None))
+
+    def test_dedupes_shared_loop_labels_no_salad(self):
+        # two loopers share the 'mid' label (real on Lazy_Sparks: other+guitar) → "the mid, the mid" is the
+        # salad Sasha killed; must collapse to one "the mid".
+        m = _masking({"bass": -20, "other": -22, "guitar": -24, "drums": -23})
+        ch = {"bass": {"label": "bass"}, "other": {"label": "mid"},
+              "guitar": {"label": "mid"}, "drums": {"label": "drums"}}
+        rep = [{"stem": "bass", "recurrence": 0.14}, {"stem": "other", "recurrence": 0.50},
+               {"stem": "guitar", "recurrence": 0.60}, {"stem": "drums", "recurrence": 0.54}]
+        blob = bw.build_recommendations(_core(), {}, m, bw.STRINGS, character=ch, repetition=rep)
+        text = " ".join(r[2] + " " + r[3] + " " + r[4] for r in blob)
+        self.assertIn("carrying the development", text)
+        self.assertNotIn("the mid, the mid", text)
+        self.assertNotIn("the mid the mid", text)
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# G21 — "Where does it get boring?" (Sasha, 2026-06-22). For an EVOLVING track, the onset after which no
+# NEW section is introduced (everything after only recombines earlier material). Measured from the self-sim
+# segment letters; gated so it never fires on a track that doesn't develop, nor when new ideas keep arriving.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+class G21_DevelopmentPlateau(unittest.TestCase):
+    def _plat(self, letters, dur=None):
+        n = len(letters)
+        dur = dur if dur is not None else n * 10.0
+        edges = [round(i * dur / n, 2) for i in range(n + 1)]
+        return bw.development_plateau(_selfsim(edges, letters), dur)
+
+    def test_fires_when_it_develops_then_plateaus(self):
+        # A B C D C D C : last NEW = D (4th of 7 segs) → tail 3/7 ≈ 0.43; 4 distinct sections.
+        p = self._plat("ABCDCDC")
+        self.assertIsNotNone(p)
+        self.assertEqual(p["n_sections"], 4)
+        self.assertGreaterEqual(p["tail_frac"], 0.30)
+        self.assertAlmostEqual(p["onset_s"], 4 / 7 * 70.0, places=1)   # end of the 4th segment
+
+    def test_none_when_new_material_keeps_arriving(self):
+        self.assertIsNone(self._plat("ABCDE"))        # every section new → last-new at the very end
+        self.assertIsNone(self._plat("ABCDEC"))       # a new E lands near the end → not a plateau
+
+    def test_none_when_it_does_not_develop_enough(self):
+        self.assertIsNone(self._plat("ABAB"))         # only 2 distinct sections
+        self.assertIsNone(self._plat("AAAA"))         # 1 section
+
+    def test_surfaced_as_a_timed_card(self):
+        ss = _selfsim([0, 20, 40, 60, 80, 100, 120], "ABCDCD")
+        core = {"duration_s": 120.0, "time_bins": [], "section_bounds_s": [], "energy": [], "energy_trend": None}
+        recs = bw.build_recommendations(core, {}, None, bw.STRINGS, selfsim=ss)
+        plat = [r for r in recs if "new ideas stop" in r[1]]
+        self.assertEqual(len(plat), 1)
+        self.assertIsNotNone(plat[0][5])              # anchored to the onset time on the timeline
+
+    def test_no_card_without_selfsim(self):
+        core = {"duration_s": 120.0, "time_bins": [], "section_bounds_s": [], "energy": [], "energy_trend": None}
+        recs = bw.build_recommendations(core, {}, None, bw.STRINGS, selfsim=None)
+        self.assertFalse([r for r in recs if "new ideas stop" in r[1]])
+
+
+class EvalRecSpecificityMetrics(unittest.TestCase):
+    """Guards the measuring stick used by scripts/eval_rec_specificity.py (NEXT_STEPS #2 eval), so the
+    'per-stem is more specific' claim rests on a counting rule that means what it says."""
+    def setUp(self):
+        import eval_rec_specificity as ev
+        self.ev = ev
+
+    def _rec(self, text, t=None):
+        return ("do", "H", text, "", "", t)   # (cls, header, title, body, fix, time)
+
+    def test_counts_named_timed_freq(self):
+        recs = [self._rec("the bass buries the mid around ≈270 Hz", t=78.0),  # named+timed+freq
+                self._rec("energy is flat", t=None),                          # none of the three
+                self._rec("the drums loop", t=12.0)]                          # named+timed
+        m = self.ev._metrics(recs)
+        self.assertEqual(m["total"], 3)
+        self.assertEqual(m["named"], 2)
+        self.assertEqual(m["timed"], 2)
+        self.assertEqual(m["freq"], 1)
+
+    def test_freq_regex_matches_hz_and_khz(self):
+        self.assertTrue(self.ev.FREQ_RE.search("cut at ≈380 Hz"))
+        self.assertTrue(self.ev.FREQ_RE.search("around ≈1.2 kHz here"))
+        self.assertIsNone(self.ev.FREQ_RE.search("the 250–600 Hz band"))   # a plain band range, not a spot
+
+
 if __name__ == "__main__":
     unittest.main()

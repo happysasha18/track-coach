@@ -215,6 +215,7 @@ def cmd_analyze(args):
                     _wav = stems / f"{_st}.wav"
                     if _wav.exists():
                         rn.step("fast", "self_similarity.py", _wav, "--out", j(f"result_selfsim_{_st}.json"))
+                        rn.step("fast", "analyze_core.py", _wav, "--out", j(f"result_core_{_st}.json"))
             except Exception as e:  # noqa: BLE001 — per-stem repetition is an enrichment, never a hard dep
                 print(f"  · per-stem self-sim skipped: {e}", file=sys.stderr)
         # B — stem<->project map: needs the .als AND the render offset (defaulted above)
@@ -324,19 +325,49 @@ def _update_meta(out_dir: Path, fields: dict):
     mp.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
 
 
+def _humanize_audio_name(path):
+    """Audio filename → a human track title. Pure & testable.
+    'Total_Reboot_-_Shared_Memories_[2026_version].mp3' → 'Total Reboot — Shared Memories [2026 version]'."""
+    if not path:
+        return None
+    stem = Path(str(path)).stem                       # drop dir + extension
+    stem = re.sub(r"_-_|_-|-_", " — ", stem)          # '_-_' separators → em dash
+    stem = stem.replace("_", " ")
+    stem = re.sub(r"\s+", " ", stem).strip()
+    return stem or None
+
+
+def _title_from_audio(meta: dict, run_dir):
+    """Best-effort track name from the source audio when run_meta carries no title.
+    meta['audio'] → the stems manifest's mix_path → None."""
+    audio = meta.get("audio")
+    if not audio:
+        for sd in ("stems_6s", "stems", "stems_web"):
+            mf = Path(run_dir) / sd / "stems_manifest.json"
+            if mf.exists():
+                try:
+                    audio = json.loads(mf.read_text()).get("mix_path")
+                except (ValueError, OSError):
+                    audio = None
+                if audio:
+                    break
+    return _humanize_audio_name(audio)
+
+
 def resolve_build_inputs(meta: dict, run_dir, *, title=None, verdict=None, narrative=None):
     """Decide title / verdict / narrative for a (re)build. Pure & testable.
 
     Precedence per field: explicit flag > persisted run_meta > derived/auto. A bare `build`
     (no flags) must NEVER silently drop what a previous build set — that exact regression
     (title vanished, narrative vanished on rebuild) is what these rules + their tests guard.
-      • title:     flag → meta['title'] → "<track> <version>" → None
+      • title:     flag → meta['title'] → "<track> <version>" → humanized audio name → None
       • verdict:   flag → meta['verdict'] → None
       • narrative: flag → <run_dir>/narrative.md if it exists → None
     """
     run_dir = Path(run_dir)
-    rt = title or meta.get("title") or (
-        f"{meta.get('track','')} {meta.get('track_version','')}".strip() or None)
+    rt = (title or meta.get("title")
+          or (f"{meta.get('track','')} {meta.get('track_version','')}".strip() or None)
+          or _title_from_audio(meta, run_dir))
     rv = verdict or meta.get("verdict")
     nar_default = run_dir / "narrative.md"
     nar = narrative or (str(nar_default) if nar_default.exists() else None)

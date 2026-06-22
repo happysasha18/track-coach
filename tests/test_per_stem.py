@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""Per-stem measurements core (SPEC §B.11 / CR-11, matrix INV-23..27). Pure functions, numpy-free.
+
+The credibility design Sasha insisted on: a stem only speaks when it DIVERGES from the REST of the
+track (not the full mix, which contains it), and cards earn their slot by an OBJECTIVE importance
+score — no per-track human approval. These tests pin those rules before the UI wires them.
+"""
+import sys, unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import build_widget as bw  # noqa: E402
+
+
+class RestCurve(unittest.TestCase):
+    """The comparison baseline is the mix MINUS this stem (prover F1) — built from the OTHER stems."""
+    def test_excludes_the_target_stem(self):
+        curves = {"bass": [1, 1, 1], "drums": [2, 2, 2], "lead": [4, 4, 4]}
+        self.assertEqual(bw.rest_curve(curves, "bass"), [3.0, 3.0, 3.0])  # mean of drums+lead
+
+    def test_single_stem_has_no_rest(self):
+        self.assertIsNone(bw.rest_curve({"bass": [1, 2, 3]}, "bass"))  # nothing to compare to
+
+    def test_unknown_target_uses_all(self):
+        # defensive: target not present → average of everything (still a valid baseline)
+        self.assertEqual(bw.rest_curve({"a": [2, 2], "b": [4, 4]}, "zzz"), [3.0, 3.0])
+
+
+class Divergence(unittest.TestCase):
+    """Shape comparison, scale-invariant (a stem sits far below the mix in absolute level)."""
+    def test_identical_shape_is_zero(self):
+        self.assertAlmostEqual(bw.divergence([1, 2, 3, 4], [1, 2, 3, 4]), 0.0)
+
+    def test_scaled_shape_is_still_zero(self):  # same shape, different level → not a divergence
+        self.assertAlmostEqual(bw.divergence([1, 2, 3, 4], [10, 20, 30, 40]), 0.0)
+
+    def test_opposite_shape_is_one(self):
+        self.assertAlmostEqual(bw.divergence([1, 2, 3, 4], [4, 3, 2, 1]), 1.0)
+
+    def test_flat_baseline_gives_no_signal(self):  # can't measure shape vs a flat line → don't cry wolf
+        self.assertEqual(bw.divergence([1, 2, 3, 4], [5, 5, 5, 5]), 0.0)
+
+    def test_too_short_gives_no_signal(self):
+        self.assertEqual(bw.divergence([1], [2]), 0.0)
+
+
+class CandidateScore(unittest.TestCase):
+    """Objective usefulness: big · persistent · specific · non-redundant. No human approval (Sasha)."""
+    def test_fully_redundant_scores_zero(self):  # restates the mix → ~0
+        self.assertEqual(bw.candidate_score(divergence=0.9, persistence=0.9,
+                                            specificity=0.9, redundancy=1.0), 0.0)
+
+    def test_strong_unique_card_scores_high(self):
+        s = bw.candidate_score(divergence=1.0, persistence=1.0, specificity=1.0, redundancy=0.0)
+        self.assertGreaterEqual(s, 0.95)
+
+    def test_more_divergence_scores_higher(self):
+        lo = bw.candidate_score(divergence=0.2, persistence=0.5, specificity=0.5, redundancy=0.0)
+        hi = bw.candidate_score(divergence=0.8, persistence=0.5, specificity=0.5, redundancy=0.0)
+        self.assertGreater(hi, lo)
+
+    def test_score_is_bounded_0_1(self):
+        for d in (0.0, 0.5, 1.0):
+            s = bw.candidate_score(divergence=d, persistence=d, specificity=d, redundancy=0.0)
+            self.assertGreaterEqual(s, 0.0)
+            self.assertLessEqual(s, 1.0)
+
+
+class Persistence(unittest.TestCase):
+    """How much of the track the divergence holds — opposite sides of their own means."""
+    def test_fully_opposite_is_one(self):
+        self.assertAlmostEqual(bw._persistence([1, 2, 3, 4], [4, 3, 2, 1]), 1.0)
+
+    def test_identical_is_zero(self):
+        self.assertAlmostEqual(bw._persistence([1, 2, 3, 4], [1, 2, 3, 4]), 0.0)
+
+
+class DivergenceCandidates(unittest.TestCase):
+    """Integrate the core: per stem × measure, compare to the REST and emit a scored candidate."""
+    def test_one_stem_diverges_others_flat_baseline(self):
+        cores = {"bass":  {"energy": [1, 2, 3, 4]},
+                 "drums": {"energy": [4, 3, 2, 1]},
+                 "lead":  {"energy": [4, 3, 2, 1]}}
+        cands = bw.stem_divergence_candidates(cores, measures=("energy",))
+        # bass runs opposite the rest (drums+lead) → one candidate; the others' baseline is flat → none
+        self.assertEqual([c["stem"] for c in cands], ["bass"])
+        self.assertEqual(cands[0]["measure"], "energy")
+        self.assertGreaterEqual(cands[0]["divergence"], 0.99)
+
+    def test_all_moving_together_yields_nothing(self):
+        cores = {"a": {"energy": [1, 2, 3]}, "b": {"energy": [1, 2, 3]}, "c": {"energy": [1, 2, 3]}}
+        self.assertEqual(bw.stem_divergence_candidates(cores, measures=("energy",)), [])
+
+    def test_sorted_by_score_desc(self):
+        cores = {"bass":  {"energy": [1, 2, 3, 4], "density": [1, 1.1, 1.2, 1.0]},
+                 "drums": {"energy": [4, 3, 2, 1], "density": [4, 3, 2, 1]},
+                 "lead":  {"energy": [4, 3, 2, 1], "density": [4, 3, 2, 1]}}
+        cands = bw.stem_divergence_candidates(cores, measures=("energy", "density"))
+        scores = [c["score"] for c in cands]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+
+class BudgetAndDiversity(unittest.TestCase):
+    """Top by score up to a TOTAL budget, with a diversity rule so one stem can't hog the list."""
+    def _c(self, stem, score):
+        return {"stem": stem, "measure": "energy", "divergence": score, "score": score}
+
+    def test_budget_limits_total(self):
+        cands = [self._c("bass", 0.9), self._c("lead", 0.8), self._c("drums", 0.7)]
+        self.assertEqual(len(bw.select_cards(cands, budget=2)), 2)
+
+    def test_diversity_lets_a_weaker_other_stem_in(self):
+        cands = [self._c("bass", 0.9), self._c("bass", 0.85), self._c("bass", 0.8),
+                 self._c("lead", 0.4)]
+        out = bw.select_cards(cands, budget=3, per_stem_cap=2)
+        stems = sorted(c["stem"] for c in out)
+        self.assertEqual(stems, ["bass", "bass", "lead"])  # 2 bass capped, lead promoted over 3rd bass
+
+    def test_fills_budget_when_one_stem_dominates(self):
+        cands = [self._c("bass", 0.9), self._c("bass", 0.85), self._c("bass", 0.8)]
+        # only bass exists → the cap must not starve the budget
+        self.assertEqual(len(bw.select_cards(cands, budget=3, per_stem_cap=2)), 3)
+
+    def test_zero_budget_is_empty(self):
+        self.assertEqual(bw.select_cards([self._c("bass", 0.9)], budget=0), [])
+
+
+class Trend(unittest.TestCase):
+    def test_rising_is_positive_flat_is_zero(self):
+        self.assertGreater(bw._trend([1, 2, 3, 4, 5, 6]), 0.3)
+        self.assertEqual(bw._trend([3, 3, 3, 3]), 0.0)
+        self.assertLess(bw._trend([6, 5, 4, 3, 2, 1]), -0.3)
+
+
+class CompositeCandidates(unittest.TestCase):
+    """Cross-signal cards: a stem moving against the whole track (Sasha's composite idea)."""
+    def test_stem_thins_as_track_builds(self):
+        mix = {"energy": [1, 2, 3, 4, 5, 6]}
+        stems = {"drums": {"density": [6, 5, 4, 3, 2, 1]}}
+        out = bw.composite_candidates(mix, stems)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["relation"], "thins_as_track_builds")
+        self.assertEqual(out[0]["stem"], "drums")
+
+    def test_moving_together_yields_nothing(self):
+        mix = {"energy": [1, 2, 3, 4, 5, 6]}
+        stems = {"drums": {"density": [1, 2, 3, 4, 5, 6]}}
+        self.assertEqual(bw.composite_candidates(mix, stems), [])
+
+
+def _fake_masking(levels_db):
+    """A minimal masking dict with one controllable level per stem: all energy in one band, constant
+    across windows, so loud_level(stem_broadband_db(...)) == the given dB. Lets us drive the
+    significance gate + prominence weight without real audio."""
+    n = 4
+    return {"stems_analysed": list(levels_db),
+            "total_windows": n,
+            "band_rms_db": {st: {"low": [db] * n} for st, db in levels_db.items()}}
+
+
+class Prominence(unittest.TestCase):
+    """Near-silent stems rank BELOW louder ones (Sasha 2026-06-22): a quiet part's card earns less budget,
+    so it sorts lower — a soft down-rank, never a drop."""
+    def test_lower_prominence_scores_lower(self):
+        loud = bw.candidate_score(divergence=0.8, persistence=0.8, specificity=0.5,
+                                  redundancy=0.0, prominence=1.0)
+        quiet = bw.candidate_score(divergence=0.8, persistence=0.8, specificity=0.5,
+                                   redundancy=0.0, prominence=0.4)
+        self.assertGreater(loud, quiet)
+
+    def test_default_prominence_is_neutral(self):  # back-compat: omitting it changes nothing
+        a = bw.candidate_score(divergence=0.6, persistence=0.6, specificity=0.6, redundancy=0.0)
+        b = bw.candidate_score(divergence=0.6, persistence=0.6, specificity=0.6,
+                               redundancy=0.0, prominence=1.0)
+        self.assertEqual(a, b)
+
+    def test_quiet_stem_ranks_below_loud_stem_at_equal_divergence(self):
+        # `loud` and `quiet` diverge from the rest IDENTICALLY; only loudness differs → loud sorts first
+        cores = {"loud":  {"energy": [1, 2, 3, 4]},
+                 "quiet": {"energy": [1, 2, 3, 4]},
+                 "restA": {"energy": [4, 3, 2, 1]},
+                 "restB": {"energy": [4, 3, 2, 1]}}
+        levels = {"loud": 1.0, "quiet": 0.4}
+        cands = bw.stem_divergence_candidates(cores, measures=("energy",), levels=levels)
+        order = [c["stem"] for c in cands]
+        self.assertLess(order.index("loud"), order.index("quiet"))
+
+    def test_stem_prominence_relative_to_loudest(self):
+        prom = bw.stem_prominence(_fake_masking({"kick": -8.0, "pad": -20.0}))
+        self.assertEqual(prom["kick"], 1.0)            # loudest stem → full weight
+        self.assertLess(prom["pad"], prom["kick"])     # quieter stem → down-weighted
+        self.assertGreaterEqual(prom["pad"], bw.PROMINENCE_FLOOR)
+
+    def test_empty_masking_yields_no_weights(self):    # → every stem defaults to full weight downstream
+        self.assertEqual(bw.stem_prominence(None), {})
+
+
+class CompositeCardWording(unittest.TestCase):
+    """Composite candidates (stem vs whole track) are now WORDED into the pool, named by character (0.8.23)."""
+    def test_composite_card_worded_and_named_by_character(self):
+        cores = {"drums": {"density": [6, 5, 4, 3, 2, 1]}}     # one stem → no divergence pair; composite fires
+        mix = {"energy": [1, 2, 3, 4, 5, 6]}
+        cards = bw.per_stem_cards(cores, mix_core=mix, character={"drums": {"label": "the beat"}})
+        self.assertTrue(cards)
+        heads = " ".join(c[2] for c in cards)
+        self.assertIn("the beat", heads)              # named by character label
+        self.assertNotIn("drums", heads)              # never the raw Demucs stem
+        self.assertTrue(all(c[5] is None for c in cards))  # Detailed-only: no timecode
+
+
+class PerStemCards(unittest.TestCase):
+    """Candidates → worded rec tuples; Detailed-only (no timecode) and named by character, not raw stem."""
+    def test_empty_input_no_cards(self):
+        self.assertEqual(bw.per_stem_cards({}), [])
+
+    def test_words_the_part_by_character_label_not_raw_stem(self):
+        cores = {"other": {"brightness": [1, 2, 3, 4]},
+                 "drums": {"brightness": [4, 3, 2, 1]},
+                 "bass":  {"brightness": [4, 3, 2, 1]}}
+        cards = bw.per_stem_cards(cores, character={"other": {"label": "lead"}})
+        self.assertTrue(cards)
+        cls, when, head, body, fix, t = cards[0]
+        self.assertEqual(cls, "concept")
+        self.assertIsNone(t)                      # no timecode → hidden in Simple, shown in Detailed
+        self.assertIn("lead", head)               # named by character label
+        self.assertNotIn("other", head)           # never the raw Demucs stem name
+
+
+if __name__ == "__main__":
+    unittest.main()

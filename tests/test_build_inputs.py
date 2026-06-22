@@ -9,7 +9,8 @@ import sys, tempfile, unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-from track_analyzer import resolve_build_inputs, pick_inherit_source, inherit_prior_read  # noqa: E402
+from track_analyzer import (resolve_build_inputs, pick_inherit_source,  # noqa: E402
+                            inherit_prior_read, _humanize_audio_name)
 
 
 class TitleVerdict(unittest.TestCase):
@@ -41,6 +42,32 @@ class TitleVerdict(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             r = resolve_build_inputs({}, d)
         self.assertIsNone(r["title"])
+
+
+class TrackNameFromAudio(unittest.TestCase):
+    """The header must show the track NAME, never the BPM. Shared_Memories had no title/track
+    in run_meta, so the title fell through to None and the widget invented '123 BPM · 5:38' as
+    the heading (Sasha 2026-06-22: "это БПМ а не имя трека!!"). Fix: derive the name from the
+    source audio filename."""
+    def test_humanize_audio_filename(self):
+        self.assertEqual(
+            _humanize_audio_name("/x/y/Total_Reboot_-_Shared_Memories_[2026_version].mp3"),
+            "Total Reboot — Shared Memories [2026 version]")
+        self.assertEqual(_humanize_audio_name("Lazy_Sparks.wav"), "Lazy Sparks")
+        self.assertIsNone(_humanize_audio_name(None))   # nothing to humanize → None
+
+    def test_title_derived_from_audio_when_meta_has_no_name(self):
+        # the Shared_Memories case: no title, no track, but the run knows its audio
+        meta = {"audio": "/p/Total_Reboot_-_Shared_Memories_[2026_version].mp3"}
+        with tempfile.TemporaryDirectory() as d:
+            r = resolve_build_inputs(meta, d)
+        self.assertEqual(r["title"], "Total Reboot — Shared Memories [2026 version]")
+
+    def test_derived_title_is_never_a_bpm_string(self):
+        meta = {"audio": "/p/My_Track.mp3"}
+        with tempfile.TemporaryDirectory() as d:
+            r = resolve_build_inputs(meta, d)
+        self.assertNotIn("BPM", r["title"])
 
 
 class Narrative(unittest.TestCase):

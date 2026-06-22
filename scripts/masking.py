@@ -87,7 +87,11 @@ def load_stem(path: str) -> tuple:
 # ── per-stem FREQUENCY ANALYZER (Sasha's idea, s14): a real spectral profile per stem, like the mix
 # gets, but per stem. Finer than the 6 coarse bands → feeds a future per-stem spectrum viz + firmer
 # role detection (the crude 6-band high-pass mislabeled a synth bass). Additive: does NOT change labels.
-SPEC_NBINS = 32
+# 64 bins (~6.6/octave), bumped from 32 in 0.8.20 (Sasha s14 idea a, the finer-частотник). Verified by
+# deed: at 32 bins (~3.3/oct) two different low-mid clashes (bass↔other, bass↔guitar) both snapped to ≈270
+# Hz — the grid was too coarse to tell them apart; at ≥48 bins they separate (other ≈290, guitar ≈260) and
+# stay STABLE through 96. 64 = clearly better discrimination, stable, not so fine it chases spectral spikes.
+SPEC_NBINS = 64
 SPEC_FMIN, SPEC_FMAX = 20.0, 16000.0
 SPEC_EDGES = np.logspace(np.log10(SPEC_FMIN), np.log10(SPEC_FMAX), SPEC_NBINS + 1)
 SPEC_CENTERS = [round(float(np.sqrt(SPEC_EDGES[i] * SPEC_EDGES[i + 1])), 1) for i in range(SPEC_NBINS)]

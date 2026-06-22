@@ -14,8 +14,7 @@ track-coach reads a producer's track + Ableton project and tells them, in plain 
 actually happening** in the music — the arc, the masking, the arrangement — so they can decide what to
 change. Its whole value is **trust**: a true, specific reading they can act on.
 
-**The current gap (Sasha, 2026-06-20):** "оно тикает и выдаёт похожие на правду СЛОВА, а копнёшь —
-неубедительно." It produces plausible-sounding words that don't survive scrutiny. So **before** any
+**The current gap (Sasha, 2026-06-20):** "it ticks along and produces plausible-sounding WORDS, but the moment you dig in — it falls apart." It produces plausible-sounding words that don't survive scrutiny. So **before** any
 composition / coaching features, the numbers behind the words must be made defensible. This SPEC's first
 job is that credibility layer.
 
@@ -24,7 +23,7 @@ job is that credibility layer.
   stereo width, tonal balance, vitals). Has a unit and a valid range.
 - **stem** — a Demucs-separated layer. Carries a **significance** state and a **mapped identity**.
   - **significance (Sasha, 2026-06-20):** a stem is SIGNIFICANT iff it has enough information in BOTH
-    axes — **loudness AND time**. Quiet-all-the-time, or one loud "писк" (transient) in silence, is NOT
+    axes — **loudness AND time**. Quiet-all-the-time, or one loud "blip" (transient) in silence, is NOT
     significant. So the gate is **temporal coverage** — the fraction of the track where the stem is above
     a dB floor (or its real onset activity over time) — not a single peak. (This corrects a peak-only
     test: e.g. a stem with median −76 dB but one −16 dB stab is NOT significant; one with steady onsets
@@ -67,11 +66,11 @@ matrix cell + test once Sasha confirms the ⟨DECIDE⟩ points):
 - **CR-5 — scene names are MUSICAL (read from curve DYNAMICS), not relative-loudness.**
   **Definition (pinned 2026-06-20 — standard EDM term, written down for precision):** a **Drop** is the
   high-energy RELEASE that enters right after a build/breakdown — energy goes UP ("the bass drops IN",
-  not down). The dip/tension before it (the "яма перед поднятием") is the **Build/Breakdown**. So a
+  not down). The dip/tension before it (the "dip before the lift") is the **Build/Breakdown**. So a
   Drop is **defined by the contrast**: a lower section immediately precedes a top-band section. Without a
   preceding dip/build it is not a Drop — just a loud section.
   Today's bug: `build_widget.py:769` calls any section ≥0.8 of peak a Drop (`tier = ti / mx`, relative),
-  ignoring the required preceding яма → a continuously-loud track reads as "весь из дропов." The signal
+  ignoring the required preceding dip → a continuously-loud track reads as "all drops." The signal
   lives in the **shape** of the curve (fall/build → sharp return + family entrance + density jump), read
   **in aggregate** — the hard call belongs to the interpretation layer (the LLM reading the real curves),
   NOT a hand-coded threshold; guarded by the necessary-condition tests in §D. Prefer labelling the
@@ -85,9 +84,9 @@ matrix cell + test once Sasha confirms the ⟨DECIDE⟩ points):
     everything." Accurate structure source = the **self-sim segmentation** (`result_selfsim.json`, 11
     segments: `A B C D C E C E C F A`), not the coarse section_bounds. Build scenes from self-sim.
   - **CR-5b: energy alone misses breakdowns.** An energy-dip→rise detector found ZERO transitions here —
-    the E "ямы" are timbral/density shifts, not energy valleys (self-sim/MFCC catches them, energy
+    the E "dips" are timbral/density shifts, not energy valleys (self-sim/MFCC catches them, energy
     doesn't). Confirms the call must be **aggregate** (self-sim boundary + energy + density + family
-    entrance), per "смотреть на данные в совокупности".
+    entrance), per "read the data in aggregate".
 
 - **CR-6 — repetition is read on the significant stems too.** Self-similarity / returns are computed on
   the non-empty stems, not only the mix, so "this part returns" is grounded in real recurring material.
@@ -129,10 +128,16 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
   Layer-1 uses per-band MEDIANS, not windows — CR-4a's time-windowing is a later refinement.
 - **CR-7 (G10) DONE (as a lock):** the map panel already states a project family only on a `clear` verdict
   (only `map_clear` carries `{fam}`); G10 prevents a non-clear verdict from ever naming one. No new UI.
-- **CR-6 (G11) COMPUTED, SURFACING OPEN:** `stem_repetition()` reads each significant stem's own self-sim
-  (recurrence 0..1), gated by `significant_stems()`; the pipeline writes `result_selfsim_<stem>.json` for
-  significant stems and build_widget auto-discovers them. Worded surfacing deferred — it must use
-  stem→real-name mapping (never raw Demucs labels) and is Sasha's design call.
+- **CR-6 (G11) COMPUTED, then SURFACED (G20, 0.8.18).** `stem_repetition()` reads each significant stem's
+  own self-sim (recurrence 0..1), gated by `significant_stems()`; the pipeline writes `result_selfsim_<stem>.json`
+  for significant stems and build_widget auto-discovers them. **Surfacing (G20):** one "Development · what
+  carries it vs what loops" card contrasts the part that EVOLVES (recurrence ≤ `EVOLVE_MAX_RECURRENCE`=0.25,
+  carrying the development) with the ones that LOOP (≥ `LOOP_MIN_RECURRENCE`=0.45). Honest-naming rules: parts
+  named by their character label, never the raw Demucs name (a stem with no label is skipped); shared labels
+  are DEDUPED ("the mid, the mid" → "the mid", the §B.7 salad). Fires only on a real spread (someone clearly
+  evolves AND someone clearly loops) and only when characters exist. Verified by deed on Lazy_Sparks: *"The
+  bass keeps changing (recurrence 0.14) — carrying the development — while the mid and the drums mostly loop."*
+  Tests: `G20_RepetitionSurfacing` (7). ⟨DECIDE⟩ the two thresholds (tune as tracks land).
 
 ### B.4 Stem CHARACTER labels (0.8.3 → 0.8.6, 2026-06-21 — G12, G13)
 > ⚠ **SUPERSEDED FOR THE DISPLAYED LABEL by §B.7 (0.8.11) + §B.8/G18 (0.8.15).** The displayed label no
@@ -274,7 +279,7 @@ stem is a synth, etc.) exactly as the masking card did before G16.
   fires on a stem whose entering peak is below the empty floor.
 
 ### B.7 ONE plain label per stem — kill the label salad (0.8.11, Sasha s14)
-Sasha, looking at the real Lazy_Sparks render: *"что за салат?"* The stem area had THREE overlapping,
+Sasha, looking at the real Lazy_Sparks render: *"what is this salad?"* The stem area had THREE overlapping,
 half-confident systems stacked on each stem — (1) measured `character` with a `≈` "uncertain" prefix,
 (2) the stem↔project map verdict (which ALSO used `≈`, meaning the OPPOSITE — "matches a family"), and
 (3) per-stem repetition letters. Worse, the headline character often degraded: on Lazy_Sparks the **bass
@@ -288,7 +293,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   untrusted and is read by measurement ([[track-coach-stem-labels]]).
 - **Character only when confident; else the base role.** A confident G13 determination (lead/melody/
   chord/pad) shows; otherwise the stem shows its plain **base role ("mid"/"high")** — never the jargon
-  "tonal", never a `≈`-uncertain marker (Sasha: *"если не уверен, просто базовая роль"*).
+  "tonal", never a `≈`-uncertain marker (Sasha: *"if not sure, just the base role"*).
 - **No raw Demucs name in the lane label, ever.** No character ⇒ "near-silent" (the stem is empty),
   never `L.name`.
 - **Sub-line = the REAL project track, never the raw Demucs name (0.8.12/0.8.13, updated from the 0.8.11
@@ -315,7 +320,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   "Guitar / Guitar").
 
 ### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Sasha's idea, s14)
-Sasha (s14): *"ты ж можешь и частотный анализатор гонять на каждый стем."* We already run full spectral
+Sasha (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
 analysis on the MIX; per stem we only had 6 coarse bands + flatness. So `masking.py:stem_spectrum(y)` now
 computes, per stem (reusing the loaded audio, one extra STFT):
 - **spectral centroid** (Hz) — energy-weighted "centre of gravity" of the spectrum = where the stem's
@@ -338,7 +343,148 @@ computes, per stem (reusing the loaded audio, one extra STFT):
   asked Sasha):** should an UNTRUSTED low-centroid stem read `bass`, or a neutral `low` so "bass" stays
   identity-only? Currently it reads `bass` (honest about the frequency range it occupies).
 - IDEA (Sasha s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
-  the bass") — see NEXT_STEPS.
+  the bass") — **DONE: §B.9 (G19) named the spot; 0.8.20 bumped the grid 32→64 bins** (see §B.9 note).
+
+### B.9 PRECISE masking frequency — name the cut spot, not the whole band (G19, 0.8.17, Sasha's idea a)
+The §B.5 masking card said *"the bass buries the lead around **250–600 Hz**"* — the whole coarse band, the
+same range for every conflict. Sasha's s14 idea (a): the per-stem spectra (§B.8 `spectrum`/`spectrum_freqs`)
+already say WHERE inside the band the two parts fight, so the card can name a cut frequency.
+- **Mechanism (`build_widget.mask_collision_freq`, pure-python so the build stays numpy-free):** within the
+  zone's band, the collision sits where the OVERLAP of the two peak-normalised spectra is greatest —
+  `min(masker_db, maskee_db)` is large only where BOTH stems have energy at that bin. Pick that bin's
+  centre frequency. Computed at REC time from the masking JSON (not stored), so no `masking.py` change.
+- **Credibility gate (CR — "don't over-claim"):** name a precise frequency ONLY when the buried part
+  genuinely has energy at that bin (its level ≥ `MASK_FREQ_MIN_LEVEL_DB` = −24 dB of its own peak).
+  Otherwise → `None`, and the card KEEPS the coarse band range. Pre-0.8.14 jsons (no `spectrum`) also fall
+  back. So the card never invents a spot the maskee isn't in.
+- **After (G19):** *"the bass is louder than the lead around **≈380 Hz** (in 250–600 Hz) ~18% … Notch the
+  bass around ≈380 Hz."* Each conflict gets its OWN frequency. `fmt_hz`: nearest 10 Hz, kHz above 1 kHz.
+- VERIFY-BY-DEED (Lazy_Sparks, regenerated masking): distinct, in-band spots — bass↔other ≈270 Hz,
+  bass↔vocals ≈510 Hz, bass↔guitar ≈340 Hz, kick↔bass (sub) ≈60 Hz (was a flat "250–600 Hz" for all).
+- INV: the named frequency always lies inside the zone's band; an out-of-band overlap is never chosen; a
+  silent/absent spectrum yields the band-range fallback. Unit tests: `G19_PreciseMaskingFreq` (7).
+- ⟨DECIDE⟩ `MASK_FREQ_MIN_LEVEL_DB` = −24 dB (tune as tracks land). OPEN: scale the SUGGESTED cut depth
+  ("a couple dB") from the measured overlap — held; the depth stays advice-not-measurement for now.
+- **0.8.20 — grid bumped 32→64 bins (`masking.SPEC_NBINS`), the finer frequency analyzer.** At 32 bins (~3.3/octave)
+  two DIFFERENT low-mid clashes (bass↔other, bass↔guitar) both snapped to ≈270 Hz — too coarse to tell apart.
+  Experiment across 32/48/64/96 bins (verified by deed on Lazy_Sparks): at ≥48 they separate (other ≈290,
+  guitar ≈260) and stay STABLE through 96. Chose 64 (~6.6/oct): clear discrimination, stable, not so fine it
+  chases spectral spikes. Pure schema change (spectrum array 32→64 long); G19/centroid consume it unchanged.
+
+### B.10 "Where does it get boring?" — the development plateau (G21, 0.8.19, Sasha's idea)
+Sasha (2026-06-22): *"for evolving tracks, the idea is to show at what point it gets boring."* For an
+EVOLVING track, mark the onset after which it stops introducing NEW material and only recombines sections
+already heard.
+- **Mechanism (`development_plateau(selfsim, dur)`, pure-python).** Read the self-sim segment letters in time
+  order (same letter = a returning section). The onset = the END (`t1`) of the last segment that introduces a
+  NEW letter; after it, every segment is a repeat. Returns `{onset_s, tail_frac, n_sections}`.
+- **Gates (so it's honest, not a blanket "this is boring"):** fires only when the track DEVELOPS
+  (≥ `MIN_DEV_SECTIONS`=3 distinct sections) AND the no-new-material tail is ≥ `PLATEAU_MIN_FRAC`=30% of the
+  track. A track that keeps introducing new sections to the end → `None` (correctly NOT flagged); a track that
+  never develops → `None`. NOT a value judgement: the card says "no new material from here", action left to
+  the producer; anchored to the onset time on the timeline.
+- VERIFY-BY-DEED (3 library tracks): **Shared_Memories** plateaus — letters `A B C B C D C D C B`, last new
+  `D` at 2:53, tail 49% → *"After 2:53 nothing new is introduced — the last 49% recombines earlier sections."*
+  **Lazy_Sparks** (`A B C D C E C E C F A`, new `F` near the end) and **Wobble_Drift** (`A B C D E C`, new `E`
+  late) → `None`, both still developing. So the gate discriminates on real material.
+- INV: the onset always equals the end of a NEW-letter segment; `None` whenever distinct letters < 3 or the
+  no-new tail < 30%. Tests: `G21_DevelopmentPlateau` (5).
+- ⟨DECIDE⟩ `MIN_DEV_SECTIONS`=3, `PLATEAU_MIN_FRAC`=0.30. **OPEN (refinement):** this catches only the
+  END plateau (last new material → end). An INTERNAL repetitive stretch (e.g. Lazy's `C E C E C` oscillation
+  in the middle, before a later new section) is NOT yet caught — a future "longest no-new run" variant could.
+
+### B.11 Per-stem measurements — run the track tools on each stem (PROPOSED, Sasha 2026-06-22, #2 advanced)
+**Sasha's model (verbatim intent):** *"we had a bunch of tools pointed at the whole track. one of those tools was stems. let's point everything (except stem separation itself) at each individual stem."* The
+whole-track measurements that `analyze_core`/`analyze_detail` produce — **energy, brightness, density,
+stereo width, modulation, loudness/dynamics** over time — are, today, computed ONLY on the mix (see the
+matrix below). This runs that same set on **each significant stem**. (Stem separation itself is excluded —
+you don't separate a stem. Stem-only tools that DON'T run on the mix — melody/chord/percussion/noise
+classification, drum-hit breakdown, masking, role — already exist; this is the missing other half.)
+
+- **Entity (new).** *per-stem audio feature* — the same measured curve as a mix `audio feature`, but over one
+  stem's wav. Inherits the stem's **significance** state (A): computed ONLY for `significant` stems (CR-2);
+  an empty/quiet stem gets no per-stem feature, no card. Same units/ranges as the mix feature.
+- **Mechanism.** Re-run the existing core measurement on each significant stem wav (the stems are already on
+  disk in `stems_6s/`), producing `result_core_<stem>.json` analogous to `result_selfsim_<stem>.json` (B.3,
+  already auto-discovered). No new DSP — the SAME functions, different input.
+
+- **CR-11 (the credibility consequence — Sasha's core objection, do NOT skip).** *"we haven't validated the hypothesis — will it actually show useful info, or just more stuff that's hard to make sense of."* So per-stem output is gated on **usefulness, not volume**: a per-stem card fires **only when the
+  stem's curve diverges NOTABLY from the REST of the track** — the bass brightens while the rest darkens; one
+  stem's density drops out while the rest rises; a stem's energy arc runs opposite the others. **"Same as the
+  rest" → NO card** (it's redundant, it just adds noise). The signal is DIVERGENCE, not the raw per-stem number.
+  - **Baseline = the mix MINUS this stem (prover F1).** Compare each stem to the rest of the track, NOT the
+    full mix — the mix contains the stem, so a loud stem (bass/drums) is partly compared to itself, which
+    SUPPRESSES exactly the "it runs opposite the track" insight we want. Build the baseline from the other
+    stems' aggregate.
+  - **Shape, not magnitude.** Compare curve SHAPE over time (normalized / correlation), since a stem sits far
+    below the mix in absolute level. ⟨DECIDE⟩ the divergence threshold (trend sign differs AND |Δtrend| ≥ τ;
+    and/or correlation with the rest < ρ).
+  - **Score importance, then budget the TOTAL — no fixed per-stem cap (Sasha 2026-06-22).** Do NOT hard-cap
+    cards per stem. Instead: (1) each candidate insight gets an **importance score** (how big the divergence,
+    how clear/actionable it is); (2) all candidates — the existing track-level recs AND the new per-stem/composite
+    ones — compete in ONE ranked pool; (3) show the top by score up to a **total card budget** kept near today's
+    "normal" count, not an explosion. ⟨DECIDE⟩ the budget (calibrate to the current count).
+  - **Diversity, so one stem can't hog the list.** A balance rule so the top cards aren't all about the drums
+    (e.g. a per-source soft quota / penalty for repeats from the same stem). ⟨DECIDE⟩ the rule.
+  - **Cards can be COMPOSITE, not one-per-stem (Sasha 2026-06-22).** A card may combine signals — two stems
+    diverging together, or a stem-vs-track relationship ("energy rises but the drums thin out") — not just a
+    single stem × single measure. The scoring/budget pool holds composite candidates alongside per-stem ones;
+    the "one stem, one measure" shape is the simplest case, not the only one. A naive per-stem enumerator is
+    explicitly rejected.
+  - **Correlated measures collapse.** Energy/density/loudness move together; a candidate that fires on several
+    correlated measures becomes ONE card naming the strongest, so it doesn't triple-count as three insights.
+  - **"Show more" on demand (Sasha 2026-06-22).** The default budget stays tight (only the high-score cards).
+    A separate control / command lowers the score threshold to reveal the next tier of lower-rated candidates
+    for a user who wants to dig — the strict default is what's shown first, the deeper set is opt-in (it never
+    changes the default view, so the calm/Simple read stays uncluttered). ⟨DECIDE⟩ the lowered threshold.
+  - **Per-measurement validity (prover F5).** Significance (loudness+time) doesn't make a SPECIFIC measure
+    meaningful — brightness of an all-sub bass, stereo width of a mono stem, is junk. Each measure carries its
+    own precondition (brightness only with real high-freq energy; stereo only when not effectively mono); unmet
+    → omit that card (same "don't paint silence" as CR-1).
+- **USEFULNESS IS DEFINED OBJECTIVELY — the system self-judges, no per-track human approval (Sasha 2026-06-22:
+  "I can't look at and approve cards for every track in the world — write yourself the criteria").** Divergence
+  alone is a weak proxy (a true-but-boring wobble diverges). So a candidate's **importance score** is built from
+  measurable properties, and only that decides whether it earns a slot:
+  1. **Big** — divergence magnitude ≥ τ (not a tiny wobble).
+  2. **Persistent** — holds over a real span (≥ a min seconds / % of the track), not one frame — same "enough
+     material" discipline as CR-1; one blip is not an insight.
+  3. **Specific / actionable** — names a part + a time + a direction (reuse the #2 metric: named & timed). A
+     vague candidate scores low and loses to a specific one.
+  4. **Non-redundant** — adds something a higher-ranked card or the mix-level reading doesn't already say
+     (dedupe by claim). A card that restates the mix scores ~0.
+  These four ARE the definition of "useful"; the score ranks candidates and the budget/diversity rule picks the
+  top. ⟨DECIDE⟩ the weights + τ + min-span — I **calibrate them ONCE on the 3 library tracks and freeze them as
+  defaults** (like the other settled ⟨DECIDE⟩ values), not per track.
+- **PROMINENCE — a near-silent stem ranks BELOW the louder ones (Sasha 2026-06-22).** *"If a stem is
+  near-silent, its cards are better placed below the others."* A quiet part diverging from the track matters
+  LESS than a loud part diverging — so each candidate's score is multiplied by a **prominence weight (0..1)**
+  measuring how loud that stem is RELATIVE to the loudest significant stem. Truly sub-floor stems never reach
+  here (no `result_core_<stem>.json` is written for them, CR-2); this orders the SIGNIFICANT-but-quiet ones.
+  It is a soft down-rank, NOT a drop: a near-silent part's card still appears if its divergence is strong
+  enough to win a budget slot, it just sorts after the prominent parts. Relative, not absolute — `weight =
+  clamp(1 + (loud_db − loudest_stem_db) / SPAN, FLOOR, 1)`, loud_db = the §1 `loud_level` (85th-pct broadband,
+  the same number the significance gate uses, NOT the self-normalized per-stem energy curve, which peaks at 1
+  for every stem). ⟨DECIDE⟩ `PROMINENCE_SPAN_DB` (24) + `PROMINENCE_FLOOR` (0.4), calibrate with the others.
+- **Composite cards are WORDED into the pool (0.8.23).** `composite_candidates` (a stem moving against the
+  whole track, e.g. "the beat thins out as the track builds") now competes in the SAME budget/diversity
+  selection as the per-stem divergence cards and is worded by character label, not the raw Demucs name —
+  previously the composite scorer existed but only divergence cards were rendered.
+- **The eval is a regression guard, not an approval gate.** `scripts/eval_*` measures, on the 3 fixtures,
+  that the shown cards satisfy the four criteria (share specific, share non-redundant, none below τ) — so a
+  future change can't quietly fill the budget with noise. Sasha's eye is a one-time sanity check on those 3
+  fixtures while I calibrate, never a per-track requirement.
+- **Back-compat (prover F6).** A run with no `result_core_<stem>.json` (pre-B.11) yields no per-stem cards and
+  NO error — same graceful fallback as pre-0.8.14 masking falling back to the band range.
+
+- **WHERE it shows (Sasha 2026-06-22).** Per-stem cards live in the **Detailed view only** by default (they
+  are depth, not the headline). **Promotion to Simple** only for a STRONG divergence (⟨DECIDE⟩ a higher
+  threshold) — *"if there's something really important there, why not put it in Simple too."* Respects the view ladder
+  (`quick ⊆ Simple ⊆ Detailed`, §the ladder): a card promoted to Simple is therefore also in Detailed.
+- **SORT TOGGLE (Sasha 2026-06-22) — Detailed only.** Today the advice cards are ordered by **urgency**
+  (`build_widget.py:1493` `_rank crit<do<concept`) while the lettered cues a/b/c on the timeline are ordered
+  **chronologically** (`build_widget.py:1999`) — a deliberate-but-confusing split. Add a Detailed-only toggle
+  to switch the CARD list between **by urgency** (default, unchanged) and **chronological** (matching the
+  letters). Pure presentation reorder; never adds/removes a card. ⟨DECIDE⟩ default = urgency (current).
 
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";

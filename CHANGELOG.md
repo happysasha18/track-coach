@@ -5,6 +5,71 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.23] — 2026-06-22
+
+### Added
+- **Quiet parts give way to loud ones in the advice.** When a separated part is near-silent next to the
+  others, its "this layer pulls against the mix" cards now rank *below* the prominent parts — a soft
+  down-rank, not a cut (a quiet part with a strong-enough divergence still earns its slot). On *Lazy
+  Sparks* this flips the lead card from the quietest stem (guitar, −27 dB) to the loudest (drums, −12 dB).
+- **Composite "moves against the track" cards.** A part that thins out while the rest of the track builds
+  (or fills in while it drops) is now worded as its own card — *"The beat thins out while the rest of the
+  track builds"* — competing in the same card budget as the per-part cards, named by character.
+
+## [0.8.22] — 2026-06-22
+
+### Added
+- **Per-part "pulls against the mix" cards.** Each significant part is measured against the rest of the
+  track; when one diverges (brighter/darker, louder/quieter, busier/sparser than everything else) it gets
+  a Detailed-view card, named by character. Cards earn a slot by an objective importance score within a
+  fixed budget, so the list never explodes.
+
+## [0.8.21] — 2026-06-22
+
+### Fixed
+- **The header shows the track NAME, never the BPM.** When a run had no title in its metadata, the
+  heading fell back to inventing one from tempo + length (`123.0 BPM · 338s`) — which read as if the
+  track were *named* that. The name is now derived from the source audio filename
+  (`Total_Reboot_-_Shared_Memories_[2026_version].mp3` → "Total Reboot — Shared Memories [2026 version]")
+  and persisted, so it stays on every rebuild. Tempo and length already live in the vitals strip.
+
+## [0.8.20] — 2026-06-22
+
+### Changed
+- **Sharper cut-frequency advice.** The per-stem frequency profile now has twice the resolution (64 bands
+  instead of 32), so two different clashes no longer get reported at the same frequency — e.g. on *Lazy
+  Sparks* the bass-vs-other and bass-vs-guitar conflicts now read ≈290 Hz and ≈260 Hz separately (both used
+  to collapse to ≈270 Hz). Chosen after measuring 32/48/64/96 bands and confirming 64 is where the values
+  separate and stay stable.
+
+## [0.8.19] — 2026-06-22
+
+### Added
+- **"Where does it get boring?" — a development card.** On a track that develops, it marks the point after
+  which no new section is introduced and the rest only recombines what you've already heard — e.g. *"After
+  2:53 nothing new is introduced — the last 49% recombines earlier sections."* It only appears when the track
+  genuinely develops first and then plateaus for a meaningful stretch; tracks that keep introducing new ideas
+  to the end aren't flagged. Verified on *Shared Memories* (fires at 2:53); *Lazy Sparks* and *Wobble Drift*
+  correctly don't fire.
+
+## [0.8.18] — 2026-06-22
+
+### Added
+- **A "what carries the development" card.** The analyzer already measured how much each part repeats; now it
+  says it out loud — e.g. *"The bass keeps changing (recurrence 0.14) — carrying the development — while the
+  mid and the drums mostly loop."* It only appears when one part clearly evolves while others clearly loop,
+  names parts by their character (never the raw stem name), and won't repeat a shared label. Verified on
+  *Lazy Sparks*.
+
+## [0.8.17] — 2026-06-22
+
+### Changed
+- **The frequency-clash advice now names the exact spot to cut, not the whole band.** Instead of "the bass
+  buries the lead around 250–600 Hz" for every clash, each conflict gets its own frequency — e.g. *"Notch
+  the bass around ≈270 Hz"* for one part, *"≈510 Hz"* for another — read straight from the per-stem spectra.
+  When the buried part isn't clearly present at any single spot, the card keeps the broad band range rather
+  than inventing a number. Verified on *Lazy Sparks* (distinct ≈270 / ≈340 / ≈510 / ≈60 Hz spots).
+
 ## [0.8.16] — 2026-06-21
 
 ### Added

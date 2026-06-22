@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.16"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.23"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -258,16 +258,30 @@ STRINGS = {
         "masking_line": "bass covers “{mid}” in {pct:.0f}% of spots",
         "masking_stem": {
             "header": "Frequencies · the {low_lbl} buries the {mid_lbl}",
-            "title": "Around {band_range} the {low_lbl} is louder than the {mid_lbl} ~{pct:.0f}% of the track",
-            "body": "Worst around {worst_t}. Where it bothers you, carve a small dip in the {low_lbl} in that "
-                    "range, or move them apart in time. Where the {mid_lbl} is simply silent there, that's not a clash.",
-            "fix": "Notch the {low_lbl} around {band_range}, or duck it under the {mid_lbl} so they stop fighting."},
+            "title": "The {low_lbl} is louder than the {mid_lbl} {spot} ~{pct:.0f}% of the track",
+            "body": "Worst around {worst_t}. Where it bothers you, carve a small dip in the {low_lbl} {notch}, "
+                    "or move them apart in time. Where the {mid_lbl} is simply silent there, that's not a clash.",
+            "fix": "Notch the {low_lbl} {notch}, or duck it under the {mid_lbl} so they stop fighting."},
         "masking_clean": {
             "header": "Low end · clean",
             "title": "The bass doesn't clash with anything",
             "body": "The bass doesn't cover the melody (250–600 Hz) or the kick (sub 20–80 Hz). If the mix sounds muddy, "
                     "the cause isn't bass-vs-mids clash.",
             "fix": "Nothing to fix here. If it still sounds muddy, look at reverb/saturation or low-mid buildup in other parts."},
+        "stem_evolves": {
+            "header": "Development · what carries it vs what loops",
+            "title": "The {evolver} keeps changing while {loopers} mostly loop",
+            "body": "Across the track the {evolver} barely repeats (recurrence {evo_r}) — it's carrying the "
+                    "development — while {loopers} loop more ({loop_r}). That's often exactly what you want.",
+            "fix": "If it ever feels static, the development is resting on one part ({evolver}) — vary a looping "
+                   "one too ({loopers}): a filter sweep, a pattern change, or drop/add a layer."},
+        "plateau": {
+            "header": "Development · where new ideas stop",
+            "title": "After {onset} nothing new is introduced — the last {tail_pct:.0f}% recombines earlier sections",
+            "body": "Up to {onset} the track keeps adding sections ({n} in all); after that it reworks material "
+                    "you've already heard, to the end. On a developing track that's often where attention drifts.",
+            "fix": "If it should keep evolving, introduce a change around {onset} — a new element, a key/filter "
+                   "move, a breakdown — so the back half isn't only recombination."},
         "low_carrier": {
             "header": "Low end · where it actually lives",
             "title": "The low end is held by “{carrier}”, not “bass”",
@@ -320,7 +334,8 @@ STRINGS = {
 REC_CLASS = {
     "long_section": "crit", "energy_flat": "crit", "endpoint": "crit", "empty_stem": "crit",
     "intention_result": "crit", "sep_incomplete": "crit", "truepeak_clip": "crit",
-    "wobble": "concept", "swing": "concept", "late_entry": "concept",
+    "wobble": "concept", "swing": "concept", "late_entry": "concept", "stem_evolves": "concept",
+    "plateau": "concept",
     "bass_groupstem": "do", "squashed": "do", "tonal_resonance": "do",
 }
 
@@ -340,6 +355,51 @@ def fmt_t(s):
     if s is None or s < 0:
         return "0:00"
     return f"{int(s // 60)}:{int(round(s % 60)):02d}"
+
+
+def fmt_hz(hz):
+    """Human frequency label for a masking-cut spot: '≈380 Hz' / '≈1.2 kHz'. None → None (caller falls
+    back to the coarse band range). Hz rounds to the nearest 10; kHz to one decimal."""
+    if hz is None:
+        return None
+    if hz >= 1000:
+        return f"≈{hz / 1000:.1f} kHz".replace(".0 kHz", " kHz")
+    return f"≈{int(round(hz / 10.0) * 10)} Hz"
+
+
+# ── PRECISE masking frequency (Sasha s14, idea a). The coarse masking band ("250–600 Hz") only flags
+# THAT the bass buries a part; the per-stem spectra (already in the masking JSON: `spectrum` /
+# `spectrum_freqs`) say WHERE inside the band they actually fight, so the rec can name a cut frequency
+# ("≈380 Hz") instead of the whole band. The collision sits where the OVERLAP of the two peak-normalised
+# spectra is greatest — min(masker,maskee) is large only where BOTH stems have energy there. We name a
+# precise frequency ONLY when the buried part genuinely has energy at that bin (credibility: don't
+# over-claim a spot the maskee isn't in); otherwise None and the caller keeps the coarse band range.
+MASK_FREQ_MIN_LEVEL_DB = -24.0   # the maskee must sit within this of its own peak at the chosen bin
+# (e) per-stem repetition surfacing (CR-6): fire the "what carries the development" card only when there's
+# a real SPREAD — at least one part clearly evolves AND at least one clearly loops (else it's not insight).
+EVOLVE_MAX_RECURRENCE = 0.25     # recurrence ≤ this ⇒ "keeps changing / carries the development"
+LOOP_MIN_RECURRENCE   = 0.45     # recurrence ≥ this ⇒ "loops"
+# numeric (low, high) Hz per analysis band — mirrors masking.BANDS (kept here so build stays numpy-free).
+BAND_HZ = {"sub": (20, 80), "low": (80, 250), "low_mid": (250, 600),
+           "mid": (600, 2000), "hi_mid": (2000, 8000), "air": (8000, 20000)}
+
+
+def mask_collision_freq(masker_spec, maskee_spec, band, freqs):
+    """Single frequency (Hz) where `masker_spec` most buries `maskee_spec` inside `band`=(low,high),
+    or None when neither has real in-band energy. `masker_spec`/`maskee_spec` are peak-normalised dB
+    aligned to `freqs` (the spectrum bin-centre frequencies). Pure-python — no numpy."""
+    if not masker_spec or not maskee_spec or not freqs:
+        return None
+    lo, hi = band
+    pairs = [(i, masker_spec[i], maskee_spec[i]) for i, f in enumerate(freqs)
+             if lo <= f < hi and i < len(masker_spec) and i < len(maskee_spec)
+             and masker_spec[i] is not None and maskee_spec[i] is not None]
+    if not pairs:
+        return None
+    i, _, maskee_db = max(pairs, key=lambda p: min(p[1], p[2]))   # worst overlap = both loud here
+    if maskee_db < MASK_FREQ_MIN_LEVEL_DB:                        # buried part barely present → don't over-claim
+        return None
+    return freqs[i]
 
 
 def stem_broadband_db(masking, stem):
@@ -376,6 +436,255 @@ def loud_level(arr):
         return None
     a = sorted(arr)
     return a[int(0.85 * (len(a) - 1))]
+
+
+# ── Per-stem measurements (SPEC §B.11 / CR-11) ─────────────────────────────────────────
+# A stem only "speaks" when it diverges from the REST of the track (the mix MINUS itself —
+# comparing to the full mix would compare a loud stem partly to itself, suppressing the very
+# "it runs opposite the track" insight). Cards then earn a slot by an OBJECTIVE importance
+# score (big · persistent · specific · non-redundant), so the system self-judges usefulness
+# with no per-track human approval. Pure / numpy-free → unit-testable.
+
+# A near-silent stem ranks BELOW the louder ones (Sasha 2026-06-22): a quiet part diverging matters less
+# than a loud one diverging, so its card score is scaled by how loud it is RELATIVE to the loudest stem.
+PROMINENCE_SPAN_DB = 24.0       # ⟨DECIDE⟩ — dB below the loudest stem at which a part's weight hits the floor
+PROMINENCE_FLOOR = 0.4          # ⟨DECIDE⟩ — minimum score weight for a relatively-quiet (near-silent) stem
+
+
+def stem_prominence(masking):
+    """{stem: weight 0..1} = how loud each SIGNIFICANT stem is relative to the loudest one, for ranking
+    per-stem cards (SPEC §B.11). Truly sub-floor stems never reach here (no core is written for them,
+    CR-2); this orders the significant-but-quiet ones below the prominent parts. From the §1 `loud_level`
+    (85th-pct broadband dB) — NOT the self-normalized per-stem energy curve, which peaks at 1 for every
+    stem. Relative: weight = clamp(1 + (loud_db − loudest_db)/SPAN, FLOOR, 1). No masking → {} (every stem
+    then defaults to full weight 1.0 downstream)."""
+    sig = significant_stems(masking)
+    if not sig:
+        return {}
+    lv = {st: (loud_level(stem_broadband_db(masking, st)) or -120.0) for st in sig}
+    top = max(lv.values())
+    return {st: max(PROMINENCE_FLOOR, min(1.0, 1.0 + (db - top) / PROMINENCE_SPAN_DB))
+            for st, db in lv.items()}
+
+
+def rest_curve(curves, target):
+    """The comparison baseline for one stem = the per-bin mean of the OTHER stems' curves.
+    `curves`: {stem: [value per time bin]}. None when there's no other stem to compare to."""
+    others = [v for s, v in curves.items() if s != target and v]
+    if not others:
+        return None
+    n = min(len(v) for v in others)
+    return [sum(v[i] for v in others) / len(others) for i in range(n)]
+
+
+def _pearson(a, b):
+    """Pearson correlation of two sequences; None if undefined (a flat input, or < 2 points)."""
+    n = min(len(a), len(b))
+    if n < 2:
+        return None
+    a, b = a[:n], b[:n]
+    ma, mb = sum(a) / n, sum(b) / n
+    da, db = [x - ma for x in a], [x - mb for x in b]
+    va, vb = sum(x * x for x in da), sum(x * x for x in db)
+    if va <= 0 or vb <= 0:                 # a flat curve has no shape to correlate against
+        return None
+    return sum(x * y for x, y in zip(da, db)) / (va ** 0.5 * vb ** 0.5)
+
+
+def divergence(stem, rest):
+    """How differently a stem's curve moves vs the rest of the track, by SHAPE (scale-invariant).
+    0 = same shape (or unmeasurable → don't cry wolf); 1 = exactly opposite. From correlation r:
+    (1 − r) / 2."""
+    r = _pearson(stem, rest)
+    if r is None:
+        return 0.0
+    return max(0.0, min(1.0, (1.0 - r) / 2.0))
+
+
+# importance weights — ⟨DECIDE⟩ defaults, to calibrate once on the 3 library tracks (SPEC §B.11)
+SCORE_W = {"divergence": 0.5, "persistence": 0.25, "specificity": 0.25}
+
+
+def candidate_score(*, divergence, persistence, specificity, redundancy, prominence=1.0):
+    """Objective usefulness of a candidate card, 0..1 (SPEC §B.11 CR-11): a weighted blend of
+    big · persistent · specific, KILLED by redundancy — a card that restates the mix scores ~0 — and
+    SCALED by prominence (0..1) so a near-silent stem's card ranks below a loud one's at equal
+    divergence (Sasha 2026-06-22). prominence defaults to 1.0 → unweighted (back-compat)."""
+    base = (SCORE_W["divergence"] * divergence
+            + SCORE_W["persistence"] * persistence
+            + SCORE_W["specificity"] * specificity)
+    return max(0.0, min(1.0, base * (1.0 - redundancy) * prominence))
+
+
+def _persistence(stem, rest):
+    """Fraction of bins where the stem sits on the OPPOSITE side of its mean from the rest —
+    i.e. how much of the track the divergence actually holds (not one blip). 0..1."""
+    n = min(len(stem), len(rest))
+    if n < 2:
+        return 0.0
+    ms, mr = sum(stem[:n]) / n, sum(rest[:n]) / n
+    opp = sum(1 for i in range(n) if (stem[i] - ms) * (rest[i] - mr) < 0)
+    return opp / n
+
+
+DIVERGENCE_MIN = 0.35            # ⟨DECIDE⟩ τ — calibrate once on the 3 library tracks (SPEC §B.11)
+PER_STEM_MEASURES = ("energy", "brightness", "density")  # curves present in result_core_<stem>.json
+
+
+def stem_divergence_candidates(stem_cores, measures=PER_STEM_MEASURES, tau=DIVERGENCE_MIN, levels=None):
+    """For each significant stem × measure, compare the stem's curve to the REST of the track and
+    emit a SCORED candidate when it diverges past `tau` (SPEC §B.11). `stem_cores`: {stem: core_dict}.
+    `levels`: optional {stem: prominence 0..1} (from `stem_prominence`) — a near-silent stem's score is
+    scaled down so its card ranks below louder parts; default → full weight. Pure — composes rest_curve +
+    divergence + _persistence + candidate_score. Sorted by score desc. (Specificity is the stem+measure
+    name here; the timed anchor + redundancy/dedupe come when these join the rec pool.) Returns [] when
+    nothing clears the bar — silence, not noise."""
+    levels = levels or {}
+    cands = []
+    for measure in measures:
+        curves = {s: c.get(measure) for s, c in stem_cores.items() if c.get(measure)}
+        for stem, curve in curves.items():
+            rest = rest_curve(curves, stem)
+            if not rest:
+                continue
+            d = divergence(curve, rest)
+            if d < tau:
+                continue
+            score = candidate_score(divergence=d, persistence=_persistence(curve, rest),
+                                    specificity=0.5, redundancy=0.0,
+                                    prominence=levels.get(stem, 1.0))
+            # which way the stem leans vs the rest (for wording): its whole-track trend, higher or lower
+            direction = "up" if _trend(curve) >= _trend(rest) else "down"
+            cands.append({"stem": stem, "measure": measure, "dir": direction,
+                          "divergence": round(d, 3), "score": round(score, 3)})
+    cands.sort(key=lambda c: -c["score"])
+    return cands
+
+
+def _trend(curve):
+    """Normalized whole-track direction of a curve: (late third mean − early third mean) / range,
+    clamped to [-1, 1]. 0 when flat or too short."""
+    n = len(curve)
+    if n < 2:
+        return 0.0
+    k = max(1, n // 3)
+    early, late = sum(curve[:k]) / k, sum(curve[-k:]) / k
+    rng = max(curve) - min(curve)
+    if rng <= 0:
+        return 0.0
+    return max(-1.0, min(1.0, (late - early) / rng))
+
+
+COMPOSITE_TREND_MIN = 0.3        # ⟨DECIDE⟩ — calibrate on the 3 library tracks (SPEC §B.11)
+
+
+def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=None):
+    """Cross-signal cards — a stem moving AGAINST the whole track (SPEC §B.11, Sasha's composite idea,
+    e.g. "energy rises but the drums thin out"). Today's rule pairs the mix's energy direction with a
+    stem's density direction; opposite + both past `tau` → a scored candidate. `levels`: optional
+    {stem: prominence 0..1} so a near-silent stem's composite card ranks below louder parts. Pure. Extend
+    with more pairings later. Returns candidates sorted by score desc."""
+    levels = levels or {}
+    out = []
+    me = _trend(mix_core.get("energy") or [])
+    for stem, c in stem_cores.items():
+        sd = _trend(c.get("density") or [])
+        if me >= tau and sd <= -tau:
+            rel = "thins_as_track_builds"
+        elif me <= -tau and sd >= tau:
+            rel = "thickens_as_track_falls"
+        else:
+            continue
+        strength = min(abs(me), abs(sd))
+        score = candidate_score(divergence=strength, persistence=strength,
+                                specificity=0.6, redundancy=0.0,
+                                prominence=levels.get(stem, 1.0))
+        out.append({"kind": "composite", "stem": stem, "relation": rel, "score": round(score, 3)})
+    out.sort(key=lambda c: -c["score"])
+    return out
+
+
+def select_cards(candidates, budget, per_stem_cap=None):
+    """Pick the top candidates by score up to a TOTAL `budget`, with a diversity rule so one stem
+    can't hog the list: once a stem hits `per_stem_cap` it's held back WHILE other stems still have
+    candidates, then any leftover budget is filled ignoring the cap (so we never show fewer than we
+    could). Deterministic (SPEC §B.11). Returns the chosen candidates in score order."""
+    if budget <= 0 or not candidates:
+        return []
+    order = sorted(range(len(candidates)), key=lambda i: -candidates[i]["score"])
+    chosen, counts = [], {}
+    for i in order:                                   # pass 1 — respect the per-stem cap
+        if len(chosen) >= budget:
+            break
+        s = candidates[i]["stem"]
+        if per_stem_cap and counts.get(s, 0) >= per_stem_cap:
+            continue
+        chosen.append(i)
+        counts[s] = counts.get(s, 0) + 1
+    for i in order:                                   # pass 2 — fill leftover budget, cap ignored
+        if len(chosen) >= budget:
+            break
+        if i not in chosen:
+            chosen.append(i)
+    return [candidates[i] for i in chosen]
+
+
+_MEASURE_WORDS = {                       # adjectives (number-neutral): (higher-vs-rest, lower-vs-rest)
+    "energy":     ("louder", "quieter"),
+    "brightness": ("brighter", "darker"),
+    "density":    ("busier", "sparser"),
+}
+
+_COMPOSITE_WORDS = {                      # stem-vs-whole-track relation → (head phrase, why)
+    "thins_as_track_builds":
+        ("thins out while the rest of the track builds",
+         "As the track gains energy this part gets sparser — it pulls back exactly where everything else "
+         "lifts. A deliberate space, or a layer that should grow with the drop?"),
+    "thickens_as_track_falls":
+        ("fills in while the rest of the track drops back",
+         "This part gets busier just as the track pulls back — it pushes forward where everything else "
+         "makes room. A deliberate hand-off, or worth a second listen?"),
+}
+
+
+def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, budget=4, per_stem_cap=2):
+    """Turn the selected per-stem candidates into worded advice cards — rec tuples
+    `(cls, when, head, body, fix, t)`. Two kinds compete in ONE budget: per-stem DIVERGENCE (a stem runs
+    against the rest) and COMPOSITE (a stem moves against the whole track, needs `mix_core`). Detailed-only
+    by default = no timecode `t` (Simple hides non-timecoded recs, INV-18). `levels` (from `stem_prominence`)
+    ranks a near-silent part's cards below the louder parts. Names the PART via its character label, never
+    the raw Demucs stem (memory track-coach-stem-labels). Empty input → []. SPEC §B.11."""
+    if not per_stem_core:
+        return []
+    cands = stem_divergence_candidates(per_stem_core, levels=levels)
+    if mix_core:
+        cands = cands + composite_candidates(mix_core, per_stem_core, levels=levels)
+    chosen = select_cards(cands, budget=budget, per_stem_cap=per_stem_cap)
+
+    def part(stem):
+        lbl = ((character or {}).get(stem, {}) or {}).get("label")
+        return lbl or stem
+
+    out = []
+    for c in chosen:
+        p = part(c["stem"])
+        if c.get("kind") == "composite":
+            worded = _COMPOSITE_WORDS.get(c["relation"])
+            if not worded:
+                continue
+            phrase, why = worded
+            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None))
+            continue
+        words = _MEASURE_WORDS.get(c["measure"])
+        if not words:
+            continue
+        adj = words[0] if c["dir"] == "up" else words[1]
+        out.append(("concept", f"Layers · the {p}",
+                    f"The {p} — {adj} than the rest of the track",
+                    f"For much of the track this part runs {adj} than everything else, pulling against "
+                    f"the mix. A deliberate contrast, or worth a second listen.",
+                    "", None))
+    return out
 
 
 def significant_stems(masking):
@@ -461,6 +770,37 @@ def stem_repetition(per_stem_selfsim, masking):
                     "recurrence": round(1 - labels / n, 2),
                     "top_letter": top_letter, "top_count": counts[top_letter]})
     return out
+
+
+# ── "Where does it get boring?" (Sasha, 2026-06-22): for an EVOLVING track, the point after which it stops
+# introducing new material and only recombines sections you've already heard. Honest + measured from the
+# self-sim segment letters (same letter = a section that returns); NOT a value judgement — the rec frames it
+# as "no new material from here", with the action left to the producer. Gated so it never fires on a track
+# that doesn't develop in the first place, nor when new ideas keep arriving to the end.
+MIN_DEV_SECTIONS = 3      # need ≥3 DISTINCT sections introduced for "stops developing" to mean anything
+PLATEAU_MIN_FRAC = 0.30   # the no-new-material tail must be ≥30% of the track to be worth a word
+
+
+def development_plateau(selfsim, dur):
+    """Onset (s) after which an evolving track introduces NO new section, or None. Reads the self-sim
+    segments: the onset = the END of the last segment that introduces a new letter; everything after only
+    recurs. Returns {onset_s, tail_frac, n_sections} when the track develops (≥MIN_DEV_SECTIONS distinct
+    sections) AND the no-new tail is ≥PLATEAU_MIN_FRAC; else None (doesn't develop / never plateaus)."""
+    segs = (selfsim or {}).get("segments", [])
+    if len(segs) < MIN_DEV_SECTIONS or not dur:
+        return None
+    seen, last_new_end = set(), 0.0
+    for s in sorted(segs, key=lambda s: s.get("t0", 0.0)):
+        L = s.get("letter")
+        if L not in seen:
+            seen.add(L)
+            last_new_end = s.get("t1", s.get("t0", 0.0))   # end of the segment that introduced this section
+    if len(seen) < MIN_DEV_SECTIONS:
+        return None
+    tail_frac = (dur - last_new_end) / dur
+    if tail_frac < PLATEAU_MIN_FRAC:
+        return None                                        # new material arrives late enough → not a plateau
+    return {"onset_s": round(last_new_end, 1), "tail_frac": round(tail_frac, 2), "n_sections": len(seen)}
 
 
 ONSET_PERCUSSIVE = 3.0   # onsets/sec at/above which a stem reads as percussive (transient-driven), else sustained
@@ -626,7 +966,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     return out
 
 
-def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None, character=None):
+def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None, character=None, repetition=None, selfsim=None):
     R = S["recs"]
     recs = []
     dur = core["duration_s"]
@@ -655,6 +995,13 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
     energy = core.get("energy", [])
     if et is not None and abs(et) < 0.12 and energy:
         add("energy_flat", peak=fmt_t(tb[peak_idx(energy)]), valley=fmt_t(tb[valley_idx(energy)]))
+
+    # "Where does it get boring?" (Sasha) — for an evolving track, the onset after which no new section is
+    # introduced. Measured from the self-sim letters; gated so it only fires when the track actually develops.
+    plat = development_plateau(selfsim, dur)
+    if plat:
+        add("plateau", _t=plat["onset_s"], onset=fmt_t(plat["onset_s"]),
+            tail_pct=plat["tail_frac"] * 100, n=plat["n_sections"])
 
     bt = core.get("brightness_trend")
     if bt is not None and bt > 0.25:
@@ -760,15 +1107,54 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
                 flags = masking.get("masking_flags", {}).get(zone, [])
                 low_stem = flags[0]["low_stem"] if flags else "bass"
                 worst = max(flags, key=lambda f: f["diff_db"]) if flags else None
+                # s14 idea (a): name the PRECISE collision frequency when the spectra pinpoint it; else
+                # keep the coarse band range. `spot` = where in the title; `notch` = the cut target.
+                band_lbl = BAND_RANGE.get(band, band)
+                spec = masking.get("spectrum") or {}
+                freqs = masking.get("spectrum_freqs")
+                mask_hz = mask_collision_freq(spec.get(low_stem), spec.get(mid),
+                                              BAND_HZ.get(band, (0, 0)), freqs)
+                hz = fmt_hz(mask_hz)
+                spot  = "around <b>{}</b> (in {})".format(hz, band_lbl) if hz else "around <b>{}</b>".format(band_lbl)
+                notch = "around <b>{}</b>".format(hz or band_lbl)
                 add("masking_stem", _t=(worst["time_s"] if worst else None),
                     low_lbl=_lbl(low_stem), mid_lbl=_lbl(mid),
-                    band_range=BAND_RANGE.get(band, band), pct=s["pct_masked"],
+                    spot=spot, notch=notch, pct=s["pct_masked"],
                     worst_t=fmt_t(worst["time_s"]) if worst else "—")
         elif real:                                          # no characters → old generic line
             lines = "; ".join(R["masking_line"].format(mid=z.split("__")[-1], pct=s["pct_masked"]) for z, s in real)
             add("masking_real", lines=lines)
         elif not empties:
             add("masking_clean")
+
+        # (e) per-stem repetition → WORDS (CR-6, 0.8.18): contrast the part that EVOLVES (low recurrence,
+        # carrying the development) with the ones that LOOP. Recurrence is measured per stem from its OWN
+        # self-similarity; we name parts by their character label, never the raw Demucs name (hard req
+        # [[track-coach-stem-labels]]) — so a stem without a label is skipped. Fires only on a real spread.
+        def _has_lbl(st):
+            return bool(((character or {}).get(st, {}) or {}).get("label"))
+
+        def _and_join(labels):
+            # DEDUPE by label, preserving order: two stems can share a character label ("mid"), and
+            # "the mid, the mid and the drums" is the salad Sasha killed in §B.7 — collapse to "the mid".
+            seen, xs = set(), []
+            for l in labels:
+                if l not in seen:
+                    seen.add(l)
+                    xs.append("the " + l)
+            return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+        rep = [r for r in (repetition or []) if r["stem"] not in empties and _has_lbl(r["stem"])]
+        if character and len(rep) >= 2:
+            evolvers = [r for r in rep if r["recurrence"] <= EVOLVE_MAX_RECURRENCE]
+            loopers  = [r for r in rep if r["recurrence"] >= LOOP_MIN_RECURRENCE]
+            if evolvers and loopers:
+                ev = min(evolvers, key=lambda r: r["recurrence"])
+                add("stem_evolves",
+                    evolver=_lbl(ev["stem"]),
+                    loopers=_and_join([_lbl(r["stem"]) for r in loopers]),
+                    evo_r="{:.2f}".format(ev["recurrence"]),
+                    loop_r="{:.2f}".format(min(r["recurrence"] for r in loopers)))
 
         tb_m = masking["time_bins"]
         nb = masking["total_windows"]
@@ -1205,7 +1591,8 @@ def _coalesce_scenes(scenes, dur):
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
-               back_href=None, audio_mix_rel=None, per_stem_selfsim=None, per_stem_notes=None):
+               back_href=None, audio_mix_rel=None, per_stem_selfsim=None, per_stem_notes=None,
+               per_stem_core=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -1348,8 +1735,14 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
 
     _leak = leakage_caveats(masking, rhythm)   # CR-4; also feeds (g) stem_character (exclude bled bands)
     _character = stem_character(masking, rhythm, _leak, per_stem_notes)  # computed once; reused by recs (G16) + payload
+    _repetition = stem_repetition(per_stem_selfsim, masking)  # CR-6; reused by the (e) dev-vs-loop rec + payload
     recs = build_recommendations(core, detail, masking, S,
-                                 als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm, character=_character)
+                                 als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm,
+                                 character=_character, repetition=_repetition, selfsim=selfsim)
+    # §B.11: per-stem "moves against the track" cards join the pool (Detailed-only — no timecode).
+    # `core` feeds composite (stem-vs-track) cards; `levels` ranks a near-silent part below louder ones.
+    recs += per_stem_cards(per_stem_core, core, character=_character,
+                           levels=stem_prominence(masking))
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
     _rank = {"crit": 0, "do": 1, "concept": 2}
     recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t)
@@ -1405,7 +1798,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "rhythm": rhythm,
         "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
         "stem_character": _character,  # (g)/G13: deterministic character label per significant stem (computed above)
-        "stem_repetition": stem_repetition(per_stem_selfsim, masking),  # CR-6: per-significant-stem repetition
+        "stem_repetition": _repetition,  # CR-6: per-significant-stem repetition (computed once above, reused by the (e) rec)
         "notes": notes,
         "drums": drums,
         "player": player,
@@ -1419,7 +1812,10 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "backHref": back_href or None,  # absolute file:// to the library index → the ← Library button
         "t": S["ui"],
     }
-    title = title or f'{core.get("tempo","?")} BPM · {dur:.0f}s'
+    # A track's name comes from the caller (track_analyzer derives it from the audio file).
+    # NEVER invent a name from tempo/duration — those live in the vitals strip + subtitle and
+    # read as a broken title here (Sasha 2026-06-22: "это БПМ а не имя трека!!").
+    title = title or "Untitled track"
     # Run-mode badge + (quick-only) explainer, rendered SERVER-SIDE from `mode` so it's deterministic
     # in the HTML (testable, no JS needed): quick = amber "Quick read" + a line on what full adds;
     # full = green "Full analysis". (Sasha 2026-06-20: метка должна быть видна на странице.)
@@ -2657,6 +3053,17 @@ def main():
                 per_stem_notes[p.stem.replace("result_notes_", "")] = json.loads(p.read_text())
             except Exception:
                 pass
+    # §B.11: per-stem CORE measurements — discover result_core_<stem>.json beside --core (one per
+    # SIGNIFICANT stem; the glob excludes the mix's result_core.json, which has no _<stem> suffix).
+    # Missing files → no per-stem cards, no error (CR-1 back-compat).
+    per_stem_core = {}
+    _core_dir = next((Path(a).resolve().parent for a in (args.core, args.masking, args.selfsim) if a), None)
+    if _core_dir:
+        for p in _core_dir.glob("result_core_*.json"):
+            try:
+                per_stem_core[p.stem.replace("result_core_", "")] = json.loads(p.read_text())
+            except Exception:
+                pass
     narrative_md = Path(args.narrative).read_text(encoding="utf-8") if args.narrative else None
     from datetime import datetime
     meta = {
@@ -2671,7 +3078,8 @@ def main():
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
                mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel,
-               per_stem_selfsim=per_stem_selfsim or None, per_stem_notes=per_stem_notes or None)
+               per_stem_selfsim=per_stem_selfsim or None, per_stem_notes=per_stem_notes or None,
+               per_stem_core=per_stem_core or None)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:
