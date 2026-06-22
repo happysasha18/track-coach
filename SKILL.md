@@ -34,7 +34,7 @@ Read `references/methodology.md` for the conceptual framework (variety vs develo
 
 ---
 
-## ▶ How to run it (0.6) — one command does the pipeline; YOU do the read
+## ▶ How to run it — one command does the pipeline; YOU do the read
 
 The whole deterministic pipeline (run dir → fast analysis → .als → Demucs → masking/
 maps/rhythm/drums/notes/web-stems → first build + catalog) is now ONE command. Do not

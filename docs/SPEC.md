@@ -431,8 +431,13 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
     single stem × single measure. The scoring/budget pool holds composite candidates alongside per-stem ones;
     the "one stem, one measure" shape is the simplest case, not the only one. A naive per-stem enumerator is
     explicitly rejected.
-  - **Correlated measures collapse.** Energy/density/loudness move together; a candidate that fires on several
-    correlated measures becomes ONE card naming the strongest, so it doesn't triple-count as three insights.
+  - **Correlated measures collapse — SMART (Sasha 2026-06-22, refined).** Energy/density are correlated
+    activity/loudness axes, so a single PART firing on both reads as a pile-up ("The mid — sparser" + "The mid
+    — quieter"). Collapse per stem: **same direction** (both "more" or both "less" — quieter+sparser restate the
+    same "this part pulls back") → keep the **strongest** only; **opposite directions** (louder BUT sparser — a
+    genuine contrast: bigger yet fewer hits) → **MERGE into ONE richer card** ("louder but sparser") so the
+    contrast survives instead of being dropped. Either way each part yields at most one divergence card.
+    Composite cards (a different KIND) are unaffected. Code: `collapse_correlated` before `select_cards`.
   - **"Show more" on demand (Sasha 2026-06-22).** The default budget stays tight (only the high-score cards).
     A separate control / command lowers the score threshold to reveal the next tier of lower-rated candidates
     for a user who wants to dig — the strict default is what's shown first, the deeper set is opt-in (it never
@@ -485,6 +490,28 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   **chronologically** (`build_widget.py:1999`) — a deliberate-but-confusing split. Add a Detailed-only toggle
   to switch the CARD list between **by urgency** (default, unchanged) and **chronological** (matching the
   letters). Pure presentation reorder; never adds/removes a card. ⟨DECIDE⟩ default = urgency (current).
+
+#### B.11.1 Resolution (2026-06-22) — BRIGHTNESS is descriptive, not a prescriptive per-stem card (Sasha)
+When A1 (per-measure validity) reached brightness, Sasha rejected the *premise*, not just the threshold:
+*"я пока не убеждён что что-то должно быть ярче чего-то… а ошибка это или нет, тебе откуда знать? может там
+барабаны должны врываться, а может синт. думаю это лучше потом на визуализацию какую-то спихнуть."* The point:
+a part being **brighter/darker than the rest is not a defect** — brightness divergence carries no intent, the
+coach cannot know whether the bright burst is wanted (a drum fill, a synth stab) or a mistake. A prescriptive
+card ("the lead is brighter than the rest — worth a second listen") therefore **asserts a problem it can't
+justify** (the credibility invariant: don't present a guess as a finding). Resolution:
+1. **Brightness is REMOVED from the prescriptive per-stem divergence measures.** `PER_STEM_MEASURES` =
+   `("energy", "density")` only. Energy/density divergence stay because they read against the *arc* (a part
+   fighting the energy build, dropping out as everything lifts) — closer to an actionable observation; brightness
+   does not. (This SUPERSEDES the earlier plan A1, which treated brightness as a card needing only a validity
+   gate.) The F5 validity discipline still governs any FUTURE measure added in E2 (stereo on a mono stem, etc.).
+2. **Relative brightness, if surfaced at all, is DESCRIPTIVE — one balance reading, or (preferred) a future
+   VIZ, never a per-part nudge.** Backlog: a single "relative brightness balance across the parts" card (no
+   judgement) OR a small per-stem brightness visualization. Deferred — Sasha leans viz-later.
+3. **Broader steer (informs E2 — widen the funnel).** "How would you know it's an error?" applies to ANY
+   per-stem MEASURE divergence: most are descriptive facts, not defects. So widening `PER_STEM_MEASURES` must
+   distinguish **arc-relevant / actionable** axes (worth a prescriptive card) from **descriptive** axes (belong
+   in a viz / one balance card). Default to descriptive unless an axis has a defensible "this fights the track"
+   reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
 
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";

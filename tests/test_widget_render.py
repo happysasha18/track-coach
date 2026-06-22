@@ -421,5 +421,28 @@ class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
                       "soloing any lane must clear every mute")
 
 
+class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
+    """Sasha 2026-06-22 (NOT critical, don't lose it): the header shows the AUDIO source — when an
+    .als project is part of the run it must be shown TOO (symmetry), and a very long path must stay
+    readable (wrap / middle-ellipsis + full value on hover), not overflow ugly on one line.
+    PROPOSED — TEST_MATRIX INV-29 (symmetry) + INV-30 (readability). The display already wires both
+    (`build_widget.py:2276-2281`); these are tripwires. INV-30 (nice long-path truncation) is the
+    open work, so both are skipped until the readability fix lands `bug→matrix→test→code`."""
+
+    @unittest.skip("PROPOSED INV-29: formalize source-file symmetry (audio shown ⇒ .als shown too)")
+    def test_source_file_symmetry(self):
+        # When meta carries BOTH audio and als, the header must push BOTH bits.
+        html, payload = _render()
+        self.assertIn('if(META.audio)bits.push(`${T.src_audio||"Audio"}:', html)
+        self.assertIn('if(META.als)bits.push(`${T.src_project||"Project"}:', html)
+
+    @unittest.skip("PROPOSED INV-30: long source path must wrap / middle-ellipsis + title-hover, not overflow")
+    def test_long_source_path_readable(self):
+        # The open work: a single very-long path token should truncate with the full value on hover
+        # (title attr) rather than blow the line out. .srcmeta currently flex-wraps but does not
+        # truncate a long unbroken token — implement, then un-skip.
+        self.fail("not yet implemented — see TEST_MATRIX INV-30")
+
+
 if __name__ == "__main__":
     unittest.main()

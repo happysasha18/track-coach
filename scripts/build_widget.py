@@ -528,7 +528,12 @@ def _persistence(stem, rest):
 
 
 DIVERGENCE_MIN = 0.35            # ⟨DECIDE⟩ τ — calibrate once on the 3 library tracks (SPEC §B.11)
-PER_STEM_MEASURES = ("energy", "brightness", "density")  # curves present in result_core_<stem>.json
+# PRESCRIPTIVE per-stem measures — axes where a divergence from the rest reads as an actionable
+# observation (a part fighting the energy arc / dropping out as everything lifts). BRIGHTNESS was
+# REMOVED here (SPEC §B.11.1, Sasha 2026-06-22): a part being brighter/darker than the rest is not a
+# defect — the coach can't know intent (a drum/synth burst may be wanted), so a prescriptive brightness
+# card asserts a problem it can't justify. Relative brightness is descriptive / a future viz, not a card.
+PER_STEM_MEASURES = ("energy", "density")  # curves present in result_core_<stem>.json
 
 
 def stem_divergence_candidates(stem_cores, measures=PER_STEM_MEASURES, tau=DIVERGENCE_MIN, levels=None):

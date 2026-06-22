@@ -6,7 +6,7 @@
 
 Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not *"energy is low,"* but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
 
-> **Status:** early (`v0.8.8`). macOS-first. Built and refined hands-on.
+> **Status:** early. macOS-first. Built and refined hands-on. <sub>(the exact version is printed in every widget's footer and tracked in [`CHANGELOG.md`](CHANGELOG.md) — not pinned here, so it can't drift)</sub>
 
 ![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
 
@@ -112,7 +112,7 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.8.8** (latest) — **stems named by what they SOUND like, advice that names the part, and a credibility pass on every number:**
+**v0.8.8** — **stems named by what they SOUND like, advice that names the part, and a credibility pass on every number:**
 
 - **Each stem gets a measured character label** — `kick` · `bass` · `melody` · `lead` · `chord` · `pad` — read from the audio (polyphony from transcribed notes + envelope shape), never guessed from the Demucs track name (which is wrong for electronic music). A held layer reads `pad`, a single moving line `lead`, stacked notes `chord`.
 - **Frequency-clash advice names the actual parts.** Instead of "bass covers *guitar* in 18% of spots," you get *"around 250–600 Hz the bass is louder than the lead ~18% of the track, worst around 1:18"* — one card per masked part, pinned to the worst moment, named by what it sounds like.

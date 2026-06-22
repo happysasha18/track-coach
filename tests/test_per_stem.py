@@ -148,6 +148,26 @@ class CompositeCandidates(unittest.TestCase):
         self.assertEqual(bw.composite_candidates(mix, stems), [])
 
 
+class BrightnessIsNotPrescriptive(unittest.TestCase):
+    """SPEC §B.11.1 (Sasha 2026-06-22): a part being brighter/darker than the rest is NOT a defect —
+    the coach can't know intent (a drum fill / synth stab may be wanted), so brightness must not produce
+    a prescriptive 'worth a second listen' per-stem card. It's dropped from the default prescriptive
+    measures; relative brightness is descriptive / a future viz, not a per-part nudge."""
+
+    def test_default_measures_exclude_brightness(self):
+        self.assertNotIn("brightness", bw.PER_STEM_MEASURES)
+        self.assertIn("energy", bw.PER_STEM_MEASURES)
+        self.assertIn("density", bw.PER_STEM_MEASURES)
+
+    def test_a_brightness_diverging_stem_yields_no_default_card(self):
+        # bass brightness runs opposite the rest, but with default measures it must NOT card.
+        cores = {"bass":  {"energy": [1, 2, 3, 4], "brightness": [4, 3, 2, 1]},
+                 "drums": {"energy": [1, 2, 3, 4], "brightness": [1, 2, 3, 4]},
+                 "lead":  {"energy": [1, 2, 3, 4], "brightness": [1, 2, 3, 4]}}
+        cands = bw.stem_divergence_candidates(cores)  # default PER_STEM_MEASURES
+        self.assertEqual([c for c in cands if c["measure"] == "brightness"], [])
+
+
 def _fake_masking(levels_db):
     """A minimal masking dict with one controllable level per stem: all energy in one band, constant
     across windows, so loud_level(stem_broadband_db(...)) == the given dB. Lets us drive the
@@ -214,9 +234,11 @@ class PerStemCards(unittest.TestCase):
         self.assertEqual(bw.per_stem_cards({}), [])
 
     def test_words_the_part_by_character_label_not_raw_stem(self):
-        cores = {"other": {"brightness": [1, 2, 3, 4]},
-                 "drums": {"brightness": [4, 3, 2, 1]},
-                 "bass":  {"brightness": [4, 3, 2, 1]}}
+        # density (a prescriptive measure) — brightness no longer cards (SPEC §B.11.1); this test's
+        # intent is the character-label wording, which is measure-independent.
+        cores = {"other": {"density": [1, 2, 3, 4]},
+                 "drums": {"density": [4, 3, 2, 1]},
+                 "bass":  {"density": [4, 3, 2, 1]}}
         cards = bw.per_stem_cards(cores, character={"other": {"label": "lead"}})
         self.assertTrue(cards)
         cls, when, head, body, fix, t = cards[0]
