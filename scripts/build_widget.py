@@ -447,8 +447,11 @@ def loud_level(arr):
 
 # A near-silent stem ranks BELOW the louder ones (Sasha 2026-06-22): a quiet part diverging matters less
 # than a loud one diverging, so its card score is scaled by how loud it is RELATIVE to the loudest stem.
-PROMINENCE_SPAN_DB = 24.0       # ⟨DECIDE⟩ — dB below the loudest stem at which a part's weight hits the floor
-PROMINENCE_FLOOR = 0.4          # ⟨DECIDE⟩ — minimum score weight for a relatively-quiet (near-silent) stem
+PROMINENCE_SPAN_DB = 24.0       # provisional (A3, validated on Lazy 2026-06-23): dB below the loudest stem
+                                # at which a part's weight hits the floor. On Lazy → drums 1.0 / bass 0.70 /
+                                # other 0.44 / guitar 0.40(floor) across a −11.6…−27.2 dB span — quiet parts
+                                # downranked, not dropped. Re-check on Shared/Wobble in Phase B.
+PROMINENCE_FLOOR = 0.4          # provisional (A3) — minimum score weight for a relatively-quiet stem (guitar)
 
 
 def stem_prominence(masking):
@@ -527,7 +530,9 @@ def _persistence(stem, rest):
     return opp / n
 
 
-DIVERGENCE_MIN = 0.35            # ⟨DECIDE⟩ τ — calibrate once on the 3 library tracks (SPEC §B.11)
+DIVERGENCE_MIN = 0.35            # provisional τ (A3, validated on Lazy 2026-06-23): real divergences on Lazy
+                                # split cleanly — bass/drums 0.16–0.25 (track the rest, excluded), guitar/
+                                # other 0.40–0.55 (diverge, admitted) — so 0.35 sits mid-gap, robust. SPEC §B.11
 # PRESCRIPTIVE per-stem measures — axes where a divergence from the rest reads as an actionable
 # observation (a part fighting the energy arc / dropping out as everything lifts). BRIGHTNESS was
 # REMOVED here (SPEC §B.11.1, Sasha 2026-06-22): a part being brighter/darker than the rest is not a
@@ -580,7 +585,9 @@ def _trend(curve):
     return max(-1.0, min(1.0, (late - early) / rng))
 
 
-COMPOSITE_TREND_MIN = 0.3        # ⟨DECIDE⟩ — calibrate on the 3 library tracks (SPEC §B.11)
+COMPOSITE_TREND_MIN = 0.3        # ⟨DECIDE⟩ STILL UNVALIDATED — Lazy can't calibrate this: its mix energy
+                                # trend is only 0.195 (no strong directional arc), so no composite can fire
+                                # regardless. Calibrate on Shared/Wobble (stronger arcs) in Phase B. SPEC §B.11
 
 
 def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=None):
@@ -607,6 +614,39 @@ def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=N
         out.append({"kind": "composite", "stem": stem, "relation": rel, "score": round(score, 3)})
     out.sort(key=lambda c: -c["score"])
     return out
+
+
+def collapse_correlated(candidates, measure_order=PER_STEM_MEASURES):
+    """Per PART, collapse correlated per-stem DIVERGENCE candidates so each part yields at most ONE
+    divergence card (SPEC §B.11 "Correlated measures collapse — SMART", Sasha 2026-06-22). Energy and
+    density are correlated activity/loudness axes, so a part firing on both reads as a pile-up ("the mid —
+    quieter" + "the mid — sparser"). Rule per stem: SAME direction (all "more" or all "less" — they restate
+    the same "this part pulls back") → keep the STRONGEST candidate only; OPPOSITE directions (louder BUT
+    sparser — a genuine contrast, bigger yet fewer hits) → MERGE into ONE richer card carrying every
+    (measure, dir) pair (ordered by `measure_order`) so the contrast survives in the wording. COMPOSITE
+    cards are a different KIND — passed through untouched. Pure; call BEFORE select_cards. A merged card
+    carries `measures` (ordered list of (measure, dir)) in place of the single `measure`/`dir`; an unmerged
+    survivor keeps its original shape."""
+    composites = [c for c in candidates if c.get("kind") == "composite"]
+    by_stem = {}
+    for c in candidates:
+        if c.get("kind") == "composite":
+            continue
+        by_stem.setdefault(c["stem"], []).append(c)
+    rank = {m: i for i, m in enumerate(measure_order)}
+    collapsed = []
+    for stem, group in by_stem.items():
+        if len(group) == 1:
+            collapsed.append(group[0])
+            continue
+        if len({c["dir"] for c in group}) == 1:        # same direction → strongest only
+            collapsed.append(max(group, key=lambda c: c["score"]))
+        else:                                          # opposite → merge into one richer card
+            ordered = sorted(group, key=lambda c: rank.get(c["measure"], len(rank)))
+            collapsed.append({"stem": stem,
+                              "measures": [(c["measure"], c["dir"]) for c in ordered],
+                              "score": max(c["score"] for c in group)})
+    return composites + collapsed
 
 
 def select_cards(candidates, budget, per_stem_cap=None):
@@ -664,6 +704,7 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
     cands = stem_divergence_candidates(per_stem_core, levels=levels)
     if mix_core:
         cands = cands + composite_candidates(mix_core, per_stem_core, levels=levels)
+    cands = collapse_correlated(cands)        # one divergence card per part (SPEC §B.11 SMART collapse)
     chosen = select_cards(cands, budget=budget, per_stem_cap=per_stem_cap)
 
     def part(stem):
@@ -680,10 +721,20 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
             phrase, why = worded
             out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None))
             continue
-        words = _MEASURE_WORDS.get(c["measure"])
-        if not words:
-            continue
-        adj = words[0] if c["dir"] == "up" else words[1]
+        if "measures" in c:                   # merged opposite-direction card ("louder but sparser")
+            adjs = []
+            for measure, dr in c["measures"]:
+                w = _MEASURE_WORDS.get(measure)
+                if w:
+                    adjs.append(w[0] if dr == "up" else w[1])
+            if not adjs:
+                continue
+            adj = " but ".join(adjs)
+        else:
+            words = _MEASURE_WORDS.get(c["measure"])
+            if not words:
+                continue
+            adj = words[0] if c["dir"] == "up" else words[1]
         out.append(("concept", f"Layers · the {p}",
                     f"The {p} — {adj} than the rest of the track",
                     f"For much of the track this part runs {adj} than everything else, pulling against "

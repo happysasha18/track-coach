@@ -248,5 +248,46 @@ class PerStemCards(unittest.TestCase):
         self.assertNotIn("other", head)           # never the raw Demucs stem name
 
 
+class CollapseCorrelated(unittest.TestCase):
+    """Per PART, correlated divergence candidates collapse to ONE card (SPEC §B.11 "Correlated measures
+    collapse — SMART"): same direction → strongest only; opposite directions → MERGE into one richer card."""
+
+    def test_same_direction_keeps_strongest_only(self):
+        cands = [{"stem": "mid", "measure": "energy", "dir": "down", "score": 0.6},
+                 {"stem": "mid", "measure": "density", "dir": "down", "score": 0.4}]
+        out = bw.collapse_correlated(cands)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["measure"], "energy")   # the stronger one survives, unmerged
+        self.assertNotIn("measures", out[0])
+
+    def test_opposite_directions_merge_carrying_both(self):
+        cands = [{"stem": "lead", "measure": "energy", "dir": "up", "score": 0.6},
+                 {"stem": "lead", "measure": "density", "dir": "down", "score": 0.4}]
+        out = bw.collapse_correlated(cands)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["measures"], [("energy", "up"), ("density", "down")])  # ordered, both kept
+        self.assertEqual(out[0]["score"], 0.6)          # carries the strongest score
+
+    def test_composite_candidates_pass_through_untouched(self):
+        comp = {"kind": "composite", "stem": "drums", "relation": "thins_as_track_builds", "score": 0.5}
+        out = bw.collapse_correlated([comp,
+                                      {"stem": "lead", "measure": "energy", "dir": "up", "score": 0.6},
+                                      {"stem": "lead", "measure": "density", "dir": "down", "score": 0.4}])
+        comps = [c for c in out if c.get("kind") == "composite"]
+        self.assertEqual(comps, [comp])
+
+    def test_integration_merged_card_reads_louder_but_sparser(self):
+        # lead's energy RISES vs the rest while its density FALLS → opposite dirs → one merged card.
+        # The rest must carry a shape (divergence is measured against shape, not a flat line), so drums/bass
+        # run OPPOSITE to the lead on each axis.
+        cores = {"other": {"energy": [1, 2, 3, 4, 5, 6], "density": [6, 5, 4, 3, 2, 1]},
+                 "drums": {"energy": [6, 5, 4, 3, 2, 1], "density": [1, 2, 3, 4, 5, 6]},
+                 "bass":  {"energy": [6, 5, 4, 3, 2, 1], "density": [1, 2, 3, 4, 5, 6]}}
+        cards = bw.per_stem_cards(cores, character={"other": {"label": "lead"}})
+        heads = " ".join(c[2] for c in cards)
+        self.assertIn("louder but sparser", heads)
+        self.assertNotIn("other", heads)               # never the raw Demucs stem
+
+
 if __name__ == "__main__":
     unittest.main()
