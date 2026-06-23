@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.30] — 2026-06-23
+
+### Changed
+- **The player's mute / solo / seek logic is now properly tested.** The synced player is the most
+  interactive part of the widget; its rules (only one of mute-mode/solo-mode at a time, soloing a part
+  isolates it, a seek keeps playing and never disturbs which parts you've muted/soloed) were previously only
+  spot-checked. They're now exercised as real combinations, so a future edit can't quietly break them. No
+  change to how the player looks or behaves — only to how well it's guarded.
+
+### Docs
+- Cold-session maintenance pass: cleaned stale references and out-of-date notes that piled up over many
+  increments (the stem-label list, dead section pointers, an old "draft" title, long-resolved open
+  questions), and added a written spec for the player. No user-visible change.
+
 ## [0.8.29] — 2026-06-23
 
 ### Added

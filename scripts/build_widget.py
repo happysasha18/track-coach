@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.29"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.30"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -3029,6 +3029,14 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const wrap=document.getElementById("playAudios");
  const auds=PL.srcs.map(s=>{const a=new Audio();a.src=s.src;a.preload="auto";wrap.appendChild(a);
   return {name:s.name,a:a,mute:false,solo:false};});
+ /* PLAYER_LOGIC_START — pure DOM-free player state machine (SPEC §B.14); node-executed by test_player_logic */
+ const pgains=stems=>{const anySolo=stems.some(s=>s.solo);return stems.map(s=>anySolo?!s.solo:s.mute);};   // → muted[] per stem
+ const toggleStem=(stems,i,kind)=>{const s=stems.map(x=>({mute:x.mute,solo:x.solo}));  // one mode at a time, across the whole player
+  if(kind==="mute"){s[i].mute=!s[i].mute;if(s[i].mute)s.forEach(x=>x.solo=false);}
+  else{s[i].solo=!s[i].solo;if(s[i].solo)s.forEach(x=>x.mute=false);}return s;};
+ const seekResult=(t,dur,wasPlaying)=>{t=Math.max(0,Math.min(dur,t));return {t:t,resume:!!wasPlaying};};   // clamp + keep transport
+ if(typeof module!=="undefined")module.exports={pgains,toggleStem,seekResult};
+ /* PLAYER_LOGIC_END */
  const master=auds[0].a;
  const btn=document.getElementById("playBtn"),tEl=document.getElementById("playTime");
  btn.textContent=T.play_play;
@@ -3044,8 +3052,8 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   buildStemGrid();
  }
  function buildStemGrid(){   // FULL only — everything stem-lane lives in here; drawL/lresize get assigned
- function gains(){const anySolo=auds.some(s=>s.solo);
-  auds.forEach(s=>{s.a.muted=anySolo?!s.solo:s.mute;});drawL(lxOf(window.__pht||0));}  // keep the playhead put
+ function gains(){const m=pgains(auds);
+  auds.forEach((s,i)=>{s.a.muted=m[i];});drawL(lxOf(window.__pht||0));}  // keep the playhead put (SPEC §B.14: pgains resolves audibility)
  // ── sequencer lanes: one playable lane per stem, with mute/solo + envelope ──
  // Each lane bridges the Demucs stem to the real project part (from the stem map),
  // so the eye (arrangement = project groups) and the ear (these stems) stay connected.
@@ -3181,8 +3189,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    // M and S are mutually exclusive — and across the WHOLE player: muting puts you in "mute mode"
    // (clears every solo), soloing puts you in "solo mode" (clears every mute). So you can never have a
    // mute on one stem AND a solo on another at the same time (Sasha, 2026-06-21: "это неправильно").
-   if(x>=3&&x<=15){if(y>=L.y+3&&y<=L.y+15){L.s.mute=!L.s.mute;if(L.s.mute)auds.forEach(a=>a.solo=false);gains();return;}
-    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){L.s.solo=!L.s.solo;if(L.s.solo)auds.forEach(a=>a.mute=false);gains();return;}}}
+   if(x>=3&&x<=15){const si=auds.indexOf(L.s),apply=k=>{const ns=toggleStem(auds,si,k);auds.forEach((a,j)=>{a.mute=ns[j].mute;a.solo=ns[j].solo;});gains();};
+    if(y>=L.y+3&&y<=L.y+15){apply("mute");return;}        // SPEC §B.14: toggleStem keeps one mode at a time
+    if(y>=L.y+L.h-15&&y<=L.y+L.h-3){apply("solo");return;}}}
   if(x>=PADL)seekTo(Math.max(0,Math.min(dur(),(x-PADL)/(LW-PADL-PADR)*dur())));});  // gutter clicks don't seek to 0
  window.addEventListener("resize",lresize);
  PH.push(t=>drawL(lxOf(t)));
@@ -3196,10 +3205,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  function pause(){auds.forEach(s=>s.a.pause());btn.textContent=T.play_play;}
  btn.onclick=()=>{master.paused?play():pause();};
  const rew=document.getElementById("rewBtn");if(rew)rew.onclick=()=>seekTo(0);  // Ableton-style back-to-start
- function seekTo(t){t=Math.max(0,Math.min(dur(),t));
-  const wasPlaying=!master.paused;            // a seek (rec card / cue / chart click) must NOT stop playback
-  auds.forEach(s=>{s.a.currentTime=t;});paint(t);
-  if(wasPlaying)Promise.all(auds.map(s=>s.a.play())).catch(()=>{});}  // re-sync the stems + keep playing
+ function seekTo(t){const r=seekResult(t,dur(),!master.paused);  // SPEC §B.14: clamp + keep transport (a seek must NOT stop playback)
+  auds.forEach(s=>{s.a.currentTime=r.t;});paint(r.t);
+  if(r.resume)Promise.all(auds.map(s=>s.a.play())).catch(()=>{});}  // re-sync the stems + keep playing
  window.__seek=t=>{seekTo(t);};   // charts/lanes call this on click; the playhead line IS the seek UI
  master.addEventListener("ended",pause);
  master.addEventListener("loadedmetadata",()=>{paint(0);lresize();});

@@ -1,4 +1,4 @@
-# track-coach — SPEC (prover-facing) — DRAFT, increment 1: the CREDIBILITY layer
+# track-coach — SPEC (prover-facing). Scope: the CREDIBILITY layer (§A–§B.11) + the ARTISTIC layer (§B.12–§B.13)
 
 _Session 12, 2026-06-20. This SPEC sits ALONGSIDE `TEST_MATRIX.md`. The matrix is the spec projected
 into a checkable grid (UI/render invariants). This SPEC is the prose-first source: what the product IS,
@@ -28,6 +28,14 @@ job is that credibility layer.
     a dB floor (or its real onset activity over time) — not a single peak. (This corrects a peak-only
     test: e.g. a stem with median −76 dB but one −16 dB stab is NOT significant; one with steady onsets
     across the track IS, even if quiet.) States: `significant` / `insignificant (quiet/empty)`.
+    - **KNOWN DEBT (2026-06-23, Sasha's call — leave the code, record the gap).** The SHIPPED gate
+      (`significant_stems`, `build_widget.py`) is level-only: `loud_level` (85th-pct broadband) ≥
+      `STEM_EMPTY_FLOOR_DB` (−55). The 85th-pct rejects a single stab (good), but the **onset-activity /
+      temporal axis above is NOT implemented** — a quiet-but-steady stem (e.g. a −58 dB perc loop ticking
+      the whole track) is dropped as "empty" though this definition says it is significant. No real track
+      has hit this yet, so the fix is deferred (like CR-4a). When a track exposes it, add an OR-branch:
+      significant if `loud_level ≥ −55` **OR** onset-coverage ≥ ⟨X⟩ over the track. Until then the gate is
+      whole-track + level-only by design, and so is per-scene significance (CR-2a is also deferred, §B.1).
   - **mapped identity** + confidence (clear/mixed/nomatch/empty) from `map_stems`. The Demucs LABEL is
     an approximation, NOT the identity (Sasha makes electronic: "vocals" is a synth). See memory
     `track-coach-stem-labels`.
@@ -72,8 +80,11 @@ matrix cell + test once Sasha confirms the ⟨DECIDE⟩ points):
   Today's bug: `build_widget.py:769` calls any section ≥0.8 of peak a Drop (`tier = ti / mx`, relative),
   ignoring the required preceding dip → a continuously-loud track reads as "all drops." The signal
   lives in the **shape** of the curve (fall/build → sharp return + family entrance + density jump), read
-  **in aggregate** — the hard call belongs to the interpretation layer (the LLM reading the real curves),
-  NOT a hand-coded threshold; guarded by the necessary-condition tests in §D. Prefer labelling the
+  **in aggregate**. The original ambition was for the interpretation layer (an LLM reading the real curves)
+  to make the call rather than a single hard threshold; **what SHIPPED (§B.2, G5/G6) is a hand-coded
+  NECESSARY condition** — a Drop requires a strictly-lower predecessor (`LIFT`=0.12 tier) — validated by the
+  necessary-condition tests in `tests/test_credibility.py` (G5/G6), NOT a phantom "§D". The LLM-reads-the-curve
+  version stays a possible future direction; for now the threshold IS the design. Prefer labelling the
   **pair** "Build/Breakdown → Drop" as a unit rather than scattering "Drop". Numbering must be gap-free
   (today names are set before `_coalesce_scenes` merges → "Drop, Drop 3, Drop 5"). ⟨DECIDE⟩ the Δ and the
   name for sustained-high non-lift sections ("Main"/"Peak"/letter only)?
@@ -99,8 +110,10 @@ matrix cell + test once Sasha confirms the ⟨DECIDE⟩ points):
 ### B.1 Phase-2 resolutions (folded back from `prover_runs/spec_credibility_2026-06-20.md`)
 - **CR-1a (from P2):** mix-level claims (energy/brightness/density/vitals/arc) are INDEPENDENT of stem
   significance — an all-insignificant-stems run still gives the full arc; only the stem layer is omitted.
-- **CR-2a (from P1):** significance is **per-scene**, not whole-track — a stem that carries only the drop
-  is significant THERE. "Omit + don't parse" applies only to a stem insignificant in EVERY scene.
+- **CR-2a (from P1) — DEFERRED (2026-06-23): the shipped gate is whole-track.** The intent: significance
+  is **per-scene**, not whole-track — a stem that carries only the drop is significant THERE; "omit + don't
+  parse" would apply only to a stem insignificant in EVERY scene. NOT implemented — `significant_stems` is
+  whole-track + level-only (§A KNOWN DEBT). Nothing downstream depends on the per-scene refinement yet.
 - **CR-4a (from P3):** leakage honesty is windowed (bleed varies over time) — caveat rather than globally
   suppress.
 - **CR-5c (from P4/P5):** using the self-sim segmentation requires it be stable (enough distinct
@@ -179,8 +192,9 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     reads ~0.88, a chord/arp ~0.49 on real stems). Was mean note duration — that NEVER fired because
     basic-pitch fragments held synths into ~0.2 s notes; the envelope holds up where note length didn't.
   - **fallback:** a mid·sustained stem with NO transcribed notes (basic-pitch found nothing, or transcribe
-    was skipped) keeps the honest **`tonal`** umbrella — we never invent a melody/chord verdict from
-    missing data (CR-1). All five new labels are `approx`.
+    was skipped) keeps the honest **`tonal`** umbrella INTERNALLY — we never invent a melody/chord verdict
+    from missing data (CR-1). **It is DISPLAYED as the base role `mid`, never the word `tonal`** (§B.7 INV).
+    All five new labels are `approx`.
   - **NO vocabulary / NO ML text-prompts** — Sasha explicitly rejected defining prompt vocabularies
     (he called that "a bit dumb"). Every bucket is a deterministic threshold on a measured quantity.
   - ⟨DECIDE⟩ thresholds (tune as more tracks land): `POLY_FRAC_MONO_MAX`=0.20, `PAD_SUSTAIN_MIN`=0.7.
@@ -308,11 +322,14 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
 - Verified by deed (Lazy_Sparks 0.8.11–0.8.15): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
   vocals/piano→"near-silent"; guitar sub-line→"Guitar".
 - **INV (label set).** The displayed lane label is EXACTLY one of:
-  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `noise` (inert — never fires
-  until a real noise/riser stem exists, §B.4/G13), `mid`, `high`, `near-silent`. **Never** `tonal`, never a
-  `≈` prefix, never a raw Demucs family name. Note: `bass` is reachable two ways — the trusted `bass`
-  family, AND an UNTRUSTED stem whose centroid is < `LOW_CENTROID_HZ` (§B.8, role `low`); the latter is
-  intentional (it occupies the bass range) but see the OPEN question below on whether to split that word.
+  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `mid`, `high`, `near-silent`.
+  **Never** `tonal`, never a `≈` prefix, never a raw Demucs family name. **Internal buckets that DON'T appear
+  verbatim:** `tonal` (G13 fallback) is displayed as the base role `mid`; `air` (G12/G14 high-sustained) is
+  displayed as `high`; `noise` is inert (the flatness gate never fires — §B.4/G13 — so it is never emitted,
+  and it is intentionally NOT in the displayed set until a real noise/riser stem exists to verify it). Note:
+  `bass` is reachable two ways — the trusted `bass` family, AND an UNTRUSTED stem whose centroid is <
+  `LOW_CENTROID_HZ` (§B.8, role `low`); the latter is intentional (it occupies the bass range) but see the
+  OPEN question below on whether to split that word.
 - **OPEN (asked Sasha):** where the map verdict is genuinely `clear` AND the matched real project track
   looks meaningful (e.g. guitar→"Guitar"), fold that real name in as the primary label instead of the
   base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). NOTE: 0.8.12 already put the
@@ -467,7 +484,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   here (no `result_core_<stem>.json` is written for them, CR-2); this orders the SIGNIFICANT-but-quiet ones.
   It is a soft down-rank, NOT a drop: a near-silent part's card still appears if its divergence is strong
   enough to win a budget slot, it just sorts after the prominent parts. Relative, not absolute — `weight =
-  clamp(1 + (loud_db − loudest_stem_db) / SPAN, FLOOR, 1)`, loud_db = the §1 `loud_level` (85th-pct broadband,
+  clamp(1 + (loud_db − loudest_stem_db) / SPAN, FLOOR, 1)`, loud_db = the §A `loud_level` (85th-pct broadband,
   the same number the significance gate uses, NOT the self-normalized per-stem energy curve, which peaks at 1
   for every stem). ⟨DECIDE⟩ `PROMINENCE_SPAN_DB` (24) + `PROMINENCE_FLOOR` (0.4), calibrate with the others.
 - **Composite cards are WORDED into the pool (0.8.23).** `composite_candidates` (a stem moving against the
@@ -484,7 +501,8 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
 - **WHERE it shows (Sasha 2026-06-22).** Per-stem cards live in the **Detailed view only** by default (they
   are depth, not the headline). **Promotion to Simple** only for a STRONG divergence (⟨DECIDE⟩ a higher
   threshold) — *"if there's something really important there, why not put it in Simple too."* Respects the view ladder
-  (`quick ⊆ Simple ⊆ Detailed`, §the ladder): a card promoted to Simple is therefore also in Detailed.
+  (`quick ⊆ Simple ⊆ Detailed`, the view ladder — INV-19 in `docs/TEST_MATRIX.md`): a card promoted to
+  Simple is therefore also in Detailed.
 - **SORT TOGGLE (Sasha 2026-06-22) — Detailed only.** Today the advice cards are ordered by **urgency**
   (`build_widget.py:1493` `_rank crit<do<concept`) while the lettered cues a/b/c on the timeline are ordered
   **chronologically** (`build_widget.py:1999`) — a deliberate-but-confusing split. Add a Detailed-only toggle
@@ -574,11 +592,50 @@ in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_
   `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
   unit-tested.
 
-## C. What I need from Sasha to derive the matrix + tests
-The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
-(2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are
-"significant" for repetition. With those, I run product-prover on this SPEC, then derive the §-grids +
-tests, then fix the code (bug → spec → test → code).
+### B.14 The synced player as a STATE MACHINE (2026-06-23, cold-session maintenance — the most interactive, least-spec'd surface)
+The full-mode player is the widget's most interactive surface (play/pause × per-stem mute × solo × seek ×
+card-click) and was, until this pass, NOT in the spec and tested only by string-matching the JS source — so
+the COMBINATIONS were never exercised (the seek-stops-playback bug, 0.8.28/INV-33, was exactly this class).
+This section names the machine; the cross-control invariants are extracted into pure, DOM-free JS helpers
+(`pgains` / `toggleStem` / `seekResult`) so they can be unit-tested by EXECUTING the real shipped code in
+node — not by mirroring it in Python (assert against the artifact, not a fragment).
+
+- **State.** Transport ∈ {`playing`, `paused`}. Each stem carries `{mute: bool, solo: bool}`. Derived:
+  `anySolo = some stem.solo`. Audible(stem) = `anySolo ? stem.solo : !stem.mute`. The browser flag set on
+  each `<audio>` is `muted = !audible` — computed by `pgains(stems) → muted[]`.
+- **Controls / transitions.**
+  - **play/pause** (the transport button): toggles `playing`↔`paused`; on play, every stem's `currentTime`
+    is re-synced to the master before `play()` (stems never drift apart).
+  - **mute(i)**: `toggleStem(stems, i, "mute")` flips stem i's mute; if it became muted, **clears every
+    solo** (you drop into "mute mode").
+  - **solo(i)**: `toggleStem(stems, i, "solo")` flips stem i's solo; if it became soloed, **clears every
+    mute** (you drop into "solo mode").
+  - **seek(t)** (chart click / rec card / cue / lane gutter / rewind): `seekResult(t, dur, wasPlaying)`
+    clamps t to [0, dur] and reports whether to resume; every stem's `currentTime := t`; if it was playing,
+    all stems resume together (re-synced).
+  - **card-click** (timecoded rec): = seek(t) + scroll `#storyPanel` into view + a CSS `pulse` on the graph
+    panel (DOM/CSS only, never the canvas — §B.13/INV-34).
+- **Cross-control INVARIANTS (the combinations that were untested).**
+  1. **One mode at a time (Sasha, 2026-06-21 — he called the mixed state wrong).** After ANY sequence of mute/solo toggles,
+     never `(some stem muted) AND (some stem soloed)` simultaneously. `toggleStem` guarantees it.
+  2. **Solo resolves gains.** When `anySolo`, the audible set is EXACTLY the soloed stems (every non-soloed
+     stem is muted), regardless of individual mute flags.
+  3. **Mute resolves gains.** When NOT `anySolo`, audible(stem) = `!stem.mute`.
+  4. **Seek preserves transport AND mix.** A seek does not change any stem's `{mute, solo}` and resumes iff
+     it was playing (a seek while paused stays paused). So: solo a stem → seek while playing → the same one
+     stem is still the only one audible AND playback continues (INV-33 generalised to the combination).
+  5. **Seek clamps.** The resulting time is always in [0, dur]; a gutter/negative/over-dur click never seeks
+     out of range.
+- **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
+  are not wired (a single source is always audible). `seekResult` still governs its seeks.
+
+## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
+All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
+`STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
+of **Drop** — strictly-lower predecessor, `LIFT` = 0.12, sustained-high = "Main" (§B.2, CR-5); (3) which
+stems count as significant for repetition — `significant_stems()` gate (§B.3, CR-6). The method (write SPEC
+→ product-prover → derive matrix/tests → fix code, bug → spec → test → code) is now the standing process,
+not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thresholds, flagged inline above.
 
 ## Glossary (plain-language definitions; expand it whenever a term needed explaining)
 - **red on the band strip** = high energy shown on the per-stem band strip.

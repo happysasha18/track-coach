@@ -186,14 +186,15 @@ class PlayerIsWired(unittest.TestCase):
         self.assertIsNone(payload.get("player"),
                           "player must be absent (not an empty shell) when there's no audio")
 
-    def test_seek_keeps_playback_running(self):
+    def test_seek_keeps_playback_running(self):  # INV-33/INV-38 — wiring half; behaviour in test_player_logic
         # 0.8.28 bug (Sasha): clicking a rec card while the track plays jumped AND stopped playback.
-        # seekTo must preserve play state — capture it and resume (re-synced) after seeking.
+        # seekTo delegates to the pure seekResult (SPEC §B.14) and resumes iff it reports resume.
+        # (The resume/clamp LOGIC is exercised in node by test_player_logic; here we pin the WIRING.)
         html, _ = _render(stems=("drums", "bass"))
-        self.assertIn("const wasPlaying=!master.paused", html,
-                      "seekTo must capture whether it was playing before the seek")
-        self.assertIn("if(wasPlaying)Promise.all(auds.map(s=>s.a.play()))", html,
-                      "seekTo must resume (and re-sync) playback after a mid-play seek")
+        self.assertIn("seekResult(t,dur(),!master.paused)", html,
+                      "seekTo must delegate to the pure seekResult helper")
+        self.assertIn("if(r.resume)Promise.all(auds.map(s=>s.a.play()))", html,
+                      "seekTo must resume (and re-sync) playback when seekResult says so")
 
     def test_card_click_pulses_the_graph(self):  # INV-34 (SPEC §B.13 navigation), 0.8.28
         # Clicking a timecoded card must draw the eye to the moment on the graph: seek + scroll + a brief
@@ -440,17 +441,16 @@ class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
     """Mute and solo are mutually exclusive across the WHOLE player, not just per lane (Sasha,
     2026-06-21: same lane can't be both, AND you can't mute one stem while soloing another — "это
     неправильно"). Muting clears every solo; soloing clears every mute → the player is always in one
-    coherent mode. Pinned at source level (plain JS toggle, no DOM needed)."""
+    coherent mode. The exclusivity LOGIC is now the pure `toggleStem` helper (SPEC §B.14), exhaustively
+    exercised in node by test_player_logic::PlayerStateMachine::test_one_mode_at_a_time (INV-35); here we
+    pin that the lane handler WIRES the toggle through it for both controls."""
 
-    def test_muting_clears_all_solos(self):
+    def test_lane_toggle_wires_through_the_resolver(self):
         html, _ = _render(stems=("drums", "bass"))
-        self.assertIn("L.s.mute=!L.s.mute;if(L.s.mute)auds.forEach(a=>a.solo=false)", html,
-                      "muting any lane must clear every solo")
-
-    def test_soloing_clears_all_mutes(self):
-        html, _ = _render(stems=("drums", "bass"))
-        self.assertIn("L.s.solo=!L.s.solo;if(L.s.solo)auds.forEach(a=>a.mute=false)", html,
-                      "soloing any lane must clear every mute")
+        self.assertIn('toggleStem(auds,si,k)', html,
+                      "the lane handler must route mute/solo through the pure toggleStem resolver")
+        self.assertIn('apply("mute")', html, "the mute box must call the resolver")
+        self.assertIn('apply("solo")', html, "the solo box must call the resolver")
 
 
 class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
