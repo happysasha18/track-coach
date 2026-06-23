@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.26] — 2026-06-23
+
+### Added
+- **The coach now flags a part whose dynamics stand out.** A part that's much more *squashed* (compressed)
+  or much more *dynamic* than the rest of the track gets its own card — e.g. *"The drums — more compressed
+  than the rest"* (Lazy/Wobble) or *"The bass — more dynamic than the rest"* (Wobble). It reads the dynamic
+  range already measured per part, so no re-analysis; the card budget is unchanged.
+
+### Tried and rejected
+- **Modulation / "wobble" per part — not shipped.** Tested by deed on all three tracks: the per-window
+  modulation signal fires on nearly every part (it mostly re-detects "drums vs not"), so it would flood the
+  advice with low-value cards rather than point at a real difference. Left out until there's a cleaner
+  modulation measure.
+
 ## [0.8.25] — 2026-06-23
 
 ### Added

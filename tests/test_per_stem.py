@@ -192,6 +192,47 @@ class StereoWidthMeasure(unittest.TestCase):
         self.assertEqual(len(stereo), 1)                               # stereo stands alone
 
 
+class DynamicsMeasure(unittest.TestCase):
+    """E2 (2026-06-23): per-part DYNAMIC RANGE as an axis ("this part is more dynamic / more compressed
+    than the rest"). Unlike energy/density/stereo this is a SCALAR (`vitals.dynamic_range_db`, already in
+    the core — no re-run), compared to the MEAN of the rest; |dev| past a dB threshold → a card. It's an
+    independent axis (passes through collapse as its own card). SPEC §B.11."""
+
+    def _cores(self, drums_dr):
+        return {"drums": {"vitals": {"dynamic_range_db": drums_dr}},
+                "bass":  {"vitals": {"dynamic_range_db": 25.0}},
+                "lead":  {"vitals": {"dynamic_range_db": 26.0}}}
+
+    def test_compressed_outlier_fires_down(self):
+        cands = bw.stem_dynamics_candidates(self._cores(13.0))
+        drums = [c for c in cands if c["stem"] == "drums"]
+        self.assertEqual(len(drums), 1)
+        self.assertEqual(drums[0]["measure"], "dynamics")
+        self.assertEqual(drums[0]["dir"], "down")          # lower DR = more compressed
+
+    def test_within_threshold_no_card(self):
+        cores = {"a": {"vitals": {"dynamic_range_db": 20.0}},
+                 "b": {"vitals": {"dynamic_range_db": 21.0}},
+                 "c": {"vitals": {"dynamic_range_db": 22.0}}}
+        self.assertEqual(bw.stem_dynamics_candidates(cores), [])
+
+    def test_dynamics_wording(self):
+        self.assertEqual(bw._MEASURE_WORDS["dynamics"], ("more dynamic", "more compressed"))
+
+    def test_dynamics_is_independent_card_through_collapse(self):
+        cands = [{"stem": "drums", "measure": "energy",   "dir": "up",   "score": 0.5},
+                 {"stem": "drums", "measure": "dynamics", "dir": "down", "score": 0.6}]
+        out = bw.collapse_correlated(cands)
+        drums = [c for c in out if c.get("stem") == "drums"]
+        self.assertEqual(len(drums), 2)                    # energy card + dynamics card, not merged
+        self.assertTrue(any(c.get("measure") == "dynamics" for c in drums))
+
+    def test_per_stem_cards_surfaces_dynamics(self):
+        cores = self._cores(13.0)
+        heads = " | ".join(c[2] for c in bw.per_stem_cards(cores))
+        self.assertIn("more compressed than the rest", heads)
+
+
 class CompositeTrendCalibration(unittest.TestCase):
     """Phase B (2026-06-23): COMPOSITE_TREND_MIN is FROZEN at a principled 0.3 — a composite ("a part
     moves against the whole track") only fires when the MIX has a genuine directional build/breakdown.

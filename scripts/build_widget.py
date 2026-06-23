@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.25"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.26"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -697,7 +697,40 @@ _MEASURE_WORDS = {                       # adjectives (number-neutral): (higher-
     "brightness":   ("brighter", "darker"),
     "density":      ("busier", "sparser"),
     "stereo_width": ("wider", "narrower"),
+    "dynamics":     ("more dynamic", "more compressed"),
 }
+
+DYNAMICS_DEV_DB = 6.0           # min |dB| a part's dynamic range must sit off the REST's mean to read as an
+                                # outlier (E2 2026-06-23, provisional — on the 3 library tracks the clear
+                                # cases sit 6–12 dB off: Lazy drums −6.6, Shared vocals +8.7, Wobble drums
+                                # −11.9; smaller gaps are mix balance, not a story). SPEC §B.11.
+DYNAMICS_DEV_SPAN_DB = 12.0     # |dev| mapped to a 0..1 divergence for scoring (12 dB off → full weight)
+
+
+def stem_dynamics_candidates(stem_cores, tau_db=DYNAMICS_DEV_DB, levels=None):
+    """Per-part DYNAMIC RANGE outlier (E2 — a SCALAR axis, not a curve). Compares each part's
+    `vitals.dynamic_range_db` to the MEAN of the other parts; a deviation past `tau_db` becomes a scored
+    candidate — lower = "more compressed" (squashed against the rest), higher = "more dynamic". Reuses the
+    DR already in `result_core_<stem>.json` (no re-run). `levels` (prominence) ranks a near-silent part
+    below loud ones, as elsewhere. Pure; returns candidates sorted by score desc."""
+    levels = levels or {}
+    drs = {s: (c.get("vitals") or {}).get("dynamic_range_db") for s, c in stem_cores.items()}
+    drs = {s: v for s, v in drs.items() if isinstance(v, (int, float))}
+    out = []
+    for stem, v in drs.items():
+        others = [drs[o] for o in drs if o != stem]
+        if not others:
+            continue
+        dev = v - sum(others) / len(others)
+        if abs(dev) < tau_db:
+            continue
+        mag = min(1.0, abs(dev) / DYNAMICS_DEV_SPAN_DB)
+        score = candidate_score(divergence=mag, persistence=mag, specificity=0.5,
+                                redundancy=0.0, prominence=levels.get(stem, 1.0))
+        out.append({"stem": stem, "measure": "dynamics", "dir": "up" if dev > 0 else "down",
+                    "divergence": round(mag, 3), "score": round(score, 3)})
+    out.sort(key=lambda c: -c["score"])
+    return out
 
 _COMPOSITE_WORDS = {                      # stem-vs-whole-track relation → (head phrase, why)
     "thins_as_track_builds":
@@ -723,7 +756,8 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
     cands = stem_divergence_candidates(per_stem_core, levels=levels)
     if mix_core:
         cands = cands + composite_candidates(mix_core, per_stem_core, levels=levels)
-    cands = collapse_correlated(cands)        # one divergence card per part (SPEC §B.11 SMART collapse)
+    cands = cands + stem_dynamics_candidates(per_stem_core, levels=levels)   # scalar DR axis (E2)
+    cands = collapse_correlated(cands)        # collapse the activity pair; other axes stay independent
     chosen = select_cards(cands, budget=budget, per_stem_cap=per_stem_cap)
 
     def part(stem):
