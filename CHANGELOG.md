@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.25] — 2026-06-23
+
+### Added
+- **The coach now reads each part's stereo width too.** On top of "louder/quieter" and "busier/sparser",
+  a part that sits *wider* or *narrower* than the rest of the track now earns its own advice card — e.g.
+  *"The drums — narrower than the rest"*. It's a separate observation from the loudness/density one, so a
+  part can show both, and a near-mono part is skipped (no stereo image to judge). The card budget is
+  unchanged, so the list stays short — this just lets a more useful card win a slot.
+
 ## [0.8.24] — 2026-06-23
 
 ### Changed

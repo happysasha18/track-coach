@@ -148,6 +148,50 @@ class CompositeCandidates(unittest.TestCase):
         self.assertEqual(bw.composite_candidates(mix, stems), [])
 
 
+class StereoWidthMeasure(unittest.TestCase):
+    """E2 (2026-06-23): widen the funnel — stereo width joins energy/density as a PRESCRIPTIVE per-part
+    measure ("this part is wider/narrower than the rest"). Two guards: (1) a near-MONO part has no real
+    stereo image to read, so its stereo card is suppressed (per-measure validity, A1 discipline);
+    (2) stereo is a SEPARATE axis from the correlated activity pair (energy+density) — it must get its OWN
+    card, never be merged into the "louder but sparser" activity card. SPEC §B.11."""
+
+    def test_stereo_in_prescriptive_measures(self):
+        self.assertIn("stereo_width", bw.PER_STEM_MEASURES)
+        self.assertEqual(bw.CORRELATED_MEASURES, ("energy", "density"))
+
+    def test_stereo_wording(self):
+        self.assertEqual(bw._MEASURE_WORDS["stereo_width"], ("wider", "narrower"))
+
+    def _cores(self, lead_mean):
+        # lead's width runs OPPOSITE the two neighbours' shape → a real shape divergence (rest is shaped,
+        # not flat — divergence is undefined vs a constant, so the baseline must move)
+        return {"lead": {"stereo_width": [1, 0, 1, 0, 1, 0], "stereo_width_mean": lead_mean},
+                "a":    {"stereo_width": [0, 1, 0, 1, 0, 1], "stereo_width_mean": 0.3},
+                "b":    {"stereo_width": [0, 1, 0, 1, 0, 1], "stereo_width_mean": 0.3}}
+
+    def test_wide_stem_emits_stereo_candidate(self):
+        cands = bw.stem_divergence_candidates(self._cores(0.4), measures=("stereo_width",))
+        self.assertTrue(any(c["stem"] == "lead" and c["measure"] == "stereo_width" for c in cands))
+
+    def test_near_mono_stem_suppressed(self):
+        # same diverging shape, but the part is essentially mono → no stereo card (nothing to widen)
+        cands = bw.stem_divergence_candidates(self._cores(0.01), measures=("stereo_width",))
+        self.assertEqual([c for c in cands if c["measure"] == "stereo_width"], [])
+
+    def test_stereo_is_its_own_card_not_merged_into_activity(self):
+        cands = [{"stem": "lead", "measure": "energy",       "dir": "up",   "score": 0.5},
+                 {"stem": "lead", "measure": "density",      "dir": "down", "score": 0.4},
+                 {"stem": "lead", "measure": "stereo_width", "dir": "up",   "score": 0.45}]
+        out = bw.collapse_correlated(cands)
+        lead = [c for c in out if c.get("stem") == "lead"]
+        self.assertEqual(len(lead), 2)                                  # activity card + stereo card
+        merged = [c for c in lead if "measures" in c]
+        stereo = [c for c in lead if c.get("measure") == "stereo_width"]
+        self.assertEqual(len(merged), 1)                               # energy+density merged into one
+        self.assertEqual({m for m, _ in merged[0]["measures"]}, {"energy", "density"})
+        self.assertEqual(len(stereo), 1)                               # stereo stands alone
+
+
 class CompositeTrendCalibration(unittest.TestCase):
     """Phase B (2026-06-23): COMPOSITE_TREND_MIN is FROZEN at a principled 0.3 — a composite ("a part
     moves against the whole track") only fires when the MIX has a genuine directional build/breakdown.

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.24"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.25"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -538,7 +538,13 @@ DIVERGENCE_MIN = 0.35            # provisional τ (A3, validated on Lazy 2026-06
 # REMOVED here (SPEC §B.11.1, Sasha 2026-06-22): a part being brighter/darker than the rest is not a
 # defect — the coach can't know intent (a drum/synth burst may be wanted), so a prescriptive brightness
 # card asserts a problem it can't justify. Relative brightness is descriptive / a future viz, not a card.
-PER_STEM_MEASURES = ("energy", "density")  # curves present in result_core_<stem>.json
+PER_STEM_MEASURES = ("energy", "density", "stereo_width")  # curves present in result_core_<stem>.json
+CORRELATED_MEASURES = ("energy", "density")   # the activity/loudness pair — these two restate one another
+                                # (a part that pulls back is usually quieter AND sparser), so they COLLAPSE
+                                # into one card (collapse_correlated). Other axes (stereo width, …) are
+                                # independent and each earn their own card. E2 2026-06-23, SPEC §B.11.
+STEREO_MONO_FLOOR = 0.05        # below this mean stereo width a part is effectively MONO — it has no stereo
+                                # image to read, so we suppress its "wider/narrower" card (A1 validity).
 
 
 def stem_divergence_candidates(stem_cores, measures=PER_STEM_MEASURES, tau=DIVERGENCE_MIN, levels=None):
@@ -554,6 +560,10 @@ def stem_divergence_candidates(stem_cores, measures=PER_STEM_MEASURES, tau=DIVER
     for measure in measures:
         curves = {s: c.get(measure) for s, c in stem_cores.items() if c.get(measure)}
         for stem, curve in curves.items():
+            # per-measure validity (A1): a near-mono part has no stereo image to read → no width card
+            if measure == "stereo_width" and \
+               (stem_cores[stem].get("stereo_width_mean") or 0) < STEREO_MONO_FLOOR:
+                continue
             rest = rest_curve(curves, stem)
             if not rest:
                 continue
@@ -619,21 +629,25 @@ def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=N
     return out
 
 
-def collapse_correlated(candidates, measure_order=PER_STEM_MEASURES):
-    """Per PART, collapse correlated per-stem DIVERGENCE candidates so each part yields at most ONE
-    divergence card (SPEC §B.11 "Correlated measures collapse — SMART", Sasha 2026-06-22). Energy and
-    density are correlated activity/loudness axes, so a part firing on both reads as a pile-up ("the mid —
-    quieter" + "the mid — sparser"). Rule per stem: SAME direction (all "more" or all "less" — they restate
-    the same "this part pulls back") → keep the STRONGEST candidate only; OPPOSITE directions (louder BUT
-    sparser — a genuine contrast, bigger yet fewer hits) → MERGE into ONE richer card carrying every
-    (measure, dir) pair (ordered by `measure_order`) so the contrast survives in the wording. COMPOSITE
-    cards are a different KIND — passed through untouched. Pure; call BEFORE select_cards. A merged card
-    carries `measures` (ordered list of (measure, dir)) in place of the single `measure`/`dir`; an unmerged
-    survivor keeps its original shape."""
+def collapse_correlated(candidates, measure_order=CORRELATED_MEASURES):
+    """Per PART, collapse the CORRELATED activity candidates so each part yields at most ONE activity card
+    (SPEC §B.11 "Correlated measures collapse — SMART", Sasha 2026-06-22). Energy and density
+    (`CORRELATED_MEASURES`) restate one another, so a part firing on both reads as a pile-up ("the mid —
+    quieter" + "the mid — sparser"). Rule per stem, WITHIN that pair: SAME direction → keep the STRONGEST
+    only; OPPOSITE directions (louder BUT sparser — a genuine contrast) → MERGE into ONE richer card
+    carrying every (measure, dir) pair (ordered by `measure_order`). Candidates on OTHER axes (stereo
+    width, …) are independent — they pass through as their own card (E2 2026-06-23), so a part can still
+    show one activity card AND a stereo card (the per-stem cap bounds the total). COMPOSITE cards are a
+    different KIND — passed through untouched. Pure; call BEFORE select_cards. A merged card carries
+    `measures` (ordered list of (measure, dir)) in place of the single `measure`/`dir`; everything else
+    keeps its original shape."""
     composites = [c for c in candidates if c.get("kind") == "composite"]
+    correlated = set(measure_order)
+    passthrough = [c for c in candidates                       # non-composite, non-correlated axes (stereo…)
+                   if c.get("kind") != "composite" and c.get("measure") not in correlated]
     by_stem = {}
     for c in candidates:
-        if c.get("kind") == "composite":
+        if c.get("kind") == "composite" or c.get("measure") not in correlated:
             continue
         by_stem.setdefault(c["stem"], []).append(c)
     rank = {m: i for i, m in enumerate(measure_order)}
@@ -649,6 +663,7 @@ def collapse_correlated(candidates, measure_order=PER_STEM_MEASURES):
             collapsed.append({"stem": stem,
                               "measures": [(c["measure"], c["dir"]) for c in ordered],
                               "score": max(c["score"] for c in group)})
+    collapsed += passthrough
     return composites + collapsed
 
 
@@ -678,9 +693,10 @@ def select_cards(candidates, budget, per_stem_cap=None):
 
 
 _MEASURE_WORDS = {                       # adjectives (number-neutral): (higher-vs-rest, lower-vs-rest)
-    "energy":     ("louder", "quieter"),
-    "brightness": ("brighter", "darker"),
-    "density":    ("busier", "sparser"),
+    "energy":       ("louder", "quieter"),
+    "brightness":   ("brighter", "darker"),
+    "density":      ("busier", "sparser"),
+    "stereo_width": ("wider", "narrower"),
 }
 
 _COMPOSITE_WORDS = {                      # stem-vs-whole-track relation → (head phrase, why)
