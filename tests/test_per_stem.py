@@ -351,11 +351,13 @@ class PerStemCards(unittest.TestCase):
                  "bass":  {"density": [4, 3, 2, 1]}}
         cards = bw.per_stem_cards(cores, character={"other": {"label": "lead"}})
         self.assertTrue(cards)
-        cls, when, head, body, fix, t = cards[0]
+        cls, when, head, body, fix, t, based = cards[0]
         self.assertEqual(cls, "concept")
         self.assertIsNone(t)                      # no timecode → hidden in Simple, shown in Detailed
         self.assertIn("lead", head)               # named by character label
         self.assertNotIn("other", head)           # never the raw Demucs stem name
+        self.assertTrue(based.strip())            # INV-31 — carries a based-on line
+        self.assertIn("lead", based)              # …names the part by its character label there too
 
 
 class CollapseCorrelated(unittest.TestCase):

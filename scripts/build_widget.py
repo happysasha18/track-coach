@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.26"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.27"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -337,6 +337,31 @@ REC_CLASS = {
     "wobble": "concept", "swing": "concept", "late_entry": "concept", "stem_evolves": "concept",
     "plateau": "concept",
     "bass_groupstem": "do", "squashed": "do", "tonal_resonance": "do",
+}
+
+# Card evidence (SPEC §B.13 / INV-31, Sasha 2026-06-23) — the plain "where this came from" line per rec key.
+# Names the SIGNAL in words (Tier-A: one number) or the COMBINATION (Tier-B/C: a fusion), NEVER a bare metric
+# tag. Format fields are a subset of each rec's add(**kw). EVERY key that produces a `D.recs` card must have an
+# entry (the invariant: every card carries a non-empty based-on). Per-stem cards build theirs in per_stem_cards.
+REC_BASED = {
+    "long_section":    "the song structure (self-similarity) — one section runs {frac:.0f}% of the track unchanged.",
+    "energy_flat":     "the loudness curve over time — it barely trends across the track.",
+    "brightness":      "the brightness curve rising while loudness and density stay roughly flat.",
+    "endpoint":        "the ending and the opening measured against each other — their spectra are nearly identical.",
+    "wobble":          "the modulation-rate curve holding a near-constant speed start to end.",
+    "climax":          "where the energy peak lands — about {pos:.0f}% through the track.",
+    "swing":           "the drum timing against the grid — about {sw:.0f} ms off the straight beat.",
+    "truepeak_clip":   "the master's true-peak meter — {tp:+.1f} dBTP (4× oversampled).",
+    "tonal_resonance": "the track's average spectrum — the {band} Hz band sits {dev:+.1f} dB off its neighbours.",
+    "squashed":        "the master's dynamic range — peak-to-RMS of only {dr:.0f} dB.",
+    "plateau":         "the song structure — no new section after {onset}; the last {tail_pct:.0f}% recombines.",
+    "stem_evolves":    "per-part repetition — the {evolver} barely repeats while {loopers} loop.",
+    "masking_stem":    "the separated parts' spectra overlapping — the {low_lbl} sits over the {mid_lbl} ~{pct:.0f}% of the track.",
+    "masking_real":    "the bass and the mid parts overlapping in the 250–600 Hz region.",
+    "masking_clean":   "the bass checked against the melody and the kick across the track — no overlap found.",
+    "breakdown":       "a dip in overall energy at {t} — a breakdown in the arc.",
+    "late_entry":      "a part whose level rises only near the end, at {t}.",
+    "intention_result":"your “{param}” automation in the .als against the measured result — they part ways after {a_end}.",
 }
 
 
@@ -746,7 +771,7 @@ _COMPOSITE_WORDS = {                      # stem-vs-whole-track relation → (he
 
 def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, budget=4, per_stem_cap=2):
     """Turn the selected per-stem candidates into worded advice cards — rec tuples
-    `(cls, when, head, body, fix, t)`. Two kinds compete in ONE budget: per-stem DIVERGENCE (a stem runs
+    `(cls, when, head, body, fix, t, based_on)`. Two kinds compete in ONE budget: per-stem DIVERGENCE (a stem runs
     against the rest) and COMPOSITE (a stem moves against the whole track, needs `mix_core`). Detailed-only
     by default = no timecode `t` (Simple hides non-timecoded recs, INV-18). `levels` (from `stem_prominence`)
     ranks a near-silent part's cards below the louder parts. Names the PART via its character label, never
@@ -772,27 +797,33 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
             if not worded:
                 continue
             phrase, why = worded
-            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None))
+            based = f"the {p} read against the whole-track arc (a cross-signal move)."   # §B.13
+            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None, based))
             continue
         if "measures" in c:                   # merged opposite-direction card ("louder but sparser")
             adjs = []
+            measures = []
             for measure, dr in c["measures"]:
                 w = _MEASURE_WORDS.get(measure)
                 if w:
                     adjs.append(w[0] if dr == "up" else w[1])
+                    measures.append(measure)
             if not adjs:
                 continue
             adj = " but ".join(adjs)
+            based = (f"the {_poss(p)} " + _join_and(_human_measure(m) for m in measures)
+                     + " measured against the other parts.")   # §B.13
         else:
             words = _MEASURE_WORDS.get(c["measure"])
             if not words:
                 continue
             adj = words[0] if c["dir"] == "up" else words[1]
+            based = f"the {_poss(p)} {_human_measure(c['measure'])} measured against the other parts."   # §B.13
         out.append(("concept", f"Layers · the {p}",
                     f"The {p} — {adj} than the rest of the track",
                     f"For much of the track this part runs {adj} than everything else, pulling against "
                     f"the mix. A deliberate contrast, or worth a second listen.",
-                    "", None))
+                    "", None, based))
     return out
 
 
@@ -1075,6 +1106,88 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     return out
 
 
+# ── Development-mode read (SPEC §B.12, Sasha 2026-06-23) — which FORM the track develops in. Feeds the
+# Producer's READ (an OBSERVATION, not a card): "grows by loud + bright; stereo & density sit idle". The four
+# trends are all `_common.trend` = Pearson corr of the curve with its time index, in [−1,1], SAME unit
+# (direction/monotonicity, not magnitude) — so one threshold is valid across all four (prover F4, 2026-06-23).
+DEV_DOMINANT = 0.12   # |trend| ≥ this ⇒ the track develops by this axis (calibrated by deed on the 3 tracks)
+DEV_IDLE     = 0.10   # |trend| < this ⇒ the axis sits idle (flaggable only when something else dominates)
+# axis label · core key · rising-word · falling-word (the read needs the DIRECTION, not just the axis — any
+# axis can be dominant while moving DOWN, so we never say "grows by brightness" on a darkening track, F1).
+_DEV_AXES = (
+    ("energy",       "energy_trend",       "gets louder",      "pulls back"),
+    ("brightness",   "brightness_trend",   "brightens",        "darkens"),
+    ("density",      "density_trend",      "gets busier",      "thins out"),
+    ("stereo width", "stereo_width_trend", "widens the image", "tightens the image"),
+)
+
+
+def development_mode(core):
+    """Which FORM the track develops in (SPEC §B.12 / INV-32). Pure + deterministic.
+    Returns {"dominant": [{"axis","trend","dir","phrase"}...sorted by |trend| desc], "idle": [axis...]}.
+    • dominant = axes with |trend| ≥ DEV_DOMINANT, each carrying its DIRECTION (sign → phrase).
+    • idle = axes with |trend| < DEV_IDLE, returned ONLY when ≥1 axis is dominant.
+    • flat track (no dominant axis) → empty dominant AND empty idle: the read then adds NO development
+      sentence (it must not double-cover the `energy_flat` card)."""
+    if not core:
+        return {"dominant": [], "idle": []}
+    dom, idle = [], []
+    for axis, key, up, down in _DEV_AXES:
+        tr = core.get(key)
+        if tr is None:
+            continue
+        mag = abs(tr)
+        if mag >= DEV_DOMINANT:
+            dom.append({"axis": axis, "trend": round(tr, 3),
+                        "dir": "up" if tr > 0 else "down",
+                        "phrase": up if tr > 0 else down})
+        elif mag < DEV_IDLE:
+            idle.append(axis)
+    if not dom:
+        return {"dominant": [], "idle": []}
+    dom.sort(key=lambda d: -abs(d["trend"]))
+    return {"dominant": dom, "idle": idle}
+
+
+def _poss(name):
+    """Possessive that reads right when the part ends in 's': drums → drums', lead → lead's."""
+    return name + ("'" if name.endswith("s") else "'s")
+
+
+def _human_measure(m):
+    """Measure key → plain words for the based-on line (stereo_width → 'stereo width')."""
+    return m.replace("_", " ")
+
+
+def _join_and(items):
+    """['a','b','c'] → 'a, b and c'; [] → ''."""
+    items = list(items)
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _development_html(core):
+    """SPEC §B.12 — the development-mode OBSERVATION as a subtle line at the top of the Producer's read.
+    COMPUTED (the build owns it) so it's consistent across tracks and can't be forgotten — never also
+    hand-write it in the narrative. Names each dominant axis WITH its direction; flags the idle axes as
+    an unused option, never a defect. Empty string on a flat track (the read then says nothing about
+    development, deferring to the `energy_flat` card)."""
+    dm = development_mode(core)
+    if not dm["dominant"]:
+        return ""
+    sent = "Across the track it " + _join_and(d["phrase"] for d in dm["dominant"])
+    if dm["idle"]:
+        one = len(dm["idle"]) == 1
+        verb = "stays" if one else "stay"
+        noun = "an axis" if one else "axes"
+        sent += " — but " + _join_and(dm["idle"]) + f" {verb} almost still, {noun} you're not yet using"
+    return ('<p class="readdev"><span class="devlab">How it develops</span> '
+            + _esc(sent) + ".</p>")
+
+
 def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=None, rhythm=None, character=None, repetition=None, selfsim=None):
     R = S["recs"]
     recs = []
@@ -1087,9 +1200,10 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
         tpl = R[key]
         cls = REC_CLASS.get(key, "do")
         fix = tpl.get("fix", "")
+        based = REC_BASED.get(key, "").format(**kw)   # SPEC §B.13 — where this card came from (plain)
         recs.append((cls, tpl["header"].format(**kw), tpl["title"].format(**kw),
                      tpl["body"].format(**kw), fix.format(**kw) if fix else "",
-                     round(_t, 2) if _t is not None else None))
+                     round(_t, 2) if _t is not None else None, based))
 
     if len(bounds) >= 2:
         edges = bounds + [dur]
@@ -1901,7 +2015,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "stem": stem_block,
         "mcards": [{"label": z, "pct": p, "diff": d, "fw": fw, "tw": tw} for z, p, d, fw, tw in masking_cards],
         "flags": flag_times,
-        "recs": [{"cls": c, "when": w, "h": h, "p": p, "fix": fx, "t": t} for c, w, h, p, fx, t in recs],
+        "recs": [{"cls": c, "when": w, "h": h, "p": p, "fix": fx, "t": t, "based": b}
+                 for c, w, h, p, fx, t, b in recs],
         "als": als_overlay,
         "stemmap": stemmap,
         "rhythm": rhythm,
@@ -1935,6 +2050,10 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     note_html = f'<p class="modenote" id="modeNote">{_esc(_ui.get("quick_explainer", ""))}</p>' if _q else ""
     # Producer's read — rendered to HTML here (server-side) so it ships in the markup, not built by JS.
     read_body = _read_html(narrative_md)
+    # SPEC §B.12 — lead the read with the computed "how it develops" observation. It's a standalone
+    # observation, so it shows even when there's no authored narrative (a Demucs run with no read still
+    # gets this one real line); a flat track with no narrative leaves both empty → the panel hides.
+    read_body = _development_html(core) + read_body
     read_title = _esc(_ui.get("read_title", "")) if read_body else ""
     read_panel_style = "" if read_body else ' style="display:none"'
     # View toggle: full gets the (JS-wired) Simple/Detailed control; quick gets a hint in its place,
@@ -2122,6 +2241,11 @@ body.quick #recs .rec:not([data-t]){display:none!important}
    was never the problem; structure + colour hierarchy is). */
 .read #readBody{font-size:14.5px;line-height:1.8;color:#aab3c7}
 .read #readBody p{margin:0 0 16px}
+/* §B.12 "how it develops" — a quiet computed lead-line, set apart from the authored prose. */
+.read #readBody p.readdev{margin:0 0 20px;padding:10px 14px;background:rgba(124,107,255,.07);
+ border-left:2px solid var(--accent,#7c6bff);border-radius:0 6px 6px 0;color:#c3cbdc;font-size:14px}
+.read #readBody p.readdev .devlab{display:inline-block;margin-right:8px;font-size:10.5px;font-weight:700;
+ letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#9b8cff)}
 .read #readBody strong{color:#fff;font-weight:650}
 .read #readBody em{color:#cdd5e6;font-style:italic}
 .read #readBody h3{font-size:15.5px;color:var(--bright);margin:30px 0 12px;font-weight:700;
@@ -2164,6 +2288,9 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:8px;color:#dfe7d8}
 .rec p.fix b{color:#eafff2}
 .fixlab{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--good);margin-right:6px;text-transform:uppercase}
+/* §B.13 card evidence — a quiet "where this came from" line; transparency, never shouting. */
+.rec p.based{margin-top:8px;font-size:12px;line-height:1.5;color:var(--muted,#8b93a7)}
+.basedlab{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#7c8398;margin-right:6px;text-transform:uppercase}
 .empty-note{color:var(--bad);font-size:12px;margin:0 0 12px;font-weight:600}
 .foot{color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center}
 .scale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:8px}
@@ -2503,10 +2630,11 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>{
  const tb=r.t!=null;
  const jump=tb?` data-t="${r.t}" style="cursor:pointer" title="Jump to ${r.when}"`:"";
  const fix=r.fix?`<p class="fix"><span class="fixlab">→ Try</span> ${r.fix}</p>`:"";
+ const based=r.based?`<p class="based"><span class="basedlab">Based on</span> ${r.based}</p>`:"";
  const cue=cueByIdx[i];const tag=cue?`<b style="color:var(--ink);text-transform:uppercase">${cue.letter}</b> `:"";
  const chip=tb?`<span class="when tbound">⏱ ${r.when}</span>`:`<span class="when glob">whole track</span>`;
  const dl=cue?` data-let="${cue.letter}"`:"";
- return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}</div>`;}).join("")||"<p class='hint'>—</p>";
+ return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}${based}</div>`;}).join("")||"<p class='hint'>—</p>";
 document.getElementById("recs").querySelectorAll(".rec[data-t]").forEach(el=>
  el.onclick=()=>{const t=+el.dataset.t;if(window.__seek)window.__seek(t);
   document.getElementById("storyPanel").scrollIntoView({behavior:"smooth",block:"start"});});

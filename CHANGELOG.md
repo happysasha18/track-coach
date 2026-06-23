@@ -5,6 +5,24 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.27] — 2026-06-23
+
+The coach started thinking like a composer: the read now names *how* a track develops, and every card shows
+its evidence.
+
+### Added
+- **The Producer's read names how the track develops.** It opens with one plain line — *"it gets louder and
+  brightens, but density and stereo width sit idle"* — naming which dimensions actually trend (loudness,
+  brightness, density, stereo width), each with its direction (brightens vs. darkens, widens vs. tightens the
+  image), and nudging you toward the one you're leaving on the table. It's computed from the measured trends,
+  so it reads the same way every time and stays silent on a track that genuinely doesn't develop. An
+  observation, not an order — the actionable moves still live in the cards.
+- **Every advice card shows its evidence.** A quiet *Based on …* line under each card names the signal — or
+  the combination of signals — behind it, in plain words: *"the master's true-peak meter,"* *"the bass and the
+  lead overlapping around 290 Hz for half the track,"* *"the drums' dynamics measured against the other
+  parts."* You always see what the advice rests on, never a bare number. (Clicking a card to light up the
+  moment on the graph is next.)
+
 ## [0.8.26] — 2026-06-23
 
 ### Added

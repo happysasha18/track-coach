@@ -18,7 +18,8 @@ Everything runs by default — no need to ask for a "deep mode." You point it at
 
 - **The song at a glance.** A one-line verdict, a spec-sheet of vitals (BPM, key, length, LUFS), and a colour-coded **structure bar** — a returning section keeps its colour *and* its letter, so reprises are obvious — over the power curve broken into the lanes that drive it (energy, brightness, density, modulation, stereo width).
 - **Hear what you see.** A synced **multi-stem player** — play / seek / mute / solo, with the playhead linked to every chart. Click anywhere on a graph to jump there.
-- **What to change, ranked.** The few things that stood out, most important first: red = worth fixing, green = working, yellow = a creative choice — each tied to a moment in the track, never a vague *"add more energy."*
+- **What to change, ranked — with the receipts.** The few things that stood out, most important first: red = worth fixing, green = working, yellow = a creative choice. Each card is tied to a moment in the track *and* shows what it's based on — the signal or the combination behind it — so it's a specific move, never a vague *"add more energy."*
+- **A read of how the track moves.** Alongside the cards, a plain-language read of *how* the track develops — which dimensions actually grow (louder, brighter, busier, wider) and which sit idle — so you can see the shape of the arc, not just the numbers.
 - **It reads your project, not just the audio.** Point it at your Ableton set and the arrangement, automation envelopes and locators come straight from the `.als` — ground truth that stem separation can only approximate.
 - **Your whole catalog, one page.** Every analysis lands in a searchable **Library** of your body of work — one row per version, each with a spectral signature, the spec, and a **one-button player** so you can audition a track without even opening it.
 
@@ -78,7 +79,7 @@ Everything it tells you sits in one of three layers, and it labels which is whic
 
 1. **Measured** — exact numbers, straight from `librosa` and `Demucs`. Nothing inferred, nothing rounded into a vibe.
 2. **What it means** — a concrete reading of those numbers. Not *"energy is low,"* but *"bass dominates 250–500 Hz for the first two minutes; the mids are there but buried."*
-3. **Up to you** — the creative call stays yours. It points out patterns; it never tells you what to change.
+3. **Your call** — the creative decision stays yours. It points out the pattern and shows its evidence; it never tells you what the track should be.
 
 The analysis lives in deterministic scripts (the orchestration just conducts), so the same track gives the same answer every time instead of being re-improvised — a machine that reports what it measured, not one pretending to have taste.
 
@@ -112,26 +113,14 @@ Claude grabs the audio (and `.als` if available), runs the pipeline, and opens t
 
 ## What's new
 
-**v0.8.8** — **stems named by what they SOUND like, advice that names the part, and a credibility pass on every number:**
+**v0.8.27 — the coach started thinking like a composer.** Two additions that make the feedback sharper *and* more honest:
 
-- **Each stem gets a measured character label** — `kick` · `bass` · `melody` · `lead` · `chord` · `pad` — read from the audio (polyphony from transcribed notes + envelope shape), never guessed from the Demucs track name (which is wrong for electronic music). A held layer reads `pad`, a single moving line `lead`, stacked notes `chord`.
-- **Frequency-clash advice names the actual parts.** Instead of "bass covers *guitar* in 18% of spots," you get *"around 250–600 Hz the bass is louder than the lead ~18% of the track, worst around 1:18"* — one card per masked part, pinned to the worst moment, named by what it sounds like.
-- **No more frequency-bleed mislabels.** Deciding "is this a bass?" now high-passes the stem and checks how much loudness it loses — so a real bass reads `bass`, but a guitar with the kick bleeding into its low end is no longer called `bass`.
-- **A pitched part that plays rhythmically isn't called percussion** — a stabby pad or a choppy vocal stays melodic/harmonic, not "perc".
-- **Honest by default:** a number computed from too little signal (a near-silent stem, frequency bleed) is omitted or caveated rather than presented as fact. Backed by a **230-test suite** on the real shipped output.
+- **A read of how the track develops.** The Producer's read now opens with one plain line naming *how* the track grows — *"it gets louder and brightens, but density and stereo width sit idle"* — each move with its direction, and a gentle nudge toward the dimension you're leaving on the table. It's computed from the measured trends, so it reads the same way every time and stays silent when a track genuinely doesn't develop.
+- **Every card shows its evidence.** A quiet *Based on …* line under each recommendation names the signal — or the combination of signals — behind it, in plain words: *"the master's true-peak meter,"* *"the bass and the lead overlapping around 290 Hz for half the track."* You always see what the advice is built on, never a bare number floating on its own.
 
-**v0.7.7** — the **view ladder**: quick → calm → detailed, each adding to the last:
+**Before that — per-part feedback.** The coach splits your track into its parts and talks about each one against the whole: which part carries the development while the others loop, where a part pulls against the arc, the exact frequency where the bass buries your lead, and which part is more compressed — or wider — than the rest.
 
-- **The Evidence drawer is now in every view**, including the calm view, where it used to vanish — a collapsed, opt-in drawer, so the calm view stays calm.
-- **The quick read shows brief recommendations** (only the ones pinned to a moment on the graph), matching the calm view, so the quick read is genuinely the lightest.
-- **The Library preview player gives feedback** when a track's audio has moved since it was filed — the play button disables with a "preview unavailable" tooltip instead of doing nothing.
-- Backed by a **154-test suite** on the real shipped HTML, with new invariants (the view ladder, deposit atomicity, a filename-independent stale flag) in `docs/TEST_MATRIX.md`.
-
-**v0.7.6** — quick-read polish + a playable Library: a one-button preview player on every catalog row (the signature ribbon doubles as a scrubber), a cleaner stem-free quick read, a tidier structure bar, and *stale* chips on out-of-date entries.
-
-**v0.7** — the **Library / Catalog**: a standalone, offline page listing every track → version → run, sortable and searchable, each row with a spectral signature and a jump into the widget; versions collapsed by content hash with LUFS/length/BPM deltas.
-
-**v0.6** — the *measure → interpret → render* re-architecture: one command runs the pipeline; one colour-coded structure bar; Simple keeps the substance; nothing is lost on rebuild.
+**And the foundations:** a measured character label on every stem (`kick` · `bass` · `lead` · `chord` · `pad`), read from the audio rather than the Demucs track name; the **view ladder** (quick → calm → detailed, each adding to the last, nothing ever lost); and the offline **Library** of your whole body of work. All of it backed by a regression suite that asserts on the real shipped HTML.
 
 → **Full history in [CHANGELOG.md](CHANGELOG.md).**
 

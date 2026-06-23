@@ -75,6 +75,14 @@ but invoke the pipeline through the entrypoint, not by pasting the step commands
 verdict into the new dated run (it won't clobber anything you set), so the Producer's read is
 never silently lost — just edit `narrative.md` before `build` if it needs updating.
 
+**Writing the Producer's read — the two layers (SPEC §B.12/§B.13).** The **cards** are strictly
+ACTIONABLE ("do X"); the **read** is *"what I hear + my thoughts as I go"* — observations and technical
+remarks that may flag something without commanding a fix. So the read can note where the track is alive or
+where it stalls in plain prose. **Two things the BUILD adds automatically — do NOT hand-write them, or you'll
+duplicate:** (1) the *"How it develops"* lead line (which dimensions trend, with direction, and the idle axis)
+is computed from the trends and prepended to the read; (2) every advice card already carries a *"Based on …"*
+provenance line. Write the rest of the read as usual; let the build own those two.
+
 **Global library (auto).** Every `build` also deposits the finished widget into the global
 library at `~/.track-coach/library/` (override with `$TRACK_COACH_LIBRARY`; pass `--no-deposit`
 to skip). Manage it with `scripts/library.py`:

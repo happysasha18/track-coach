@@ -260,16 +260,31 @@ class ProducerReadRendersServerSide(unittest.TestCase):
         self.assertIn("<em>em</em>", out)
         self.assertIn("<ul><li>one</li><li>two</li></ul>", out)
 
-    def test_empty_narrative_renders_nothing_and_hides_the_panel(self):
-        tmp = Path(tempfile.mkdtemp(prefix="tc_noread_"))
-        out = tmp / "w.html"
-        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "No Read",
+    def test_empty_narrative_on_a_flat_track_hides_the_panel(self):
+        # SPEC §B.12 (2026-06-23): the read panel hides only when there's no narrative AND no dev line.
+        # Force a FLAT core (no axis trends) so development_mode says nothing.
+        flat = _synthetic_core()
+        flat.update({k: 0.0 for k in ("energy_trend", "brightness_trend",
+                                      "density_trend", "stereo_width_trend")})
+        out = Path(tempfile.mkdtemp(prefix="tc_noread_")) / "w.html"
+        build_widget.build_html(flat, {}, None, None, str(out), "No Read",
                                 build_widget.STRINGS, narrative_md=None)
         html = out.read_text(encoding="utf-8")
         m = re.search(r'<div id="readBody">(.*?)</div>', html, re.S)
-        self.assertEqual(m.group(1).strip(), "", "readBody must be empty with no narrative")
+        self.assertEqual(m.group(1).strip(), "", "readBody must be empty with no narrative on a flat track")
         self.assertRegex(html, r'id="readPanel"[^>]*style="display:none"',
-                         "read panel must stay hidden when there's no narrative")
+                         "read panel must stay hidden when there's no narrative and no dev line")
+
+    def test_dev_line_shows_without_a_narrative_on_a_developing_track(self):
+        # SPEC §B.12 standalone clause: a Demucs run with no authored read still gets the dev observation.
+        out = Path(tempfile.mkdtemp(prefix="tc_devonly_")) / "w.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "No Read",
+                                build_widget.STRINGS, narrative_md=None)   # _synthetic_core develops
+        html = out.read_text(encoding="utf-8")
+        body = re.search(r'<div id="readBody">(.*?)</div>', html, re.S).group(1)
+        self.assertIn('class="readdev"', body, "dev line must render even with no narrative")
+        self.assertNotRegex(html, r'id="readPanel"[^>]*style="display:none"',
+                            "read panel must be visible when a dev line exists")
 
     def test_rendered_widget_embeds_the_read_html(self):
         tmp = Path(tempfile.mkdtemp(prefix="tc_read_"))

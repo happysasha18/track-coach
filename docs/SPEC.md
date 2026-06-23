@@ -513,6 +513,61 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
    in a viz / one balance card). Default to descriptive unless an axis has a defensible "this fights the track"
    reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
 
+### B.12 Producer's read — name HOW it develops, flag an idle axis (2026-06-23, Sasha — the artistic layer)
+The Producer's read is authored prose — *"вот что я слышу и мои мысли по ходу дела"*. Its job is
+**OBSERVATION**, not a command: the actionable "do X" lives in the **cards**; the read carries thinking-aloud
++ technical remarks (the two-layer principle, memory `track-coach-two-layers-cards-vs-read`). So the read MAY
+state a precise observation or a soft flag **without** forcing a fake action item.
+Sasha (2026-06-23): the read shows the curves and what's heard, but never states a short **verdict of which
+FORM the development takes**, nor FLAGS a dimension that sits idle. Add to the read's "shape" paragraph one
+observation:
+- name the **dominant development mode(s)** — which of {energy/loudness, brightness, density, stereo width}
+  actually trend across the track, **each with its DIRECTION** (the trend's sign): louder vs pulls back,
+  brightens vs darkens, busier vs thins, widens vs tightens the image. (F1, prover 2026-06-23: dominance is on
+  `|trend|`, so any axis can be dominant while moving DOWN — the read must never say "grows by brightness" on a
+  darkening track.)
+- **flag an idle axis** as a soft option, never a defect — *"стерео и плотность почти стоят — образ всю
+  дорогу узкий; если хочется раскрытия к финалу, это незанятая ось."*
+- **Credibility:** the verdict comes from the measured trends via a pure helper `development_mode(core)`
+  reading `energy_trend` / `brightness_trend` / `density_trend` / `stereo_width_trend`. **All four are the SAME
+  metric — Pearson correlation of the curve with its time index (`_common.trend`), in [−1,1], scale-invariant
+  (direction/monotonicity, not magnitude)** — so ONE threshold across all four is sound (F4 resolved by deed,
+  prover 2026-06-23). Dominant = `|trend| ≥ DEV_DOMINANT` (0.12); idle = `|trend| < DEV_IDLE` (0.10); the
+  0.10–0.12 gap is "moderate" (neither named nor flagged). NEVER name a mode whose `|trend|` is below
+  DEV_DOMINANT; flag an idle axis ONLY when ≥1 axis is dominant. **Flat-track postcondition (F5):** when NO
+  axis reaches DEV_DOMINANT, `development_mode` returns empty dominant + empty idle, and the read adds **no**
+  development sentence (it does not say "no dominant mode" — that would double-cover `energy_flat`). Calibrated
+  by deed on the 3 library tracks (Lazy → grows by loud+bright, idle density+stereo; Shared → busier + image
+  tightens; Wobble → opens only in brightness) — matches the hand-written stories in `docs/signal_value_map.md`.
+- **NOT a card** (no fake action) — an observation IN the read. The helper is pure + unit-tested; the prose is
+  authored, and `SKILL.md` carries the writing rule so every read includes it.
+- **Standalone (2026-06-23, by deed on Wobble — a Demucs run with NO authored narrative):** the line renders
+  even when there's no authored read, so a developing track without a written read still gets this one real
+  observation. The read panel hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
+  (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
+
+### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Sasha)
+Sasha: *"показать какие сигналы на каждую карточку повлияли."* Every recommendation card carries a plain
+line saying what it is **based on**. The credibility trap (memory `track-coach-card-evidence`): a raw lone
+number/tag says nothing — *"динамика 30.7 — это много? в апельсинах или чебурашках?"*. So the based-on line is
+in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`).
+- **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
+  advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
+  project panel (export, model, leakage) are an evidence SURFACE, out of scope this increment.
+- **Tier-A vs Tier-B/C wording (F3, prover 2026-06-23):** a **single-signal (Tier-A)** card (true-peak,
+  swing, tonal resonance) honestly comes from one number — its based-on names that **one signal in plain
+  words** ("from the master's true-peak meter"), which is allowed; the ban is only on a bare tag. A
+  **fused (Tier-B/C)** card names the **combination** ("the bass and the lead overlap around ≈290 Hz for ~half
+  the track"), the fusion from `signal_value_map.md`. Source is multi-level: a whole-track signal / a separated
+  part / an `.als` moment.
+- **Build order = MEANING then NAVIGATION** (Sasha): (1) the plain based-on line per card — THIS increment;
+  (2) click→highlight the lane / part / moment on the graph — next, UI-risky, deferred.
+- **Subtle in the UI** — transparency, not overload (the "не перегружать" steer). A quiet muted line under the
+  card body.
+- **Machine-checkable invariant (the rest is authoring quality):** every `D.recs` entry has a **non-empty**
+  `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
+  unit-tested.
+
 ## C. What I need from Sasha to derive the matrix + tests
 The ⟨DECIDE⟩ points above — especially: (1) the dB floor(s) for "empty / don't-parse" and "no colour";
 (2) the musical definition of **Drop** (and the name for sustained-loud non-lifts); (3) which stems are

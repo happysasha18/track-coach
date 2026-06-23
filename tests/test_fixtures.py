@@ -75,6 +75,35 @@ class GoldenRenderFromRealData(unittest.TestCase):
             comps = {c["key"] for c in payload["story"]["components"]}
             self.assertEqual(comps, {"energy", "brightness", "density", "modulation", "stereo"})
 
+    def test_every_card_carries_a_based_on_line(self):  # INV-31 (SPEC §B.13) — card evidence
+        for label, payload, html in (("quick", self.q, self.q_html), ("full", self.f, self.f_html)):
+            recs = payload["recs"]
+            self.assertTrue(recs, f"{label}: no recs on real data to check")
+            for r in recs:
+                self.assertTrue(r.get("based", "").strip(),
+                                f"{label}: card {r['h']!r} has an empty based-on line")
+                # never a bare metric identifier as the whole line
+                self.assertNotRegex(r["based"], r"^[a-z_]+$",
+                                    f"{label}: card {r['h']!r} based-on is a bare tag")
+            self.assertIn('class="based"', html, f"{label}: based-on line did not render")
+
+    def test_develop_mode_line_leads_the_read_when_the_track_develops(self):  # INV-32 (SPEC §B.12)
+        # Shared Memories develops (density up + image tightens) → the read leads with the observation,
+        # carrying DIRECTION (tightens, not widens).
+        self.assertIn('class="readdev"', self.f_html, "developing track lost its 'how it develops' line")
+        dev = re.search(r'<p class="readdev">(.*?)</p>', self.f_html, re.S).group(1)
+        self.assertIn("How it develops", dev)
+        self.assertIn("tightens the image", dev)   # stereo trend is negative — direction matters (F1)
+
+    def test_develop_line_shows_even_without_an_authored_read(self):  # §B.12 — Demucs run, no narrative
+        core = json.loads((FIX / "shared_memories" / "result_core.json").read_text())
+        out = Path(tempfile.mkdtemp(prefix="tc_nonarr_")) / "w.html"
+        build_widget.build_html(core, {}, None, None, str(out), None, build_widget.STRINGS,
+                                mode="full", narrative_md=None)   # NO read authored
+        html = out.read_text(encoding="utf-8")
+        self.assertIn('class="readdev"', html, "dev line vanished when there was no narrative")
+        self.assertNotIn('id="readPanel" style="display:none"', html, "read panel hid despite a dev line")
+
 
 class SyntheticClipIntegrity(unittest.TestCase):
     """The committed synthetic clip is the seed for the analyze→json smoke test (run in the full uv env).
