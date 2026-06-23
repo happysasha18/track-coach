@@ -5,6 +5,23 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.24] — 2026-06-23
+
+### Changed
+- **Per-part advice now runs on all three library tracks, not just one.** Generated the per-part
+  measurements for *Shared Memories* and analysed *Wobble Drift* from scratch, so every track in the
+  library now shows the "this layer pulls against the mix" cards on a real render — e.g. on *Wobble*:
+  *the lead and the melody run louder than the rest*, *the beat is quieter but busier*, *the chord sits
+  quieter*. Each part still yields at most one such card, named in plain terms (no raw stem names).
+- **The "moves against the whole track" composite threshold is settled.** It now only speaks when a track
+  has a real overall build or breakdown — none of the three library tracks does (their energy stays level
+  end-to-end), so these composite cards correctly stay silent rather than firing on noise.
+
+### Fixed
+- **A fresh analysis no longer crashes when its folder carries leftovers from an older track.** Running a
+  new track into a project folder that already held an earlier analysis could abort the final render; it
+  now skips the stale entry and renders cleanly.
+
 ## [0.8.23] — 2026-06-22
 
 ### Added

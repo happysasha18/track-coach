@@ -171,6 +171,8 @@ def cmd_catalog(args):
     bytrack = {}
     self_track = None
     for e in runs:
+        if not isinstance(e, dict):
+            continue   # tolerate a legacy/malformed entry (e.g. a stray slug string from an old run)
         rd = Path(e.get("run_dir", "")).resolve()
         widget = e.get("widget", "analysis_widget.html")
         try:

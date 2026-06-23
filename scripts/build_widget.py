@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.23"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.24"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -585,9 +585,12 @@ def _trend(curve):
     return max(-1.0, min(1.0, (late - early) / rng))
 
 
-COMPOSITE_TREND_MIN = 0.3        # ⟨DECIDE⟩ STILL UNVALIDATED — Lazy can't calibrate this: its mix energy
-                                # trend is only 0.195 (no strong directional arc), so no composite can fire
-                                # regardless. Calibrate on Shared/Wobble (stronger arcs) in Phase B. SPEC §B.11
+COMPOSITE_TREND_MIN = 0.3        # FROZEN (Phase B, 2026-06-23) — principled floor: a composite fires only
+                                # when the MIX has a real directional build/breakdown. NONE of the 3 library
+                                # tracks does (mix energy _trend: Lazy 0.195, Shared -0.002, Wobble -0.034),
+                                # so composites are correctly SILENT on all 3 — validated as not-crying-wolf,
+                                # NOT lowered to fire on a flat arc. Awaiting a building track to see one fire.
+                                # Guarded by test_per_stem::CompositeTrendCalibration. SPEC §B.11
 
 
 def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=None):

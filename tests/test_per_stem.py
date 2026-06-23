@@ -148,6 +148,31 @@ class CompositeCandidates(unittest.TestCase):
         self.assertEqual(bw.composite_candidates(mix, stems), [])
 
 
+class CompositeTrendCalibration(unittest.TestCase):
+    """Phase B (2026-06-23): COMPOSITE_TREND_MIN is FROZEN at a principled 0.3 — a composite ("a part
+    moves against the whole track") only fires when the MIX has a genuine directional build/breakdown.
+    None of the 3 library tracks does (mix energy _trend: Lazy 0.195, Shared -0.002, Wobble -0.034), so
+    composites are correctly SILENT on all 3 — the threshold is validated as not-crying-wolf, not lowered
+    to fire on noise. This guards both ends: a weak-arc track stays silent at the frozen tau; a real build
+    still fires. JOURNAL 2026-06-23 s18 Phase B."""
+
+    def test_frozen_threshold_value(self):
+        self.assertEqual(bw.COMPOSITE_TREND_MIN, 0.3)
+
+    def test_weak_arc_track_stays_silent_at_frozen_tau(self):
+        # mix energy _trend ≈ 0.15 (< 0.3), like the flat library tracks, even with a strongly-thinning
+        # stem → no composite. Forcing a fire here would mean lowering tau onto noise.
+        mix = {"energy": [1, 3, 2, 2, 2, 2.6]}
+        self.assertLess(bw._trend(mix["energy"]), bw.COMPOSITE_TREND_MIN)
+        stems = {"drums": {"density": [6, 5, 4, 3, 2, 1]}}
+        self.assertEqual(bw.composite_candidates(mix, stems), [])
+
+    def test_genuine_build_still_fires_at_frozen_tau(self):
+        mix = {"energy": [1, 2, 3, 4, 5, 6]}            # _trend = 1.0, a real build
+        stems = {"drums": {"density": [6, 5, 4, 3, 2, 1]}}
+        self.assertEqual(len(bw.composite_candidates(mix, stems)), 1)
+
+
 class BrightnessIsNotPrescriptive(unittest.TestCase):
     """SPEC §B.11.1 (Sasha 2026-06-22): a part being brighter/darker than the rest is NOT a defect —
     the coach can't know intent (a drum fill / synth stab may be wanted), so brightness must not produce

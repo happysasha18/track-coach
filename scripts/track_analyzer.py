@@ -435,6 +435,8 @@ def _register_run(out_dir: Path, widget_file: str, verdict):
         return
     changed = False
     for e in idx.get("runs", []):
+        if not isinstance(e, dict):
+            continue   # tolerate a legacy/malformed entry (e.g. a stray slug string from an old run)
         try:
             same = Path(e.get("run_dir", "")).resolve() == out_dir.resolve()
         except OSError:

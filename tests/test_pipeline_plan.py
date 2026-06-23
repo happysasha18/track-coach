@@ -13,10 +13,11 @@ lived in the orchestration seams, so this is exactly where a regression test pay
 
 Pure stdlib unittest, so it runs with plain `python3 -m unittest` — no pytest needed.
 """
-import subprocess, sys, unittest
+import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "track_analyzer.py"
+sys.path.insert(0, str(SCRIPT.parent))
 
 
 def plan(*extra):
@@ -144,6 +145,45 @@ class BuildPlan(unittest.TestCase):
         lines = build_plan("--no-catalog")
         self.assertEqual(step_index(lines, "run_dir.py catalog"), -1)
         self.assertGreaterEqual(step_index(lines, "build_widget.py"), 0)
+
+
+class MalformedRunIndexTolerated(unittest.TestCase):
+    """A run dir nested under a SHARED track-coach-output/ (e.g. Wobble under the Fragile project)
+    can inherit a legacy index.json whose `runs` holds a stray non-dict entry (an old slug string).
+    Neither the run registrar (track_analyzer._register_run, before build) nor the catalog reader
+    (run_dir cmd_catalog) may crash on it — they skip the bad entry and still process the real dict.
+    Regression: Phase B 2026-06-23, `'str' object has no attribute 'get'` on the first fresh full
+    build since the index schema firmed up. Sibling of INV-15 (deposit refuses malformed run dirs)."""
+
+    def _tree(self, td):
+        base = Path(td) / "track-coach-output"
+        run = base / "My_Track" / "v1__2026-06-23_1000"
+        run.mkdir(parents=True)
+        idx = {"runs": ["My_Track_v1",                       # the stray legacy string
+                        {"track": "My_Track", "version": "v1", "run_dir": str(run),
+                         "analyzed_at": "2026-06-23 10:00", "mode": "full",
+                         "widget": "analysis_widget_v1.html"}]}
+        (base / "index.json").write_text(json.dumps(idx))
+        return base, run
+
+    def test_register_run_skips_non_dict_entry(self):
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as td:
+            base, run = self._tree(td)
+            ta._register_run(run, "analysis_widget_v1.html", "looks good")   # must not raise
+            runs = json.loads((base / "index.json").read_text())["runs"]
+            self.assertEqual(runs[0], "My_Track_v1")                         # stray left untouched
+            self.assertEqual(runs[1]["verdict"], "looks good")               # real entry updated
+
+    def test_catalog_reader_skips_non_dict_entry(self):
+        with tempfile.TemporaryDirectory() as td:
+            base, run = self._tree(td)
+            out = subprocess.run([sys.executable, str(SCRIPT.parent / "run_dir.py"),
+                                  "catalog", "--self", str(run)],
+                                 text=True, capture_output=True)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            cat = json.loads((run / "catalog.json").read_text())
+            self.assertEqual(cat["n_runs"], 1)                              # only the real dict counted
 
 
 if __name__ == "__main__":
