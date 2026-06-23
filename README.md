@@ -53,14 +53,6 @@ Your automation is what you *meant* to happen; the audio is what *did*. Track Co
 
 <sub>**The "intention" layer:** real automation envelopes aligned to the audio, with the Brightness arc ghosted into each lane for direct comparison. It's where the *"the cutoff stops moving at 2:45 but brightness keeps rising to 3:10"* recommendation comes from — now you can see it, not just read it.</sub>
 
-### Evidence & detail
-
-Collapsed by default at the bottom of every view, one drawer holds everything it measured — the receipts behind every call above:
-
-![Evidence drawer — tonal balance, the project arrangement, stem↔track map, rhythm and separation quality, transcribed notes](docs/evidence.png)
-
-<sub>**The full drawer:** the mix's average spectrum (**tonal balance**), the real **arrangement** from the `.als`, the **stem ↔ track map** (does separation match the project?), per-stem **rhythm & separation quality**, and the **transcribed notes**. Nothing interpreted here — just the measurements the read is built on.</sub>
-
 ### Three views, one ladder
 
 The views stack — each adds to the one below, so nothing visible in a lighter view ever disappears in a heavier one:

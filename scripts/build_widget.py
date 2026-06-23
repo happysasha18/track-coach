@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.28"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.29"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -2291,6 +2291,10 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 /* §B.13 card evidence — a quiet "where this came from" line; transparency, never shouting. */
 .rec p.based{margin-top:8px;font-size:12px;line-height:1.5;color:var(--muted,#8b93a7)}
 .basedlab{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#7c8398;margin-right:6px;text-transform:uppercase}
+/* INV-34 — card-click navigation: a brief pulse on the graph panel so the eye lands where the playhead
+   jumped. CSS-only (the canvas draw is untouched). */
+@keyframes graphpulse{0%{box-shadow:0 0 0 0 rgba(124,107,255,0)}18%{box-shadow:0 0 0 3px rgba(124,107,255,.55)}100%{box-shadow:0 0 0 0 rgba(124,107,255,0)}}
+#storyPanel.pulse{animation:graphpulse 1.1s ease-out;border-radius:12px}
 .empty-note{color:var(--bad);font-size:12px;margin:0 0 12px;font-weight:600}
 .foot{color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center}
 .scale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:8px}
@@ -2637,7 +2641,11 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>{
  return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}${based}</div>`;}).join("")||"<p class='hint'>—</p>";
 document.getElementById("recs").querySelectorAll(".rec[data-t]").forEach(el=>
  el.onclick=()=>{const t=+el.dataset.t;if(window.__seek)window.__seek(t);
-  document.getElementById("storyPanel").scrollIntoView({behavior:"smooth",block:"start"});});
+  const sp=document.getElementById("storyPanel");sp.scrollIntoView({behavior:"smooth",block:"start"});
+  // INV-34: a brief attention pulse on the graph PANEL (CSS/DOM only — never the canvas) so the eye
+  // catches that the playhead jumped to this card's moment. Reflow reset lets repeat clicks re-fire it.
+  sp.classList.remove("pulse");void sp.offsetWidth;sp.classList.add("pulse");
+  setTimeout(()=>sp.classList.remove("pulse"),1200);});
 
 const getCss=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 // floating tooltip that follows the cursor over a chart (replaces the fixed bottom readout)

@@ -195,6 +195,14 @@ class PlayerIsWired(unittest.TestCase):
         self.assertIn("if(wasPlaying)Promise.all(auds.map(s=>s.a.play()))", html,
                       "seekTo must resume (and re-sync) playback after a mid-play seek")
 
+    def test_card_click_pulses_the_graph(self):  # INV-34 (SPEC §B.13 navigation), 0.8.28
+        # Clicking a timecoded card must draw the eye to the moment on the graph: seek + scroll + a brief
+        # CSS pulse on the graph panel. The pulse is DOM/CSS only — it must not touch the canvas draw.
+        html, _ = _render(stems=("drums", "bass"))
+        self.assertIn('classList.add("pulse")', html, "card click must pulse the graph panel")
+        self.assertRegex(html, r"@keyframes\s+graphpulse", "missing the graph pulse animation")
+        self.assertRegex(html, r"#storyPanel\.pulse", "missing the .pulse rule on the graph panel")
+
 
 class QuickRunGivesAMixPlayer(unittest.TestCase):
     """INV-7. Sasha 2026-06-20 ("плеер какая разница быстрый прогон?"): a quick run has no stems

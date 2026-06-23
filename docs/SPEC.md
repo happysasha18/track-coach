@@ -493,8 +493,9 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
 
 #### B.11.1 Resolution (2026-06-22) — BRIGHTNESS is descriptive, not a prescriptive per-stem card (Sasha)
 When A1 (per-measure validity) reached brightness, Sasha rejected the *premise*, not just the threshold:
-*"я пока не убеждён что что-то должно быть ярче чего-то… а ошибка это или нет, тебе откуда знать? может там
-барабаны должны врываться, а может синт. думаю это лучше потом на визуализацию какую-то спихнуть."* The point:
+*"I'm not convinced yet that anything *should* be brighter than anything else — and whether it's a mistake,
+how would you know? Maybe the drums are meant to burst in, maybe a synth. Better to push this to some
+visualization later."* The point:
 a part being **brighter/darker than the rest is not a defect** — brightness divergence carries no intent, the
 coach cannot know whether the bright burst is wanted (a drum fill, a synth stab) or a mistake. A prescriptive
 card ("the lead is brighter than the rest — worth a second listen") therefore **asserts a problem it can't
@@ -514,7 +515,7 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
    reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
 
 ### B.12 Producer's read — name HOW it develops, flag an idle axis (2026-06-23, Sasha — the artistic layer)
-The Producer's read is authored prose — *"вот что я слышу и мои мысли по ходу дела"*. Its job is
+The Producer's read is authored prose — *"here's what I hear, and my thoughts as I go"* (Sasha). Its job is
 **OBSERVATION**, not a command: the actionable "do X" lives in the **cards**; the read carries thinking-aloud
 + technical remarks (the two-layer principle, memory `track-coach-two-layers-cards-vs-read`). So the read MAY
 state a precise observation or a soft flag **without** forcing a fake action item.
@@ -526,8 +527,8 @@ observation:
   brightens vs darkens, busier vs thins, widens vs tightens the image. (F1, prover 2026-06-23: dominance is on
   `|trend|`, so any axis can be dominant while moving DOWN — the read must never say "grows by brightness" on a
   darkening track.)
-- **flag an idle axis** as a soft option, never a defect — *"стерео и плотность почти стоят — образ всю
-  дорогу узкий; если хочется раскрытия к финалу, это незанятая ось."*
+- **flag an idle axis** as a soft option, never a defect — *"stereo and density barely move — the image
+  stays narrow the whole way; if you want it to open up toward the finale, that's an unused axis."*
 - **Credibility:** the verdict comes from the measured trends via a pure helper `development_mode(core)`
   reading `energy_trend` / `brightness_trend` / `density_trend` / `stereo_width_trend`. **All four are the SAME
   metric — Pearson correlation of the curve with its time index (`_common.trend`), in [−1,1], scale-invariant
@@ -547,9 +548,9 @@ observation:
   (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
 
 ### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Sasha)
-Sasha: *"показать какие сигналы на каждую карточку повлияли."* Every recommendation card carries a plain
+Sasha: *"show which signals drove each card."* Every recommendation card carries a plain
 line saying what it is **based on**. The credibility trap (memory `track-coach-card-evidence`): a raw lone
-number/tag says nothing — *"динамика 30.7 — это много? в апельсинах или чебурашках?"*. So the based-on line is
+number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what, oranges?"* (Sasha). So the based-on line is
 in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`).
 - **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
   advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
@@ -560,10 +561,15 @@ in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_
   **fused (Tier-B/C)** card names the **combination** ("the bass and the lead overlap around ≈290 Hz for ~half
   the track"), the fusion from `signal_value_map.md`. Source is multi-level: a whole-track signal / a separated
   part / an `.als` moment.
-- **Build order = MEANING then NAVIGATION** (Sasha): (1) the plain based-on line per card — THIS increment;
-  (2) click→highlight the lane / part / moment on the graph — next, UI-risky, deferred.
-- **Subtle in the UI** — transparency, not overload (the "не перегружать" steer). A quiet muted line under the
-  card body.
+- **Build order = MEANING then NAVIGATION** (Sasha): (1) the plain based-on line per card — done 0.8.27;
+  (2) **NAVIGATION (0.8.28):** clicking a timecoded card seeks the playhead to that moment AND scrolls the
+  main graph into view (already wired), now plus a brief **attention pulse on the graph container** so the eye
+  catches that the playhead jumped there. The pulse is a **CSS/DOM class toggle on the graph panel — it does
+  NOT touch the canvas drawing** (deliberately low-risk: the canvas render is the fragile surface we never edit
+  blind). A deeper per-lane / per-part highlight (light up the exact lane the card is about) stays deferred —
+  it needs canvas work and a live render review.
+- **Subtle in the UI** — transparency, not overload (Sasha's "don't overload" steer). A quiet muted line under
+  the card body.
 - **Machine-checkable invariant (the rest is authoring quality):** every `D.recs` entry has a **non-empty**
   `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
   unit-tested.

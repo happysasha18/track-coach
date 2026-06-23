@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.29] — 2026-06-23
+
+### Added
+- **Clicking a recommendation now takes you to the moment on the graph.** A timecoded card seeks the player
+  to its moment, scrolls the main graph into view, and gives the graph a brief pulse so your eye lands where
+  the playhead jumped — the read-it / see-it / hear-it loop in one click. (A deeper per-lane highlight is still
+  to come.)
+
 ## [0.8.28] — 2026-06-23
 
 ### Fixed
@@ -488,9 +496,9 @@ disappears in a heavier one.
 
 ### Changed
 - **Callout cards under the graph**: Simple shows the first 3 (calm), Detailed shows all
-  ("в детальном больше"). CSS cap on `#storyCues` in Simple only.
+  (Sasha: "more in Detailed"). CSS cap on `#storyCues` in Simple only.
 - **Tonal balance moved OUT of the Evidence drawer** into a standalone panel, placed last before
-  the collapsible — always visible in both views (Sasha: "он прикольный"). The Evidence drawer is
+  the collapsible — always visible in both views (Sasha: "it's neat"). The Evidence drawer is
   now arrangement + automation + stem↔track map + rhythm + transcribed notes (no tonal).
 - Default view confirmed Simple. Tests 60 → 61.
 
