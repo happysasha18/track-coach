@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.27"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.28"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -3188,7 +3188,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  function pause(){auds.forEach(s=>s.a.pause());btn.textContent=T.play_play;}
  btn.onclick=()=>{master.paused?play():pause();};
  const rew=document.getElementById("rewBtn");if(rew)rew.onclick=()=>seekTo(0);  // Ableton-style back-to-start
- function seekTo(t){t=Math.max(0,Math.min(dur(),t));auds.forEach(s=>{s.a.currentTime=t;});paint(t);}
+ function seekTo(t){t=Math.max(0,Math.min(dur(),t));
+  const wasPlaying=!master.paused;            // a seek (rec card / cue / chart click) must NOT stop playback
+  auds.forEach(s=>{s.a.currentTime=t;});paint(t);
+  if(wasPlaying)Promise.all(auds.map(s=>s.a.play())).catch(()=>{});}  // re-sync the stems + keep playing
  window.__seek=t=>{seekTo(t);};   // charts/lanes call this on click; the playhead line IS the seek UI
  master.addEventListener("ended",pause);
  master.addEventListener("loadedmetadata",()=>{paint(0);lresize();});

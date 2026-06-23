@@ -5,6 +5,13 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.28] — 2026-06-23
+
+### Fixed
+- **Clicking a recommendation while the track plays no longer stops playback.** Jumping to a card's moment
+  (or a timeline callout) now keeps the music running and re-syncs the stems at the new position, instead of
+  silently pausing. Seeking while paused still stays paused.
+
 ## [0.8.27] — 2026-06-23
 
 The coach started thinking like a composer: the read now names *how* a track develops, and every card shows

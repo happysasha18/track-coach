@@ -186,6 +186,15 @@ class PlayerIsWired(unittest.TestCase):
         self.assertIsNone(payload.get("player"),
                           "player must be absent (not an empty shell) when there's no audio")
 
+    def test_seek_keeps_playback_running(self):
+        # 0.8.28 bug (Sasha): clicking a rec card while the track plays jumped AND stopped playback.
+        # seekTo must preserve play state — capture it and resume (re-synced) after seeking.
+        html, _ = _render(stems=("drums", "bass"))
+        self.assertIn("const wasPlaying=!master.paused", html,
+                      "seekTo must capture whether it was playing before the seek")
+        self.assertIn("if(wasPlaying)Promise.all(auds.map(s=>s.a.play()))", html,
+                      "seekTo must resume (and re-sync) playback after a mid-play seek")
+
 
 class QuickRunGivesAMixPlayer(unittest.TestCase):
     """INV-7. Sasha 2026-06-20 ("плеер какая разница быстрый прогон?"): a quick run has no stems
