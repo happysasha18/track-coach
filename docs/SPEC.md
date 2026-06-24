@@ -701,7 +701,9 @@ Every term used below, defined once.
 - **evidence pool** — the real measured signals underneath the read (arc, palette, density, meter, stereo,
   repetition/novelty). They are the PROOF a read cites, and the coordinates for the map. They are not a
   checklist you "score against".
-- **fingerprint** — the numeric summary of one track's signals, used ONLY to place it on the map.
+- **fingerprint** — the **full-dimensional** numeric vector of one track's signals. It grounds BOTH the
+  in-zone/diverge verdict (read in full dimensions, D-INV-19) AND the map. The **map** is its 2-D/3-D
+  *projection* — only the projection is lossy; the fingerprint itself is not "for the map only".
 - **the map (constellation)** — one picture where your tracks and the reference clouds live together;
   distance ≈ similarity.
 - **the read panel** — click your track and read, in words, how it sits against a direction.
@@ -756,8 +758,10 @@ direction emptied to **zero** members persists as a named-but-inert reduced dire
 survive); it is never auto-deleted. ⟨DECIDE D-1⟩ how many placeable members make a cloud.
 
 **The fingerprint (the numeric side — map only).** To draw the map we need coordinates, so — and only here —
-each track's signals are boiled down to a fixed list of numbers (the development trends, the tonal palette,
-density, meter rate, repetition). This is geometry, not words; it never produces a read. The numbers are
+each track's signals are boiled down to a **full-dimensional** vector of numbers (the development trends, the
+tonal palette, density, meter rate, repetition). This is geometry: it grounds the **geometric** in-zone/
+diverge verdict (D-INV-19) and, projected to 2-D/3-D, the map — but it never writes the **worded** mood/style
+read (that's §D.2's holistic synthesis, anchored to signals). The numbers are
 **normalised against statistics over the current set** (your library + the reference groups in play) — so a
 coordinate is meaningful relative to everything it's being compared against, not in a vacuum. The honesty
 rule is NOT "never recompute" — it's **never move silently** (Sasha 2026-06-24): a coordinate is a
@@ -874,8 +878,9 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
 - Re-flavouring over several aimed-at directions is **deterministic**: a card's order rank is its strongest
   divergence across all of them (largest divergence breaks ties), so the card list has one well-defined order
   even when directions pull opposite ways. The card SET is still identical to the plain view (D-INV-15).
-  Re-flavouring re-orders **within the active §B.11 sort mode** (urgency default / chronological toggle stays
-  the base key; divergence promotes within it), never a third competing order. `D-INV-17`
+  Re-flavouring re-orders **within the active §B.11 sort mode** as a SECONDARY key, never a third competing
+  order: in urgency mode divergence sub-sorts within each tier; in strict chronological mode (no ties) the
+  re-order lever is inert and only re-word/on-style act. `D-INV-17`
 - in-zone/diverge/«своё» is a **pure function of the full-dimensional fingerprint** (per-facet spread test),
   independent of the map projection — so the verdict is the same whether the map is drawn in 2-D, 3-D, or not
   at all. The map can disagree with it (a dropped facet); the verdict is authoritative (D-INV-11). `D-INV-19`
@@ -900,10 +905,11 @@ levers, all in the "observe and offer" register (never a command):
 1. **Re-order.** Cards about where you *diverge* rise; where you're already in-zone, they sink. With several
    aimed-at directions a card's rank is its **strongest divergence across all of them** (a facet where you
    diverge from ANY aimed direction rises; the largest divergence breaks ties) — so the order is
-   deterministic even when two directions pull opposite ways (D-INV-17). This re-order happens **within the
-   active §B.11 sort mode** (urgency by default, or the chronological toggle) — divergence promotes diverging
-   cards inside that mode; it is not a third competing sort. The set of cards shown never changes — only the
-   order. Nothing is hidden.
+   deterministic even when two directions pull opposite ways (D-INV-17). Divergence is a **secondary key
+   inside the active §B.11 sort mode, not a promotion over it**: in urgency mode it sub-sorts within each
+   tier (crit/do/concept) so diverging cards come first within their tier; in the **strict chronological
+   mode there are no ties, so the re-order lever is inert** — only the re-word + on-style levers act. It is
+   never a third competing sort. The set of cards shown never changes — only the order. Nothing is hidden.
 2. **Re-frame as an option.** A card gains a direction, phrased as a choice: "the bass buries the lead around
    ≈290 Hz" → "…and Venetian Snares keeps that low-mid clearer; an option, if you want to lean that way."
    When directions genuinely disagree (one keeps that low-mid clearer, another sits dense too) **both options
