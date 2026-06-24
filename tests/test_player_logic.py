@@ -124,6 +124,14 @@ class PlayerStateMachine(unittest.TestCase):
         A(P.seekResult(50,96,true).t===50,'in-range seek must pass through');
         """)
 
+    def test_simple_resets_mix(self):  # INV-40 — entering Simple resets to full mix (solo/mute is Detailed-only)
+        self._node(r"""
+        const s=[{mute:false,solo:true},{mute:true,solo:false},{mute:false,solo:false}];  // a solo AND a mute live
+        const r=P.resetMix(s);
+        A(r.every(x=>!x.mute&&!x.solo),'resetMix must clear every mute+solo: '+JSON.stringify(r));
+        A(P.pgains(r).every(x=>x===false),'after resetMix every stem must be audible: '+JSON.stringify(P.pgains(r)));
+        """)
+
 
 if __name__ == "__main__":
     unittest.main()

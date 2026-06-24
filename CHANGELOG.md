@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.8.31] — 2026-06-24
+
+### Fixed
+- **Soloing a part and switching to Simple no longer leaves it stuck.** Mute/solo lives on the per-stem
+  lanes, which only show in Detailed — so soloing a stem and flipping to Simple used to hide the part you
+  were hearing with no way to switch it back. Now switching to Simple resets to the full mix, so you never
+  hear a part you can't see or undo. (Mute/solo stays a Detailed-view tool.)
+
 ## [0.8.30] — 2026-06-23
 
 ### Changed

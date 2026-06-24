@@ -452,6 +452,14 @@ class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
         self.assertIn('apply("mute")', html, "the mute box must call the resolver")
         self.assertIn('apply("solo")', html, "the solo box must call the resolver")
 
+    def test_simple_toggle_resets_the_mix(self):  # INV-40 (SPEC §B.14 inv 6) — Simple hides the grid → full mix
+        # Solo/mute is Detailed-only; entering Simple must reset to full mix so a hidden solo can't strand you.
+        html, _ = _render(stems=("drums", "bass"))
+        self.assertIn('window.__resetMix=', html,
+                      "the player must expose __resetMix (clears every mute/solo → full mix)")
+        self.assertIn('if(v==="simple"&&window.__resetMix)window.__resetMix()', html,
+                      "the view toggle must reset the mix when entering Simple")
+
 
 class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
     """Sasha 2026-06-22 (NOT critical, don't lose it): the header shows the AUDIO source — when an

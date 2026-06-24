@@ -626,6 +626,16 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
      stem is still the only one audible AND playback continues (INV-33 generalised to the combination).
   5. **Seek clamps.** The resulting time is always in [0, dur]; a gutter/negative/over-dur click never seeks
      out of range.
+  6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability (2026-06-23, Sasha
+     found by deed: solo a stem → switch to Simple → the soloed part visually vanishes and you can't un-solo
+     it).** The stem grid (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
+     absent in quick (the view ladder, INV-18/22). So a per-stem mute/solo state is only **visible and
+     reversible in Detailed**. Invariant: **entering Simple RESETS the per-stem mix to the full mix**
+     (`resetMix` clears every mute+solo, then `pgains` → all audible) — so the user is never left hearing a
+     solo / muted part they can't see or undo. Re-entering Detailed starts from the full mix (no hidden
+     leftover state). This is the general rule the original §B.14 missed by modelling the player on the audio
+     axis ALONE: an interactive surface must be specified across EVERY view/mode axis it lives under, not just
+     its own. (Quick never has the grid, so it never reaches this state.)
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.30"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.31"   # Track Coach analyzer version (early; bump as it matures)
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -2535,6 +2535,7 @@ const META=D.meta||{};
   `<button data-v="full">${T.view_full||"Detailed"}</button>`;
  function apply(v){document.body.classList.toggle("simple",v==="simple");
   tg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="simple"&&window.__resetMix)window.__resetMix();  // SPEC §B.14: Simple hides the stem grid (M/S controls) → reset to full mix, never strand a hidden solo/mute
   try{localStorage.setItem("tc_view",v);}catch(e){}
   // let every canvas relayout for its new width / lane count
   window.dispatchEvent(new Event("resize"));}
@@ -3035,7 +3036,8 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   if(kind==="mute"){s[i].mute=!s[i].mute;if(s[i].mute)s.forEach(x=>x.solo=false);}
   else{s[i].solo=!s[i].solo;if(s[i].solo)s.forEach(x=>x.mute=false);}return s;};
  const seekResult=(t,dur,wasPlaying)=>{t=Math.max(0,Math.min(dur,t));return {t:t,resume:!!wasPlaying};};   // clamp + keep transport
- if(typeof module!=="undefined")module.exports={pgains,toggleStem,seekResult};
+ const resetMix=stems=>stems.map(()=>({mute:false,solo:false}));   // full mix — solo/mute is a Detailed-only capability (SPEC §B.14): leaving the stem grid (→ Simple) resets to full mix so you never strand a hidden solo
+ if(typeof module!=="undefined")module.exports={pgains,toggleStem,seekResult,resetMix};
  /* PLAYER_LOGIC_END */
  const master=auds[0].a;
  const btn=document.getElementById("playBtn"),tEl=document.getElementById("playTime");
@@ -3054,6 +3056,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  function buildStemGrid(){   // FULL only — everything stem-lane lives in here; drawL/lresize get assigned
  function gains(){const m=pgains(auds);
   auds.forEach((s,i)=>{s.a.muted=m[i];});drawL(lxOf(window.__pht||0));}  // keep the playhead put (SPEC §B.14: pgains resolves audibility)
+ window.__resetMix=()=>{const r=resetMix(auds);auds.forEach((a,i)=>{a.mute=r[i].mute;a.solo=r[i].solo;});gains();};  // Simple hides the stem grid → reset to full mix so a hidden solo never strands you (SPEC §B.14)
  // ── sequencer lanes: one playable lane per stem, with mute/solo + envelope ──
  // Each lane bridges the Demucs stem to the real project part (from the stem map),
  // so the eye (arrangement = project groups) and the ear (these stems) stay connected.
