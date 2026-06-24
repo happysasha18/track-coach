@@ -1,4 +1,4 @@
-# track-coach — SPEC (prover-facing). Scope: the CREDIBILITY layer (§A–§B.11) + the ARTISTIC layer (§B.12–§B.13)
+# track-coach — SPEC (prover-facing). Scope: the CREDIBILITY layer (§A–§B.11) + the ARTISTIC layer (§B.12–§B.14) + the REFERENCE layer (§D, 0.9 DRAFT)
 
 _Session 12, 2026-06-20. This SPEC sits ALONGSIDE `TEST_MATRIX.md`. The matrix is the spec projected
 into a checkable grid (UI/render invariants). This SPEC is the prose-first source: what the product IS,
@@ -639,6 +639,376 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 
+## D. The REFERENCE layer (0.9 — DRAFT, 2026-06-24, Sasha). "Хочу как Aphex Twin."
+**Status: DRAFT, mid-design — Sasha was actively widening the scope as this was written. Every ⟨DECIDE⟩ is
+open; the SHAPE below is agreed, the THRESHOLDS/metrics are not. Do NOT derive tests/code until this layer is
+proven AND Sasha has confirmed the draft.** This layer is AUDIO-ANALYSIS + COACHING; it builds on §A–§B and
+must not re-open the credibility/artistic invariants.
+
+### D.0 Why this layer exists (purpose — REFRAMED by Sasha mid-session)
+The point is **not to clone a reference 1:1.** The point is: point at a reference — a track, or a whole
+*direction* (an album / several albums by an artist) — understand it deeply (composition, sound, mood, style,
+hypnotic↔hysteria, and more), see **where my track already sits relative to it** and **where it's my own**,
+and then **bias track-coach's existing recommendations + read to be "more in the style of" that reference.**
+Comparison (map + read) is how you SEE the direction; the re-flavoured coaching is the PAYOFF. (Sasha,
+2026-06-24: "цель не сделать один к одному… но чтобы рекомендации были более 'в стиле' референс трека.")
+
+Ties to the standing principles: the artistic north-star (OBSERVE & OFFER, never grade —
+`track-coach-artistic-northstar`) and the two-layer split (cards = actionable, read = observation —
+`track-coach-two-layers-cards-vs-read`). A reference NEVER produces a grade.
+
+### D.0.1 The reading stance (Sasha, 2026-06-24 — the design decision that shapes the whole layer)
+Character (psychotic / hypnotic / a mood / a style) is **NOT a single hand-engineered metric with a
+threshold.** That path templated and went stale before (the artistic spine, NEXT_STEPS s18). Character lives
+in the **interrelations of many signals**, which is exactly what a holistic read synthesises well — proven by
+deed: with no metric and no mapping given, the read called `wobble drift` psychotic and the other two hypnotic
+purely from the signals (live transcript 2026-06-24; NOT a stored classifier — code has only one generic
+"hypnotic" template string, `build_widget.py:197`). So:
+- **Measured signals (§A–§B) stay the credible floor — they are the EVIDENCE/proof.** Unchanged; still
+  deterministic and tested as today.
+- **Character is a holistic READ over the whole constellation of those signals** (the two-layer read register
+  §B.12), not a formula. The reference comparison is "does my track read as the **same family** as the
+  reference?" across the whole fingerprint — not an axis-by-axis pass/fail.
+- **The anti-fabrication discipline (extends CR-1 / the based-on line §B.13):** every character word is
+  **anchored to a real piece of evidence OR a COMBINATION of evidence** (Sasha: "прибито к улике или к
+  комбинации улик"). Synthesis composes the words; the numbers prove them — "psychotic *because* novelty
+  spikes + density ruptures + the meter breaks at 1:40 & 2:10 together." A character claim with no evidence
+  (single or combined) behind it is a CR-1 violation, omitted not rendered.
+- **Two uses of the same evidence:** the **numbers** drive the constellation-MAP geometry (similarity over the
+  signal vector, §D.7/S1); the **read** drives the WORDS. One evidence base, two outputs.
+
+### D.1 Entities (reference layer)
+- **reference track** — a third-party track analysed with the SAME pipeline as my tracks, but **AUDIO-ONLY**
+  (a local audio file at start; **never has an `.als`**). So every `.als`-derived surface (arrangement,
+  automation intention-vs-result, locators, .als parts §A) is **absent** for a reference — the pipeline runs
+  its audio subset only. Lives in a **separate reference catalog** (§D.7). Has an **artist** attribute (a
+  name string) and optional **artist metadata** (§D.5).
+- **reference direction** (a.k.a. **reference cloud**) — a user-named SET of reference tracks (one album, or
+  several albums grouped under one name, e.g. "Venetian Snares", "scsi-9 + deepchord"). Defines a **region** in
+  the signal-fingerprint space = `{centroid, spread}` over its member fingerprints (§D.2.1, for the map), and a
+  shared **mood/style read** (§D.2). **A direction with fewer than N members IS reduced mode (§D.4) — there is
+  no separate "point-direction" state** [resolves prover A1/D-7]: below N there is no meaningful spread, so it
+  reads as plain track-vs-track, no range cited. ⟨DECIDE D-1⟩ the threshold N (the one number that says "enough
+  members to be a cloud").
+- **read dimensions** — what a track is actually read & compared on: **mood** and **style** (§D.2), holistic
+  reads, not mechanical meters. Under them sits the **evidence pool** — the existing measured signals (§A–§B:
+  arc/development, palette, density, meter, stereo, novelty) that each read CITES (single or combined,
+  D-INV-10) and that also serve as the numeric fingerprint for the map. The set of read-dimensions can grow,
+  but each stays a read over evidence, never a hardcoded axis (Sasha, 2026-06-24).
+- **aspiration mapping** — a **user-authored, MANY-TO-MANY** link: my track(s) → reference direction(s). The
+  tool does **NOT guess** which direction I aspire to; I declare it (e.g. `wobble drift → Venetian Snares`;
+  `{lazy sparks, shared memories} → {scsi-9, deepchord}`). Cardinality both ways: one of my tracks may aspire
+  to several directions; one direction may be the aspiration of several of my tracks. ⟨DECIDE D-2⟩ where the
+  mapping is stored (a project-level file? the library index?) and how it's edited.
+- **my track** — the existing library entity (§A, the catalog), now additionally **PLACEABLE** against a
+  direction (gets a mood/style read + a position in the signal-fingerprint space for the map, §D.2/§D.7) and
+  **re-flavourable** (§D.6).
+
+### D.1.1 Lifecycle of directions & mappings — who edits, what recomputes [resolves prover F4 / D-2]
+The direction and the mapping are the layer's data backbone; both are **user-authored content** (the tool
+never creates or guesses them, D-INV-4). ⟨DECIDE D-2⟩ the store (a project-level file vs the library index)
+and the edit surface; the TRANSITIONS below hold regardless of store.
+- **reference track** — `import` (analyse audio subset, build its fingerprint §D.2.1) → `remove` (drops it
+  from every direction it belonged to → those directions recompute, below).
+- **reference direction** — `create` (name + ≥1 member), `add-member` / `remove-member`, `rename`, `delete`.
+  Any membership change RECOMPUTES `{centroid, spread}` + the direction's mood/style read, and therefore every
+  placement read of a my-track mapped to it. **`delete` CASCADES:** the mappings pointing to it are removed and
+  the affected my-tracks revert to un-flavoured coaching (D-INV-5) with a one-line note — never a dangling
+  mapping (D-INV-13).
+- **aspiration mapping** — `create` (user links my-track(s) ↔ direction(s)), `delete`. If a my-track is removed
+  from the library, or a direction is deleted, the dependent mappings are dropped (D-INV-13).
+- **The reference set moves, not your track — make it visible (F11).** Because a membership change can flip a
+  placement read (in-zone → diverge) without the my-track changing, every placement read is **stamped with the
+  reference set it was computed against** — direction name + member count + date ("vs Venetian Snares · 6
+  tracks · 2026-06-24"). So a changed verdict is explainable, not spooky (D-INV-14, observability).
+- **Atomic recompute [resolves prover G3].** A placement read and its stamp are written TOGETHER from the same
+  recompute — a verdict is never shown with a stamp from a different reference-set version (no fresh verdict
+  under a stale "vs N tracks · old-date"). If a recompute is interrupted, the prior consistent (read, stamp)
+  pair stands until the next completes.
+- **Actor:** the user for every create/edit/delete; the tool only recomputes derived reads + fingerprints in
+  response. No automated direction/mapping authorship, ever.
+
+### D.2 What we read & compare on: MOOD & STYLE (with the measured signals as evidence underneath)
+We do NOT present a list of mechanical meters to compare on (Sasha, 2026-06-24: drop the axis taxonomy). The
+dimensions a producer actually reads a track — and a reference — on are **mood** and **style** ("настроение").
+Under them sits the credible **EVIDENCE POOL**: the existing measured signals (§A–§B) — arc/development shape,
+palette (9-band tonal + brightness), density, meter, stereo width, self-similarity novelty — which the read
+**cites** (a single signal OR a combination, D-INV-10). The signals are the PROOF and the map coordinates;
+they are not themselves the things you "score against."
+
+- **mood** — a holistic read (§D.0.1) over the constellation of signals. Facets live inside it: e.g.
+  **hypnotic ↔ psychotic/hysteric** (steady-loop vs ruptured) is a *facet of mood*, read from self-similarity
+  novelty + density + meter together — NOT a standalone axis with a threshold. Anchored to its evidence.
+- **style / family** — a holistic family read (§D.0.1): "reads like the scsi-9 / deepchord lineage". Surfaces
+  as a named family/tag per direction. ⟨DECIDE D-5⟩ whether it ever needs a numeric coordinate (for the map)
+  or stays purely a read/label.
+- (the set of read-dimensions can grow, but each is a READ over the evidence pool, never a hardcoded meter.)
+
+**The web's role (Sasha, 2026-06-24, refined).** Pulling the reference ARTIST's known mood/style from the
+internet (§D.5) is a **LEAD that helps connect the dots** — it helps explain WHY the signals you measured
+relate to a felt mood ("the web says X is anxious, claustrophobic techno → and indeed my reading sees the
+density never resolving + the meter staying rigid"). **But it is a lead, not evidence (playbook: a paraphrase
+is a lead, not proof) — it must be CONFIRMED against the actual measured signals before it's stated (Sasha:
+"но проверил!").** A web-suggested mood the signals don't support is NOT asserted; the signals win. Web mood
+labelled external (D-INV-2); never the source of a stated fact.
+
+**IN ZONE / DIVERGE is itself a read, not a threshold test** (§D.0.1). Whether my track "caught the vibe" of a
+direction is the same-family judgement over the whole fingerprint, anchored to the evidence that makes it
+so/not-so — not "within k·spread on axis X". The cloud's `{centroid, spread}` numbers still exist as EVIDENCE
+the read cites and as MAP geometry (§D.2.1), but the in-zone *verdict* is read, not arithmetic. For a sub-N
+direction (reduced mode, §D.4) there is no spread — the read degrades to a plain track-vs-track family read,
+no spread cited.
+
+### D.2.1 The fingerprint — the numeric side (map geometry only) [resolves prover F2]
+The constellation map (§D.7/S1) needs coordinates, so — and ONLY here — the evidence pool is reduced to a
+fixed numeric **fingerprint vector**. This is geometry, NOT a verdict; it never produces words (the words are
+the holistic read, §D.0.1/§D.2).
+- **Contents.** A FIXED, named list of scalars summarising the evidence-pool signals (§D.2): the development
+  trends (energy/brightness/density/stereo, the §B.12 `_common.trend` scalars, already in [−1,1]), the
+  palette (the 9-band tonal-balance vector + brightness centre), density level, meter-change rate,
+  self-similarity novelty (mean + variance). Curves are reduced to these scalars; the vector has the SAME
+  shape for every track (mine or reference).
+- **Normalisation — FROZEN, not population-relative [resolves prover G1].** Each component is normalised
+  against **fixed statistics computed ONCE from my library** (the per-component mean + std, stored as
+  constants like the other calibrated thresholds). Every track — mine or a reference — is projected into that
+  SAME frozen space. So a track's coordinates are a pure function of ITS OWN signals: adding/removing a
+  reference, or toggling the switch, never moves any existing point. (An explicit, rare `recalibrate` action
+  may re-derive the constants; nothing else does.) This is what makes D-INV-12 true — z-scoring against the
+  changing on-map set would have moved every marker whenever the set changed.
+- **Distance.** Euclidean in the normalised space (or cosine — ⟨DECIDE D-17⟩); deterministic — the same
+  signals always give the same position (D-INV-12), because the normalisation is frozen (above).
+- **Weighting.** ⟨DECIDE D-18⟩ equal weights to start, or emphasise some components; calibrate once on the
+  library like the other settled thresholds, never per track.
+- A direction's `{centroid, spread}` (§D.1) = the mean and dispersion of its members' fingerprint vectors.
+
+**The map distance and the worded verdict answer DIFFERENT questions — and must never flatly contradict
+[resolves prover F1].** The map distance = overall fingerprint similarity (all components, geometry); the
+read (in-zone/diverge, §D.3) = the mood/style FAMILY judgement (a holistic subset, words). They can differ in
+nuance (close overall yet a different mood, or vice versa) — that's legitimate and even informative. What is
+FORBIDDEN is a flat contradiction: the read never says **in-zone** while the marker sits clearly OUTSIDE
+the direction's region, nor **diverge** while clearly INSIDE it (D-INV-11). When they'd conflict, the read
+must name which facet pulls it the other way ("sits inside their sound overall, but the mood reads colder").
+- **This is an AUTHORING guard, not a unit test [resolves prover G2].** The map is a 2-D PROJECTION (⟨DECIDE
+  D-12⟩) of the high-dim fingerprint, and projection distorts distance — so "inside/outside" is judged
+  against the **rendered 2-D blob** (the drawn `{centroid, spread}` region), checked BY EYE like §B.13's
+  based-on, not asserted by a test. "Clearly" = outside the blob by a stated margin (⟨DECIDE D-19⟩, e.g. >½ a
+  blob-radius), so a point grazing the edge is never called a contradiction. (A machine-checkable version would
+  test full-dim cloud membership instead of the projected blob — rejected, it re-introduces the threshold the
+  reading stance dropped.)
+
+### D.3 The placement read (my track vs a direction)
+For a my-track mapped (§D.1) to a direction: a **mood/style read** (§D.2) of how it sits — **IN ZONE** (reads
+as the same family) or **DIVERGE** — with the difference in plain words, each anchored to its evidence
+("palette colder than theirs", "their arc ruptures, yours stays level"). Aggregate observation
+**"своё / my own" [definition tightened, prover F9]** = a facet (mood or style) where my track **diverges from
+EVERY direction it's mapped to**. It needs **≥2 mapped directions** to be meaningful — only then is "outside
+all of them" a voice rather than a single divergence. With **one mapping** it is NOT computed (the read just
+says "diverges from X" on that facet); in **reduced mode** (no cloud, §D.4) it is NOT computed (there is no
+range to be outside of). Framed as **observation / possible voice, NOT an error and NOT a grade** (north-star). The read OFFERS options where it diverges ("you could let the meter
+break here, the way they do"), never commands. This is a **READ** (two-layer principle), not an actionable
+card — see §D.7 composition.
+
+**The checkable contract [resolves prover F3].** The WORDS stay authored quality (like §B.13's based-on, not
+unit-tested). The layer pins **two machine-checkable guarantees** + **one authoring guard** so a refactor
+can't silently drift the core output:
+1. **Anchored (machine-checkable)** — every placement statement references ≥1 named evidence signal, non-empty
+   (D-INV-10), exactly like a card's `based_on`.
+2. **Deterministic geometry (machine-checkable)** — the fingerprint vector + distance are a pure function of
+   the signals, unit-tested on a fixture (D-INV-12); the map never moves a marker run-to-run for the same input
+   (the normalisation is frozen, §D.2.1/G1).
+3. **No flat contradiction (authoring guard, by eye)** — the verdict doesn't blatantly disagree with the
+   marker's visible position (D-INV-11, §D.2.1/G2) — reviewed like based-on, not unit-tested.
+**Empty/low-confidence read (F8, mirrors §B.12 flat-track):** when nothing anchors a read against a direction,
+S2 shows an explicit "no clear read against this yet", never a half-empty panel; the map marker still appears
+(geometry is independent of the worded read).
+
+### D.4 Granularity: reduced vs full — ONE state machine, decided by member count [resolves prover A1/D-7]
+Comparison granularity is NOT a separate user toggle and NOT a second "single reference" concept — it is a
+property of the direction's size (Sasha: "может быть и просто трек с треком в reduced варианте"):
+- **reduced (track ↔ track)** — a direction with **< N members** (§D.1). No aggregation, no cloud/spread; a
+  direct mood/style read of my track against the reference(s) (§D.2). The light path; "своё"/in-zone-vs-cloud
+  language is not used (there's no range to be in).
+- **full (track ↔ direction/cloud)** — a direction with **≥ N members**. My track read against the
+  `{centroid, spread}` (§D.1–§D.3). Adds the in-zone/diverge + "своё" reads.
+Crossing N (adding/removing members, §D.1.1) moves a direction between the two — the single fact "how many
+members" decides it, so there is exactly one notion of "single/few reference" in the spec.
+
+### D.5 Artist metadata from the web (external enrichment — OPTIONAL, never core)
+Sasha: "можешь ещё по исполнителю подтянуть данные о нём из интернета." For a reference's **artist**, optionally
+fetch public info (genre/style tags, era, known techniques, bio) to ENRICH the mood/style READ (§D.2) and the
+read's wording. **It is a LEAD, confirmed against the measured signals before stated (§D.2, "но проверил") —
+strictly enrichment, never a source of the credibility-layer numbers.**
+- **Fetch KEY = the reference TRACK's artist, not the direction name [prover F7].** Metadata is fetched per
+  DISTINCT artist across a direction's tracks and attached to that artist — NOT to the direction. The direction
+  NAME is never a fetch key (it can be arbitrary — "scsi-9 + deepchord" — or a vibe label, not a real act).
+- **Per-direction aggregation [prover F7].** If all of a direction's tracks share one artist → that artist's
+  info leads the direction's read. If the direction **spans artists** → present PER-ARTIST, never a single
+  merged claim ("по данным сети: scsi-9 — …; deepchord — …"). A read never blends two artists into one fact.
+- **Name ambiguity → omit, don't guess (CR-1).** An ambiguous artist string (the same name shared by acts, or
+  no confident match) yields NO external info for that artist, never a guessed one.
+- **Actor.** ⟨DECIDE D-8⟩ who triggers the fetch — automatic on reference import, or an explicit user action?
+- **Safety (no-over-claiming, extends CR-1 §B).** Web facts are LABELLED as external ("по данным сети: …"),
+  never merged into the measured/observational read as if track-coach measured them; never fabricated — if a
+  fact isn't found, it's omitted, not guessed (CR-1 "don't cry wolf"). A web claim must carry its source.
+- **Liveness.** The fetch can fail / time out / be offline. The reference feature MUST work fully without it
+  (metadata is additive); a failed fetch degrades to "no external info", never blocks analysis or the map.
+- ⟨DECIDE D-9⟩ source(s) + caching (don't refetch every render; respect that this is an offline-first tool —
+  the widget is offline HTML).
+
+### D.6 Recommendation re-flavouring — the payoff ("in the style of") [D-10 RESOLVED, Sasha 2026-06-24]
+The deepest value (§D.0). When my track is mapped to a direction, track-coach's EXISTING recommendation cards
+(§B.5–B.11) and the producer's read (§B.12) are **re-flavoured toward that direction** — same engine, same
+findings, reference-aware. **Three levers, all in the OBSERVE-&-OFFER register** (Sasha's call: never a
+command, even on cards — north-star, D-INV-1):
+- **A. Re-order (presentation only).** Cards on a facet where I **diverge** from the direction surface higher;
+  in-zone facets sink. **It NEVER adds or removes a card vs the un-flavoured view** (Sasha: "ничего не прячем")
+  — same shown set as today, only the ORDER changes (like the §B.11 sort toggle). So re-flavouring is fully
+  transparent + testable: mapped vs unmapped show the identical card SET (D-INV-15).
+- **B. Re-frame the target (wording).** A card gains a direction, phrased as an OPTION: "the bass buries the
+  lead around ≈290 Hz" → "…— and <direction> keeps that low-mid clearer; an option, if you want to lean that
+  way." The reference gives the suggestion somewhere to point; it never becomes "do X".
+- **C. Resolve intent by MARKING, never suppressing (the soul — and it closes §B.11.1's intent gap).** §B.11.1
+  records that the coach **can't know** whether a trait (density, brightness) is a mistake or the point, so it
+  won't prescribe. The reference is the missing intent signal — BUT, per Sasha, when my "problem" trait
+  **matches** the aspired style, the card is **kept, not hidden**, and gains a note: "…though <direction>
+  sits this dense too — maybe it's the point." Nothing is silenced; the ambiguity is SURFACED, not silently
+  resolved. (When the trait DIVERGES from the style, B's option-framing applies instead.)
+- **Credibility unbroken (extends D-INV-2):** every re-flavoured card still fires only on a real measured
+  finding and still cites the SAME `based_on` (§B.13); the reference changes order / wording / the on-style
+  note, never the truth or the underlying signal.
+- **Two-layer respected:** re-flavouring touches BOTH the cards (still actionable, but option-framed) and the
+  read (observation, "у <direction> это звучит так…"), each in its own register.
+- ⟨DECIDE D-11⟩ off-by-default? A my-track with NO aspiration mapping shows the normal (un-flavoured) coaching
+  exactly as today — the reference layer is purely additive and never changes a track that isn't mapped
+  (D-INV-5). **Recommend: yes, off unless mapped** (re-flavouring requires an aspiration to point at).
+
+### D.7 Surfaces & cross-section composition (prover-critical)
+Two surfaces, BOTH shipped (Sasha chose "оба"):
+
+**(S1) Constellation map** — ONE shared 2-D space where my tracks (markers) and reference clouds (centroid +
+spread blob) appear together; visual **distance = similarity** over the signal fingerprint. The map GEOMETRY
+is numeric (the one place numbers position things directly, §D.0.1) — similarity over the whole signal vector,
+not the holistic word-read. ⟨DECIDE D-12⟩ the projection (similarity/embedding of the full vector to 2-D, vs a
+user-picked pair of axes on x/y).
+- **The reference SWITCH (Sasha: "можно свитч сделать").** A toggle controls whether references are shown
+  **separate** (my library only) vs **overlaid** on the map. State: `refs ∈ {hidden, shown}`. ⟨DECIDE D-13⟩
+  default value. This switch is the SAME control referenced by the catalog (below) — **one switch, one name**;
+  do not let "the map overlay toggle" and "the catalog switch" read as two things.
+- The constellation map is a **distinct view/surface**; it is NOT the synced player (§B.14). Composition with
+  the player: ⟨DECIDE D-14⟩ does clicking a map marker open that track's widget/player, or just its read
+  panel (S2)? State that the map does not carry transport state — it is a navigational/overview surface.
+
+**(S2) Per-track read panel** — clicking my track opens the placement read (§D.3): "тянется к <direction>",
+the mood/style in-zone/diverge read, "своё", each anchored to its evidence. It is a **READ** (observation), living in the producer's-read layer
+(§B.12), NOT among the actionable cards — the two-layer line holds (cards stay strictly actionable §B.5–B.11;
+the reference contributes a read + re-flavours cards via §D.6, it does not add a new card species).
+
+**The reference catalog (the switch's other face).** References live in a **separate catalog** by default
+(so third-party tracks never pollute my library catalog / its signatures, memory `track-coach-catalog-viz`),
+with the **same switch** (above) merging/overlaying them onto the shared map. The catalog row signature for a
+reference is the audio-only subset (no `.als` columns).
+
+**Composition with the 3-view ladder (quick ⊆ Simple ⊆ Detailed, the monotonic ladder, memory
+`track-coach-view-ladder`, INV-18/22).** The reference surfaces must obey the ladder:
+- ⟨DECIDE D-15⟩ which reference surfaces appear in which view. Proposed (to confirm): **quick** = no reference
+  surfaces (cheapest read, like it has no stems); **Simple** = the placement read summary (S2) + "тянется к
+  X" line, no map; **Detailed** = full map (S1) + full per-axis read + the switch. Must be MONOTONIC: nothing
+  in Simple that's absent in Detailed.
+- **State across the axis (like §B.14 player).** The reference SWITCH (`refs hidden/shown`) is a stateful
+  control. If it lives only in Detailed (where the map is), entering Simple/quick must **not strand** an
+  overlay the user can't see or toggle — ⟨DECIDE D-16⟩ entering a view without the map RESETS/ignores the
+  overlay state (mirror the §B.14 inv-6 rule: a control's state is only live where its surface is visible).
+- The aspiration mapping (§D.1) is **content, not view-state** — it persists across views (it's authored data,
+  like the .als); only the *display* of reference surfaces is gated by view.
+- **Mode (reduced/full) composes too [prover F6].** Reduced vs full is NOT a per-view toggle — it's the
+  direction's member count (§D.4), so a direction renders in its own mode inside WHATEVER view shows reference
+  surfaces. On the Detailed map (S1): a **full** direction draws its centroid + spread blob; a **reduced**
+  direction (sub-N) draws its member track(s) as plain markers, **no blob** — my track is a marker either way,
+  distance still reads. **A reduced direction's markers still carry their direction's identity [resolves prover
+  G4]** — a shared per-direction colour/glyph (+ label on hover) — so the user sees WHICH dots are "the Aphex
+  direction" even without a blob; the grouping is never invisible just because the direction is small (⟨DECIDE
+  D-20⟩ the exact visual). In Simple: the read summary is the cloud read for full, the track-vs-track read for
+  reduced. The **switch** (`refs hidden/shown`) is orthogonal to mode — it shows/hides ALL reference markers
+  and blobs alike; when every mapped direction is reduced (no clouds at all) the switch still toggles the bare
+  reference markers. So the full product view × mode × switch is defined: view gates WHETHER references show,
+  mode gates AS-cloud-or-as-markers, the switch gates VISIBLE-or-not.
+
+### D.8 Invariants (reference layer)
+**Safety — must NEVER happen:**
+- **D-INV-1 (no grade).** No reference surface emits a score/grade/pass-fail. Only observation + offered
+  options (north-star). "DIVERGE" is descriptive, never "wrong".
+- **D-INV-2 (credibility holds, CR-1 extends).** A reference never makes track-coach state an unmeasured
+  number as fact; web metadata (§D.5) is labelled external; a re-flavoured card (§D.6) still only fires on a
+  real finding.
+- **D-INV-3 (reference is audio-only).** No `.als`-derived surface is ever shown for a reference track; the
+  reference catalog row has no .als columns.
+- **D-INV-4 (no auto-guessed aspiration).** The aspiration mapping is only ever user-authored; the tool never
+  silently assigns my track to a direction.
+- **D-INV-5 (additive / no-mapping = unchanged) [scoped, prover F5].** A my-track with no aspiration mapping
+  has its EXISTING widget — cards, producer's read, player — byte-for-byte as pre-0.9 (D-10/D-11). The
+  constellation map (§D.7/S1) is a NEW additive view that shows ALL my tracks (mapped or not); appearing as a
+  marker there is not a "change" to the track's widget. The layer never degrades the existing experience.
+- **D-INV-6 (one switch, one name).** The reference visibility toggle is a single named control shared by the
+  map overlay and the catalog; no view strands its state (composition with the ladder, §D.7).
+- **D-INV-7 (separate catalogs).** Reference tracks never enter my library catalog's set/signatures unless the
+  switch overlays them onto the shared MAP (display only) — the underlying catalogs stay separate.
+- **D-INV-10 (every character word is anchored).** Every character / mood / style / in-zone read (§D.0.1, §D.2,
+  §D.3) carries the real evidence — a single signal OR a combination — behind it (extends §B.13 based-on). A
+  character claim with no evidence is omitted (CR-1), never rendered. This is the authoring guard on the read;
+  no character is a hardcoded threshold or a hardcoded label (Sasha, 2026-06-24: no hardcoding, no regression
+  anchors for now).
+- **D-INV-11 (map and read never flatly contradict) [prover F1, AUTHORING guard — G2].** The read never claims
+  **in-zone** while the marker sits clearly OUTSIDE the direction's rendered 2-D blob (by the D-19 margin), nor
+  **diverge** while clearly INSIDE (§D.2.1). Checked by eye like §B.13 based-on, NOT unit-tested (the map is a
+  projection). They may differ in nuance; on tension the read names the facet that pulls the other way.
+- **D-INV-12 (deterministic geometry) [prover F3, machine-checkable].** The fingerprint vector + distance
+  (§D.2.1) are a pure function of the measured signals — the same input always yields the same map position
+  (unit-tested on a fixture) — BECAUSE the normalisation is frozen, not population-relative (§D.2.1/G1).
+- **D-INV-13 (no dangling mapping) [prover F4].** No aspiration mapping ever points at a deleted direction or a
+  removed my-track; delete/remove cascades to drop the dependent mappings (§D.1.1). The affected my-tracks
+  revert to un-flavoured coaching (D-INV-5), never a broken reference.
+- **D-INV-14 (a verdict change is explainable) [prover F11].** Every placement read carries the reference set
+  it was computed against (direction · member count · date, §D.1.1), so a verdict that moved because the
+  REFERENCE changed (not the track) is visible, not spooky.
+- **D-INV-15 (re-flavouring is transparent — same card SET) [D-10, Sasha].** Re-flavouring (§D.6) changes a
+  card's ORDER, WORDING, and may add an on-style NOTE, but never adds or removes a card vs the un-flavoured
+  view, never suppresses an on-style "problem" card, and never changes a card's `based_on`. Mapped and
+  unmapped render the identical card set; only order/text differ. Stays in the observe-&-offer register (no
+  command), D-INV-1.
+
+**Liveness — must EVENTUALLY happen:** (IDs are stable, not sequential — 8/9 are the original liveness pair.)
+- **D-INV-8 (web fetch terminates).** Any artist-metadata fetch (§D.5) completes, fails, or times out, and the
+  feature proceeds either way (never hangs the analysis/render).
+- **D-INV-9 (reference analysis terminates / degrades).** Importing/analysing a reference either yields a
+  placeable fingerprint (§D.2.1) + read, or reports which signals it couldn't compute (CR-1 style omission),
+  never a partial silent state.
+
+### D.9 Open ⟨DECIDE⟩ summary (nothing below is settled — Sasha's calls)
+**Resolved by the reading stance (§D.0.1):** D-3 (hypnotic metric) and D-6 (in-zone threshold) became holistic
+evidence-anchored reads, not metrics; D-4 (mood) likewise. No hardcoded thresholds, no regression anchors.
+**Resolved by the prover-fix pass (2026-06-24):** D-7 (reduced vs point — now ONE state by member count, §D.4);
+prover F1 (map↔read consistency, D-INV-11), F2 (fingerprint defined, §D.2.1), F3 (checkable contract, §D.3 /
+D-INV-12), F4 (lifecycle + no dangling, §D.1.1 / D-INV-13), F5 (D-INV-5 scoped), F8 (empty-read state, §D.3),
+F11 (verdict stamp, D-INV-14). D-2 has its TRANSITIONS pinned (§D.1.1); only the STORE/edit-surface is open.
+**D-10 RESOLVED (2026-06-24, Sasha):** re-flavouring = three levers (re-order / re-frame-as-option /
+mark-on-style), all observe-&-offer, never changes the card SET, never suppresses, always same `based_on`
+(§D.6, D-INV-15). Closes §B.11.1's intent gap by SURFACING intent, not silently resolving it.
+Still open (genuine policy/tuning):
+D-1 member threshold N for a cloud · D-2 mapping store + edit surface · D-5 style: numeric coordinate or
+read/label only · D-8 web-fetch trigger/actor · D-9 web source + caching (offline-first) · D-11 off-by-default
+for unmapped tracks (recommend yes) · D-12 full-vector→2-D map projection · D-13 switch default · D-14
+map-marker click target · D-15 reference surfaces per view (monotonic) · D-16 overlay-state reset across the
+ladder · D-17 distance metric (euclidean vs cosine) · D-18 fingerprint component weighting · D-19 contradiction
+margin · D-20 reduced-group visual.
+**Also resolved (2026-06-24, second fix pass):** F6 (mode × view × switch composed, §D.7), F7 (web key =
+per-artist, per-direction aggregation, name ambiguity omitted, §D.5), F9 ("своё" needs ≥2 directions, §D.3).
+**Third pass (prover G1–G4):** G1 (normalisation FROZEN to library constants, not population-relative —
+restores deterministic geometry, §D.2.1), G2 (D-INV-11 reclassified as an authoring guard + "clearly" margin
+D-19, §D.2.1), G3 (verdict+stamp written atomically, §D.1.1), G4 (reduced direction keeps a per-direction
+colour/glyph, D-20, §D.7). All prover findings F1–F11 + G1–G4 now folded; remaining items below are genuine
+policy/tuning ⟨DECIDE⟩, not holes (added: D-17 metric, D-18 weights, D-19 contradiction margin, D-20 reduced
+group visual).
+
 ## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
@@ -664,3 +1034,19 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   "is this really a bass?" by how much loudness vanishes when the bottom is dropped.
 - **polyphony** = how many notes sound at once. ~1 at a time = a melody/lead (monophonic); stacked =
   chords/pad (polyphonic). Measured from the transcribed notes (basic-pitch).
+- **reference direction / cloud** (0.9, §D) = a named set of someone else's tracks (an album / a few albums)
+  that stands for a *direction* you're reaching toward — a region in the shared feature-space, not a single
+  target to copy.
+- **aspiration mapping** (0.9, §D) = YOUR declaration of "this track of mine reaches toward that direction".
+  Many-to-many, authored by you; the tool never guesses it.
+- **in zone / diverge** (0.9, §D) = on a given axis, my track sits inside the reference cloud's range (caught
+  the vibe) / outside it. Descriptive, never a pass/fail.
+- **своё / my own** (0.9, §D) = where my track sits outside every reference I aimed it at — read as a possible
+  voice, not an error.
+- **hypnotic ↔ psychotic/hysteric** (0.9, §D) = a FACET OF MOOD (§D.2): how steady vs ruptured the track is
+  over time (steady loop vs frequent breaks), read from self-similarity novelty + density + meter together —
+  not a standalone axis or threshold; a sibling to the "how it develops" read (§B.12).
+- **mood / style read** (0.9, §D) = the human-meaningful dimensions we read a track on; holistic, anchored to
+  the measured signals (the evidence pool), optionally led by verified web info about the artist.
+- **constellation map** (0.9, §D) = the overview where my tracks and reference clouds share one space and
+  distance ≈ similarity; a navigational view, not the player.
