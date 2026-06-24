@@ -1282,7 +1282,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
 
     if masking:
         empties = [st for st in masking.get("stems_analysed", [])
-                   if (loud_level(stem_broadband_db(masking, st)) or -120) < -55]
+                   if (loud_level(stem_broadband_db(masking, st)) or -120) < STEM_EMPTY_FLOOR_DB]
 
         def loudest_in(band):
             best, bestv = None, -999
@@ -1412,7 +1412,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
             # else this is a near-silent separation artifact (Lazy_Sparks vocals: peak −61 dB, verdict
             # 'empty'), not a musical event. Peak-based, not loud_level: a genuine late accent is silent
             # most of the track so its 85th-pct is low — only the peak proves it's real.
-            if (mmed < -55 and arr[li] > mmed + 20 and tb_m[li] > 0.8 * dur
+            if (mmed < STEM_EMPTY_FLOOR_DB and arr[li] > mmed + 20 and tb_m[li] > 0.8 * dur
                     and arr[li] >= STEM_EMPTY_FLOOR_DB):
                 add("late_entry", _t=tb_m[li], part=_part_name(st), t=fmt_t(tb_m[li]))
                 break
@@ -1868,7 +1868,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             # Skip if the "covered" part is essentially silent in that band — a big
             # dB gap against silence is not a real clash, just an absent instrument.
             mid_band = masking["band_rms_db"].get(mid, {}).get(band, [])
-            if (loud_level(mid_band) or -120) < -55:
+            if (loud_level(mid_band) or -120) < STEM_EMPTY_FLOOR_DB:
                 continue
             label = f"Bass vs {mid} · {BAND_HZ.get(band, band)}"
             masking_cards.append((label, s["pct_masked"], s["mean_diff_db"], s["flagged_windows"], s["total_windows"]))
