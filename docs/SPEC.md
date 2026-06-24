@@ -71,20 +71,21 @@ finding. "Don't cry wolf, and don't paint silence."
 - **CR-2 — empty stems are omitted, not parsed.** A stem whose broadband level is below the floor is
   dropped from analysis: no notes / rhythm / masking / per-stem viz are computed for it (saves compute),
   and the widget shows "stems X, Y omitted — too little material to read." Evidence: Lazy_Sparks vocals
-  −92 dB (peak −61), piano −88 dB (peak −42) — silent, yet currently shown. ⟨DECIDE⟩ floor value: code
-  already uses **−55 dB** broadband for the "empty" caveat (`build_widget.py:900`) — reuse that, or set
-  a dedicated "don't-parse" floor (e.g. peak < −45 dB)?
+  −92 dB (peak −61), piano −88 dB (peak −42) — silent, yet currently shown. ⟨DECIDE⟩ floor value →
+  **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)** — reused the existing empty-caveat floor, no
+  dedicated peak floor.
 
 - **CR-3 — per-stem visuals are gated on ABSOLUTE level, not per-stem normalization.** A silent stem
   must render as empty, never full-colour. Evidence: vocals sits at −92 dB yet its loudest band
-  normalizes to full colour → looks like content. ⟨DECIDE⟩ the dB at which a band reads as "present" on
-  the strip (e.g. −60 dB absolute floor for any colour).
+  normalizes to full colour → looks like content. ⟨DECIDE⟩ the dB at which a band reads as "present" →
+  **SETTLED §B.2: −60 dB absolute (`STEM_COLOUR_FLOOR_DB`)**, not per-stem max.
 
 - **CR-4 — bled energy is not attributed to the wrong stem.** Where a stem's band energy is dominated by
   measured leakage from another stem, it is caveated or not shown as that stem's content. Evidence:
   guitar low −40 dB > its own mid −46 dB; bass low is −26 dB (~14 dB louder) and bass↔guitar leakage =
-  0.24 → the guitar's "low/red" is bass bleed. ⟨DECIDE⟩ when to suppress vs caveat (e.g. if a band is
-  within N dB of a higher-leakage neighbour's same band).
+  0.24 → the guitar's "low/red" is bass bleed. ⟨DECIDE⟩ suppress vs caveat → **SETTLED §B.3 (G9): caveat,
+  not suppress** — `leakage_caveats()` flags the loudest band when a carrier owns it ≥ `LEAK_LOUDER_DB`(10)
+  louder AND r ≥ `LEAK_CORR_MIN`(0.2); windowed time-refinement (CR-4a) deferred.
 
 - **CR-5 — scene names are MUSICAL (read from curve DYNAMICS), not relative-loudness.**
   **Definition (pinned 2026-06-20 — standard EDM term, written down for precision):** a **Drop** is the
@@ -705,9 +706,14 @@ Every term used below, defined once.
   distance ≈ similarity.
 - **the read panel** — click your track and read, in words, how it sits against a direction.
 - **in-zone / diverge** — on a facet, your track reads as the same family as the direction (in-zone) or not
-  (diverge). Descriptive, never pass/fail.
-- **«своё» (my own)** — a facet where your track diverges from *every* direction you aimed it at — read as a
-  possible voice, not an error.
+  (diverge). Descriptive, never pass/fail. **It is a per-facet test in FULL-dimensional fingerprint space**
+  (your track within the cloud's per-facet spread = in-zone), NOT a marker-distance read off the 2-D/3-D map —
+  the map *projects* this verdict but does not define it (D-INV-11), which is exactly why a projected marker
+  can look "close" while a dropped facet still reads "diverge" (D-INV-19).
+- **«своё» (my own)** — a facet where your track diverges from *every* **cloud** direction it's aimed at —
+  read as a possible voice, not an error. Reduced directions (too few members for in-zone/diverge) do NOT
+  participate: «своё» needs a real zone to be outside of, so a track aimed only at reduced directions has
+  no «своё» computed (D-INV-16).
 - **reduced vs full** — comparing against a small reference (track-vs-track, no cloud) vs a real cloud.
 - **the switch** — one toggle that shows/hides the reference tracks on the map and in the catalog.
 - **re-flavouring** — biasing your existing cards + read toward a direction ("in the style of X").
@@ -744,15 +750,29 @@ catalog so other people's music never mixes into your library's signatures. `tag
 *cloud*: it has a centre and a spread, and your track can be read as in-zone or diverging from it. A
 direction with **too few** members is *reduced mode* — just track-vs-track, no spread, no "in-zone" talk.
 The same single fact, "how many members", decides which it is — there is no second separate "single
-reference" concept. ⟨DECIDE D-1⟩ how many members make a cloud.
+reference" concept. The count is **placeable members only** — a reference missing a fingerprint axis is
+catalogued but contributes no coordinates (D-INV-9), so it doesn't count toward the cloud threshold. A
+direction emptied to **zero** members persists as a named-but-inert reduced direction (your mappings to it
+survive); it is never auto-deleted. ⟨DECIDE D-1⟩ how many placeable members make a cloud.
 
 **The fingerprint (the numeric side — map only).** To draw the map we need coordinates, so — and only here —
 each track's signals are boiled down to a fixed list of numbers (the development trends, the tonal palette,
-density, meter rate, repetition). This is geometry, not words; it never produces a read. The crucial part:
-the numbers are **normalised against fixed statistics computed once from your library**, NOT against whatever
-happens to be on the map. So a track's position depends only on its own signals — adding a reference, or
-flipping the switch, never makes your existing points jump around. ⟨DECIDE D-17⟩ distance measure (straight-
-line vs angle); ⟨DECIDE D-18⟩ whether some signals weigh more. `tags: frozen-geometry · D-INV-12`
+density, meter rate, repetition). This is geometry, not words; it never produces a read. The numbers are
+**normalised against statistics over the current set** (your library + the reference groups in play) — so a
+coordinate is meaningful relative to everything it's being compared against, not in a vacuum. The honesty
+rule is NOT "never recompute" — it's **never move silently** (Sasha 2026-06-24): a coordinate is a
+deterministic pure function of *(its signals, the current normalisation epoch)*. When the inputs change — you
+add library tracks, or add/remove members of a reference group — every dependent fingerprint and read
+**recomputes together and is re-stamped** (D-INV-12). The skill detects the change on each run by a **content
+hash of the dependency unit's inputs — the member set's track ids + the normalisation epoch id** — NOT the
+human-readable "name · count · date" stamp: the hash catches an *equal-count swap* (drop track A, add track B
+— the count is unchanged but the cloud moved) and a *library-normalisation change* (which the reference-set
+stamp wouldn't see), so nothing moves unnoticed. A read recomputes iff its input hash differs from the hash it
+was last computed against; the skill surfaces that it recomputed, so a marker that moved is always explained,
+never spooky. The **dependency unit is a reference group together with the set of your tracks aimed at it** —
+a change on EITHER side recomputes that unit (Sasha's "для каждой группы моих треков есть группа референсов").
+⟨DECIDE D-17⟩ distance measure (straight-line vs angle); ⟨DECIDE D-18⟩ whether some signals weigh more.
+`tags: recompute-on-change · D-INV-12 · D-INV-14`
 
 **Mood / style read + the evidence pool.** We read a track on **mood** and **style**, in words, over the
 constellation of measured signals beneath. "Hypnotic ↔ psychotic" is a *facet of mood* (steady loop vs
@@ -776,8 +796,9 @@ Where it's stored and how you edit it is open. ⟨DECIDE D-2⟩. `tags: D-INV-4`
 reference clouds as soft blobs (centre + spread), distance ≈ similarity. It's an overview you navigate, not
 a player — it carries no play/seek state. The read panel opens when you click your track: "тянется к
 Venetian Snares", the in-zone/diverge read, "своё", each backed by its evidence. The read panel is a *read*
-(observation), it never becomes an action card. ⟨DECIDE D-12⟩ how the many signals collapse onto a 2-D
-picture; ⟨DECIDE D-13⟩ the switch's default; ⟨DECIDE D-14⟩ what clicking a marker opens.
+(observation), it never becomes an action card; **it is authoritative over the map** (D-INV-11 — the map is
+a lossy viewport). ⟨DECIDE D-12⟩ how the many signals collapse onto a 2-D/3-D picture; ⟨DECIDE D-13⟩ the
+switch's default; ⟨DECIDE D-14⟩ what clicking a marker opens.
 
 ### D.4 How you use it (worked scenarios)
 
@@ -791,8 +812,9 @@ if you want to lean that way." Nothing is hidden; nothing is graded.
 
 **2 — A single reference track (reduced).** You only have one scsi-9 track, not the album. That's *reduced
 mode*: no cloud, no spread, no "in-zone". You still get a straight track-vs-track read ("your track is denser
-and warmer than this one") and both appear on the map, but there's no region to be inside, and "своё" isn't
-computed (it needs more than one direction to mean "a voice").
+and warmer than this one") and both appear on the map, but there's no region to be inside, so "своё" isn't
+computed — **not because you only have one direction (one CLOUD is enough for «своё», D-INV-16), but because
+a reduced direction has no zone to be outside of.**
 
 **3 — Several artists, the web, and deleting a direction.** You make a direction "scsi-9 + deepchord". The
 web lead is shown per artist, never merged. Later you delete that direction: every mapping that pointed at it
@@ -820,38 +842,78 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   shared map for display. `D-INV-7`
 - Every character / mood / style / in-zone statement carries its real evidence — one signal or a combination;
   with none, it's omitted, never shown. `D-INV-10`
-- The map and the read never flatly contradict: the read won't say "in-zone" while the marker sits clearly
-  outside the cloud, or "diverge" while clearly inside (they may differ in nuance). Checked by eye, like the
-  "based-on" line, not by a unit test — the map is a projection. ⟨DECIDE D-19⟩ the "clearly" margin. `D-INV-11`
-- The map geometry is deterministic: the same signals always give the same position, because the
-  normalisation is frozen, not relative to what's on the map. `D-INV-12`
+- The **read is the source of truth; the map is a lossy viewport** (Sasha 2026-06-24: any flattening — 2D or
+  even 3D — drops dimensions, "даже 3 измерения далеко не предел"). The in-zone/diverge/«своё» verdict is read
+  in **full dimensions** and is authoritative; the map is an illustration that may not show every facet, and
+  is labelled as such. So the read does NOT derive from marker distance, and a marker that looks "close" while
+  the read says "diverge" is expected, not a bug — there is no contradiction to guard because they aren't the
+  same computation. (This SUPERSEDES the earlier "map and read never flatly contradict, checked by eye" rule.)
+  `D-INV-11`
+- The map geometry is **deterministic per epoch and never moves silently**: a position is a pure function of
+  *(its signals, the current normalisation epoch)*. It is NOT frozen-forever — when the inputs change (library
+  grows, a reference group gains/loses members) every dependent position recomputes together and is re-stamped
+  (D-INV-14); within one epoch, nothing drifts run-to-run. `D-INV-12`
 - No mapping ever points at a deleted direction or a removed track; deletes cascade, and affected tracks
   revert to plain coaching. `D-INV-13`
-- Every placement read is stamped with the reference set it was computed against (name · member count ·
-  date); a read and its stamp are written together, so a fresh verdict never carries a stale stamp. `D-INV-14`
+- **Adding AND removing a member are symmetric** (Sasha 2026-06-24, recompute-on-change): both recompute the
+  direction's cloud and every dependent read, and re-stamp them. If a **removal crosses the cloud below the
+  member threshold** (D-1), the direction becomes *reduced* — its dependent reads drop their in-zone/diverge
+  and «своё» content (a reduced direction has no zone to be inside, D-INV-16) rather than keeping a stale
+  cloud-mode verdict; if an **addition crosses up**, the in-zone/diverge read appears. A read's stamp always
+  matches the member count it was computed against. `D-INV-18`
+- Every placement read carries TWO things, written together with the read so a fresh verdict never carries a
+  stale stamp: a **human stamp** (name · member count · date) shown to you, AND a **content hash** of its
+  inputs (member track-ids + normalisation epoch) used to detect change. A read recomputes iff its input hash
+  differs — the count alone is never the change key (an equal-count swap must still trigger recompute, §D.3).
+  `D-INV-14`
 - Re-flavouring only re-orders, re-words, and may add an "on-style" note — it never adds, removes, or
   suppresses a card versus the plain view, and never changes a card's "based-on". `D-INV-15`
+- «своё» and in-zone/diverge are computed only against **cloud** directions; a reduced direction (too few
+  members for a zone) never produces an in-zone/diverge/«своё» verdict, and a track aimed only at reduced
+  directions has no «своё». `D-INV-16`
+- Re-flavouring over several aimed-at directions is **deterministic**: a card's order rank is its strongest
+  divergence across all of them (largest divergence breaks ties), so the card list has one well-defined order
+  even when directions pull opposite ways. The card SET is still identical to the plain view (D-INV-15).
+  Re-flavouring re-orders **within the active §B.11 sort mode** (urgency default / chronological toggle stays
+  the base key; divergence promotes within it), never a third competing order. `D-INV-17`
+- in-zone/diverge/«своё» is a **pure function of the full-dimensional fingerprint** (per-facet spread test),
+  independent of the map projection — so the verdict is the same whether the map is drawn in 2-D, 3-D, or not
+  at all. The map can disagree with it (a dropped facet); the verdict is authoritative (D-INV-11). `D-INV-19`
 
 **Always, eventually (liveness).**
 
 - Any web fetch completes, fails, or times out, and the feature carries on either way — it never hangs the
   analysis or the render. `D-INV-8`
 - Analysing a reference either produces a placeable fingerprint and read, or reports which signals it
-  couldn't compute — never a half-finished silent state. `D-INV-9`
+  couldn't compute — never a half-finished silent state. A reference **missing any fingerprint axis is
+  catalogued but NOT placed on the map** (a fixed-axis projection needs every coordinate — we don't impute a
+  fake one and park it at a misleading spot), with a one-line "couldn't place: ⟨signals⟩" note; its written
+  read still renders from whatever signals DID compute. `D-INV-9`
 
 ### D.6 How the coaching changes — re-flavouring (the payoff)
 
-When your track is mapped to a direction, the *existing* cards and read are re-flavoured toward it. Same
-engine, same findings — three levers, all in the "observe and offer" register (never a command):
+When your track is mapped to a direction, the *existing* cards and read are re-flavoured toward it. A track
+can aim at **several directions at once** (the mapping is many-to-many, D-INV-4), and re-flavouring **mixes
+them all** (Sasha 2026-06-24: "смешивать все сразу"), not one-at-a-time. Same engine, same findings — three
+levers, all in the "observe and offer" register (never a command):
 
-1. **Re-order.** Cards about where you *diverge* from the direction rise; where you're already in-zone, they
-   sink. The set of cards shown never changes — only the order. Nothing is hidden.
+1. **Re-order.** Cards about where you *diverge* rise; where you're already in-zone, they sink. With several
+   aimed-at directions a card's rank is its **strongest divergence across all of them** (a facet where you
+   diverge from ANY aimed direction rises; the largest divergence breaks ties) — so the order is
+   deterministic even when two directions pull opposite ways (D-INV-17). This re-order happens **within the
+   active §B.11 sort mode** (urgency by default, or the chronological toggle) — divergence promotes diverging
+   cards inside that mode; it is not a third competing sort. The set of cards shown never changes — only the
+   order. Nothing is hidden.
 2. **Re-frame as an option.** A card gains a direction, phrased as a choice: "the bass buries the lead around
    ≈290 Hz" → "…and Venetian Snares keeps that low-mid clearer; an option, if you want to lean that way."
+   When directions genuinely disagree (one keeps that low-mid clearer, another sits dense too) **both options
+   are offered** — that's the observe-and-offer register; the coach never picks for you. Notes are deduped
+   and capped so a card isn't buried under one note per direction. ⟨DECIDE D-21⟩ the per-card note cap.
 3. **Mark on-style, don't suppress.** We used to leave a trait unflagged because the coach couldn't know if
    it was a mistake or the point. The reference is that missing intent signal — but when your "problem"
-   *matches* the aspired style, the card is **kept and marked**, not hidden: "though Venetian Snares sits
-   this dense too — maybe it's the point." The doubt is surfaced, never silently resolved.
+   *matches* the aspired style of **any** aimed direction, the card is **kept and marked**, not hidden:
+   "though Venetian Snares sits this dense too — maybe it's the point." The doubt is surfaced, never silently
+   resolved.
 
 Through all of it the card still stands on its real finding and cites the same "based-on" — re-flavouring
 changes emphasis and words, never the truth. A track with no mapping is untouched. `tags: D-INV-15 · D-INV-2
@@ -880,13 +942,15 @@ The *words* of a read stay authoring quality, judged by eye (like the "based-on"
 pinned so a refactor can't quietly break the core:
 
 1. **Anchored** — every placement statement names at least one real evidence signal (checkable). `D-INV-10`
-2. **Deterministic geometry** — the fingerprint + distance are a pure function of the signals, tested on a
-   fixture; markers never drift run-to-run. `D-INV-12`
+2. **Deterministic geometry (per epoch)** — the fingerprint + distance are a pure function of *(the signals,
+   the current normalisation epoch)*, tested on a fixture; within an epoch markers never drift run-to-run,
+   and across an epoch change they recompute together + re-stamp, never silently. `D-INV-12`
 3. **Transparent re-flavouring** — mapped vs unmapped show the identical card set; only order/wording differ
    (checkable). `D-INV-15`
 
-The map↔read "no flat contradiction" rule and the anchoring of *wording* are **authoring guards** — reviewed
-by eye, not unit-tested.
+The map↔read relationship is NO LONGER an eyeball guard: the read is authoritative and the map is a labelled
+lossy viewport (D-INV-11), so there's nothing to reconcile — only the anchoring of *wording* stays an
+authoring guard, reviewed by eye.
 
 ### D.9 Open decisions (need Sasha)
 
@@ -900,15 +964,20 @@ structural holes:
 - ⟨DECIDE D-8⟩ what triggers the web fetch.
 - ⟨DECIDE D-9⟩ web source + caching (offline-first).
 - ⟨DECIDE D-11⟩ off-by-default for unmapped tracks (recommend: yes).
-- ⟨DECIDE D-12⟩ how signals collapse onto the 2-D map.
+- ⟨DECIDE D-12⟩ how signals collapse onto the map, AND its dimensionality (2-D vs 3-D) — Sasha wants to SEE a
+  prototype on the real library before deciding, since any flattening loses info. The projection must stay
+  deterministic-per-epoch (D-INV-12), which rules out neighbour-embedding methods (t-SNE/UMAP refit and move
+  every point); the open choice is which fixed axes + how many.
 - ⟨DECIDE D-13⟩ the switch's default.
 - ⟨DECIDE D-14⟩ what clicking a map marker opens.
 - ⟨DECIDE D-15⟩ which reference surfaces show in which view.
 - ⟨DECIDE D-16⟩ how the switch's state resets across views.
 - ⟨DECIDE D-17⟩ distance measure (straight-line vs angle).
 - ⟨DECIDE D-18⟩ whether some signals weigh more in the fingerprint.
-- ⟨DECIDE D-19⟩ the "clearly outside" margin for the map↔read guard.
+- ⟨DECIDE D-19⟩ ~~the "clearly outside" margin for the map↔read guard~~ → **DROPPED 2026-06-24**: the read is
+  authoritative and the map is a labelled lossy viewport (D-INV-11), so there is no map↔read guard to tune.
 - ⟨DECIDE D-20⟩ the visual that groups a reduced direction's markers.
+- ⟨DECIDE D-21⟩ the per-card note cap when several aimed directions each add an option-note (§D.6 lever 2).
 
 ## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
@@ -935,5 +1004,10 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   "is this really a bass?" by how much loudness vanishes when the bottom is dropped.
 - **polyphony** = how many notes sound at once. ~1 at a time = a melody/lead (monophonic); stacked =
   chords/pad (polyphonic). Measured from the transcribed notes (basic-pitch).
+- **quick — run mode, not just a view** (clarified 2026-06-24). "quick" is a *cheaper run* (`tc-quick`,
+  no Demucs stems) that produces a **mix-mode player** (one source, transport + seek, no mute/solo grid —
+  §B.14). The view ladder `quick ⊆ Simple ⊆ Detailed` (INV-18/22) describes what's VISIBLE at each rung;
+  Simple/Detailed are view toggles within a full stemmed run, while quick is the stemless run beneath them.
+  So "quick" names one thing — the stemless run and the calm view it shows — not two.
 - _(0.9 reference-layer terms — reference direction, aspiration mapping, in-zone/diverge, «своё», mood/style
   read, fingerprint, the map — are defined once in §D.1 Terminology, not duplicated here.)_
