@@ -999,9 +999,11 @@ structural holes:
 - ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
   mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
   only the map overlay + re-flavouring on mapping, as D-11 already leans).
-- ⟨DECIDE D-24⟩ runner-up direction — **SETTLED 2026-06-25 (Alexander): show a "+⟨second⟩" only when the
-  runner-up is in the SAME proximity bucket (high) as the nearest**, not by a raw numeric margin; this rides
-  the high/medium/low cue (D-INV-26), so there's no magic threshold to tune.
+- ⟨DECIDE D-24⟩ runner-up direction — **RE-OPENED 2026-06-25 (by deed, s25): DEFERRED from v1.** The
+  intended "show +second when it's also close" is self-contradictory under the relative-lean cue (D-INV-26): a
+  second direction that's *tied* with the nearest means the nearest does NOT stand apart — i.e. a *weak* lean,
+  not a close one. A real "co-leaders" display needs its own design (e.g. a distinct tied-pair tint), so v1
+  ships a single direction; revisit later.
 - ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
   Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip).
 - ⟨DECIDE D-27⟩ the exact boundaries of the own-library high/medium/low buckets (§F) — relative to the
@@ -1102,8 +1104,10 @@ relative**: the reference column tints by **lean strength** — how much the nea
 from the track's other directions (⟨DECIDE D-28⟩ settled = relative, not absolute cloud-depth); the §F own
 column tints by closeness against the **library's own distance distribution** (⟨DECIDE D-27⟩). **Green and
 amber are the default; red is a last-resort tint** in §F — used only when nothing closer qualifies, never
-hiding that the sibling is far. The same cue governs the reference runner-up — shown only when it is also
-green/close (⟨DECIDE D-24⟩), so there is no numeric margin to tune. So colour is never the *sole* channel: the
+hiding that the sibling is far. A reference **runner-up (+second direction) is DEFERRED** (⟨DECIDE D-24⟩
+re-opened by deed, s25): under relative lean a *tied* second means the nearest does NOT stand apart — a weak
+lean, not a close one — so "runner = also close" is self-contradictory; v1 shows one direction and a
+co-leaders display waits for a later pass. So colour is never the *sole* channel: the
 **nearest-first order** carries the ranking and a **hover label** names the closeness, keeping the cue
 readable in greyscale or for a colour-blind reader without adding visible words. `D-INV-26`
 

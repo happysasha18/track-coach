@@ -228,7 +228,7 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | D-INV-23 | both placements under the ONE references switch; toggle hides/shows both; never strands | not built — lands with the switch + catalog/widget render |
 | D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
 | D-INV-25 | never a NUMBER — no raw distance / score / rank / % / "match %"; only a direction name + a coarse cue | not built — assert rendered chip carries no numeric token at all |
-| D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Runner-up only when also green | bucketing geometry NOW (relative lean + RC-INV-5a/5b); colour render: not built — assert tint ∈ {green,amber,red}, no numeric/word token on the cell |
+| D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Reference runner-up DEFERRED (D-24) | geometry **BUILT+TESTED** `test_similarity_columns::RelativeLeanBuckets` + `NearestOwnRedIsLastResort`; colour render: not built — assert tint ∈ {green,amber,red}, no numeric/word token on the cell |
 
 ### Similar-in-your-own-library, the DJ column (SPEC §F)
 | code | rule (1-line) | owning test / status |
@@ -241,6 +241,13 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | F-INV-6 | a version missing a fingerprint axis: not listed AND not offered AS a neighbour; cell "can't compare — ⟨signals⟩" | geometry NOW (not-comparable via RC-INV-5a `TooFewSharedIsNotComparable`); render: not built |
 | F-INV-7 | with no other placeable own-track, the cell reads "no comparison yet", never an empty-looks-broken cell | not built — lands with catalog render |
 | F-INV-8 | recompute + re-stamp on library/epoch change; never points at a deleted version (cascade like D-INV-13) | not built — composes with placement + deposit/clean |
+
+**Geometry layer BUILT+TESTED 2026-06-25 (s25):** `scripts/similarity_columns.py` (`leans_toward` + `nearest_own`
+over `completeness.py`) — pure logic, no render. `tests/test_similarity_columns.py` (15 tests, red-on-bug
+proven: a fabricated nearest fails the no-directions→None test). Suite 375 green (+15), 0 regression. Covers the
+geometry half of D-INV-21/26 + F-INV-1/2/6/7; the colour render + scroll-nav (D-INV-22/23/25, F-INV-4/5) land
+with the §D/§F catalog code, asserted against the real artifact. **D-24 runner-up RE-OPENED + deferred** (a
+tied second is a weak lean, not a close one — self-contradictory under relative lean).
 
 **Settled 2026-06-25 (Alexander):** D-17 = straight-line. D-28 = reference cue is RELATIVE lean (not absolute
 cloud-depth). Closeness shown by **colour only** — green/amber/red tint on the name, NO closeness words, no
