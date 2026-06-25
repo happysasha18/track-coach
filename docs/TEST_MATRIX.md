@@ -223,12 +223,12 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 ### Reference line «leans toward» (SPEC §D.10)
 | code | rule (1-line) | owning test / status |
 |---|---|---|
-| D-INV-21 | catalog chip = plaque chip = map dot's nearest — ONE full-dim geometry, never a 2-D marker distance; the single nearest is chosen across ALL directions (clouds by centroid · reduced by nearest member), axis-count-fair (RC-INV-5b); no directions ⇒ "no direction yet", never a fabricated nearest | geometry NOW via `test_completeness::RankingIsAxisCountFair`; cross-surface agreement + empty-case render: not built — lands with §D render |
+| D-INV-21 | catalog column = plaque chip = read panel's nearest — ONE full-dim geometry, never a 2-D marker distance (no map); the single nearest is chosen across ALL directions (clouds by centroid · reduced by nearest member), axis-count-fair (RC-INV-5b); no directions ⇒ "no direction yet", never a fabricated nearest | geometry NOW via `test_completeness::RankingIsAxisCountFair`; cross-surface agreement + empty-case render: not built — lands with §D render |
 | D-INV-22 | quick-only version ⇒ cell "full analysis only" (silent, RC-INV-7); row reads the version's most-complete run (E.4); never blank-implies-none | not built — lands with catalog render + run selection |
 | D-INV-23 | both placements under the ONE references switch; toggle hides/shows both; never strands | not built — lands with the switch + catalog/widget render |
 | D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
 | D-INV-25 | never a NUMBER — no raw distance / score / rank / % / "match %"; only a direction name + a coarse cue | not built — assert rendered chip carries no numeric token at all |
-| D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Reference runner-up DEFERRED (D-24) | geometry **BUILT+TESTED** `test_similarity_columns::RelativeLeanBuckets` + `NearestOwnRedIsLastResort`; colour render: not built — assert tint ∈ {green,amber,red}, no numeric/word token on the cell |
+| D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Reference runner-up DEFERRED (D-24) | geometry **BUILT+TESTED** `test_similarity_columns::RelativeLeanBuckets` + `NearestOwnRedIsLastResort`; colour render: not built — assert §D reference cell carries a greyscale-safe glyph tier (●●●/●●○/●○○) beside colour, §F uses nearest-first order, both carry a hover label; no numeric/word closeness token on any cell |
 
 ### Similar-in-your-own-library, the DJ column (SPEC §F)
 | code | rule (1-line) | owning test / status |
@@ -266,8 +266,8 @@ label keep the cue readable in greyscale / for colour-blind readers (D-INV-26) �
 coloured cell carries an order rank + a title attr.
 
 **Cross-page (extends §7).** The reference column's "leans toward X" on a catalog row names the SAME nearest
-direction the §D map dot projects for that track (D-INV-21) — one geometry, two surfaces; owning test lands
-with the §D render. The own-library column is NOT under the references switch (§F vs D-INV-23) — a switch-off
+direction the §D read panel cites for that track (D-INV-21) — one full-dim geometry, two surfaces (no map);
+owning test lands with the §D render. The own-library column is NOT under the references switch (§F vs D-INV-23) — a switch-off
 state hides the reference column but leaves the DJ column visible; owning test lands with the switch render.
 
 ## §8 — Coverage status

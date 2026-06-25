@@ -680,8 +680,8 @@ human first; the short `tags` at the ends of rule lines are handles for the test
 The point is **not to clone a reference 1:1.** It is to: aim your track at a direction (a track, or a whole
 album / a few albums by an artist), *understand that direction* — its mood, its style, how it moves — then
 **see where you're already close and where you're your own**, and have track-coach's existing advice + read
-start speaking "in the style of" that direction. The comparison (a map + a written read) is how you SEE the
-direction; the re-flavoured coaching is the point of it.
+start speaking "in the style of" that direction. The comparison (the «leans toward» line + a written read) is
+how you SEE the direction; the re-flavoured coaching is the point of it.
 
 It stays true to the two standing principles: it **observes and offers, never grades** (the artistic
 north-star), and it keeps the **two layers** separate — the cards stay the actionable layer, the read stays
@@ -703,25 +703,26 @@ Every term used below, defined once.
 - **mood / style read** — the human-meaningful things we actually read a track on (e.g. hypnotic vs
   hysteric, cold vs warm, dense vs airy). Holistic, in words.
 - **evidence pool** — the real measured signals underneath the read (arc, palette, density, meter, stereo,
-  repetition/novelty). They are the PROOF a read cites, and the coordinates for the map. They are not a
+  repetition/novelty). They are the PROOF a read cites, and the coordinates of the fingerprint. They are not a
   checklist you "score against".
-- **fingerprint** — the **full-dimensional** numeric vector of one track's signals. It grounds BOTH the
-  in-zone/diverge verdict (read in full dimensions, D-INV-19) AND the map. The **map** is its 2-D/3-D
-  *projection* — only the projection is lossy; the fingerprint itself is not "for the map only".
-- **the map (constellation)** — one picture where your tracks and the reference clouds live together;
-  distance ≈ similarity.
+- **fingerprint** — the **full-dimensional** numeric vector of one track's signals. It grounds the
+  in-zone/diverge verdict (read in full dimensions, D-INV-19) AND the «leans toward» nearest-direction
+  computation (§D.10). It is read in full dimensions — there is **no** lossy projection of it.
+- **the «leans toward» line** — the compact surface (a catalog column + a Detailed plaque chip) naming the
+  reference direction this track's fingerprint sits nearest to; see §D.10. (There is **no** 2-D/3-D
+  constellation map — dropped 2026-06-26: we show the nearest centroid, not a flattened picture.)
 - **the read panel** — click your track and read, in words, how it sits against a direction.
 - **in-zone / diverge** — on a facet, your track reads as the same family as the direction (in-zone) or not
   (diverge). Descriptive, never pass/fail. **It is a per-facet test in FULL-dimensional fingerprint space**
-  (your track within the cloud's per-facet spread = in-zone), NOT a marker-distance read off the 2-D/3-D map —
-  the map *projects* this verdict but does not define it (D-INV-11), which is exactly why a projected marker
-  can look "close" while a dropped facet still reads "diverge" (D-INV-19).
+  (your track within the cloud's per-facet spread = in-zone). It is read directly in full-dimensional
+  fingerprint space, never off a projection (there is no map); a per-facet drop can still read "diverge"
+  even when the overall fingerprint sits near (D-INV-19).
 - **«своё» (my own)** — a facet where your track diverges from *every* **cloud** direction it's aimed at —
   read as a possible voice, not an error. Reduced directions (too few members for in-zone/diverge) do NOT
   participate: «своё» needs a real zone to be outside of, so a track aimed only at reduced directions has
   no «своё» computed (D-INV-16).
 - **reduced vs full** — comparing against a small reference (track-vs-track, no cloud) vs a real cloud.
-- **the switch** — one toggle that shows/hides the reference tracks on the map and in the catalog.
+- **the switch** — one toggle that shows/hides the reference surfaces (the §D.10 column + the plaque chip).
 - **re-flavouring** — biasing your existing cards + read toward a direction ("in the style of X").
 - **artist info (the web)** — optional public info about a reference's artist, used as a *lead* to understand
   the mood — always confirmed against the signals before it's stated.
@@ -761,11 +762,12 @@ catalogued but contributes no coordinates (D-INV-9), so it doesn't count toward 
 direction emptied to **zero** members persists as a named-but-inert reduced direction (your mappings to it
 survive); it is never auto-deleted. ⟨DECIDE D-1⟩ how many placeable members make a cloud.
 
-**The fingerprint (the numeric side — map only).** To draw the map we need coordinates, so — and only here —
-each track's signals are boiled down to a **full-dimensional** vector of numbers (the development trends, the
-tonal palette, density, meter rate, repetition). This is geometry: it grounds the **geometric** in-zone/
-diverge verdict (D-INV-19) and, projected to 2-D/3-D, the map — but it never writes the **worded** mood/style
-read (that's §D.2's holistic synthesis, anchored to signals). The numbers are
+**The fingerprint (the numeric side).** The «leans toward» line and the in-zone/diverge verdict need
+coordinates, so each track's signals are boiled down to a **full-dimensional** vector of numbers (the
+development trends, the tonal palette, density, meter rate, repetition). This is geometry: it grounds the
+**geometric** in-zone/diverge verdict (D-INV-19) and the nearest-direction «leans toward» (§D.10) — but it
+never writes the **worded** mood/style read (that's §D.2's holistic synthesis, anchored to signals). The
+numbers are
 **normalised against statistics over the current set** (your library + the reference groups in play) — so a
 coordinate is meaningful relative to everything it's being compared against, not in a vacuum. The honesty
 rule is NOT "never recompute" — it's **never move silently** (Alexander 2026-06-24): a coordinate is a
@@ -776,7 +778,7 @@ hash of the dependency unit's inputs — the member set's track ids + the normal
 human-readable "name · count · date" stamp: the hash catches an *equal-count swap* (drop track A, add track B
 — the count is unchanged but the cloud moved) and a *library-normalisation change* (which the reference-set
 stamp wouldn't see), so nothing moves unnoticed. A read recomputes iff its input hash differs from the hash it
-was last computed against; the skill surfaces that it recomputed, so a marker that moved is always explained,
+was last computed against; the skill surfaces that it recomputed, so a reading that moved is always explained,
 never spooky. The **dependency unit is a reference group together with the set of your tracks aimed at it** —
 a change on EITHER side recomputes that unit (Alexander’s framing: each of his track-groups can have a matching reference group).
 ⟨DECIDE D-17⟩ distance measure (straight-line vs angle); ⟨DECIDE D-18⟩ whether some signals weigh more.
@@ -785,8 +787,8 @@ a change on EITHER side recomputes that unit (Alexander’s framing: each of his
 **Mood / style read + the evidence pool.** We read a track on **mood** and **style**, in words, over the
 constellation of measured signals beneath. "Hypnotic ↔ psychotic" is a *facet of mood* (steady loop vs
 ruptured), read from repetition + density + meter together — not its own dial. Style is a family read ("reads
-like the scsi-9 / deepchord lineage"), usually a named tag. ⟨DECIDE D-5⟩ whether style ever needs a number
-for the map or stays a pure label.
+like the scsi-9 / deepchord lineage"), usually a named tag. Style stays a pure label (⟨DECIDE D-5⟩ dropped
+2026-06-26 — the map that might have needed a style number is gone).
 
 **Artist info from the web (a lead, never a fact).** For a reference's artist we may pull public info (genre
 tags, era, known techniques) to help explain *why* the signals read as a certain mood — "the web says X is
@@ -800,19 +802,18 @@ D-9⟩ which source + caching (we're offline-first). `tags: web-is-a-lead · D-I
 **Aspiration mapping.** Your authored link from your track(s) to direction(s). The tool never assigns it.
 Where it's stored and how you edit it is open. ⟨DECIDE D-2⟩. `tags: D-INV-4`
 
-**The two surfaces — the map and the read panel.** The map is one shared picture: your tracks as markers,
-reference clouds as soft blobs (centre + spread), distance ≈ similarity. It's an overview you navigate, not
-a player — it carries no play/seek state. The read panel opens when you click your track: "leans toward
-Venetian Snares", the in-zone/diverge read, "своё", each backed by its evidence. The read panel is a *read*
-(observation), it never becomes an action card; **it is authoritative over the map** (D-INV-11 — the map is
-a lossy viewport). ⟨DECIDE D-12⟩ how the many signals collapse onto a 2-D/3-D picture; ⟨DECIDE D-13⟩ the
-switch's default; ⟨DECIDE D-14⟩ what clicking a marker opens.
+**The two surfaces — the «leans toward» line and the read panel.** The «leans toward» line (§D.10) is the
+glanceable handle: a catalog column + a Detailed plaque chip naming the nearest reference direction with a
+colour closeness cue. The read panel opens when you click your track: "leans toward Venetian Snares", the
+in-zone/diverge read, "своё", each backed by its evidence. The read panel is a *read* (observation), it
+never becomes an action card. Both draw from the SAME full-dimensional fingerprint, so they can never
+disagree about which direction is nearest (D-INV-11). ⟨DECIDE D-13⟩ the switch's default.
 
 ### D.4 How you use it (worked scenarios)
 
 **1 — An album as a direction (the full case).** You drop the Venetian Snares album in as a reference
 direction and say "wobble drift reaches toward this." track-coach analyses the album (audio only), forms the
-cloud, and places wobble drift against it. On the map, wobble drift sits just inside the cloud. You click it
+cloud, and reads wobble drift against it: its fingerprint sits just inside the cloud. You click it
 and read: "leans toward Venetian Snares — on the hysteric, ruptured feel you're in their zone; the palette runs
 colder than theirs; their arc breaks where yours stays level." Your usual cards reorder so the ones about
 where you diverge come up first, and one gets a note: "their low-mid stays clearer around 290 Hz — an option,
@@ -820,7 +821,7 @@ if you want to lean that way." Nothing is hidden; nothing is graded.
 
 **2 — A single reference track (reduced).** You only have one scsi-9 track, not the album. That's *reduced
 mode*: no cloud, no spread, no "in-zone". You still get a straight track-vs-track read ("your track is denser
-and warmer than this one") and both appear on the map, but there's no region to be inside, so "своё" isn't
+and warmer than this one") and both are catalogued, but there's no region to be inside, so "своё" isn't
 computed — **not because you only have one direction (one CLOUD is enough for «своё», D-INV-16), but because
 a reduced direction has no zone to be outside of.**
 
@@ -842,30 +843,32 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
 - A reference track never shows any Ableton-project surface — it's audio-only, and its catalog row has no
   project columns. `D-INV-3`
 - The tool never guesses which direction your track aims at — the mapping is always yours. `D-INV-4`
-- A track with no mapping is byte-for-byte as it is today (its cards, read, player). The map is a *new*
-  view that simply shows all your tracks; being a dot on it isn't a change to the track's widget. `D-INV-5`
+- A track with no mapping is byte-for-byte as it is today (its cards, read, player). The «leans toward» line
+  and the reference catalog are *new* surfaces about your tracks; carrying a leans-toward isn't a change to
+  the track's widget. `D-INV-5`
 - **Reference / compare is a FULL-run-only feature — quick mode is never referenceable** (Alexander 2026-06-25:
   quick mode is not for reference). The fingerprint is per-stem; a quick (mix-only, no Demucs) run has no
-  fingerprint to place or compare, so "хочу как X", the map dot, and re-flavouring are simply **not offered**
+  fingerprint to place or compare, so "хочу как X", the «leans toward» line, and re-flavouring are simply **not offered**
   on a quick run — shown as "full analysis only", never a half-comparison on mix axes alone.
   This is the canonical missing-by-mode case (RC-INV-7): quick never promised reference, so its absence is
   silent, not an error (it is NOT a partial-run failure under RC-INV-10). `D-INV-20`
-- The show/hide-references control is one named switch shared by the map and the catalog; no view strands its
-  state where you can't see or undo it. `D-INV-6`
-- Reference tracks never enter your library's catalog/signatures; the switch only overlays them onto the
-  shared map for display. `D-INV-7`
+- The show/hide-references control is one named switch shared by the reference column and the plaque chip;
+  no view strands its state where you can't see or undo it. `D-INV-6`
+- Reference tracks never enter your library's catalog/signatures; the switch only surfaces them through the
+  reference column for display. `D-INV-7`
 - Every character / mood / style / in-zone statement carries its real evidence — one signal or a combination;
   with none, it's omitted, never shown. `D-INV-10`
-- The **read is the source of truth; the map is a lossy viewport** (Alexander, 2026-06-24: any flattening — 2D or even 3D — drops dimensions; even 3 axes are far from the limit). The in-zone/diverge/«своё» verdict is read
-  in **full dimensions** and is authoritative; the map is an illustration that may not show every facet, and
-  is labelled as such. So the read does NOT derive from marker distance, and a marker that looks "close" while
-  the read says "diverge" is expected, not a bug — there is no contradiction to guard because they aren't the
-  same computation. (This SUPERSEDES the earlier "map and read never flatly contradict, checked by eye" rule.)
-  `D-INV-11`
-- The map geometry is **deterministic per epoch and never moves silently**: a position is a pure function of
-  *(its signals, the current normalisation epoch)*. It is NOT frozen-forever — when the inputs change (library
-  grows, a reference group gains/loses members) every dependent position recomputes together and is re-stamped
-  (D-INV-14); within one epoch, nothing drifts run-to-run. `D-INV-12`
+- The verdict is read in **full dimensions** and is authoritative; there is **no lossy projection** — the
+  2-D/3-D map was dropped (Alexander, 2026-06-26: any flattening drops dimensions, so we show the nearest
+  centroid via the «leans toward» line, not a flattened picture). The «leans toward» line and the read both
+  derive from the **same full-dimensional fingerprint** at the current epoch, so they can never disagree about
+  which direction is nearest. A per-facet drop can still read "diverge" even when the fingerprint sits near
+  overall — that's the facet test (D-INV-19), not a contradiction. `D-INV-11`
+- The fingerprint geometry is **deterministic per epoch and never moves silently**: a position (and the
+  nearest-direction it implies) is a pure function of *(its signals, the current normalisation epoch)*. It is
+  NOT frozen-forever — when the inputs change (library grows, a reference group gains/loses members) every
+  dependent position recomputes together and is re-stamped (D-INV-14); within one epoch, nothing drifts
+  run-to-run. `D-INV-12`
 - No mapping ever points at a deleted direction or a removed track; deletes cascade, and affected tracks
   revert to plain coaching. `D-INV-13`
 - **Adding AND removing a member are symmetric** (Alexander 2026-06-24, recompute-on-change): both recompute the
@@ -890,9 +893,9 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   Re-flavouring re-orders **within the active §B.11 sort mode** as a SECONDARY key, never a third competing
   order: in urgency mode divergence sub-sorts within each tier; in strict chronological mode (no ties) the
   re-order lever is inert and only re-word/on-style act. `D-INV-17`
-- in-zone/diverge/«своё» is a **pure function of the full-dimensional fingerprint** (per-facet spread test),
-  independent of the map projection — so the verdict is the same whether the map is drawn in 2-D, 3-D, or not
-  at all. The map can disagree with it (a dropped facet); the verdict is authoritative (D-INV-11). `D-INV-19`
+- in-zone/diverge/«своё» is a **pure function of the full-dimensional fingerprint** (per-facet spread test).
+  There is no projection to disagree with it — the full-dimensional verdict is the only one, and it is
+  authoritative (D-INV-11). `D-INV-19`
 
 **Always, eventually (liveness).**
 
@@ -900,9 +903,11 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   analysis or the render. `D-INV-8`
 - Analysing a reference either produces a placeable fingerprint and read, or reports which signals it
   couldn't compute — never a half-finished silent state. A reference **missing any fingerprint axis is
-  catalogued but NOT placed on the map** (a fixed-axis projection needs every coordinate — we don't impute a
-  fake one and park it at a misleading spot), with a one-line "couldn't place: ⟨signals⟩" note; its written
-  read still renders from whatever signals DID compute. `D-INV-9`
+  catalogued but NOT comparable** (a nearest-direction needs every coordinate — we don't impute a
+  fake one and lean on a misleading distance), with a one-line "couldn't compare: ⟨signals⟩" note. It gets
+  **no own leans-toward and is never offered as a neighbour**, but it **still contributes per-axis to the
+  centroid of any direction it belongs to** (RC-INV-6) — not comparable as an own placement, never excluded
+  from its cloud. Its written read still renders from whatever signals DID compute. `D-INV-9`
 
 ### D.6 How the coaching changes — re-flavouring (the payoff)
 
@@ -939,18 +944,16 @@ changes emphasis and words, never the truth. A track with no mapping is untouche
 - **The view ladder (quick ⊆ Simple ⊆ Detailed).** Reference surfaces obey it. **Quick shows none — and not
   by view but by mode: reference is full-run-only (D-INV-20), a quick run has no fingerprint, so there is
   nothing to reference, not even a hidden one.** Within a full run: Simple shows the written read + "leans toward
-  X"; Detailed adds the full map and the switch. Nothing in Simple is absent from Detailed. ⟨DECIDE D-15⟩.
-- **The switch across views.** If the switch lives only where the map lives (Detailed), entering a view
-  without the map must not strand a hidden overlay — the same rule the player follows (state is only live
+  X"; Detailed adds the plaque chip and the switch. Nothing in Simple is absent from Detailed. ⟨DECIDE D-15⟩.
+- **The switch across views.** If the switch lives only where the chip lives (Detailed), entering a view
+  without the chip must not strand a hidden state — the same rule the player follows (state is only live
   where its surface is visible). ⟨DECIDE D-16⟩.
-- **Reduced vs full across views.** Whether a direction is a cloud or just markers is decided by its member
-  count, not the view — so it renders in its own mode wherever references show: a full direction draws a
-  blob, a reduced one draws bare markers (kept visibly grouped by colour/label so you still see which dots
-  are "the Aphex direction"). The switch shows/hides all of them alike. ⟨DECIDE D-20⟩ the reduced-group
-  visual.
+- **Reduced vs full across views.** Whether a direction is a cloud or just a point is decided by its member
+  count, not the view: a full direction yields an in-zone/diverge read and a centroid to lean toward; a
+  reduced one yields only a track-vs-track read and leans toward its nearest member. The switch shows/hides
+  the reference surfaces alike in every view.
 - **The mapping is content, not view state** — it persists across views like the project does; only the
   *display* of reference surfaces is gated by view.
-- **The map is not the player** — it's a navigational overview and carries no transport state.
 
 ### D.8 What's machine-checked vs eyeballed (and how we'll test the spec)
 
@@ -959,14 +962,14 @@ pinned so a refactor can't quietly break the core:
 
 1. **Anchored** — every placement statement names at least one real evidence signal (checkable). `D-INV-10`
 2. **Deterministic geometry (per epoch)** — the fingerprint + distance are a pure function of *(the signals,
-   the current normalisation epoch)*, tested on a fixture; within an epoch markers never drift run-to-run,
+   the current normalisation epoch)*, tested on a fixture; within an epoch readings never drift run-to-run,
    and across an epoch change they recompute together + re-stamp, never silently. `D-INV-12`
 3. **Transparent re-flavouring** — mapped vs unmapped show the identical card set; only order/wording differ
    (checkable). `D-INV-15`
 
-The map↔read relationship is NO LONGER an eyeball guard: the read is authoritative and the map is a labelled
-lossy viewport (D-INV-11), so there's nothing to reconcile — only the anchoring of *wording* stays an
-authoring guard, reviewed by eye.
+There is no map↔read relationship to guard — the map was dropped (D-INV-11); the read and the «leans toward»
+line share one full-dimensional computation, so nothing can drift between them. Only the anchoring of
+*wording* stays an authoring guard, reviewed by eye.
 
 ### D.9 Open decisions (need Alexander)
 
@@ -976,29 +979,32 @@ structural holes:
 
 - ⟨DECIDE D-1⟩ how many members make a cloud (below it = reduced).
 - ⟨DECIDE D-2⟩ where the mapping is stored + how it's edited.
-- ⟨DECIDE D-5⟩ does style ever need a number for the map, or stay a label.
+- ⟨DECIDE D-5⟩ ~~does style ever need a number for the map~~ → **DROPPED 2026-06-26**: the map is gone;
+  style stays a label.
 - ⟨DECIDE D-8⟩ what triggers the web fetch.
 - ⟨DECIDE D-9⟩ web source + caching (offline-first).
 - ⟨DECIDE D-11⟩ off-by-default for unmapped tracks (recommend: yes).
-- ⟨DECIDE D-12⟩ how signals collapse onto the map, AND its dimensionality (2-D vs 3-D) — Alexander wants to SEE a
-  prototype on the real library before deciding, since any flattening loses info. The projection must stay
-  deterministic-per-epoch (D-INV-12), which rules out neighbour-embedding methods (t-SNE/UMAP refit and move
-  every point); the open choice is which fixed axes + how many.
+- ⟨DECIDE D-12⟩ ~~how signals collapse onto the map + its dimensionality~~ → **DROPPED 2026-06-26**: no map
+  is drawn at all (Alexander 2026-06-26: no point drawing a map we never show — we show the nearest centroid).
+  The full-dimensional fingerprint is read directly; the «leans toward» line names the nearest centroid. No
+  projection to design.
 - ⟨DECIDE D-13⟩ the switch's default.
-- ⟨DECIDE D-14⟩ what clicking a map marker opens.
+- ⟨DECIDE D-14⟩ ~~what clicking a map marker opens~~ → **DROPPED 2026-06-26**: no map markers. The plaque
+  chip carries a hover label (D-INV-26); own-library click-to-scroll is specified in §F.2 (F-INV-4).
 - ⟨DECIDE D-15⟩ which reference surfaces show in which view.
-- ⟨DECIDE D-16⟩ how the switch's state resets across views.
+- ⟨DECIDE D-16⟩ **SETTLED 2026-06-26:** one global persisted show/hide-references flag; the catalog page and a track's widget both read it (D-INV-23) — not a per-page toggle.
 - ⟨DECIDE D-17⟩ distance measure — **SETTLED 2026-06-25 (Alexander): straight-line.** (He weighed an
   on-the-manifold/surface measure and chose not to over-engineer; straight-line and angle agree on the
   real 3-track library anyway. Revisit only if a larger library shows them diverging.)
 - ⟨DECIDE D-18⟩ whether some signals weigh more in the fingerprint.
 - ⟨DECIDE D-19⟩ ~~the "clearly outside" margin for the map↔read guard~~ → **DROPPED 2026-06-24**: the read is
   authoritative and the map is a labelled lossy viewport (D-INV-11), so there is no map↔read guard to tune.
-- ⟨DECIDE D-20⟩ the visual that groups a reduced direction's markers.
+- ⟨DECIDE D-20⟩ ~~the visual that groups a reduced direction's markers~~ → **DROPPED 2026-06-26**: no map
+  markers to group; a reduced direction simply yields a track-vs-track read and its nearest-member lean.
 - ⟨DECIDE D-21⟩ the per-card note cap when several aimed directions each add an option-note (§D.6 lever 2).
 - ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
   mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
-  only the map overlay + re-flavouring on mapping, as D-11 already leans).
+  only re-flavouring on mapping, as D-11 already leans).
 - ⟨DECIDE D-24⟩ runner-up direction — **RE-OPENED 2026-06-25 (by deed, s25): DEFERRED from v1.** The
   intended "show +second when it's also close" is self-contradictory under the relative-lean cue (D-INV-26): a
   second direction that's *tied* with the nearest means the nearest does NOT stand apart — i.e. a *weak* lean,
@@ -1021,9 +1027,9 @@ structural holes:
 ### D.10 The reference line — the «leans toward» surface (catalog column + Detailed plaque) — 0.9
 
 One compact surface that answers, at a glance, *which direction is this track closest to?* — without opening
-the map. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
+the full read panel. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
 **chip on the Detailed plaque** of a track's widget. Both draw the identical fact from the identical
-computation; they are not two features, and not a second name for the map. It is one of the **two catalog
+computation; they are not two features, and not a second name for the read panel. It is one of the **two catalog
 similarity columns** — the *reference* one (this section); the *own-library* one is §F. `tags:
 one-surface-two-placements`
 
@@ -1047,10 +1053,10 @@ one-surface-two-placements`
   the line marks it with an aim glyph — and when the direction you *aim at* is not the one you're *nearest*
   to, it shows both ("nearest DeepChord · aimed SCSI-9"), because that gap is exactly the useful thing to see.
 
-**Same geometry as the map, named once.** The "nearest" here is the **same full-dimensional fingerprint
-distance that places the dot on the map** (D-INV-12/19), at the current normalisation epoch — never a 2-D
-marker distance. So the catalog column, the plaque chip, and the map dot can never disagree about which
-direction is nearest: one geometry, drawn three ways. `D-INV-21`
+**Same geometry, named once.** The "nearest" here is the **same full-dimensional fingerprint distance** that
+grounds the in-zone/diverge read (D-INV-12/19), at the current normalisation epoch — never a 2-D marker
+distance (there is no map). So the catalog column, the plaque chip, and the read panel can never disagree
+about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
 
 **How it composes across the axes.**
 
@@ -1080,12 +1086,12 @@ direction is nearest: one geometry, drawn three ways. `D-INV-21`
   dash), never the red "far" tint** — red is a *measured* "far", grey is "no measurement"; collapsing them
   would be the missing-as-value trap (RC-INV-1) in colour form. `tags: D-INV-9 · RC-INV-5a · RC-INV-1 · E.3`
 - **The switch.** The reference line is a reference surface in both placements, so it is governed by the **one
-  show/hide-references switch** (D-INV-6) shared with the map and the catalog overlay: hiding references hides
-  the column and the chip together, and the switch never strands the line where you can't see or restore it.
+  show/hide-references switch** (D-INV-6) shared by the catalog column and the plaque chip: hiding references
+  hides the column and the chip together, and the switch never strands the line where you can't see or restore it. The switch is **one global persisted flag** that both the catalog page and a track's widget read, so hiding references on either page hides both — one flag, never a per-page toggle (⟨DECIDE D-16⟩ resolved).
   (The §F own-library column is NOT reference content and is NOT under this switch.) `D-INV-23`
 - **Unmapped tracks.** Because leans-toward is descriptive, it CAN show for a track you've written no mapping
   for. Whether it does by default is ⟨DECIDE D-22⟩ (tied to D-11) — recommend showing the descriptive line for
-  every full run and adding the aim glyph only when you've aspired; the map overlay and re-flavouring stay
+  every full run and adding the aim glyph only when you've aspired; re-flavouring stays
   off-unless-mapped as before. `tags: ⟨DECIDE D-22⟩ · D-INV-5`
 - **Recompute, never stale.** The named direction and its cue are a pure function of (fingerprints, epoch);
   when the library grows or a direction gains/loses members, the line recomputes and re-stamps with every
@@ -1108,8 +1114,10 @@ hiding that the sibling is far. A reference **runner-up (+second direction) is D
 re-opened by deed, s25): under relative lean a *tied* second means the nearest does NOT stand apart — a weak
 lean, not a close one — so "runner = also close" is self-contradictory; v1 shows one direction and a
 co-leaders display waits for a later pass. So colour is never the *sole* channel: the
-**nearest-first order** carries the ranking and a **hover label** names the closeness, keeping the cue
-readable in greyscale or for a colour-blind reader without adding visible words. `D-INV-26`
+In **§F** (a list of up to three) the **nearest-first order** carries the ranking; in the **§D reference
+column** (one direction per cell, no order to lean on) a **greyscale-safe glyph tier** (●●● close / ●●○ mild /
+●○○ no real lean) sits beside the name. A **hover label** names the closeness on both. So the cue stays
+readable in greyscale, in print, and for a colour-blind reader without adding closeness words. `D-INV-26`
 
 ## F. Similar in your own library — the DJ column (1.0)
 
@@ -1213,8 +1221,8 @@ manifest, not a sentinel number. `RC-INV-2`
 - **Missing is never silently imputed to a real value and then shown or compared.** No step fills a missing
   measurement with 0, the pool mean, or any default and then treats it as measured — in a card, a read, a
   catalog cell, a fingerprint axis, or a distance. Imputation for an internal projection is allowed **only**
-  when its result is not presented as a measured fact and the gap is disclosed (the reference map already does
-  this the honest way: a fingerprint missing any axis is **not placed**, D-INV-9). `RC-INV-3`
+  when its result is not presented as a measured fact and the gap is disclosed (the reference layer already does
+  this the honest way: a fingerprint missing any axis is **not comparable**, D-INV-9). `RC-INV-3`
 - **A surface renders a missing measurement as "not measured" (not measured), never as a number or a bar.** A
   card or read that would rest on a missing measurement is **omitted** (it has no evidence — the §B.13 based-on
   line and §D's D-INV-10 already require evidence; missing = no evidence = no claim). A per-facet bar / catalog
@@ -1277,7 +1285,7 @@ richer measurement set (e.g. `sustain` present, and the most stems transcribed) 
 a usable measurement is never missed just because the newest run happened to be thinner. Completeness is
 **still checked per-axis at use time** (RC-INV-2) — picking the best run reduces gaps but never assumes them
 away. **The chosen run's id is part of the placement content-hash (D-INV-14)** — so when a re-measure produces
-a more-complete run and the selection changes, the dependent fingerprint and map position **recompute and
+a more-complete run and the selection changes, the dependent fingerprint and nearest-direction **recompute and
 re-stamp visibly** (D-INV-12), they never drift silently to a new spot. `RC-INV-9`
 
 **A stem whose significance-gate inputs weren't measured is `unknown`, not `insignificant`.** The §A
@@ -1346,4 +1354,4 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   So "quick" names one thing — the stemless run and the calm view it shows — not two. **Quick is not
   referenceable** — with no stems there is no fingerprint, so §D reference/compare is full-run-only (D-INV-20).
 - _(0.9 reference-layer terms — reference direction, aspiration mapping, in-zone/diverge, «своё», mood/style
-  read, fingerprint, the map — are defined once in §D.1 Terminology, not duplicated here.)_
+  read, fingerprint, the «leans toward» line — are defined once in §D.1 Terminology, not duplicated here.)_
