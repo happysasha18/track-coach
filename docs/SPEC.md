@@ -17,7 +17,7 @@ session-by-session "why we changed it" live in `JOURNAL.md`, not here.
   layer above obeys, so a not-measured signal is never read or compared as a real zero.
 
 This SPEC is the source; `TEST_MATRIX.md` is it projected into a checkable grid, and the tests are derived
-from it (`spec → prove → matrix → test → code`). Points still needing Sasha's call are marked ⟨DECIDE⟩.
+from it (`spec → prove → matrix → test → code`). Points still needing Alexander's call are marked ⟨DECIDE⟩.
 
 ## 0. What it's for, and the gap it had to close
 
@@ -25,7 +25,7 @@ track-coach's whole value is **trust**: a true, specific reading you can act on 
 the arrangement, in plain words.
 
 The reason §A–§B exist: early on it "produced plausible-sounding WORDS, but the moment you dig in, it fell
-apart" (Sasha). So before any coaching features, the numbers behind the words had to be made defensible.
+apart" (Alexander). So before any coaching features, the numbers behind the words had to be made defensible.
 That is the credibility layer, and it is the first thing this spec pins down.
 
 ## A. The building blocks (what track-coach reasons about)
@@ -36,14 +36,14 @@ The nouns the rest of the spec talks about. Each is a real measured thing with a
   stereo width, tonal balance, vitals. Each has a unit and a valid range.
 - **stem** — one Demucs-separated layer of the track. It carries two states: whether it's **significant**
   (worth reading at all) and its **mapped identity** (which real project part it is).
-  - **What "significant" means** (Sasha): a stem matters only if it has enough information in BOTH
+  - **What "significant" means** (Alexander): a stem matters only if it has enough information in BOTH
     loudness AND time. Quiet the whole way, or one loud blip in silence, does NOT count. The real gate is
     **temporal coverage** — how much of the track the stem is actually above a loudness floor — not a
     single peak. (So a stem at median −76 dB with one −16 dB stab is not significant; a quiet stem with
     steady hits across the track is.) States: `significant` / `insignificant (quiet/empty)` / `unknown (not
     measured)` — the third for a run that lacks the gate's inputs (quick mode, a partial stem), which must NOT
     be dropped as empty (§E / RC-INV-11).
-    - _Known debt (Sasha's call — leave the code, record the gap):_ the shipped gate is loudness-only —
+    - _Known debt (Alexander's call — leave the code, record the gap):_ the shipped gate is loudness-only —
       `loud_level` (85th-percentile broadband) ≥ −55 dB (`STEM_EMPTY_FLOOR_DB`). That correctly rejects a
       single stab, but the **time-coverage half above isn't built yet** — a quiet-but-steady stem (e.g. a
       −58 dB perc loop ticking the whole track) is wrongly dropped as "empty". No real track has hit this,
@@ -51,7 +51,7 @@ The nouns the rest of the spec talks about. Each is a real measured thing with a
       enough of the track). Until then the gate is whole-track + loudness-only by design (and so is
       per-scene significance — deferred too). `tags: STEM_EMPTY_FLOOR_DB=−55 · CR-2a/CR-4a deferred · §B.1`
   - **mapped identity** + a confidence (clear / mixed / nomatch / empty), from `map_stems`. The raw Demucs
-    label is only an approximation, never the identity — Sasha makes electronic music, so a "vocals" stem
+    label is only an approximation, never the identity — Alexander makes electronic music, so a "vocals" stem
     is usually a synth. See [[track-coach-stem-labels]].
 - **stem band energy** — one stem's energy in a frequency band. It can be real, or **leakage** — another
   stem bleeding into this one's file (`rhythm_quality` measures the pairwise bleed). See "bleed" in the
@@ -179,20 +179,20 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
 > no-centroid fallback. B.4 is retained as the G12–G15 DERIVATION HISTORY (how the buckets are computed),
 > not as the current label vocabulary. Read B.4 for mechanism; read §B.7 for what the user actually sees.
 
-Raw Demucs labels (`vocals`/`guitar`/…) are wrong for electronic music ([[track-coach-stem-labels]]): Sasha
+Raw Demucs labels (`vocals`/`guitar`/…) are wrong for electronic music ([[track-coach-stem-labels]]): Alexander
 makes synths, not a band. So we name a SIGNIFICANT stem by what its SOUND measurably IS — **never by which
-instrument made it, EXCEPT the `bass` and `drums` families, which Demucs separates reliably and which Sasha
+instrument made it, EXCEPT the `bass` and `drums` families, which Demucs separates reliably and which Alexander
 confirmed we read reliably (the low-end exception, §B.7)** — and the label must be DETERMINISTIC (same track → same label every run; no per-run
 renaming) and gated to `significant_stems()`. Same credibility family as CR-1: a label is a claim, so it
 must be backed by a measurement, marked `approx` (shown `≈`) when the measurement is indicative not certain.
 
 - **G12 (0.8.3) — the two coarse axes.** freq-role (which third of the spectrum carries the energy,
   EXCLUDING CR-4-bled bands) × percussive-vs-sustained (`onset_rate ≥ ONSET_PERCUSSIVE`). Gives:
-  low·perc=`kick`, low·sus=`bass` (both `clear` — Sasha confirmed we read the low end reliably), mid·perc=
+  low·perc=`kick`, low·sus=`bass` (both `clear` — Alexander confirmed we read the low end reliably), mid·perc=
   `perc`, high·perc=`hats`, high·sus=`air`. mid·sustained was the honest umbrella **`tonal`** (`approx`) —
   it DELIBERATELY did not claim melody-vs-pad, because freq+onset can't split those.
 
-- **G13 (0.8.6, THIS pass) — split the `tonal` umbrella into 5 measured buckets** (Sasha's call,
+- **G13 (0.8.6, THIS pass) — split the `tonal` umbrella into 5 measured buckets** (Alexander's call,
   2026-06-21: he wants to tell a chord from a melody, and it IS measurable — polyphony). Only the mid·sustained
   (old `tonal`) case is refined; every other G12 label is unchanged. Two new MEASURES per significant stem:
   1. **polyphony** — run `basic-pitch` (`transcribe.py`) on each significant non-drum stem →
@@ -205,7 +205,7 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
   - flatness ≥ `FLATNESS_NOISE_MIN` → **`noise/air`** (broadband, no pitch to call melody vs chord).
   - else MONO (`poly_frac < POLY_FRAC_MONO_MAX`): the loudest mono-tonal stem (within `LEAD_MARGIN_DB`
     of the loudest) → **`lead`**, the quieter ones → **`melody`**. _This loudness split is the WEAKEST
-    of the five (relative loudness, not a content measure) — Sasha was shown this when he chose 5 buckets;
+    of the five (relative loudness, not a content measure) — Alexander was shown this when he chose 5 buckets;
     it stays `approx` and the JOURNAL flags it for tuning._
   - else POLY: envelope CONTINUITY (`masking.sustain`) ≥ `PAD_SUSTAIN_MIN` → **`pad`** (a held drone),
     else → **`chord`** (rhythmic stabs). `sustain` = sounding-frames ÷ frames-in-active-span (a drone-pad
@@ -215,7 +215,7 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     was skipped) keeps the honest **`tonal`** umbrella INTERNALLY — we never invent a melody/chord verdict
     from missing data (CR-1). **It is DISPLAYED as the base role `mid`, never the word `tonal`** (§B.7 INV).
     All five new labels are `approx`.
-  - **NO vocabulary / NO ML text-prompts** — Sasha explicitly rejected defining prompt vocabularies
+  - **NO vocabulary / NO ML text-prompts** — Alexander explicitly rejected defining prompt vocabularies
     (he called that "a bit dumb"). Every bucket is a deterministic threshold on a measured quantity.
   - ⟨DECIDE⟩ thresholds (tune as more tracks land): `POLY_FRAC_MONO_MAX`=0.20, `PAD_SUSTAIN_MIN`=0.7.
     `lead` = the single loudest mono line (exclusive; no margin).
@@ -230,12 +230,12 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
       `FLATNESS_NOISE_MIN`=0.30 never fires; can't enable a noise label without a track that has a real
       noise/riser stem to verify against. Kept inert (never a wrong label) until such a test track exists.
 
-- **G14 (0.8.6, THIS pass) — robust freq-ROLE via a HIGH-PASS drop (Sasha's idea, 2026-06-21).** G12 typed
+- **G14 (0.8.6, THIS pass) — robust freq-ROLE via a HIGH-PASS drop (Alexander's idea, 2026-06-21).** G12 typed
   the role from the loudest band-group, which broke on real intermittent stems two different ways (found by
   deed): typing by per-band **median** makes a bass that only hits some beats read as ~silence in every band
   (its role becomes noise → it got mislabeled mid/"melody"); typing by **loud-level** (85th pct) instead
   picks up a guitar's loud kick-BLEED in the low and mislabels the guitar "bass" (the exact CR-4 failure).
-  Sasha's fix sidesteps the bleed argument entirely: **high-pass the stem (ignore `sub`+`low`) and ask how
+  Alexander's fix sidesteps the bleed argument entirely: **high-pass the stem (ignore `sub`+`low`) and ask how
   much energy it LOSES.** A genuine low/bass stem loses almost everything; a mid stem with bled low keeps
   its real mid content.
   - measure (no extra audio pass — reuse the per-band loud-levels): `hp_drop` = full loud-level −
@@ -264,8 +264,8 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
   - Verify-by-deed (Simon Fava): `other` → `pad` (was `perc`), `vocals` → `melody` (was `perc`); drums
     still `kick`, bass still `bass`.
 
-### B.5 Individual recommendations — name the PART, not a template (G16, 0.8.8, Sasha's #2)
-Sasha's standing complaint (2026-06-20, looking at the Lazy_Sparks render): recommendations "feel samey
+### B.5 Individual recommendations — name the PART, not a template (G16, 0.8.8, Alexander's #2)
+Alexander's standing complaint (2026-06-20, looking at the Lazy_Sparks render): recommendations "feel samey
 because `build_recommendations` is a FIXED template catalog fired by thresholds — same handful repeats
 track-to-track." The bet: now that we measure each stem, a rec can name the SPECIFIC part, band, and time
 instead of a generic line. First target = the masking/frequency-clash rec, which already has the data per
@@ -279,15 +279,15 @@ conflict (`masking_flags`: which low stem buries which mid stem, in which band, 
 - gated to `significant_stems()` (a near-silent stem like an empty `piano` is never named); the carrier is
   the masking low stem named by its character label (`bass`→"bass", `drums`→"drums" since §B.7 — was "kick").
   Falls back to the old generic card when stem characters aren't available (no masking/rhythm).
-- **EVALUATION (Sasha's metric):** specificity up = fewer generic-type cards, more named-stem/time cards.
+- **EVALUATION (Alexander's metric):** specificity up = fewer generic-type cards, more named-stem/time cards.
   Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
   melody 15%"), piano (empty) dropped.
 
-### B.6 The `late_entry` rec — name the part, never the raw Demucs name (G17, 0.8.9, Sasha's #2 cont.)
+### B.6 The `late_entry` rec — name the part, never the raw Demucs name (G17, 0.8.9, Alexander's #2 cont.)
 Continuing #2 ("wire per-stem character into MORE recs beyond masking"): the `late_entry` rec — fired
 when a stem is silent for almost the whole track and only appears near the end — was the last LIVE rec
 still printing the **raw Demucs stem name** (`Stem "{st}" is silent… bring "{st}" in earlier`). That
-violates the hard requirement [[track-coach-stem-labels]] (Sasha makes electronic music — a `vocals`
+violates the hard requirement [[track-coach-stem-labels]] (Alexander makes electronic music — a `vocals`
 stem is a synth, etc.) exactly as the masking card did before G16.
 - **Wrinkle:** `late_entry` is BY DEFINITION about a near-silent stem, and `stem_character` only labels
   SIGNIFICANT stems — so the G16 character label is usually ABSENT here. We can't lean on it alone.
@@ -302,7 +302,7 @@ stem is a synth, etc.) exactly as the masking card did before G16.
   enters right at the end…"* when unidentifiable. INV: a `late_entry` rec's text never contains a raw
   Demucs family name unless that name is also the real mapped track name.
 - **The real cleanup wasn't the name — it was DON'T CRY WOLF (0.8.10, found by deed on Lazy_Sparks when
-  Sasha asked "the card existed before — what's the point?").** late_entry was firing on the `vocals`
+  Alexander asked "the card existed before — what's the point?").** late_entry was firing on the `vocals`
   stem whose late spike only reached **−61 dB** (peak), median −81, stemmap verdict `empty` — i.e. a
   near-silent SEPARATION ARTIFACT at the very end, not a musical event. Renaming it honestly is cosmetic;
   the card shouldn't fire at all. So late_entry is now GATED: it fires only when the entering peak clears
@@ -312,22 +312,22 @@ stem is a synth, etc.) exactly as the masking card did before G16.
   proves it's real content. On Lazy_Sparks this card now correctly DISAPPEARS. INV: late_entry never
   fires on a stem whose entering peak is below the empty floor.
 
-### B.7 ONE plain label per stem — kill the label salad (0.8.11, Sasha s14)
-Sasha, looking at the real Lazy_Sparks render: *"what is this salad?"* The stem area had THREE overlapping,
+### B.7 ONE plain label per stem — kill the label salad (0.8.11, Alexander s14)
+Alexander, looking at the real Lazy_Sparks render: *"what is this salad?"* The stem area had THREE overlapping,
 half-confident systems stacked on each stem — (1) measured `character` with a `≈` "uncertain" prefix,
 (2) the stem↔project map verdict (which ALSO used `≈`, meaning the OPPOSITE — "matches a family"), and
 (3) per-stem repetition letters. Worse, the headline character often degraded: on Lazy_Sparks the **bass
 stem read `≈ tonal`** (G14's high-pass drop didn't trip on a synth bass with mid harmonics), the whole
 `drums` stem read `kick`, and empty stems STILL leaked the **raw Demucs name** (`vocals`) into the lane
 label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE plain label per stem:
-- **Trust the stem for the reliable low-end families.** Demucs separates bass & drums cleanly and Sasha
+- **Trust the stem for the reliable low-end families.** Demucs separates bass & drums cleanly and Alexander
   confirmed we read the low end reliably, so a `bass` stem is **"bass"** (we do NOT run it through the G14
   high-pass that demoted it) and a `drums` stem is **"drums"** (not "kick" — kick is a drum-breakdown
   sub-part). Only these two exact families are trusted by name; every other (electronic) stem name stays
   untrusted and is read by measurement ([[track-coach-stem-labels]]).
 - **Character only when confident; else the base role.** A confident G13 determination (lead/melody/
   chord/pad) shows; otherwise the stem shows its plain **base role ("mid"/"high")** — never the jargon
-  "tonal", never a `≈`-uncertain marker (Sasha: *"if not sure, just the base role"*).
+  "tonal", never a `≈`-uncertain marker (Alexander’s call: when uncertain, fall back to the base role).
 - **No raw Demucs name in the lane label, ever.** No character ⇒ "near-silent" (the stem is empty),
   never `L.name`.
 - **Sub-line = the REAL project track, never the raw Demucs name (0.8.12/0.8.13, updated from the 0.8.11
@@ -350,14 +350,14 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   `bass` is reachable two ways — the trusted `bass` family, AND an UNTRUSTED stem whose centroid is <
   `LOW_CENTROID_HZ` (§B.8, role `low`); the latter is intentional (it occupies the bass range) but see the
   OPEN question below on whether to split that word.
-- **OPEN (asked Sasha):** where the map verdict is genuinely `clear` AND the matched real project track
+- **OPEN (asked Alexander):** where the map verdict is genuinely `clear` AND the matched real project track
   looks meaningful (e.g. guitar→"Guitar"), fold that real name in as the primary label instead of the
   base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). NOTE: 0.8.12 already put the
   real name in the SUB-line, so if it's ever promoted to PRIMARY, drop the sub-line duplicate (else
   "Guitar / Guitar").
 
-### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Sasha's idea, s14)
-Sasha (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
+### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Alexander's idea, s14)
+Alexander (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
 analysis on the MIX; per stem we only had 6 coarse bands + flatness. So `masking.py:stem_spectrum(y)` now
 computes, per stem (reusing the loaded audio, one extra STFT):
 - **spectral centroid** (Hz) — energy-weighted "centre of gravity" of the spectrum = where the stem's
@@ -367,7 +367,7 @@ computes, per stem (reusing the loaded audio, one extra STFT):
   is deferred until it can be visually verified).
 - **G18 — freq-role now from the centroid (supersedes G14's high-pass for the role).** A SUSTAINED
   (non-trusted) stem's role = `low` if `centroid < LOW_CENTROID_HZ` (250), `high` if `> HIGH_CENTROID_HZ`
-  (3500), else `mid`. This is the robust signal Sasha asked for — it fixes the synth-bass-→-`tonal`
+  (3500), else `mid`. This is the robust signal Alexander asked for — it fixes the synth-bass-→-`tonal`
   failure at the root (a 6-band high-pass drop was a poor proxy for "where the energy is"). The **G14
   high-pass drop is kept ONLY as the fallback** when the masking carries no centroid (pre-0.8.14 jsons),
   so nothing regresses. Trusted `bass`/`drums` (§B.7) still short-circuit before any role computation.
@@ -377,14 +377,14 @@ computes, per stem (reusing the loaded audio, one extra STFT):
 - INV: when `spectral_centroid[st]` is present, a non-trusted sustained stem's role is a pure function of
   it (deterministic); `< LOW_CENTROID_HZ` ⇒ role `low` ⇒ label `bass`.
 - ⟨DECIDE⟩ thresholds: `LOW_CENTROID_HZ`=250, `HIGH_CENTROID_HZ`=3500 (tune as tracks land). **OPEN (F5,
-  asked Sasha):** should an UNTRUSTED low-centroid stem read `bass`, or a neutral `low` so "bass" stays
+  asked Alexander):** should an UNTRUSTED low-centroid stem read `bass`, or a neutral `low` so "bass" stays
   identity-only? Currently it reads `bass` (honest about the frequency range it occupies).
-- IDEA (Sasha s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
+- IDEA (Alexander s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
   the bass") — **DONE: §B.9 (G19) named the spot; 0.8.20 bumped the grid 32→64 bins** (see §B.9 note).
 
-### B.9 PRECISE masking frequency — name the cut spot, not the whole band (G19, 0.8.17, Sasha's idea a)
+### B.9 PRECISE masking frequency — name the cut spot, not the whole band (G19, 0.8.17, Alexander's idea a)
 The §B.5 masking card said *"the bass buries the lead around **250–600 Hz**"* — the whole coarse band, the
-same range for every conflict. Sasha's s14 idea (a): the per-stem spectra (§B.8 `spectrum`/`spectrum_freqs`)
+same range for every conflict. Alexander's s14 idea (a): the per-stem spectra (§B.8 `spectrum`/`spectrum_freqs`)
 already say WHERE inside the band the two parts fight, so the card can name a cut frequency.
 - **Mechanism (`build_widget.mask_collision_freq`, pure-python so the build stays numpy-free):** within the
   zone's band, the collision sits where the OVERLAP of the two peak-normalised spectra is greatest —
@@ -408,8 +408,8 @@ already say WHERE inside the band the two parts fight, so the card can name a cu
   guitar ≈260) and stay STABLE through 96. Chose 64 (~6.6/oct): clear discrimination, stable, not so fine it
   chases spectral spikes. Pure schema change (spectrum array 32→64 long); G19/centroid consume it unchanged.
 
-### B.10 "Where does it get boring?" — the development plateau (G21, 0.8.19, Sasha's idea)
-Sasha (2026-06-22): *"for evolving tracks, the idea is to show at what point it gets boring."* For an
+### B.10 "Where does it get boring?" — the development plateau (G21, 0.8.19, Alexander's idea)
+Alexander (2026-06-22): *"for evolving tracks, the idea is to show at what point it gets boring."* For an
 EVOLVING track, mark the onset after which it stops introducing NEW material and only recombines sections
 already heard.
 - **Mechanism (`development_plateau(selfsim, dur)`, pure-python).** Read the self-sim segment letters in time
@@ -430,14 +430,14 @@ already heard.
   END plateau (last new material → end). An INTERNAL repetitive stretch (e.g. Lazy's `C E C E C` oscillation
   in the middle, before a later new section) is NOT yet caught — a future "longest no-new run" variant could.
 
-### B.11 Per-stem measurements — run the track tools on each stem (Sasha 2026-06-22)
+### B.11 Per-stem measurements — run the track tools on each stem (Alexander 2026-06-22)
 
 In plain words: we already measure energy/brightness/density/etc. on the whole mix; this points the same
 tools at each significant stem, and shows a card ONLY when a stem behaves notably differently from the rest
 of the track (divergence, scored and budgeted — not "more numbers"). The detail below is the scoring and
 the honesty gates.
 
-**Sasha's model (verbatim intent):** *"we had a bunch of tools pointed at the whole track. one of those tools was stems. let's point everything (except stem separation itself) at each individual stem."* The
+**Alexander's model (verbatim intent):** *"we had a bunch of tools pointed at the whole track. one of those tools was stems. let's point everything (except stem separation itself) at each individual stem."* The
 whole-track measurements that `analyze_core`/`analyze_detail` produce — **energy, brightness, density,
 stereo width, modulation, loudness/dynamics** over time — are, today, computed ONLY on the mix (see the
 matrix below). This runs that same set on **each significant stem**. (Stem separation itself is excluded —
@@ -451,7 +451,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   disk in `stems_6s/`), producing `result_core_<stem>.json` analogous to `result_selfsim_<stem>.json` (B.3,
   already auto-discovered). No new DSP — the SAME functions, different input.
 
-- **CR-11 (the credibility consequence — Sasha's core objection, do NOT skip).** *"we haven't validated the hypothesis — will it actually show useful info, or just more stuff that's hard to make sense of."* So per-stem output is gated on **usefulness, not volume**: a per-stem card fires **only when the
+- **CR-11 (the credibility consequence — Alexander's core objection, do NOT skip).** *"we haven't validated the hypothesis — will it actually show useful info, or just more stuff that's hard to make sense of."* So per-stem output is gated on **usefulness, not volume**: a per-stem card fires **only when the
   stem's curve diverges NOTABLY from the REST of the track** — the bass brightens while the rest darkens; one
   stem's density drops out while the rest rises; a stem's energy arc runs opposite the others. **"Same as the
   rest" → NO card** (it's redundant, it just adds noise). The signal is DIVERGENCE, not the raw per-stem number.
@@ -462,26 +462,26 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   - **Shape, not magnitude.** Compare curve SHAPE over time (normalized / correlation), since a stem sits far
     below the mix in absolute level. ⟨DECIDE⟩ the divergence threshold (trend sign differs AND |Δtrend| ≥ τ;
     and/or correlation with the rest < ρ).
-  - **Score importance, then budget the TOTAL — no fixed per-stem cap (Sasha 2026-06-22).** Do NOT hard-cap
+  - **Score importance, then budget the TOTAL — no fixed per-stem cap (Alexander 2026-06-22).** Do NOT hard-cap
     cards per stem. Instead: (1) each candidate insight gets an **importance score** (how big the divergence,
     how clear/actionable it is); (2) all candidates — the existing track-level recs AND the new per-stem/composite
     ones — compete in ONE ranked pool; (3) show the top by score up to a **total card budget** kept near today's
     "normal" count, not an explosion. ⟨DECIDE⟩ the budget (calibrate to the current count).
   - **Diversity, so one stem can't hog the list.** A balance rule so the top cards aren't all about the drums
     (e.g. a per-source soft quota / penalty for repeats from the same stem). ⟨DECIDE⟩ the rule.
-  - **Cards can be COMPOSITE, not one-per-stem (Sasha 2026-06-22).** A card may combine signals — two stems
+  - **Cards can be COMPOSITE, not one-per-stem (Alexander 2026-06-22).** A card may combine signals — two stems
     diverging together, or a stem-vs-track relationship ("energy rises but the drums thin out") — not just a
     single stem × single measure. The scoring/budget pool holds composite candidates alongside per-stem ones;
     the "one stem, one measure" shape is the simplest case, not the only one. A naive per-stem enumerator is
     explicitly rejected.
-  - **Correlated measures collapse — SMART (Sasha 2026-06-22, refined).** Energy/density are correlated
+  - **Correlated measures collapse — SMART (Alexander 2026-06-22, refined).** Energy/density are correlated
     activity/loudness axes, so a single PART firing on both reads as a pile-up ("The mid — sparser" + "The mid
     — quieter"). Collapse per stem: **same direction** (both "more" or both "less" — quieter+sparser restate the
     same "this part pulls back") → keep the **strongest** only; **opposite directions** (louder BUT sparser — a
     genuine contrast: bigger yet fewer hits) → **MERGE into ONE richer card** ("louder but sparser") so the
     contrast survives instead of being dropped. Either way each part yields at most one divergence card.
     Composite cards (a different KIND) are unaffected. Code: `collapse_correlated` before `select_cards`.
-  - **"Show more" on demand (Sasha 2026-06-22).** The default budget stays tight (only the high-score cards).
+  - **"Show more" on demand (Alexander 2026-06-22).** The default budget stays tight (only the high-score cards).
     A separate control / command lowers the score threshold to reveal the next tier of lower-rated candidates
     for a user who wants to dig — the strict default is what's shown first, the deeper set is opt-in (it never
     changes the default view, so the calm/Simple read stays uncluttered). ⟨DECIDE⟩ the lowered threshold.
@@ -489,7 +489,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
     meaningful — brightness of an all-sub bass, stereo width of a mono stem, is junk. Each measure carries its
     own precondition (brightness only with real high-freq energy; stereo only when not effectively mono); unmet
     → omit that card (same "don't paint silence" as CR-1).
-- **USEFULNESS IS DEFINED OBJECTIVELY — the system self-judges, no per-track human approval (Sasha 2026-06-22:
+- **USEFULNESS IS DEFINED OBJECTIVELY — the system self-judges, no per-track human approval (Alexander 2026-06-22:
   "I can't look at and approve cards for every track in the world — write yourself the criteria").** Divergence
   alone is a weak proxy (a true-but-boring wobble diverges). So a candidate's **importance score** is built from
   measurable properties, and only that decides whether it earns a slot:
@@ -503,7 +503,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   These four ARE the definition of "useful"; the score ranks candidates and the budget/diversity rule picks the
   top. ⟨DECIDE⟩ the weights + τ + min-span — I **calibrate them ONCE on the 3 library tracks and freeze them as
   defaults** (like the other settled ⟨DECIDE⟩ values), not per track.
-- **PROMINENCE — a near-silent stem ranks BELOW the louder ones (Sasha 2026-06-22).** *"If a stem is
+- **PROMINENCE — a near-silent stem ranks BELOW the louder ones (Alexander 2026-06-22).** *"If a stem is
   near-silent, its cards are better placed below the others."* A quiet part diverging from the track matters
   LESS than a loud part diverging — so each candidate's score is multiplied by a **prominence weight (0..1)**
   measuring how loud that stem is RELATIVE to the loudest significant stem. Truly sub-floor stems never reach
@@ -519,24 +519,24 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   previously the composite scorer existed but only divergence cards were rendered.
 - **The eval is a regression guard, not an approval gate.** `scripts/eval_*` measures, on the 3 fixtures,
   that the shown cards satisfy the four criteria (share specific, share non-redundant, none below τ) — so a
-  future change can't quietly fill the budget with noise. Sasha's eye is a one-time sanity check on those 3
+  future change can't quietly fill the budget with noise. Alexander's eye is a one-time sanity check on those 3
   fixtures while I calibrate, never a per-track requirement.
 - **Back-compat (prover F6).** A run with no `result_core_<stem>.json` (pre-B.11) yields no per-stem cards and
   NO error — same graceful fallback as pre-0.8.14 masking falling back to the band range.
 
-- **WHERE it shows (Sasha 2026-06-22).** Per-stem cards live in the **Detailed view only** by default (they
+- **WHERE it shows (Alexander 2026-06-22).** Per-stem cards live in the **Detailed view only** by default (they
   are depth, not the headline). **Promotion to Simple** only for a STRONG divergence (⟨DECIDE⟩ a higher
   threshold) — *"if there's something really important there, why not put it in Simple too."* Respects the view ladder
   (`quick ⊆ Simple ⊆ Detailed`, the view ladder — INV-19 in `docs/TEST_MATRIX.md`): a card promoted to
   Simple is therefore also in Detailed.
-- **SORT TOGGLE (Sasha 2026-06-22) — Detailed only.** Today the advice cards are ordered by **urgency**
+- **SORT TOGGLE (Alexander 2026-06-22) — Detailed only.** Today the advice cards are ordered by **urgency**
   (`build_widget.py:1493` `_rank crit<do<concept`) while the lettered cues a/b/c on the timeline are ordered
   **chronologically** (`build_widget.py:1999`) — a deliberate-but-confusing split. Add a Detailed-only toggle
   to switch the CARD list between **by urgency** (default, unchanged) and **chronological** (matching the
   letters). Pure presentation reorder; never adds/removes a card. ⟨DECIDE⟩ default = urgency (current).
 
-#### B.11.1 Resolution (2026-06-22) — BRIGHTNESS is descriptive, not a prescriptive per-stem card (Sasha)
-When A1 (per-measure validity) reached brightness, Sasha rejected the *premise*, not just the threshold:
+#### B.11.1 Resolution (2026-06-22) — BRIGHTNESS is descriptive, not a prescriptive per-stem card (Alexander)
+When A1 (per-measure validity) reached brightness, Alexander rejected the *premise*, not just the threshold:
 *"I'm not convinced yet that anything *should* be brighter than anything else — and whether it's a mistake,
 how would you know? Maybe the drums are meant to burst in, maybe a synth. Better to push this to some
 visualization later."* The point:
@@ -551,19 +551,19 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
    gate.) The F5 validity discipline still governs any FUTURE measure added in E2 (stereo on a mono stem, etc.).
 2. **Relative brightness, if surfaced at all, is DESCRIPTIVE — one balance reading, or (preferred) a future
    VIZ, never a per-part nudge.** Backlog: a single "relative brightness balance across the parts" card (no
-   judgement) OR a small per-stem brightness visualization. Deferred — Sasha leans viz-later.
+   judgement) OR a small per-stem brightness visualization. Deferred — Alexander leans viz-later.
 3. **Broader steer (informs E2 — widen the funnel).** "How would you know it's an error?" applies to ANY
    per-stem MEASURE divergence: most are descriptive facts, not defects. So widening `PER_STEM_MEASURES` must
    distinguish **arc-relevant / actionable** axes (worth a prescriptive card) from **descriptive** axes (belong
    in a viz / one balance card). Default to descriptive unless an axis has a defensible "this fights the track"
    reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
 
-### B.12 Producer's read — name HOW it develops, flag an idle axis (2026-06-23, Sasha — the artistic layer)
-The Producer's read is authored prose — *"here's what I hear, and my thoughts as I go"* (Sasha). Its job is
+### B.12 Producer's read — name HOW it develops, flag an idle axis (2026-06-23, Alexander — the artistic layer)
+The Producer's read is authored prose — *"here's what I hear, and my thoughts as I go"* (Alexander). Its job is
 **OBSERVATION**, not a command: the actionable "do X" lives in the **cards**; the read carries thinking-aloud
 + technical remarks (the two-layer principle, memory `track-coach-two-layers-cards-vs-read`). So the read MAY
 state a precise observation or a soft flag **without** forcing a fake action item.
-Sasha (2026-06-23): the read shows the curves and what's heard, but never states a short **verdict of which
+Alexander (2026-06-23): the read shows the curves and what's heard, but never states a short **verdict of which
 FORM the development takes**, nor FLAGS a dimension that sits idle. Add to the read's "shape" paragraph one
 observation:
 - name the **dominant development mode(s)** — which of {energy/loudness, brightness, density, stereo width}
@@ -591,10 +591,10 @@ observation:
   observation. The read panel hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
   (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
 
-### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Sasha)
-Sasha: *"show which signals drove each card."* Every recommendation card carries a plain
+### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Alexander)
+Alexander: *"show which signals drove each card."* Every recommendation card carries a plain
 line saying what it is **based on**. The credibility trap (memory `track-coach-card-evidence`): a raw lone
-number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what, oranges?"* (Sasha). So the based-on line is
+number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what, oranges?"* (Alexander). So the based-on line is
 in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`).
 - **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
   advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
@@ -605,14 +605,14 @@ in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_
   **fused (Tier-B/C)** card names the **combination** ("the bass and the lead overlap around ≈290 Hz for ~half
   the track"), the fusion from `signal_value_map.md`. Source is multi-level: a whole-track signal / a separated
   part / an `.als` moment.
-- **Build order = MEANING then NAVIGATION** (Sasha): (1) the plain based-on line per card — done 0.8.27;
+- **Build order = MEANING then NAVIGATION** (Alexander): (1) the plain based-on line per card — done 0.8.27;
   (2) **NAVIGATION (0.8.28):** clicking a timecoded card seeks the playhead to that moment AND scrolls the
   main graph into view (already wired), now plus a brief **attention pulse on the graph container** so the eye
   catches that the playhead jumped there. The pulse is a **CSS/DOM class toggle on the graph panel — it does
   NOT touch the canvas drawing** (deliberately low-risk: the canvas render is the fragile surface we never edit
   blind). A deeper per-lane / per-part highlight (light up the exact lane the card is about) stays deferred —
   it needs canvas work and a live render review.
-- **Subtle in the UI** — transparency, not overload (Sasha's "don't overload" steer). A quiet muted line under
+- **Subtle in the UI** — transparency, not overload (Alexander's "don't overload" steer). A quiet muted line under
   the card body.
 - **Machine-checkable invariant (the rest is authoring quality):** every `D.recs` entry has a **non-empty**
   `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
@@ -642,7 +642,7 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
   - **card-click** (timecoded rec): = seek(t) + scroll `#storyPanel` into view + a CSS `pulse` on the graph
     panel (DOM/CSS only, never the canvas — §B.13/INV-34).
 - **Cross-control INVARIANTS (the combinations that were untested).**
-  1. **One mode at a time (Sasha, 2026-06-21 — he called the mixed state wrong).** After ANY sequence of mute/solo toggles,
+  1. **One mode at a time (Alexander, 2026-06-21 — he called the mixed state wrong).** After ANY sequence of mute/solo toggles,
      never `(some stem muted) AND (some stem soloed)` simultaneously. `toggleStem` guarantees it.
   2. **Solo resolves gains.** When `anySolo`, the audible set is EXACTLY the soloed stems (every non-soloed
      stem is muted), regardless of individual mute flags.
@@ -652,7 +652,7 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
      stem is still the only one audible AND playback continues (INV-33 generalised to the combination).
   5. **Seek clamps.** The resulting time is always in [0, dur]; a gutter/negative/over-dur click never seeks
      out of range.
-  6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability (2026-06-23, Sasha
+  6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability (2026-06-23, Alexander
      found by deed: solo a stem → switch to Simple → the soloed part visually vanishes and you can't un-solo
      it).** The stem grid (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
      absent in quick (the view ladder, INV-18/22). So a per-stem mute/solo state is only **visible and
@@ -768,7 +768,7 @@ diverge verdict (D-INV-19) and, projected to 2-D/3-D, the map — but it never w
 read (that's §D.2's holistic synthesis, anchored to signals). The numbers are
 **normalised against statistics over the current set** (your library + the reference groups in play) — so a
 coordinate is meaningful relative to everything it's being compared against, not in a vacuum. The honesty
-rule is NOT "never recompute" — it's **never move silently** (Sasha 2026-06-24): a coordinate is a
+rule is NOT "never recompute" — it's **never move silently** (Alexander 2026-06-24): a coordinate is a
 deterministic pure function of *(its signals, the current normalisation epoch)*. When the inputs change — you
 add library tracks, or add/remove members of a reference group — every dependent fingerprint and read
 **recomputes together and is re-stamped** (D-INV-12). The skill detects the change on each run by a **content
@@ -778,7 +778,7 @@ human-readable "name · count · date" stamp: the hash catches an *equal-count s
 stamp wouldn't see), so nothing moves unnoticed. A read recomputes iff its input hash differs from the hash it
 was last computed against; the skill surfaces that it recomputed, so a marker that moved is always explained,
 never spooky. The **dependency unit is a reference group together with the set of your tracks aimed at it** —
-a change on EITHER side recomputes that unit (Sasha's "для каждой группы моих треков есть группа референсов").
+a change on EITHER side recomputes that unit (Alexander’s framing: each of his track-groups can have a matching reference group).
 ⟨DECIDE D-17⟩ distance measure (straight-line vs angle); ⟨DECIDE D-18⟩ whether some signals weigh more.
 `tags: recompute-on-change · D-INV-12 · D-INV-14`
 
@@ -802,7 +802,7 @@ Where it's stored and how you edit it is open. ⟨DECIDE D-2⟩. `tags: D-INV-4`
 
 **The two surfaces — the map and the read panel.** The map is one shared picture: your tracks as markers,
 reference clouds as soft blobs (centre + spread), distance ≈ similarity. It's an overview you navigate, not
-a player — it carries no play/seek state. The read panel opens when you click your track: "тянется к
+a player — it carries no play/seek state. The read panel opens when you click your track: "leans toward
 Venetian Snares", the in-zone/diverge read, "своё", each backed by its evidence. The read panel is a *read*
 (observation), it never becomes an action card; **it is authoritative over the map** (D-INV-11 — the map is
 a lossy viewport). ⟨DECIDE D-12⟩ how the many signals collapse onto a 2-D/3-D picture; ⟨DECIDE D-13⟩ the
@@ -813,7 +813,7 @@ switch's default; ⟨DECIDE D-14⟩ what clicking a marker opens.
 **1 — An album as a direction (the full case).** You drop the Venetian Snares album in as a reference
 direction and say "wobble drift reaches toward this." track-coach analyses the album (audio only), forms the
 cloud, and places wobble drift against it. On the map, wobble drift sits just inside the cloud. You click it
-and read: "тянется к Venetian Snares — on the hysteric, ruptured feel you're in their zone; the palette runs
+and read: "leans toward Venetian Snares — on the hysteric, ruptured feel you're in their zone; the palette runs
 colder than theirs; their arc breaks where yours stays level." Your usual cards reorder so the ones about
 where you diverge come up first, and one gets a note: "their low-mid stays clearer around 290 Hz — an option,
 if you want to lean that way." Nothing is hidden; nothing is graded.
@@ -844,14 +844,19 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
 - The tool never guesses which direction your track aims at — the mapping is always yours. `D-INV-4`
 - A track with no mapping is byte-for-byte as it is today (its cards, read, player). The map is a *new*
   view that simply shows all your tracks; being a dot on it isn't a change to the track's widget. `D-INV-5`
+- **Reference / compare is a FULL-run-only feature — quick mode is never referenceable** (Alexander 2026-06-25:
+  quick mode is not for reference). The fingerprint is per-stem; a quick (mix-only, no Demucs) run has no
+  fingerprint to place or compare, so "хочу как X", the map dot, and re-flavouring are simply **not offered**
+  on a quick run — shown as "full analysis only", never a half-comparison on mix axes alone.
+  This is the canonical missing-by-mode case (RC-INV-7): quick never promised reference, so its absence is
+  silent, not an error (it is NOT a partial-run failure under RC-INV-10). `D-INV-20`
 - The show/hide-references control is one named switch shared by the map and the catalog; no view strands its
   state where you can't see or undo it. `D-INV-6`
 - Reference tracks never enter your library's catalog/signatures; the switch only overlays them onto the
   shared map for display. `D-INV-7`
 - Every character / mood / style / in-zone statement carries its real evidence — one signal or a combination;
   with none, it's omitted, never shown. `D-INV-10`
-- The **read is the source of truth; the map is a lossy viewport** (Sasha 2026-06-24: any flattening — 2D or
-  even 3D — drops dimensions, "даже 3 измерения далеко не предел"). The in-zone/diverge/«своё» verdict is read
+- The **read is the source of truth; the map is a lossy viewport** (Alexander, 2026-06-24: any flattening — 2D or even 3D — drops dimensions; even 3 axes are far from the limit). The in-zone/diverge/«своё» verdict is read
   in **full dimensions** and is authoritative; the map is an illustration that may not show every facet, and
   is labelled as such. So the read does NOT derive from marker distance, and a marker that looks "close" while
   the read says "diverge" is expected, not a bug — there is no contradiction to guard because they aren't the
@@ -863,7 +868,7 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   (D-INV-14); within one epoch, nothing drifts run-to-run. `D-INV-12`
 - No mapping ever points at a deleted direction or a removed track; deletes cascade, and affected tracks
   revert to plain coaching. `D-INV-13`
-- **Adding AND removing a member are symmetric** (Sasha 2026-06-24, recompute-on-change): both recompute the
+- **Adding AND removing a member are symmetric** (Alexander 2026-06-24, recompute-on-change): both recompute the
   direction's cloud and every dependent read, and re-stamp them. If a **removal crosses the cloud below the
   member threshold** (D-1), the direction becomes *reduced* — its dependent reads drop their in-zone/diverge
   and «своё» content (a reduced direction has no zone to be inside, D-INV-16) rather than keeping a stale
@@ -903,7 +908,7 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
 
 When your track is mapped to a direction, the *existing* cards and read are re-flavoured toward it. A track
 can aim at **several directions at once** (the mapping is many-to-many, D-INV-4), and re-flavouring **mixes
-them all** (Sasha 2026-06-24: "смешивать все сразу"), not one-at-a-time. Same engine, same findings — three
+them all** (Alexander, 2026-06-24: re-flavouring mixes all aimed directions at once), not one-at-a-time. Same engine, same findings — three
 levers, all in the "observe and offer" register (never a command):
 
 1. **Re-order.** Cards about where you *diverge* rise; where you're already in-zone, they sink. With several
@@ -931,9 +936,10 @@ changes emphasis and words, never the truth. A track with no mapping is untouche
 
 ### D.7 How it fits the views, the switch, and the player
 
-- **The view ladder (quick ⊆ Simple ⊆ Detailed).** Reference surfaces obey it. Proposed: quick shows none;
-  Simple shows the written read + "тянется к X"; Detailed adds the full map and the switch. Nothing in Simple
-  is absent from Detailed. ⟨DECIDE D-15⟩.
+- **The view ladder (quick ⊆ Simple ⊆ Detailed).** Reference surfaces obey it. **Quick shows none — and not
+  by view but by mode: reference is full-run-only (D-INV-20), a quick run has no fingerprint, so there is
+  nothing to reference, not even a hidden one.** Within a full run: Simple shows the written read + "leans toward
+  X"; Detailed adds the full map and the switch. Nothing in Simple is absent from Detailed. ⟨DECIDE D-15⟩.
 - **The switch across views.** If the switch lives only where the map lives (Detailed), entering a view
   without the map must not strand a hidden overlay — the same rule the player follows (state is only live
   where its surface is visible). ⟨DECIDE D-16⟩.
@@ -962,7 +968,7 @@ The map↔read relationship is NO LONGER an eyeball guard: the read is authorita
 lossy viewport (D-INV-11), so there's nothing to reconcile — only the anchoring of *wording* stays an
 authoring guard, reviewed by eye.
 
-### D.9 Open decisions (need Sasha)
+### D.9 Open decisions (need Alexander)
 
 Settled already by the reading stance: how to measure hypnotic/mood and where the "in-zone" line is — both
 became reads, not numbers; no hardcoded thresholds, no regression anchors. Still open, all genuine tuning, no
@@ -974,7 +980,7 @@ structural holes:
 - ⟨DECIDE D-8⟩ what triggers the web fetch.
 - ⟨DECIDE D-9⟩ web source + caching (offline-first).
 - ⟨DECIDE D-11⟩ off-by-default for unmapped tracks (recommend: yes).
-- ⟨DECIDE D-12⟩ how signals collapse onto the map, AND its dimensionality (2-D vs 3-D) — Sasha wants to SEE a
+- ⟨DECIDE D-12⟩ how signals collapse onto the map, AND its dimensionality (2-D vs 3-D) — Alexander wants to SEE a
   prototype on the real library before deciding, since any flattening loses info. The projection must stay
   deterministic-per-epoch (D-INV-12), which rules out neighbour-embedding methods (t-SNE/UMAP refit and move
   every point); the open choice is which fixed axes + how many.
@@ -1021,7 +1027,7 @@ manifest, not a sentinel number. `RC-INV-2`
   catalog cell, a fingerprint axis, or a distance. Imputation for an internal projection is allowed **only**
   when its result is not presented as a measured fact and the gap is disclosed (the reference map already does
   this the honest way: a fingerprint missing any axis is **not placed**, D-INV-9). `RC-INV-3`
-- **A surface renders a missing measurement as "не измерено" (not measured), never as a number or a bar.** A
+- **A surface renders a missing measurement as "not measured" (not measured), never as a number or a bar.** A
   card or read that would rest on a missing measurement is **omitted** (it has no evidence — the §B.13 based-on
   line and §D's D-INV-10 already require evidence; missing = no evidence = no claim). A per-facet bar / catalog
   cell for a missing axis shows the explicit not-measured marker, never a zero-length or centred bar that reads
@@ -1032,12 +1038,13 @@ manifest, not a sentinel number. `RC-INV-2`
   missing axis must not read as "identical" (0 gap) nor as "maximally different"; it is simply **not part of
   that comparison**, and the result discloses how many axes it was computed over. `RC-INV-5`
 - **Too few shared axes ⇒ "not comparable", never a number.** When two sides share fewer than `MIN_SHARED_AXES`
-  = **10** measured axes (Sasha 2026-06-25), the pair is declared **not comparable** — the same honest move as a
-  fingerprint that can't be placed (D-INV-9) — with a one-line "слишком мало общих измерений (N)" note, never a
+  = **10** measured axes (Alexander 2026-06-25), the pair is declared **not comparable** — the same honest move as a
+  fingerprint that can't be placed (D-INV-9) — with a one-line "too few shared measurements (N)" note, never a
   distance of 0 (false "identical") or a filled bar. The floor guards against **missing DATA, not dissimilar
   music**: two very different tracks that are both fully measured share all axes and SHOULD be compared (a big
-  divergence is the useful answer). The floor only fires when there isn't enough measured overlap to compare at
-  all — a quick mix-only run (~6 axes) against a full fingerprint ("вальс на записи птичек в саду"). `RC-INV-5a`
+  divergence is the useful answer). The floor only fires between two *full* runs where one is partial enough to
+  share too little; a quick run never reaches this test at all, because reference is full-run-only (D-INV-20) —
+  forcing a comparison where too little is shared. `RC-INV-5a`
 - **Ranking directions uses distance PER shared axis, never the raw sum.** Because two directions can share a
   different number of axes with your track (different members miss different signals), raw Euclidean sums are
   not comparable across directions — more shared axes inflate the sum and would bias "nearest" toward the
@@ -1053,25 +1060,26 @@ manifest, not a sentinel number. `RC-INV-2`
 
 **Completeness rides the view ladder, it doesn't break it.** The ladder is `quick ⊆ Simple ⊆ Detailed`
 (INV-18/22): quick is the stemless run, so every per-stem axis is *missing-by-mode*, and the calm read simply
-**doesn't offer** per-stem character there — it never shows a stemmed claim as "не измерено" clutter, because
-at the quick rung that surface isn't promised at all. Within a full (stemmed) run, a per-stem axis that a
-*partial* run failed to measure DOES surface as "не измерено" on Simple/Detailed, because there the surface IS
-promised and its absence is information. So: **missing-by-mode is silent (the rung never promised it);
-missing-within-a-promised-surface is shown.** `RC-INV-7`
+**doesn't offer** per-stem character there — nor the whole reference/compare feature (full-run-only, D-INV-20)
+— it never shows a stemmed claim as "not measured" clutter, because at the quick rung those surfaces aren't
+promised at all. Within a full (stemmed) run, a per-stem axis that a *partial* run failed to measure DOES
+surface as "not measured" on Simple/Detailed, because there the surface IS promised and its absence is
+information. So: **missing-by-mode is silent (the rung never promised it); missing-within-a-promised-surface is
+shown.** `RC-INV-7`
 
 **The same missing axis reads identically in the coach, the catalog, and the reference layer** — one track's
-fingerprint, its catalog row, and its dot/divergence in §D all draw "не измерено" from the same manifest, so a
+fingerprint, its catalog row, and its dot/divergence in §D all draw "not measured" from the same manifest, so a
 facet can't read as present in one surface and absent in another. `RC-INV-8`
 
 **Which per-stem surfaces each rung promises is stated once, and RC-INV-7 keys off it.** The view ladder
 (INV-18/22, §B.14) is the authority for what is promised at quick / Simple / Detailed; missing-by-mode vs
 missing-within-a-promised-surface (RC-INV-7) reads "promised here?" from that ladder, never from a second,
-divergent list — so two builders can't disagree on whether a failed pad-transcription shows "не измерено" in
+divergent list — so two builders can't disagree on whether a failed pad-transcription shows "not measured" in
 Simple. `RC-INV-7a`
 
 **Absence-of-card from missing data is disclosed once per run, so a clean widget isn't misread as all-clear.**
 A coach read omitted for a missing input (RC-INV-4) looks identical to "nothing to flag here"; to keep that
-honest the run shows a single completeness line — "измерено N из M сигналов; пропущены: ⟨reads⟩" — in the same
+honest the run shows a single completeness line — "measured N of M signals; skipped: ⟨reads⟩" — in the same
 register as the §B.13 based-on line, not one note per suppressed card. `RC-INV-12`
 
 ### E.4 Choosing the run, and closing the gap
@@ -1087,28 +1095,27 @@ re-stamp visibly** (D-INV-12), they never drift silently to a new spot. `RC-INV-
 **A stem whose significance-gate inputs weren't measured is `unknown`, not `insignificant`.** The §A
 significance gate needs loudness (and, when built, time-coverage) data; on a run that lacks it (quick mode, a
 partial stem) the stem is **significance-unknown**, a third state distinct from `significant` /
-`insignificant (quiet/empty)` — shown as "не измерено", never dropped as empty. This is the §A debt seen on
+`insignificant (quiet/empty)` — shown as "not measured", never dropped as empty. This is the §A debt seen on
 the completeness axis: a not-measured stem must not masquerade as a measured-silent one (RC-INV-1). `RC-INV-11`
 
-**A partial run is a TECHNICAL ERROR — flag it and re-run; never invent the value.** (Sasha 2026-06-25:
-"это же техническая ошибка, не надо врать или изобретать.") When a measurement that the run's mode **should**
+**A partial run is a TECHNICAL ERROR — flag it and re-run; never invent the value.** (Alexander, 2026-06-25: a partial run is a technical error — don’t fake or invent around it) When a measurement that the run's mode **should**
 have produced is missing (Lazy's un-transcribed bass/lead notes; an old run with no `sustain`), the run is
-**incomplete** — the tool says plainly "прогон неполный — перезапусти" and the user re-runs it; it is NOT
+**incomplete** — the tool says plainly "incomplete run — re-run" and the user re-runs it; it is NOT
 auto-fixed, NOT imputed, NOT silently degraded. This is distinct from **missing-by-mode**, which is not an
 error: a quick run has no stems *by design* (RC-INV-7), so per-stem axes aren't "broken", they're simply not
 promised. So: *should-have-measured-but-didn't* = error, re-run; *mode-never-promised-it* = silent. Until a
 genuinely-incomplete run is re-run, its missing axes stay *missing* under the rules above (dropped from
-comparison, shown as не-измерено). ⟨DECIDE E-1⟩ **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
+comparison, shown as "not measured"). ⟨DECIDE E-1⟩ **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
 (a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
 
-### E.5 Decisions (settled 2026-06-25, Sasha)
+### E.5 Decisions (settled 2026-06-25, Alexander)
 
-- **E-1 — SETTLED:** a partial run is a technical error → flag "прогон неполный — перезапусти", manual re-run,
+- **E-1 — SETTLED:** a partial run is a technical error → flag "incomplete run — re-run", manual re-run,
   no auto-trigger, no imputation (RC-INV-10). Missing-by-mode (quick has no stems) is not an error.
 - **E-2 — SETTLED:** `MIN_SHARED_AXES` = **10**. Below 10 shared measured axes a pair is not comparable
   (RC-INV-5a) — guards against too little DATA (quick vs full), not against dissimilar music.
 
-## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
+## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
 of **Drop** — strictly-lower predecessor, `LIFT` = 0.12, sustained-high = "Main" (§B.2, CR-5); (3) which
@@ -1121,7 +1128,7 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
 - **drop** = a `Drop`-named scene.
 - **empty stem** = a stem below the validity floor (near-silent; omitted from per-stem analysis).
 - **Demucs label vs identity** = the raw Demucs stem name (`vocals`/`guitar`/…) is NOT the real
-  instrument — Sasha makes electronic music, so a `vocals` stem is usually a synth. We label by measured
+  instrument — Alexander makes electronic music, so a `vocals` stem is usually a synth. We label by measured
   character, never by the raw name.
 - **bleed** (2026-06-21) = leakage BETWEEN stems. Demucs separation isn't perfect, so a loud part still
   shows up faintly inside another stem's file — e.g. the kick bleeds into the `guitar` stem's low band.
@@ -1135,7 +1142,7 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   chords/pad (polyphonic). Measured from the transcribed notes (basic-pitch).
 - **measured vs missing vs measured-zero** (§E) = three different things that must never blur. *Measured* = the
   step ran and produced a value. *Measured-zero / near-silent* = the step ran and the value is ~0 (a real
-  musical fact — handled by the §A significance gate). *Missing / "не измерено"* = the step never ran for this
+  musical fact — handled by the §A significance gate). *Missing / "not measured"* = the step never ran for this
   signal/stem on this run (quick mode, old schema, an un-transcribed stem). A missing value read as a real 0 is
   the bug §E exists to prevent.
 - **completeness manifest** (§E) = the list a run carries of which signals/stems it actually measured, so a
@@ -1148,6 +1155,7 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   no Demucs stems) that produces a **mix-mode player** (one source, transport + seek, no mute/solo grid —
   §B.14). The view ladder `quick ⊆ Simple ⊆ Detailed` (INV-18/22) describes what's VISIBLE at each rung;
   Simple/Detailed are view toggles within a full stemmed run, while quick is the stemless run beneath them.
-  So "quick" names one thing — the stemless run and the calm view it shows — not two.
+  So "quick" names one thing — the stemless run and the calm view it shows — not two. **Quick is not
+  referenceable** — with no stems there is no fingerprint, so §D reference/compare is full-run-only (D-INV-20).
 - _(0.9 reference-layer terms — reference direction, aspiration mapping, in-zone/diverge, «своё», mood/style
   read, fingerprint, the map — are defined once in §D.1 Terminology, not duplicated here.)_
