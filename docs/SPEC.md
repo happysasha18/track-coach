@@ -13,6 +13,8 @@ session-by-session "why we changed it" live in `JOURNAL.md`, not here.
 - **§A–§B.11 — the credibility layer** (shipped): make every number defensible before any advice is given.
 - **§B.12–§B.14 — the artistic layer** (shipped): the producer's read, card evidence, the player.
 - **§D — the reference layer** (0.9 design): compare against a direction and re-flavour the coaching.
+- **§E — run completeness** (cross-cutting): one rule for partial runs / missing measurements that every
+  layer above obeys, so a not-measured signal is never read or compared as a real zero.
 
 This SPEC is the source; `TEST_MATRIX.md` is it projected into a checkable grid, and the tests are derived
 from it (`spec → prove → matrix → test → code`). Points still needing Sasha's call are marked ⟨DECIDE⟩.
@@ -38,7 +40,9 @@ The nouns the rest of the spec talks about. Each is a real measured thing with a
     loudness AND time. Quiet the whole way, or one loud blip in silence, does NOT count. The real gate is
     **temporal coverage** — how much of the track the stem is actually above a loudness floor — not a
     single peak. (So a stem at median −76 dB with one −16 dB stab is not significant; a quiet stem with
-    steady hits across the track is.) States: `significant` / `insignificant (quiet/empty)`.
+    steady hits across the track is.) States: `significant` / `insignificant (quiet/empty)` / `unknown (not
+    measured)` — the third for a run that lacks the gate's inputs (quick mode, a partial stem), which must NOT
+    be dropped as empty (§E / RC-INV-11).
     - _Known debt (Sasha's call — leave the code, record the gap):_ the shipped gate is loudness-only —
       `loud_level` (85th-percentile broadband) ≥ −55 dB (`STEM_EMPTY_FLOOR_DB`). That correctly rejects a
       single stab, but the **time-coverage half above isn't built yet** — a quiet-but-steady stem (e.g. a
@@ -985,6 +989,122 @@ structural holes:
 - ⟨DECIDE D-20⟩ the visual that groups a reduced direction's markers.
 - ⟨DECIDE D-21⟩ the per-card note cap when several aimed directions each add an option-note (§D.6 lever 2).
 
+## E. Run completeness & missing measurements (cross-cutting — applies to §A, §B, the catalog, and §D)
+
+Every reading in this tool stands on measurements from one **run**. But a run can be **partial**: a quick run
+has no stems at all; an older run predates a signal (no `sustain` field); note transcription may have covered
+only some stems (the real case that forced this section — Lazy Sparks was transcribed on the `other` stem
+only, so bass/lead note-counts came back **0 — meaning "not measured", not "no notes"**). The danger is
+uniform and shows up anywhere a number is read or compared: a missing measurement silently read as a real
+**0** becomes a false musical claim ("no bass notes", "dead pad") or a false distance ("identical here"). This
+section is the one rule for that, shared by the coach, the catalog, and the reference layer — so no surface
+has to reinvent it, and the prover can check it once. `tags: §A-significance-debt · D-INV-9 · D-INV-16`
+
+### E.1 The state every measurement carries
+
+**A measurement is either *measured* or *missing* — and missing is a real, first-class state, never a value.**
+"Missing" means the step that would produce it did not run or produced nothing for this signal/stem on this
+run (quick mode → no stems; old schema → no `sustain`; transcription skipped a stem; a step failed). It is
+**distinct from a measured zero / silence**: a stem measured and found near-silent is *measured* (and handled
+by the §A significance gate — `STEM_EMPTY_FLOOR_DB`); a stem never analysed is *missing*. The two must never
+collapse into the same 0. `RC-INV-1`
+
+**A run carries a completeness manifest — which signals and stems it actually has — so every reader branches
+on data, not assumption.** The pattern already exists (`masking.json` lists `stems_analysed`); this generalises
+it: from a run you can ask "is axis X present here?" without guessing from a value. Readers consult the
+manifest, not a sentinel number. `RC-INV-2`
+
+### E.2 What must never happen (safety)
+
+- **Missing is never silently imputed to a real value and then shown or compared.** No step fills a missing
+  measurement with 0, the pool mean, or any default and then treats it as measured — in a card, a read, a
+  catalog cell, a fingerprint axis, or a distance. Imputation for an internal projection is allowed **only**
+  when its result is not presented as a measured fact and the gap is disclosed (the reference map already does
+  this the honest way: a fingerprint missing any axis is **not placed**, D-INV-9). `RC-INV-3`
+- **A surface renders a missing measurement as "не измерено" (not measured), never as a number or a bar.** A
+  card or read that would rest on a missing measurement is **omitted** (it has no evidence — the §B.13 based-on
+  line and §D's D-INV-10 already require evidence; missing = no evidence = no claim). A per-facet bar / catalog
+  cell for a missing axis shows the explicit not-measured marker, never a zero-length or centred bar that reads
+  as data. `RC-INV-4`
+- **Any pairwise comparison is computed only over axes present on BOTH sides; a missing axis is dropped from
+  that pair, never scored as a 0-gap or a max-gap.** This binds every comparison the tool makes — fingerprint
+  distance, the per-facet reference read, the reference-explorer divergence, and a direction's centroid. A
+  missing axis must not read as "identical" (0 gap) nor as "maximally different"; it is simply **not part of
+  that comparison**, and the result discloses how many axes it was computed over. `RC-INV-5`
+- **Too few shared axes ⇒ "not comparable", never a number.** When two sides share fewer than a floor of axes
+  (a quick mix-only run vs a full reference can share almost none), the pair is declared **not comparable** —
+  the same honest move as a fingerprint that can't be placed (D-INV-9) — with a one-line "слишком мало общих
+  измерений (N)" note, never a distance of 0 (false "identical") or a filled bar. ⟨DECIDE E-2⟩ the floor
+  `MIN_SHARED_AXES`. `RC-INV-5a`
+- **Ranking directions uses distance PER shared axis, never the raw sum.** Because two directions can share a
+  different number of axes with your track (different members miss different signals), raw Euclidean sums are
+  not comparable across directions — more shared axes inflate the sum and would bias "nearest" toward the
+  direction you happen to share fewest axes with. So the nearest-direction verdict ranks on **per-axis (RMS)
+  distance over each pair's shared set**, or over the single axis set common to all candidates; disclosing the
+  axis count (RC-INV-5) is necessary but not sufficient — the rank must be axis-count-fair. `RC-INV-5b`
+- **A direction's centroid (or any pooled summary) is averaged per-axis over only the members that HAVE that
+  axis; a member missing an axis does not drag it toward 0.** One reference track lacking `sustain` must not
+  pull the cloud's sustain toward zero. An axis no member has is **absent from the cloud**, not zero.
+  `RC-INV-6`
+
+### E.3 How it composes with the views and the run modes
+
+**Completeness rides the view ladder, it doesn't break it.** The ladder is `quick ⊆ Simple ⊆ Detailed`
+(INV-18/22): quick is the stemless run, so every per-stem axis is *missing-by-mode*, and the calm read simply
+**doesn't offer** per-stem character there — it never shows a stemmed claim as "не измерено" clutter, because
+at the quick rung that surface isn't promised at all. Within a full (stemmed) run, a per-stem axis that a
+*partial* run failed to measure DOES surface as "не измерено" on Simple/Detailed, because there the surface IS
+promised and its absence is information. So: **missing-by-mode is silent (the rung never promised it);
+missing-within-a-promised-surface is shown.** `RC-INV-7`
+
+**The same missing axis reads identically in the coach, the catalog, and the reference layer** — one track's
+fingerprint, its catalog row, and its dot/divergence in §D all draw "не измерено" from the same manifest, so a
+facet can't read as present in one surface and absent in another. `RC-INV-8`
+
+**Which per-stem surfaces each rung promises is stated once, and RC-INV-7 keys off it.** The view ladder
+(INV-18/22, §B.14) is the authority for what is promised at quick / Simple / Detailed; missing-by-mode vs
+missing-within-a-promised-surface (RC-INV-7) reads "promised here?" from that ladder, never from a second,
+divergent list — so two builders can't disagree on whether a failed pad-transcription shows "не измерено" in
+Simple. `RC-INV-7a`
+
+**Absence-of-card from missing data is disclosed once per run, so a clean widget isn't misread as all-clear.**
+A coach read omitted for a missing input (RC-INV-4) looks identical to "nothing to flag here"; to keep that
+honest the run shows a single completeness line — "измерено N из M сигналов; пропущены: ⟨reads⟩" — in the same
+register as the §B.13 based-on line, not one note per suppressed card. `RC-INV-12`
+
+### E.4 Choosing the run, and closing the gap
+
+**When a track has several runs, the tool reads from the most-complete one** — it prefers a run that has the
+richer measurement set (e.g. `sustain` present, and the most stems transcribed) over an older/partial run, so
+a usable measurement is never missed just because the newest run happened to be thinner. Completeness is
+**still checked per-axis at use time** (RC-INV-2) — picking the best run reduces gaps but never assumes them
+away. **The chosen run's id is part of the placement content-hash (D-INV-14)** — so when a re-measure produces
+a more-complete run and the selection changes, the dependent fingerprint and map position **recompute and
+re-stamp visibly** (D-INV-12), they never drift silently to a new spot. `RC-INV-9`
+
+**A stem whose significance-gate inputs weren't measured is `unknown`, not `insignificant`.** The §A
+significance gate needs loudness (and, when built, time-coverage) data; on a run that lacks it (quick mode, a
+partial stem) the stem is **significance-unknown**, a third state distinct from `significant` /
+`insignificant (quiet/empty)` — shown as "не измерено", never dropped as empty. This is the §A debt seen on
+the completeness axis: a not-measured stem must not masquerade as a measured-silent one (RC-INV-1). `RC-INV-11`
+
+**A known gap is recorded, not papered over — and re-measuring is the fix, never imputation.** When a real
+track exposes a missing axis that matters (Lazy's un-transcribed bass/lead notes; the §A time-coverage half of
+significance), the honest path is to **re-run the missing measurement** (transcribe the missing stems, re-run
+with the current schema), exactly as the §A significance debt says "add the branch when a real track hits it".
+Until re-measured, the axis stays *missing* under the rules above (dropped from comparison, shown as
+не-измерено) — the tool never invents the value to make a surface look complete. ⟨DECIDE E-1⟩ does the tool
+**auto-trigger** a re-measure when it detects a partial run for a track it's about to compare, or only flag
+"this run is partial — re-measure to compare on N more axes" and leave the trigger to Sasha? (Recommend: flag,
+not auto — a Demucs/transcription re-run on a compare is expensive and surprising; meanwhile the compare shows
+its partial result with the missing-axis count.) `RC-INV-10`
+
+### E.5 Open decisions (need Sasha)
+
+- ⟨DECIDE E-1⟩ auto-trigger a re-measure on a detected partial run, or only flag it (recommend flag; §E.4).
+- ⟨DECIDE E-2⟩ `MIN_SHARED_AXES` — the floor below which a pair is "not comparable" (RC-INV-5a). Calibrate
+  once on the library like the other frozen thresholds.
+
 ## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
@@ -1010,6 +1130,17 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
   "is this really a bass?" by how much loudness vanishes when the bottom is dropped.
 - **polyphony** = how many notes sound at once. ~1 at a time = a melody/lead (monophonic); stacked =
   chords/pad (polyphonic). Measured from the transcribed notes (basic-pitch).
+- **measured vs missing vs measured-zero** (§E) = three different things that must never blur. *Measured* = the
+  step ran and produced a value. *Measured-zero / near-silent* = the step ran and the value is ~0 (a real
+  musical fact — handled by the §A significance gate). *Missing / "не измерено"* = the step never ran for this
+  signal/stem on this run (quick mode, old schema, an un-transcribed stem). A missing value read as a real 0 is
+  the bug §E exists to prevent.
+- **completeness manifest** (§E) = the list a run carries of which signals/stems it actually measured, so a
+  reader asks "is this axis present?" instead of guessing from a sentinel number. Generalises
+  `masking.json: stems_analysed`.
+- **partial run** (§E) = a run missing some measurements another run of the same track could have (fewer stems
+  transcribed, an older schema, quick mode). The tool reads from the **most-complete** run available and still
+  checks each axis at use time.
 - **quick — run mode, not just a view** (clarified 2026-06-24). "quick" is a *cheaper run* (`tc-quick`,
   no Demucs stems) that produces a **mix-mode player** (one source, transport + seek, no mute/solo grid —
   §B.14). The view ladder `quick ⊆ Simple ⊆ Detailed` (INV-18/22) describes what's VISIBLE at each rung;

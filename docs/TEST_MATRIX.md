@@ -183,6 +183,33 @@ A flat per-surface grid can't see drift BETWEEN the two pages; these are the cro
 | X3 | Track Story arc (`story` curves) | signature ribbon `c-sig` | same underlying run curves (ribbon = downsample of the arc source) | `test_catalog::RunMetrics`, `Signature` |
 | X4 | S1 player (per-stem / mix) | S2 one-button preview | both play the SAME run's web mix; absent mix ⇒ no control on either (INV-7/8) | `test_catalog::CatalogRowPlayer` |
 
+## §E — Run completeness & missing measurements (SPEC §E → RC-INV-1…12)
+
+The cross-cutting "partial run" rules, projected to a checkable grid. The canonical logic is one shared
+module (`scripts/completeness.py`) so the coach, catalog, and §D all treat *missing* the same way; the
+pure-logic invariants are unit-tested NOW, the surface-rendering ones land with the §D/manifest code.
+
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| RC-INV-1 | missing (None/NaN) ≠ measured-zero; never collapse | `test_completeness::MissingIsNotZero` ✓ |
+| RC-INV-2 | a run carries a completeness manifest; read it, not a sentinel | `test_completeness::MissingIsNotZero::manifest` ✓ |
+| RC-INV-3 | never impute missing→real value then show/compare | `test_completeness::CompareOverSharedAxesOnly` ✓ |
+| RC-INV-4 | surface shows "не измерено", omits the card (no evidence) | not built — lands with the per-facet/catalog render |
+| RC-INV-5 | compare over BOTH-present axes only; never 0-gap/max-gap | `test_completeness::CompareOverSharedAxesOnly` ✓ |
+| RC-INV-5a | < `MIN_SHARED_AXES` shared ⇒ "not comparable", not a 0 | `test_completeness::TooFewSharedIsNotComparable` ✓ |
+| RC-INV-5b | rank directions by **per-axis** distance (axis-count-fair) | `test_completeness::RankingIsAxisCountFair` ✓ |
+| RC-INV-6 | centroid per-axis over members that HAVE it; absent≠0 | `test_completeness::CentroidSkipsMissingMembers` ✓ |
+| RC-INV-7 | missing-by-mode silent; missing-in-promised-surface shown | not built — composes with view ladder INV-18/22 |
+| RC-INV-7a | the rung→promised-surface list is the single authority | not built — keys off §B.14/INV-18/22 |
+| RC-INV-8 | same missing axis reads identically across coach/catalog/§D | not built — lands with the manifest render |
+| RC-INV-9 | pick most-complete run; run-id in content-hash (D-INV-14) | not built — lands with run selection + §D placement |
+| RC-INV-10 | gap → re-measure, never impute; ⟨DECIDE E-1⟩ auto vs flag | not built — re-measure command (backlog) |
+| RC-INV-11 | significance has a third `unknown (not measured)` state | `test_completeness::SignificanceHasUnknown` ✓ |
+| RC-INV-12 | one per-run completeness line so absence≠all-clear | not built — lands with the coach render |
+
+**Open ⟨DECIDE⟩:** E-1 (auto-trigger re-measure vs flag — recommend flag), E-2 (`MIN_SHARED_AXES` floor,
+calibrate once on the library). Logic tests proven red-on-bug (inject impute-as-0 ⇒ 5 fail), 2026-06-25.
+
 ## §8 — Coverage status
 - **INV-11 — CLOSED.** `CrossVersionPanelData` pins the `D.catalog` passthrough + the hide-when-empty
   guard.
