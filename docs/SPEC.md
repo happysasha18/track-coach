@@ -994,8 +994,149 @@ structural holes:
   authoritative and the map is a labelled lossy viewport (D-INV-11), so there is no map↔read guard to tune.
 - ⟨DECIDE D-20⟩ the visual that groups a reduced direction's markers.
 - ⟨DECIDE D-21⟩ the per-card note cap when several aimed directions each add an option-note (§D.6 lever 2).
+- ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
+  mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
+  only the map overlay + re-flavouring on mapping, as D-11 already leans).
+- ⟨DECIDE D-24⟩ when a track sits between directions, does the compact line show only the nearest, or the
+  nearest plus a "+⟨second⟩" when a runner-up is within a margin? (recommend: nearest + one runner-up
+  within margin, kept to one line).
+- ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
+  Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip).
 
-## E. Run completeness & missing measurements (cross-cutting — applies to §A, §B, the catalog, and §D)
+> _(⟨DECIDE D-23⟩ own-track neighbours is no longer open — Alexander 2026-06-25 chose YES, as its **own
+> column** beside the reference one, scoped to **1.0**. It is specced as its own surface in **§F**, not
+> folded into the reference line.)_
+
+### D.10 The reference line — the «leans toward» surface (catalog column + Detailed plaque) — 0.9
+
+One compact surface that answers, at a glance, *which direction is this track closest to?* — without opening
+the map. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
+**chip on the Detailed plaque** of a track's widget. Both draw the identical fact from the identical
+computation; they are not two features, and not a second name for the map. It is one of the **two catalog
+similarity columns** — the *reference* one (this section); the *own-library* one is §F. `tags:
+one-surface-two-placements`
+
+**Two facts it can carry, never conflated.**
+
+- **Leans toward X (descriptive).** The reference **cloud whose centre is nearest** this track in
+  full-dimensional fingerprint space. It is computed for ANY full run and needs **no aspiration mapping** —
+  "nearest" is just a measured fact about the fingerprints. It carries a small in-zone/diverge cue when X is a
+  real cloud (a zone to be inside); against a reduced direction it reads "closest to ⟨track⟩" with no in-zone
+  cue, since a reduced direction has no zone (D-INV-16). **The single nearest is chosen across ALL your
+  reference directions at once** — clouds ranked by their centroid, reduced directions by their nearest member
+  — using the axis-count-fair per-axis distance (RC-INV-5b), so a direction isn't picked just for sharing
+  fewer axes. With **no reference directions defined at all**, there is nothing to lean toward and the cell is
+  empty with a quiet "no direction yet", never a fabricated nearest.
+- **Aimed at X (aspiration).** Your written mapping (D-INV-4). When you have aimed this track at a direction,
+  the line marks it with an aim glyph — and when the direction you *aim at* is not the one you're *nearest*
+  to, it shows both ("nearest DeepChord · aimed SCSI-9"), because that gap is exactly the useful thing to see.
+
+**Same geometry as the map, named once.** The "nearest" here is the **same full-dimensional fingerprint
+distance that places the dot on the map** (D-INV-12/19), at the current normalisation epoch — never a 2-D
+marker distance. So the catalog column, the plaque chip, and the map dot can never disagree about which
+direction is nearest: one geometry, drawn three ways. `D-INV-21`
+
+**How it composes across the axes.**
+
+- **The view ladder (the plaque chip).** The chip lives in the per-track widget, so it obeys quick ⊆ Simple ⊆
+  Detailed. **Quick shows nothing** — reference is full-run-only (D-INV-20): a quick run has no fingerprint, so
+  there is no nearest to name. **Detailed shows the chip.** Whether **Simple** also shows it is ⟨DECIDE D-25⟩:
+  Simple already carries "leans toward X" as *prose inside the read* (§D.7), which is a different surface (the
+  read panel — authored words) from this glanceable chip. The chip and the read's prose are **not two names for
+  one thing** — the chip is a glance handle, the read is the words; both cite the same leans-toward fact. The
+  ladder stays monotonic: Detailed adds the chip without removing the Simple-level prose. `tags: view-ladder ·
+  D-INV-20 · ⟨DECIDE D-25⟩`
+- **The run mode (the catalog column).** The catalog is its own page (a row per version), governed by run
+  MODE, not the per-track view ladder. A **full-run** version shows its leans-toward; a **quick-only**
+  version's cell reads "full analysis only" — the canonical missing-by-mode case (D-INV-20, RC-INV-7): quick
+  never promised reference, so the empty cell is silent, never an error and never blank-implying-"no
+  direction". A catalog row collapses a version's runs, so the column reads the version's **most-complete
+  run** (E.4); "full analysis only" shows only when that version has **no** full run at all. The column's
+  default visibility follows the references switch default ⟨DECIDE D-13⟩ — confirm it isn't hidden-by-default,
+  or a brand-new column reads as a missing feature. `D-INV-22`
+- **Completeness (a full run that couldn't measure everything).** A version whose fingerprint is **missing an
+  axis is not comparable** — its cell and chip read "can't compare — ⟨missing signals⟩", never a fabricated
+  nearest. It draws this from the same run manifest as the coach and §D, so one gap reads identically in all
+  three (E.3). `tags: D-INV-9 · RC-INV-5a · E.3`
+- **The switch.** The reference line is a reference surface in both placements, so it is governed by the **one
+  show/hide-references switch** (D-INV-6) shared with the map and the catalog overlay: hiding references hides
+  the column and the chip together, and the switch never strands the line where you can't see or restore it.
+  (The §F own-library column is NOT reference content and is NOT under this switch.) `D-INV-23`
+- **Unmapped tracks.** Because leans-toward is descriptive, it CAN show for a track you've written no mapping
+  for. Whether it does by default is ⟨DECIDE D-22⟩ (tied to D-11) — recommend showing the descriptive line for
+  every full run and adding the aim glyph only when you've aspired; the map overlay and re-flavouring stay
+  off-unless-mapped as before. `tags: ⟨DECIDE D-22⟩ · D-INV-5`
+- **Recompute, never stale.** The named direction and its cue are a pure function of (fingerprints, epoch);
+  when the library grows or a direction gains/loses members, the line recomputes and re-stamps with every
+  other placement (D-INV-12/14/18) — the catalog never shows a "leans toward" the current geometry no longer
+  supports. `D-INV-24`
+
+**Never happens (safety), specific to this surface.** The reference line never shows a score, rank,
+percentage, or "match %" — it names a direction and an in-zone/diverge cue; "leans toward" is observation,
+never "you should sound like this" (the artistic north-star, D-INV-1). `D-INV-25`
+
+## F. Similar in your own library — the DJ column (1.0)
+
+A second catalog column, sitting beside the reference one (§D.10), that answers a different question:
+*which of MY OWN other tracks does this one sound closest to?* Alexander's use case (2026-06-25): a DJ
+glances down the library and sees, per track, its **1–3 nearest siblings** — handy for building a set, a
+transition, an A/B. It is a 1.0 surface; 0.9 finishes on the reference feature (§D).
+
+It is deliberately **not** a reference surface: the neighbours are tracks already in *your* library, so this
+column is **always-on library data, never under the show/hide-references switch** (D-INV-7 keeps other
+people's music out of your signatures; this column only ever lists your own). `tags: own-library · not-a-reference`
+
+### F.1 What it shows
+
+- **Up to three nearest own-tracks.** The 1–3 versions in your library whose **full-dimensional fingerprint**
+  is nearest this one — the *same* geometry as §D (D-INV-12/19), just measured library-track ↔ library-track
+  instead of track ↔ reference cloud, axis-count-fair per RC-INV-5b. Ranked nearest-first. `F-INV-1`
+- **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
+  (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
+- **No score shown** — it names the neighbour tracks (and may show the same in-zone-style cue as §D), never a
+  percentage or rank number. Same observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
+
+### F.2 Navigation — click a neighbour, scroll to it (Alexander: «чтобы к ним скроллилось»)
+
+- **Click a listed neighbour → the catalog scrolls to that track's row and highlights it.** The catalog is
+  the one surface that moves; the click is a pure navigation, it changes no analysis state. `F-INV-4`
+- **If the target row is currently hidden by a search/sort filter**, the click must not scroll to nothing:
+  ⟨DECIDE F-1⟩ either clear the filter first, or briefly surface the row — never a silent no-op that looks
+  broken. `tags: ⟨DECIDE F-1⟩`
+- **On a track's own widget plaque** (not the catalog) there is no catalog to scroll, so ⟨DECIDE F-2⟩
+  whether the own-library neighbours appear on the plaque at all, and if so each name **opens that track's
+  widget** rather than scrolling. Recommend: catalog-only for 1.0; revisit the plaque later.
+
+### F.3 How it composes across the axes
+
+- **Run mode.** Nearest-own uses the full-dimensional fingerprint, so it is **full-run-only** like §D: a
+  **quick-only** version has no fingerprint, so its cell reads "full analysis only" — silent, not an error
+  (RC-INV-7), exactly as the reference column does (D-INV-22). `F-INV-5`
+- **Completeness.** A version **missing a fingerprint axis is not comparable**, so it neither lists neighbours
+  nor is offered AS a neighbour to others (it would be a fabricated nearest) — its cell reads "can't compare —
+  ⟨missing signals⟩" from the same run manifest as the coach, the catalog, and §D (E.3, RC-INV-5a). `F-INV-6`
+- **A library of one (or of one placeable track).** With no other placeable own-track, the column reads
+  "no comparison yet" rather than an empty cell that looks broken. `F-INV-7`
+- **Recompute, never stale.** Neighbours are a pure function of (the library's fingerprints, the current
+  normalisation epoch); when the library grows or an epoch changes, every row's neighbour list recomputes and
+  re-stamps together (D-INV-12/14) — the catalog never shows a neighbour the current geometry no longer
+  supports, and never points at a deleted version (cascade like D-INV-13). `F-INV-8`
+- **The two columns side by side.** The reference column (§D.10) and this own-library column read the same
+  fingerprint geometry but answer different questions (a *direction* you reach toward vs a *sibling* already in
+  your library); they are two named columns, never merged, and only the reference one is under the references
+  switch. `tags: two-columns · cross-link §D.10`
+
+### F.4 Open decisions (need Alexander)
+
+- ⟨DECIDE F-1⟩ click-to-scroll when the target row is filtered out (clear filter vs surface-the-row).
+- ⟨DECIDE F-2⟩ do own-library neighbours also appear on the per-track plaque (and open the track), or stay
+  catalog-only for 1.0 (recommend catalog-only).
+- ⟨DECIDE F-3⟩ exactly how many neighbours — fixed 3, or "up to 3 within a similarity margin" so a track with
+  no close sibling doesn't list a distant one as if it were close (recommend: up to 3 within a margin).
+- ⟨DECIDE F-4⟩ the distance measure for own↔own — inherit §D's choice (⟨DECIDE D-17⟩ straight-line vs angle)
+  or pick independently (recommend: inherit, one geometry across the whole tool).
+
+## E. Run completeness & missing measurements (cross-cutting — applies to §A, §B, the catalog incl. its §D.10/§F similarity columns, §D, and §F)
 
 Every reading in this tool stands on measurements from one **run**. But a run can be **partial**: a quick run
 has no stems at all; an older run predates a signal (no `sustain` field); note transcription may have covered
