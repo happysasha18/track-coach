@@ -1031,11 +1031,13 @@ manifest, not a sentinel number. `RC-INV-2`
   distance, the per-facet reference read, the reference-explorer divergence, and a direction's centroid. A
   missing axis must not read as "identical" (0 gap) nor as "maximally different"; it is simply **not part of
   that comparison**, and the result discloses how many axes it was computed over. `RC-INV-5`
-- **Too few shared axes ⇒ "not comparable", never a number.** When two sides share fewer than a floor of axes
-  (a quick mix-only run vs a full reference can share almost none), the pair is declared **not comparable** —
-  the same honest move as a fingerprint that can't be placed (D-INV-9) — with a one-line "слишком мало общих
-  измерений (N)" note, never a distance of 0 (false "identical") or a filled bar. ⟨DECIDE E-2⟩ the floor
-  `MIN_SHARED_AXES`. `RC-INV-5a`
+- **Too few shared axes ⇒ "not comparable", never a number.** When two sides share fewer than `MIN_SHARED_AXES`
+  = **10** measured axes (Sasha 2026-06-25), the pair is declared **not comparable** — the same honest move as a
+  fingerprint that can't be placed (D-INV-9) — with a one-line "слишком мало общих измерений (N)" note, never a
+  distance of 0 (false "identical") or a filled bar. The floor guards against **missing DATA, not dissimilar
+  music**: two very different tracks that are both fully measured share all axes and SHOULD be compared (a big
+  divergence is the useful answer). The floor only fires when there isn't enough measured overlap to compare at
+  all — a quick mix-only run (~6 axes) against a full fingerprint ("вальс на записи птичек в саду"). `RC-INV-5a`
 - **Ranking directions uses distance PER shared axis, never the raw sum.** Because two directions can share a
   different number of axes with your track (different members miss different signals), raw Euclidean sums are
   not comparable across directions — more shared axes inflate the sum and would bias "nearest" toward the
@@ -1088,22 +1090,23 @@ partial stem) the stem is **significance-unknown**, a third state distinct from 
 `insignificant (quiet/empty)` — shown as "не измерено", never dropped as empty. This is the §A debt seen on
 the completeness axis: a not-measured stem must not masquerade as a measured-silent one (RC-INV-1). `RC-INV-11`
 
-**A known gap is recorded, not papered over — and re-measuring is the fix, never imputation.** When a real
-track exposes a missing axis that matters (Lazy's un-transcribed bass/lead notes; the §A time-coverage half of
-significance), the honest path is to **re-run the missing measurement** (transcribe the missing stems, re-run
-with the current schema), exactly as the §A significance debt says "add the branch when a real track hits it".
-Until re-measured, the axis stays *missing* under the rules above (dropped from comparison, shown as
-не-измерено) — the tool never invents the value to make a surface look complete. ⟨DECIDE E-1⟩ does the tool
-**auto-trigger** a re-measure when it detects a partial run for a track it's about to compare, or only flag
-"this run is partial — re-measure to compare on N more axes" and leave the trigger to Sasha? (Recommend: flag,
-not auto — a Demucs/transcription re-run on a compare is expensive and surprising; meanwhile the compare shows
-its partial result with the missing-axis count.) `RC-INV-10`
+**A partial run is a TECHNICAL ERROR — flag it and re-run; never invent the value.** (Sasha 2026-06-25:
+"это же техническая ошибка, не надо врать или изобретать.") When a measurement that the run's mode **should**
+have produced is missing (Lazy's un-transcribed bass/lead notes; an old run with no `sustain`), the run is
+**incomplete** — the tool says plainly "прогон неполный — перезапусти" and the user re-runs it; it is NOT
+auto-fixed, NOT imputed, NOT silently degraded. This is distinct from **missing-by-mode**, which is not an
+error: a quick run has no stems *by design* (RC-INV-7), so per-stem axes aren't "broken", they're simply not
+promised. So: *should-have-measured-but-didn't* = error, re-run; *mode-never-promised-it* = silent. Until a
+genuinely-incomplete run is re-run, its missing axes stay *missing* under the rules above (dropped from
+comparison, shown as не-измерено). ⟨DECIDE E-1⟩ **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
+(a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
 
-### E.5 Open decisions (need Sasha)
+### E.5 Decisions (settled 2026-06-25, Sasha)
 
-- ⟨DECIDE E-1⟩ auto-trigger a re-measure on a detected partial run, or only flag it (recommend flag; §E.4).
-- ⟨DECIDE E-2⟩ `MIN_SHARED_AXES` — the floor below which a pair is "not comparable" (RC-INV-5a). Calibrate
-  once on the library like the other frozen thresholds.
+- **E-1 — SETTLED:** a partial run is a technical error → flag "прогон неполный — перезапусти", manual re-run,
+  no auto-trigger, no imputation (RC-INV-10). Missing-by-mode (quick has no stems) is not an error.
+- **E-2 — SETTLED:** `MIN_SHARED_AXES` = **10**. Below 10 shared measured axes a pair is not comparable
+  (RC-INV-5a) — guards against too little DATA (quick vs full), not against dissimilar music.
 
 ## C. (RESOLVED) Increment-1 inputs that needed Sasha's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse

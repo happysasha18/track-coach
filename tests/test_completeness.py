@@ -119,6 +119,58 @@ class CentroidSkipsMissingMembers(unittest.TestCase):
         self.assertAlmostEqual(cen["tempo"], 122.0, places=6)
 
 
+class SharedAxisFloor(unittest.TestCase):
+    """RC-INV-5a / ⟨E-2 settled⟩: MIN_SHARED_AXES = 10 — below it, not comparable (too little DATA)."""
+
+    def test_floor_is_ten(self):
+        self.assertEqual(C.MIN_SHARED_AXES, 10)
+
+    def test_comparable_at_floor_not_below(self):
+        ten = {f"a{i}": 0.0 for i in range(10)}
+        nine = {f"a{i}": 0.0 for i in range(9)}
+        self.assertTrue(C.comparable(ten, dict(ten)))            # 10 shared -> comparable
+        self.assertFalse(C.comparable(ten, nine))               # 9 shared -> not comparable
+
+    def test_quick_vs_full_not_comparable(self):
+        # a quick mix-only run (~6 axes) against a full fingerprint shares too few — "вальс на птичек"
+        quick = {f"mix{i}": 0.0 for i in range(6)}
+        full = {**{f"mix{i}": 0.0 for i in range(6)}, **{f"stem{i}": 0.0 for i in range(8)}}
+        self.assertFalse(C.comparable(quick, full))
+        rank = C.nearest(quick, {"full": full})                 # default floor -> excluded, never a fake 0
+        self.assertEqual(rank, [])
+
+    def test_dissimilar_but_fully_measured_IS_comparable(self):
+        # the floor is about missing DATA, not dissimilar music: two fully-measured tracks compare fine
+        a = {f"x{i}": 0.0 for i in range(14)}
+        b = {f"x{i}": 9.0 for i in range(14)}                    # very different, but all axes present
+        self.assertTrue(C.comparable(a, b))
+        d, n = C.per_axis_distance(a, b, min_shared=C.MIN_SHARED_AXES)
+        self.assertIsNotNone(d)
+        self.assertEqual(n, 14)
+
+
+class PartialRunIsAnError(unittest.TestCase):
+    """RC-INV-10 / ⟨E-1 settled⟩: should-have-measured-but-didn't = technical error; mode-never-promised = not."""
+
+    def test_missing_promised_axis_is_failure(self):
+        present = {"tempo", "bass_notes"}            # bass present
+        expected = {"tempo", "bass_notes", "pad_notes"}
+        self.assertEqual(C.incomplete_axes(present, expected), {"pad_notes"})
+        self.assertTrue(C.is_partial_failure(present, expected))
+
+    def test_complete_run_is_not_a_failure(self):
+        present = {"tempo", "bass_notes", "pad_notes"}
+        expected = {"tempo", "bass_notes", "pad_notes"}
+        self.assertEqual(C.incomplete_axes(present, expected), set())
+        self.assertFalse(C.is_partial_failure(present, expected))
+
+    def test_mode_never_promised_is_not_a_failure(self):
+        # quick mode promises only mix axes; absent stem axes are NOT an error
+        present = {"tempo", "stereo"}
+        expected_quick = {"tempo", "stereo"}
+        self.assertFalse(C.is_partial_failure(present, expected_quick))
+
+
 class SignificanceHasUnknown(unittest.TestCase):
     """RC-INV-11: a stem whose gate inputs weren't measured is UNKNOWN, not INSIGNIFICANT."""
 

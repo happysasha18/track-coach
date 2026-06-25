@@ -13,6 +13,12 @@ import math
 
 MISSING = None  # the value a fingerprint carries for an axis that wasn't measured (RC-INV-1)
 
+# ⟨E-2 settled⟩ below this many shared MEASURED axes, two fingerprints aren't comparable (RC-INV-5a) —
+# a quick mix-only run (~6 axes) vs a full fingerprint shares too few ("вальс на записи птичек в саду").
+# This guards against missing DATA, never against dissimilar music (two fully-measured tracks always share
+# all axes and SHOULD be compared — big divergence is the useful answer).
+MIN_SHARED_AXES = 10
+
 # significance states (§A + RC-INV-11) — three, not two
 SIGNIFICANT   = "significant"
 INSIGNIFICANT = "insignificant"
@@ -32,6 +38,23 @@ def manifest(fp):
 def shared_axes(a, b):
     """RC-INV-5: axes present on BOTH sides — the only axes a pair may be compared on."""
     return manifest(a) & manifest(b)
+
+
+def comparable(a, b, min_shared=MIN_SHARED_AXES):
+    """RC-INV-5a: are two fingerprints sharing enough measured axes to be compared at all?"""
+    return len(shared_axes(a, b)) >= min_shared
+
+
+def incomplete_axes(present, expected):
+    """RC-INV-10 (E-1): axes the run's MODE should have measured but didn't = a technical error (re-run).
+    Distinct from axes a mode never promises (quick has no stems — not an error, RC-INV-7).
+    `present` = measured axes (a manifest), `expected` = what this mode promises. Empty set ⇒ run is OK."""
+    return set(expected) - set(present)
+
+
+def is_partial_failure(present, expected):
+    """True when a run is genuinely incomplete (should-have-measured-but-didn't) → flag 'прогон неполный'."""
+    return bool(incomplete_axes(present, expected))
 
 
 def per_axis_distance(a, b, min_shared=1):
@@ -60,7 +83,7 @@ def centroid(members):
     return out
 
 
-def nearest(track, directions, min_shared=1):
+def nearest(track, directions, min_shared=MIN_SHARED_AXES):
     """RC-INV-5b: rank directions by axis-count-fair (per-axis) distance; a not-comparable direction is
     skipped, never scored 0. `directions` = {name: centroid_fingerprint}.
     Returns [(distance_per_axis, name, n_shared), …] ascending (nearest first)."""

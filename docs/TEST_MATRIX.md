@@ -207,8 +207,10 @@ pure-logic invariants are unit-tested NOW, the surface-rendering ones land with 
 | RC-INV-11 | significance has a third `unknown (not measured)` state | `test_completeness::SignificanceHasUnknown` ✓ |
 | RC-INV-12 | one per-run completeness line so absence≠all-clear | not built — lands with the coach render |
 
-**Open ⟨DECIDE⟩:** E-1 (auto-trigger re-measure vs flag — recommend flag), E-2 (`MIN_SHARED_AXES` floor,
-calibrate once on the library). Logic tests proven red-on-bug (inject impute-as-0 ⇒ 5 fail), 2026-06-25.
+**Settled 2026-06-25 (Sasha):** E-1 = partial run is a technical error → flag "прогон неполный, перезапусти"
+(manual, no auto, no imputation; `is_partial_failure`/`incomplete_axes`). E-2 = `MIN_SHARED_AXES` = **10**
+(below it: not comparable; guards missing DATA not dissimilar music; `comparable`/`nearest` default to it).
+22 logic tests, proven red-on-bug (inject impute-as-0 ⇒ 5 fail).
 
 ## §8 — Coverage status
 - **INV-11 — CLOSED.** `CrossVersionPanelData` pins the `D.catalog` passthrough + the hide-when-empty
