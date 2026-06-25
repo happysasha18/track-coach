@@ -1006,8 +1006,11 @@ structural holes:
   Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip).
 - ⟨DECIDE D-27⟩ the exact boundaries of the own-library high/medium/low buckets (§F) — relative to the
   library's own distribution of pairwise distances (recommend: terciles / a spread multiple), since §F has no
-  cloud spread to borrow. The reference buckets (§D.10) already key off the cloud's in-zone spread, so only
-  §F's basis is open.
+  cloud spread to borrow.
+- ⟨DECIDE D-28⟩ the reference cue basis — **SETTLED 2026-06-25 (Alexander): RELATIVE lean** (how strongly the
+  nearest direction stands apart from the track's other directions), NOT absolute depth inside one cloud
+  (which read "far" for every own track). Shown by colour only — green/amber/red tint on the direction name,
+  no closeness words (color-only).
 
 > _(⟨DECIDE D-23⟩ own-track neighbours is no longer open — Alexander 2026-06-25 chose YES, as its **own
 > column** beside the reference one, scoped to **1.0**. It is specced as its own surface in **§F**, not
@@ -1026,12 +1029,15 @@ one-surface-two-placements`
 
 - **Leans toward X (descriptive).** The reference **cloud whose centre is nearest** this track in
   full-dimensional fingerprint space. It is computed for ANY full run and needs **no aspiration mapping** —
-  "nearest" is just a measured fact about the fingerprints. It carries a **coarse proximity cue — high /
-  medium / low** — never the raw distance: against a real cloud the cue keys off the cloud's own in-zone
-  spread (inside the spread = high, at the edge = medium, well outside = low — the same zone machinery as
-  in-zone/diverge, D-INV-16); against a reduced direction (no spread) it reads "closest to ⟨track⟩" with no
-  cue. The cue is a *closeness* word, not a quality grade and not a number (D-INV-26). **The single nearest
-  is chosen across ALL your reference directions at once** — clouds ranked by their centroid (straight-line,
+  "nearest" is just a measured fact about the fingerprints. It carries a **coarse closeness cue — high /
+  medium / low** read as **how strongly the track leans to its nearest direction versus its other directions**
+  (relative lean, ⟨DECIDE D-28⟩ settled = relative; Alexander 2026-06-25) — never the raw distance, never the
+  absolute depth inside one cloud (which read "far" for every own track, since a producer sits outside the
+  album clusters they reach toward). The cue is shown by **colour, not words** (Alexander 2026-06-25,
+  color-only): the direction's name is tinted green (close) → amber (mild) → red (no real lean); the column
+  header stays "leans toward" and the cell carries no per-row closeness word. Colour is the only cue — never a
+  number, never a grade (D-INV-26). **The single
+  nearest is chosen across ALL your reference directions at once** — clouds ranked by their centroid (straight-line,
   ⟨DECIDE D-17⟩), reduced directions by their nearest member — using the axis-count-fair per-axis distance
   (RC-INV-5b), so a direction isn't picked just for sharing fewer axes. With **no reference directions defined at all**, there is nothing to lean toward and the cell is
   empty with a quiet "no direction yet", never a fabricated nearest.
@@ -1068,7 +1074,9 @@ direction is nearest: one geometry, drawn three ways. `D-INV-21`
 - **Completeness (a full run that couldn't measure everything).** A version whose fingerprint is **missing an
   axis is not comparable** — its cell and chip read "can't compare — ⟨missing signals⟩", never a fabricated
   nearest. It draws this from the same run manifest as the coach and §D, so one gap reads identically in all
-  three (E.3). `tags: D-INV-9 · RC-INV-5a · E.3`
+  three (E.3). **Because the cue is colour, the not-measured / not-comparable cell uses a NEUTRAL grey (or a
+  dash), never the red "far" tint** — red is a *measured* "far", grey is "no measurement"; collapsing them
+  would be the missing-as-value trap (RC-INV-1) in colour form. `tags: D-INV-9 · RC-INV-5a · RC-INV-1 · E.3`
 - **The switch.** The reference line is a reference surface in both placements, so it is governed by the **one
   show/hide-references switch** (D-INV-6) shared with the map and the catalog overlay: hiding references hides
   the column and the chip together, and the switch never strands the line where you can't see or restore it.
@@ -1086,15 +1094,18 @@ direction is nearest: one geometry, drawn three ways. `D-INV-21`
 distance, score, rank, percentage, or "match %"; it names a direction and a coarse cue. "leans toward" is
 observation, never "you should sound like this" (the artistic north-star, D-INV-1). `D-INV-25`
 
-**The proximity cue is a closeness word, not a grade.** The only cue the line carries is a coarse
-**high / medium / low** *closeness* (how near the track sits to the direction), surfaced instead of the raw
-distance — never a quality judgement ("low" means *far from this direction*, never *a worse track*). It is
-qualitative (three words, no number), keyed off the cloud's in-zone spread for a real cloud (D-INV-16) and
-the library's own distribution for §F (⟨DECIDE D-27⟩). **High and medium are the default; low is a
-last-resort fallback** — surfaced only when nothing closer qualifies (Alexander 2026-06-25), and always
-labelled so "low" reads as *far*, never as a hidden recommendation. The same cue governs whether a runner-up
-direction is shown — only when it shares the nearest's *high* bucket (⟨DECIDE D-24⟩), so there is no numeric
-margin to tune. `D-INV-26`
+**The closeness cue is a colour, not a number or a grade.** The cue is a coarse three-level closeness shown
+as **colour only — green (close) / amber (medium) / red (far)** — no closeness words and no number on the
+cell (Alexander 2026-06-25, color-only); a small legend names the colours once. It is never a quality
+judgement (red means *far from this direction*, never *a worse track*). Its **basis differs by surface, both
+relative**: the reference column tints by **lean strength** — how much the nearest direction stands apart
+from the track's other directions (⟨DECIDE D-28⟩ settled = relative, not absolute cloud-depth); the §F own
+column tints by closeness against the **library's own distance distribution** (⟨DECIDE D-27⟩). **Green and
+amber are the default; red is a last-resort tint** in §F — used only when nothing closer qualifies, never
+hiding that the sibling is far. The same cue governs the reference runner-up — shown only when it is also
+green/close (⟨DECIDE D-24⟩), so there is no numeric margin to tune. So colour is never the *sole* channel: the
+**nearest-first order** carries the ranking and a **hover label** names the closeness, keeping the cue
+readable in greyscale or for a colour-blind reader without adding visible words. `D-INV-26`
 
 ## F. Similar in your own library — the DJ column (1.0)
 
@@ -1111,17 +1122,18 @@ people's music out of your signatures; this column only ever lists your own). `t
 
 - **Up to three nearest own-tracks — but only the close ones.** The versions in your library nearest this one
   by **full-dimensional fingerprint** (same geometry as §D, D-INV-12/19, straight-line ⟨DECIDE D-17⟩,
-  axis-count-fair RC-INV-5b), capped at three and ranked nearest-first. **By default it lists the high/medium
-  siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly marked low** — a
-  last resort, never empty when another track exists (Alexander 2026-06-25). Because the low one is clearly
-  labelled "far", it isn't a distant track dressed up as close — that was the worry, and the label answers it.
+  axis-count-fair RC-INV-5b), capped at three and ranked nearest-first. **By default it lists the green/amber
+  (close/medium) siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly
+  tinted red (far)** — a last resort, never empty when another track exists (Alexander 2026-06-25). Because
+  the red tint reads plainly as "far", it isn't a distant track dressed up as close — that was the worry, and
+  the colour answers it.
   The reference column likewise always names your nearest *direction* even at a low cue; «no comparison yet»
   (F-INV-7) is reserved for when there is truly no other placeable track at all. `F-INV-1`
 - **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
   (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
-- **No number shown — a closeness word, not a score.** It names the neighbour tracks, each with the same
-  coarse high/medium/low *closeness* cue as §D (D-INV-26), never a percentage, rank number, or raw distance.
-  Same observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
+- **No number shown — closeness is a colour, not a score.** It names the neighbour tracks, each tinted by the
+  same green/amber/red closeness cue as §D (D-INV-26), never a percentage, rank number, or raw distance. Same
+  observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
 
 ### F.2 Navigation — click a neighbour, scroll to it (Alexander: «чтобы к ним скроллилось»)
 

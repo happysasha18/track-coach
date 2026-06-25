@@ -228,7 +228,7 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | D-INV-23 | both placements under the ONE references switch; toggle hides/shows both; never strands | not built — lands with the switch + catalog/widget render |
 | D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
 | D-INV-25 | never a NUMBER — no raw distance / score / rank / % / "match %"; only a direction name + a coarse cue | not built — assert rendered chip carries no numeric token at all |
-| D-INV-26 | the only cue is a coarse high/medium/low CLOSENESS word (keyed off cloud spread / lib distribution), not a grade and not a number; "low" = far from this direction, never a worse track; runner-up shows only in the nearest's HIGH bucket | bucketing geometry NOW (cloud in-zone spread, RC-INV-5a/5b); the closeness-not-grade render: not built — assert cue ∈ {high,medium,low} and no numeric token |
+| D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Runner-up only when also green | bucketing geometry NOW (relative lean + RC-INV-5a/5b); colour render: not built — assert tint ∈ {green,amber,red}, no numeric/word token on the cell |
 
 ### Similar-in-your-own-library, the DJ column (SPEC §F)
 | code | rule (1-line) | owning test / status |
@@ -242,12 +242,21 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | F-INV-7 | with no other placeable own-track, the cell reads "no comparison yet", never an empty-looks-broken cell | not built — lands with catalog render |
 | F-INV-8 | recompute + re-stamp on library/epoch change; never points at a deleted version (cascade like D-INV-13) | not built — composes with placement + deposit/clean |
 
-**Settled 2026-06-25 (Alexander):** D-17 = straight-line (manifold revisitable on a bigger library). D-24 =
-runner-up shows only in the nearest's HIGH bucket (no numeric margin). F-3 = up to 3, high/medium only. F-4 =
-own↔own inherits straight-line. Column visibility = shown if ≥1 track has a leans-toward, else absent. Both
-columns sit at the catalog tail, slightly smaller font (P-1). Open: D-27 (own-library bucket boundaries),
-F-1 (filtered-row scroll), F-2 (plaque presence), D-25 (Simple chip). The hi/med/low cue (D-INV-26) replaces
-the raw distance — verify-by-deed on the real library: straight-line and angle agree on all 3 tracks (no flip).
+**Settled 2026-06-25 (Alexander):** D-17 = straight-line. D-28 = reference cue is RELATIVE lean (not absolute
+cloud-depth). Closeness shown by **colour only** — green/amber/red tint on the name, NO closeness words, no
+number (color-only). D-24 = runner-up only when also green. F-3 = up to 3 green/amber; red only as a last
+resort, never empty if a sibling exists. F-4 = own inherits straight-line. Visibility = shown if ≥1 track has
+data, else absent. Both columns at the catalog tail, smaller font; **interface in English**. Open: D-27
+(own-library bucket boundaries), F-1 (filtered-row scroll), F-2 (plaque presence), D-25 (Simple chip).
+Verify-by-deed on the real library: relative lean tints Lazy→Venetian green, Shared→SCSI-9 amber,
+Wobble→Venetian amber — no all-red deadness the absolute basis produced.
+
+**Prove (2026-06-25, s25 re-prove of the two new surfaces) closed 2 composition holes:** (1) a not-measured /
+not-comparable cell uses a NEUTRAL grey/dash, never the red "far" tint (red=measured-far, grey=no-measurement;
+missing-as-value trap RC-INV-1 in colour form) — owning test lands with the colour render, assert
+not-measured tint ∉ {green,amber,red}; (2) colour is never the sole channel — nearest-first order + a hover
+label keep the cue readable in greyscale / for colour-blind readers (D-INV-26) — owning test: assert each
+coloured cell carries an order rank + a title attr.
 
 **Cross-page (extends §7).** The reference column's "leans toward X" on a catalog row names the SAME nearest
 direction the §D map dot projects for that track (D-INV-21) — one geometry, two surfaces; owning test lands
