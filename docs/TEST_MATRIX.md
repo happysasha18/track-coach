@@ -212,6 +212,40 @@ pure-logic invariants are unit-tested NOW, the surface-rendering ones land with 
 (below it: not comparable; guards missing DATA not dissimilar music; `comparable`/`nearest` default to it).
 22 logic tests, proven red-on-bug (inject impute-as-0 ⇒ 5 fail).
 
+## §D10F — Catalog similarity columns (SPEC §D.10 + §F → D-INV-21…25, F-INV-1…8)
+
+Two side-by-side catalog columns (+ a Detailed plaque chip for the reference one). The **geometry** rows
+ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) and are testable NOW; the
+**surface-render** rows land with the §D/§F catalog+widget code (asserted against the REAL rendered
+`index.html` / widget, never a source fragment — same discipline as §6/§7). Scope: reference column ships
+**0.9**, the own-library DJ column ships **1.0**.
+
+### Reference line «leans toward» (SPEC §D.10)
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| D-INV-21 | catalog chip = plaque chip = map dot's nearest — ONE full-dim geometry, never a 2-D marker distance; the single nearest is chosen across ALL directions (clouds by centroid · reduced by nearest member), axis-count-fair (RC-INV-5b); no directions ⇒ "no direction yet", never a fabricated nearest | geometry NOW via `test_completeness::RankingIsAxisCountFair`; cross-surface agreement + empty-case render: not built — lands with §D render |
+| D-INV-22 | quick-only version ⇒ cell "full analysis only" (silent, RC-INV-7); row reads the version's most-complete run (E.4); never blank-implies-none | not built — lands with catalog render + run selection |
+| D-INV-23 | both placements under the ONE references switch; toggle hides/shows both; never strands | not built — lands with the switch + catalog/widget render |
+| D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
+| D-INV-25 | never a score / rank / % / "match %" — only a direction name + in-zone/diverge cue | not built — assert rendered chip carries no numeric-score token |
+
+### Similar-in-your-own-library, the DJ column (SPEC §F)
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| F-INV-1 | up to 3 nearest OWN tracks, same full-dim geometry, axis-count-fair (RC-INV-5b), ranked nearest-first | geometry NOW (`completeness.nearest`, own↔own); render: not built |
+| F-INV-2 | a track is never its own neighbour; per-row display may be asymmetric (A lists B, B's top-3 need not list A) | geometry NOW (self excluded); render: not built |
+| F-INV-3 | no score shown — names the neighbour tracks (+ optional in-zone cue), never a % or rank number | not built — assert rendered cell carries no numeric-score token |
+| F-INV-4 | click a neighbour ⇒ catalog scrolls to that row + highlights it; pure navigation, changes no analysis state | not built — lands with catalog client-JS (node-exec like the player tests) |
+| F-INV-5 | quick-only version ⇒ "full analysis only" (silent, RC-INV-7), exactly like D-INV-22 | not built — lands with catalog render |
+| F-INV-6 | a version missing a fingerprint axis: not listed AND not offered AS a neighbour; cell "can't compare — ⟨signals⟩" | geometry NOW (not-comparable via RC-INV-5a `TooFewSharedIsNotComparable`); render: not built |
+| F-INV-7 | with no other placeable own-track, the cell reads "no comparison yet", never an empty-looks-broken cell | not built — lands with catalog render |
+| F-INV-8 | recompute + re-stamp on library/epoch change; never points at a deleted version (cascade like D-INV-13) | not built — composes with placement + deposit/clean |
+
+**Cross-page (extends §7).** The reference column's "leans toward X" on a catalog row names the SAME nearest
+direction the §D map dot projects for that track (D-INV-21) — one geometry, two surfaces; owning test lands
+with the §D render. The own-library column is NOT under the references switch (§F vs D-INV-23) — a switch-off
+state hides the reference column but leaves the DJ column visible; owning test lands with the switch render.
+
 ## §8 — Coverage status
 - **INV-11 — CLOSED.** `CrossVersionPanelData` pins the `D.catalog` passthrough + the hide-when-empty
   guard.
