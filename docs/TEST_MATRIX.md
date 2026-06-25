@@ -227,12 +227,13 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | D-INV-22 | quick-only version ⇒ cell "full analysis only" (silent, RC-INV-7); row reads the version's most-complete run (E.4); never blank-implies-none | not built — lands with catalog render + run selection |
 | D-INV-23 | both placements under the ONE references switch; toggle hides/shows both; never strands | not built — lands with the switch + catalog/widget render |
 | D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
-| D-INV-25 | never a score / rank / % / "match %" — only a direction name + in-zone/diverge cue | not built — assert rendered chip carries no numeric-score token |
+| D-INV-25 | never a NUMBER — no raw distance / score / rank / % / "match %"; only a direction name + a coarse cue | not built — assert rendered chip carries no numeric token at all |
+| D-INV-26 | the only cue is a coarse high/medium/low CLOSENESS word (keyed off cloud spread / lib distribution), not a grade and not a number; "low" = far from this direction, never a worse track; runner-up shows only in the nearest's HIGH bucket | bucketing geometry NOW (cloud in-zone spread, RC-INV-5a/5b); the closeness-not-grade render: not built — assert cue ∈ {high,medium,low} and no numeric token |
 
 ### Similar-in-your-own-library, the DJ column (SPEC §F)
 | code | rule (1-line) | owning test / status |
 |---|---|---|
-| F-INV-1 | up to 3 nearest OWN tracks, same full-dim geometry, axis-count-fair (RC-INV-5b), ranked nearest-first | geometry NOW (`completeness.nearest`, own↔own); render: not built |
+| F-INV-1 | up to 3 nearest OWN tracks, axis-count-fair (RC-INV-5b), ranked; default = high/medium siblings; if none qualify, fall back to the single nearest **marked low** (last resort, never empty when another track exists); "no comparison yet" only when no other placeable track at all | geometry NOW (`completeness.nearest` + bucket gate + low-fallback); render: not built |
 | F-INV-2 | a track is never its own neighbour; per-row display may be asymmetric (A lists B, B's top-3 need not list A) | geometry NOW (self excluded); render: not built |
 | F-INV-3 | no score shown — names the neighbour tracks (+ optional in-zone cue), never a % or rank number | not built — assert rendered cell carries no numeric-score token |
 | F-INV-4 | click a neighbour ⇒ catalog scrolls to that row + highlights it; pure navigation, changes no analysis state | not built — lands with catalog client-JS (node-exec like the player tests) |
@@ -240,6 +241,13 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | F-INV-6 | a version missing a fingerprint axis: not listed AND not offered AS a neighbour; cell "can't compare — ⟨signals⟩" | geometry NOW (not-comparable via RC-INV-5a `TooFewSharedIsNotComparable`); render: not built |
 | F-INV-7 | with no other placeable own-track, the cell reads "no comparison yet", never an empty-looks-broken cell | not built — lands with catalog render |
 | F-INV-8 | recompute + re-stamp on library/epoch change; never points at a deleted version (cascade like D-INV-13) | not built — composes with placement + deposit/clean |
+
+**Settled 2026-06-25 (Alexander):** D-17 = straight-line (manifold revisitable on a bigger library). D-24 =
+runner-up shows only in the nearest's HIGH bucket (no numeric margin). F-3 = up to 3, high/medium only. F-4 =
+own↔own inherits straight-line. Column visibility = shown if ≥1 track has a leans-toward, else absent. Both
+columns sit at the catalog tail, slightly smaller font (P-1). Open: D-27 (own-library bucket boundaries),
+F-1 (filtered-row scroll), F-2 (plaque presence), D-25 (Simple chip). The hi/med/low cue (D-INV-26) replaces
+the raw distance — verify-by-deed on the real library: straight-line and angle agree on all 3 tracks (no flip).
 
 **Cross-page (extends §7).** The reference column's "leans toward X" on a catalog row names the SAME nearest
 direction the §D map dot projects for that track (D-INV-21) — one geometry, two surfaces; owning test lands

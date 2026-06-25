@@ -988,7 +988,9 @@ structural holes:
 - ⟨DECIDE D-14⟩ what clicking a map marker opens.
 - ⟨DECIDE D-15⟩ which reference surfaces show in which view.
 - ⟨DECIDE D-16⟩ how the switch's state resets across views.
-- ⟨DECIDE D-17⟩ distance measure (straight-line vs angle).
+- ⟨DECIDE D-17⟩ distance measure — **SETTLED 2026-06-25 (Alexander): straight-line.** (He weighed an
+  on-the-manifold/surface measure and chose not to over-engineer; straight-line and angle agree on the
+  real 3-track library anyway. Revisit only if a larger library shows them diverging.)
 - ⟨DECIDE D-18⟩ whether some signals weigh more in the fingerprint.
 - ⟨DECIDE D-19⟩ ~~the "clearly outside" margin for the map↔read guard~~ → **DROPPED 2026-06-24**: the read is
   authoritative and the map is a labelled lossy viewport (D-INV-11), so there is no map↔read guard to tune.
@@ -997,11 +999,15 @@ structural holes:
 - ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
   mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
   only the map overlay + re-flavouring on mapping, as D-11 already leans).
-- ⟨DECIDE D-24⟩ when a track sits between directions, does the compact line show only the nearest, or the
-  nearest plus a "+⟨second⟩" when a runner-up is within a margin? (recommend: nearest + one runner-up
-  within margin, kept to one line).
+- ⟨DECIDE D-24⟩ runner-up direction — **SETTLED 2026-06-25 (Alexander): show a "+⟨second⟩" only when the
+  runner-up is in the SAME proximity bucket (high) as the nearest**, not by a raw numeric margin; this rides
+  the high/medium/low cue (D-INV-26), so there's no magic threshold to tune.
 - ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
   Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip).
+- ⟨DECIDE D-27⟩ the exact boundaries of the own-library high/medium/low buckets (§F) — relative to the
+  library's own distribution of pairwise distances (recommend: terciles / a spread multiple), since §F has no
+  cloud spread to borrow. The reference buckets (§D.10) already key off the cloud's in-zone spread, so only
+  §F's basis is open.
 
 > _(⟨DECIDE D-23⟩ own-track neighbours is no longer open — Alexander 2026-06-25 chose YES, as its **own
 > column** beside the reference one, scoped to **1.0**. It is specced as its own surface in **§F**, not
@@ -1020,12 +1026,14 @@ one-surface-two-placements`
 
 - **Leans toward X (descriptive).** The reference **cloud whose centre is nearest** this track in
   full-dimensional fingerprint space. It is computed for ANY full run and needs **no aspiration mapping** —
-  "nearest" is just a measured fact about the fingerprints. It carries a small in-zone/diverge cue when X is a
-  real cloud (a zone to be inside); against a reduced direction it reads "closest to ⟨track⟩" with no in-zone
-  cue, since a reduced direction has no zone (D-INV-16). **The single nearest is chosen across ALL your
-  reference directions at once** — clouds ranked by their centroid, reduced directions by their nearest member
-  — using the axis-count-fair per-axis distance (RC-INV-5b), so a direction isn't picked just for sharing
-  fewer axes. With **no reference directions defined at all**, there is nothing to lean toward and the cell is
+  "nearest" is just a measured fact about the fingerprints. It carries a **coarse proximity cue — high /
+  medium / low** — never the raw distance: against a real cloud the cue keys off the cloud's own in-zone
+  spread (inside the spread = high, at the edge = medium, well outside = low — the same zone machinery as
+  in-zone/diverge, D-INV-16); against a reduced direction (no spread) it reads "closest to ⟨track⟩" with no
+  cue. The cue is a *closeness* word, not a quality grade and not a number (D-INV-26). **The single nearest
+  is chosen across ALL your reference directions at once** — clouds ranked by their centroid (straight-line,
+  ⟨DECIDE D-17⟩), reduced directions by their nearest member — using the axis-count-fair per-axis distance
+  (RC-INV-5b), so a direction isn't picked just for sharing fewer axes. With **no reference directions defined at all**, there is nothing to lean toward and the cell is
   empty with a quiet "no direction yet", never a fabricated nearest.
 - **Aimed at X (aspiration).** Your written mapping (D-INV-4). When you have aimed this track at a direction,
   the line marks it with an aim glyph — and when the direction you *aim at* is not the one you're *nearest*
@@ -1051,9 +1059,12 @@ direction is nearest: one geometry, drawn three ways. `D-INV-21`
   version's cell reads "full analysis only" — the canonical missing-by-mode case (D-INV-20, RC-INV-7): quick
   never promised reference, so the empty cell is silent, never an error and never blank-implying-"no
   direction". A catalog row collapses a version's runs, so the column reads the version's **most-complete
-  run** (E.4); "full analysis only" shows only when that version has **no** full run at all. The column's
-  default visibility follows the references switch default ⟨DECIDE D-13⟩ — confirm it isn't hidden-by-default,
-  or a brand-new column reads as a missing feature. `D-INV-22`
+  run** (E.4); "full analysis only" shows only when that version has **no** full run at all.
+  **The column appears whenever at least ONE track in the library has a leans-toward** (Alexander 2026-06-25:
+  don't hide it if there's data for even one track); only when NO track has any reference data at all is the
+  whole column absent — so a brand-new column never reads as a missing feature, and an all-quick library
+  doesn't carry an all-empty column. It sits as one of the **last two columns** with a slightly smaller font
+  than the spec columns, as long as the look holds (placement P-1). `D-INV-22`
 - **Completeness (a full run that couldn't measure everything).** A version whose fingerprint is **missing an
   axis is not comparable** — its cell and chip read "can't compare — ⟨missing signals⟩", never a fabricated
   nearest. It draws this from the same run manifest as the coach and §D, so one gap reads identically in all
@@ -1071,9 +1082,19 @@ direction is nearest: one geometry, drawn three ways. `D-INV-21`
   other placement (D-INV-12/14/18) — the catalog never shows a "leans toward" the current geometry no longer
   supports. `D-INV-24`
 
-**Never happens (safety), specific to this surface.** The reference line never shows a score, rank,
-percentage, or "match %" — it names a direction and an in-zone/diverge cue; "leans toward" is observation,
-never "you should sound like this" (the artistic north-star, D-INV-1). `D-INV-25`
+**Never happens (safety), specific to this surface.** The reference line never shows a number — no raw
+distance, score, rank, percentage, or "match %"; it names a direction and a coarse cue. "leans toward" is
+observation, never "you should sound like this" (the artistic north-star, D-INV-1). `D-INV-25`
+
+**The proximity cue is a closeness word, not a grade.** The only cue the line carries is a coarse
+**high / medium / low** *closeness* (how near the track sits to the direction), surfaced instead of the raw
+distance — never a quality judgement ("low" means *far from this direction*, never *a worse track*). It is
+qualitative (three words, no number), keyed off the cloud's in-zone spread for a real cloud (D-INV-16) and
+the library's own distribution for §F (⟨DECIDE D-27⟩). **High and medium are the default; low is a
+last-resort fallback** — surfaced only when nothing closer qualifies (Alexander 2026-06-25), and always
+labelled so "low" reads as *far*, never as a hidden recommendation. The same cue governs whether a runner-up
+direction is shown — only when it shares the nearest's *high* bucket (⟨DECIDE D-24⟩), so there is no numeric
+margin to tune. `D-INV-26`
 
 ## F. Similar in your own library — the DJ column (1.0)
 
@@ -1088,13 +1109,19 @@ people's music out of your signatures; this column only ever lists your own). `t
 
 ### F.1 What it shows
 
-- **Up to three nearest own-tracks.** The 1–3 versions in your library whose **full-dimensional fingerprint**
-  is nearest this one — the *same* geometry as §D (D-INV-12/19), just measured library-track ↔ library-track
-  instead of track ↔ reference cloud, axis-count-fair per RC-INV-5b. Ranked nearest-first. `F-INV-1`
+- **Up to three nearest own-tracks — but only the close ones.** The versions in your library nearest this one
+  by **full-dimensional fingerprint** (same geometry as §D, D-INV-12/19, straight-line ⟨DECIDE D-17⟩,
+  axis-count-fair RC-INV-5b), capped at three and ranked nearest-first. **By default it lists the high/medium
+  siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly marked low** — a
+  last resort, never empty when another track exists (Alexander 2026-06-25). Because the low one is clearly
+  labelled "far", it isn't a distant track dressed up as close — that was the worry, and the label answers it.
+  The reference column likewise always names your nearest *direction* even at a low cue; «no comparison yet»
+  (F-INV-7) is reserved for when there is truly no other placeable track at all. `F-INV-1`
 - **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
   (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
-- **No score shown** — it names the neighbour tracks (and may show the same in-zone-style cue as §D), never a
-  percentage or rank number. Same observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
+- **No number shown — a closeness word, not a score.** It names the neighbour tracks, each with the same
+  coarse high/medium/low *closeness* cue as §D (D-INV-26), never a percentage, rank number, or raw distance.
+  Same observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
 
 ### F.2 Navigation — click a neighbour, scroll to it (Alexander: «чтобы к ним скроллилось»)
 
@@ -1131,10 +1158,14 @@ people's music out of your signatures; this column only ever lists your own). `t
 - ⟨DECIDE F-1⟩ click-to-scroll when the target row is filtered out (clear filter vs surface-the-row).
 - ⟨DECIDE F-2⟩ do own-library neighbours also appear on the per-track plaque (and open the track), or stay
   catalog-only for 1.0 (recommend catalog-only).
-- ⟨DECIDE F-3⟩ exactly how many neighbours — fixed 3, or "up to 3 within a similarity margin" so a track with
-  no close sibling doesn't list a distant one as if it were close (recommend: up to 3 within a margin).
-- ⟨DECIDE F-4⟩ the distance measure for own↔own — inherit §D's choice (⟨DECIDE D-17⟩ straight-line vs angle)
-  or pick independently (recommend: inherit, one geometry across the whole tool).
+- ⟨DECIDE F-3⟩ how many neighbours — **SETTLED 2026-06-25 (Alexander): up to 3, and only the close ones**
+  (high/medium proximity bucket, D-INV-26), so a distant sibling is never listed as if close (F-INV-1).
+- ⟨DECIDE F-4⟩ the distance measure for own↔own — **SETTLED 2026-06-25 (Alexander): inherit §D's straight-line
+  (⟨DECIDE D-17⟩), one geometry across the whole tool.**
+- ⟨DECIDE D-27⟩ (shared with §D.9) the own-library high/medium/low bucket boundaries — relative to the
+  library's own distance distribution, since §F has no cloud spread to borrow.
+- **Placement (P-1).** This column is the **other of the last two columns**, beside the §D.10 reference one,
+  with the same slightly-smaller font (Alexander 2026-06-25). Both are catalog-tail columns.
 
 ## E. Run completeness & missing measurements (cross-cutting — applies to §A, §B, the catalog incl. its §D.10/§F similarity columns, §D, and §F)
 
