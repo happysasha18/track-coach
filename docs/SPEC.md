@@ -709,8 +709,9 @@ Every term used below, defined once.
   in-zone/diverge verdict (read in full dimensions, D-INV-19) AND the «leans toward» nearest-direction
   computation (§D.10). It is read in full dimensions — there is **no** lossy projection of it.
 - **the «leans toward» line** — the compact surface (a catalog column + a Detailed plaque chip) naming the
-  reference direction this track's fingerprint sits nearest to; see §D.10. (There is **no** 2-D/3-D
-  constellation map — dropped 2026-06-26: we show the nearest centroid, not a flattened picture.)
+  reference direction this track's fingerprint sits nearest to; in Detailed it expands to an **up-to-three
+  nearest-first selector** (§D.10.1) and a per-direction **web-style plaque** (§D.10.2). See §D.10. (There is
+  **no** 2-D/3-D constellation map — dropped 2026-06-26: we show the nearest centroid, not a flattened picture.)
 - **the read panel** — click your track and read, in words, how it sits against a direction.
 - **in-zone / diverge** — on a facet, your track reads as the same family as the direction (in-zone) or not
   (diverge). Descriptive, never pass/fail. **It is a per-facet test in FULL-dimensional fingerprint space**
@@ -1005,13 +1006,27 @@ structural holes:
 - ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
   mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
   only re-flavouring on mapping, as D-11 already leans).
-- ⟨DECIDE D-24⟩ runner-up direction — **RE-OPENED 2026-06-25 (by deed, s25): DEFERRED from v1.** The
-  intended "show +second when it's also close" is self-contradictory under the relative-lean cue (D-INV-26): a
-  second direction that's *tied* with the nearest means the nearest does NOT stand apart — i.e. a *weak* lean,
-  not a close one. A real "co-leaders" display needs its own design (e.g. a distinct tied-pair tint), so v1
-  ships a single direction; revisit later.
+- ⟨DECIDE D-24⟩ runner-up direction — **RESOLVED 2026-06-26 by listing, not tinting (§D.10.1, D-INV-27).** The
+  earlier worry (a *tied* second under relative lean means the nearest does NOT stand apart, so a second tint
+  in one cell is self-contradictory) dissolves once the surface is an **up-to-three nearest-first selector**:
+  a list HAS an order to carry the ranking, exactly as §F does, so a 2nd/3rd direction is its own ordered,
+  cued entry rather than a crammed second tint. No co-leaders tied-pair tint needed.
 - ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
-  Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip).
+  Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip;
+  the up-to-three selector and the web-style plaque are Detailed-only by §D.10.1/§D.10.2).
+- ⟨DECIDE D-29⟩ aimed direction outside the three nearest — **RESOLVED 2026-06-29 (Alexander).** Pin **only the
+  single nearest of the aimed** ones, as an additive entry (it never displaces a nearer one), shown **even if it
+  tints far** because a declared aim is intent, not filler; the other aimed directions live in the read panel.
+  At most one pinned aimed entry. `§D.10.1`
+- ⟨DECIDE D-30⟩ a web facet the measurement **contradicts** — silently **dropped** (recommend) or shown
+  **struck-through** as a teaching contrast ("web says wide stereo; the signals run narrow")? `§D.10.2`
+- ⟨DECIDE D-32⟩ where the **facet→signal map** lives and how it's curated — the table tying a web style phrase
+  to a measured axis (★ direct) or a sound indirect signal (☆). It's authored, not learned; recommend a
+  versioned in-repo table maintained like the other frozen constants, reviewed when a new ☆ tie is claimed.
+  `§D.10.2`
+- ⟨DECIDE D-31⟩ a **second ★-style mark for "your track shares this confirmed trait"** (per-your-track, atop
+  the v1 ★ that means "true of the direction") — build it, or leave ★ as direction-only? (deferred; v1 =
+  direction-only). `§D.10.2`
 - ⟨DECIDE D-27⟩ the exact boundaries of the own-library high/medium/low buckets (§F) — relative to the
   library's own distribution of pairwise distances (recommend: terciles / a spread multiple), since §F has no
   cloud spread to borrow.
@@ -1042,13 +1057,15 @@ one-surface-two-placements`
   (relative lean, ⟨DECIDE D-28⟩ settled = relative; Alexander 2026-06-25) — never the raw distance, never the
   absolute depth inside one cloud (which read "far" for every own track, since a producer sits outside the
   album clusters they reach toward). The cue is shown by **colour, not words** (Alexander 2026-06-25,
-  color-only): the direction's name is tinted green (close) → amber (mild) → red (no real lean); the column
-  header stays "leans toward" and the cell carries no per-row closeness word. Colour is the only cue — never a
-  number, never a grade (D-INV-26). **The single
-  nearest is chosen across ALL your reference directions at once** — clouds ranked by their centroid (straight-line,
-  ⟨DECIDE D-17⟩), reduced directions by their nearest member — using the axis-count-fair per-axis distance
-  (RC-INV-5b), so a direction isn't picked just for sharing fewer axes. With **no reference directions defined at all**, there is nothing to lean toward and the cell is
-  empty with a quiet "no direction yet", never a fabricated nearest.
+  color-only): the direction's name is tinted green (close) → amber (mild). A would-be **red (no real lean) is
+  not shown as a named direction at all** — the cell reads **"no close direction yet"** instead (Alexander
+  2026-06-29, §D.10.1): a far direction named in red would mislead. The column header stays "leans toward" and
+  the cell carries no per-row closeness word. Colour is the only cue — never a number, never a grade (D-INV-26).
+  **The single nearest is chosen across ALL your reference directions at once** — clouds ranked by their centroid
+  (straight-line, ⟨DECIDE D-17⟩), reduced directions by their nearest member — using the axis-count-fair per-axis
+  distance (RC-INV-5b), so a direction isn't picked just for sharing fewer axes. With **no reference directions
+  defined at all** (or none clearing the lean bar), there is nothing to lean toward and the cell is empty with a
+  quiet "no close direction yet", never a fabricated nearest.
 - **Aimed at X (aspiration).** Your written mapping (D-INV-4). When you have aimed this track at a direction,
   the line marks it with an aim glyph — and when the direction you *aim at* is not the one you're *nearest*
   to, it shows both ("nearest DeepChord · aimed SCSI-9"), because that gap is exactly the useful thing to see.
@@ -1110,14 +1127,167 @@ relative**: the reference column tints by **lean strength** — how much the nea
 from the track's other directions (⟨DECIDE D-28⟩ settled = relative, not absolute cloud-depth); the §F own
 column tints by closeness against the **library's own distance distribution** (⟨DECIDE D-27⟩). **Green and
 amber are the default; red is a last-resort tint** in §F — used only when nothing closer qualifies, never
-hiding that the sibling is far. A reference **runner-up (+second direction) is DEFERRED** (⟨DECIDE D-24⟩
-re-opened by deed, s25): under relative lean a *tied* second means the nearest does NOT stand apart — a weak
-lean, not a close one — so "runner = also close" is self-contradictory; v1 shows one direction and a
-co-leaders display waits for a later pass. So colour is never the *sole* channel: the
-In **§F** (a list of up to three) the **nearest-first order** carries the ranking; in the **§D reference
+hiding that the sibling is far. A reference **runner-up (+second direction) is now RESOLVED by listing, not
+tinting** (⟨DECIDE D-24⟩ resolved 2026-06-26): the surface shows the **up to three nearest directions as a
+nearest-first selector** (§D.10.1, D-INV-27), so a second and third direction are their own ordered, colour +
+glyph-cued entries — not a self-contradictory second tint crammed into one cell. The old worry (a *tied*
+second under relative lean means the nearest does NOT stand apart) dissolves because a list HAS an order to
+carry the ranking, exactly as §F's own-library list does. So colour is never the *sole* channel:
+in **§F** (a list of up to three) the **nearest-first order** carries the ranking; in the **§D reference
 column** (one direction per cell, no order to lean on) a **greyscale-safe glyph tier** (●●● close / ●●○ mild /
 ●○○ no real lean) sits beside the name. A **hover label** names the closeness on both. So the cue stays
 readable in greyscale, in print, and for a colour-blind reader without adding closeness words. `D-INV-26`
+
+### D.10.1 The up-to-three selector — your three nearest directions, chosen one at a time — 0.9
+
+**The «leans toward» surface lists up to your three nearest directions, not just the single nearest.**
+Earlier the surface named one direction and a runner-up was deferred, because cramming a *second* colour tint
+into one cell was self-contradictory under relative lean — a tied second means the nearest does NOT stand
+apart, so "also close" contradicted itself. A **nearest-first list with a selector dissolves that**: a list
+HAS an order, and the order carries the ranking exactly as §F's own-library list does, so a second and third
+direction are no longer a confusing second tint in one cell but their own clearly-ordered, clearly-cued
+entries. The runner-up is resolved by listing, not by tinting (⟨DECIDE D-24⟩ resolved). `D-INV-27`
+
+**What the list holds and how it's cued.**
+- **Up to the three nearest reference clouds that are a REAL lean** — ranked nearest-first, in the **same
+  full-dimensional fingerprint geometry** as the single-nearest (D-INV-21). The list shows only the directions
+  that clear the lean bar (green / amber); it **never pads to three with weak or far filler**. If even the
+  nearest is only a weak lean (no direction stands apart), the surface reads **"no close direction yet"**
+  rather than naming a red one — better to show nothing than a misleading "you lean toward X" when you don't
+  (Alexander 2026-06-29). **This supersedes the earlier "always name the nearest even at a low cue"** for the
+  reference list: a far *direction* is noise, whereas §F keeps its single-red last-resort because a far *own
+  sibling* is still a real track you might mix. With no directions defined at all, "no direction yet" (D-INV-22).
+  `tags: fewer-not-filler · supersedes-F-INV-1-for-§D · D-INV-27`
+- **Each shown direction is tinted by its OWN closeness, order carries the rank.** Each entry's colour + glyph
+  cue (D-INV-26) reflects **how close THAT direction is to the track** (its own relative lean against the field
+  of all the track's directions — the gap from it to the next, not just "is it the single winner"); the
+  nearest-first order carries which is closest. So the cue is defined for every entry shown, not only the top
+  one, and a list of two amber entries reads honestly as "two mild leans, neither strong". `tags: D-INV-26 ·
+  per-entry-cue · D-INV-27`
+- **No numbers, no "#1/#2/#3".** Position in the list IS the ranking; the surface never prints a rank number,
+  distance, or score (D-INV-25 unchanged).
+- **Ties resolve deterministically.** When two directions sit at the same distance, the order — and which is
+  the default-shown nearest in the collapsed cell — is broken by a stable secondary key (the direction name),
+  so the list and the collapsed cell never flicker between runs. `tags: deterministic-order`
+
+**Everything is clickable, and a click is always NAVIGATION — never a persisted selection.** The surface
+carries no lingering "which one is selected" state on the catalog (Alexander 2026-06-29: everything clickable,
+like the own-track column). `D-INV-28`
+- **On the catalog (the library list).** Every name is a link: clicking your **track** opens it; clicking an
+  **own sibling** scrolls to that track's row (F-INV-4); clicking a **direction** opens THIS track's read
+  panel already focused on that direction. The catalog cell, collapsed, shows the **nearest** direction with
+  its cue and expands to the up-to-three list; the list is for the glance and the links, not a stateful picker.
+  Because every click is a jump, nothing on the list page can strand. `tags: clickable-navigation · F-INV-4`
+- **In the per-track read panel.** Here the up-to-three list is a set of **direction tabs**: the read defaults
+  to the **nearest**, and switching a tab re-targets the read's in-zone/diverge words and the web-style plaque
+  (§D.10.2) to that direction. The tab is **ephemeral view state** (it changes no analysis, and does not
+  persist across a reload — like the view ladder itself). On a recompute (D-INV-24) that drops the focused
+  direction out of the shown list, the read **falls back to the nearest** — it never leaves the read comparing
+  against a direction no longer on screen. `tags: ephemeral-view-state · no-strand · D-INV-24 · D-INV-28`
+- **The aim glyph rides the list.** A direction you've *aimed at* (D-INV-4) is marked with the aim glyph
+  wherever it appears. Because aspiration is many-to-many, several directions can be aimed at; when **none of
+  the aimed is among the shown nearest**, the surface pins **only the single nearest of the aimed ones** as an
+  extra entry — shown **even if it tints far/red**, because a declared aim is intent, not filler, and the
+  nearest↔aimed gap ("aimed SCSI-9 · but far from it") is exactly the useful thing to see. The other aimed
+  directions live in the read panel, not the catalog cell. So at most one pinned aimed entry (⟨DECIDE D-29⟩
+  resolved). `tags: D-INV-4 · intent-not-filler · ⟨DECIDE D-29⟩`
+
+**How it composes across the axes.**
+- **The catalog column (run mode).** A full-run row shows the **nearest** in the cell with its cue, and the
+  cell **expands to the up-to-three list** (the column stays glanceable by default; the list of links is one
+  interaction away — links, not a stateful picker). Quick-only rows read "full analysis only" (D-INV-20); the
+  column appears whenever ≥1 track has a leans-toward (D-INV-22). `tags: view-ladder · D-INV-22`
+- **The per-track widget (view ladder).** **Quick** shows nothing (no fingerprint). **Simple** keeps the
+  single **nearest** as prose in the read (§D.7) — no tabs; the ladder's bottom rung stays a one-line glance.
+  **Detailed adds the up-to-three direction tabs and the 2nd/3rd directions**, monotonically — Detailed only
+  ADDS, never removes Simple's nearest. ⟨DECIDE D-25⟩ (Simple chip) is unchanged: Simple's reference content
+  stays prose-only. `tags: view-ladder · ⟨DECIDE D-25⟩ · D-INV-27`
+- **Beside the §F own-library list — two parallel up-to-three lists, both clickable, named apart.** §D.10's
+  list (reference *directions*, other artists, under the show/hide-references switch) sits beside §F's list
+  (your OWN *tracks*, always-on, F-INV-4). They look parallel — both up-to-three, both nearest-first, both
+  colour-cued, **both clickable** — so the spec names the one real difference, the click TARGET: **a direction
+  click opens THIS track's read focused on that direction; an own-track click scrolls the catalog to that
+  track's row.** Both are navigation, never a persisted selection; never merged, never the same control; the
+  references switch hides only the §D list. One more rule difference: §D shows only the close directions (else
+  "no close direction yet"), while §F keeps a single-red last-resort sibling — a far direction is noise, a far
+  sibling is still a real track. `tags: one-surface-one-name · D-INV-7 · F-INV-4 · D-INV-27`
+
+**Never happens (safety), specific to the list.** The list never shows more than the three nearest close
+directions (plus at most one pinned aimed direction); it never pads with weak/far filler; it never prints a
+number or rank; a click never edits a mapping and never changes the cards/read content beyond which direction
+the read compares against; and the read's focused direction never strands on a hidden or dropped direction
+(it falls back to the nearest). `D-INV-28`
+
+### D.10.2 The web-style plaque and the ★ cross-validation mark — 0.9
+
+**Beside the focused direction, a small plaque lists what the web told us about that direction's style — but
+only the parts we can tie to measurement.** When the read is focused on a direction (§D.10.1), a compact
+**bulleted plaque** shows style facets pulled from the web for that direction's artist (dense unresolving
+harmony, wide stereo pads…). It is the visible face of the web-descriptor layer — **web suggests, measurement
+decides** (D-INV-2). `D-INV-29`
+
+**What gets onto the plaque — only facets a curated map ties to a measured signal.** A web phrase is shown
+**only if** the curated **facet→signal map** connects it to a measured fingerprint axis; everything else the
+web says is dropped, never shown as untethered prose. Two marks, by how the tie holds:
+- **★ — directly confirmed.** The map ties the facet to an axis AND the direction's measurement bears it out
+  (e.g. "wide stereo pads" ↔ stereo-width axis reads wide). The ★ is the only thing that asserts a direct
+  measured confirmation. `tags: D-INV-2 · facet→signal-map`
+- **☆ — indirect but soundly tied.** The map ties the facet to a measured signal by a sound, unambiguous
+  argument even though no axis confirms it head-on (e.g. "underwater, dubby" ↔ a steep low-pass + long
+  reverb tail). ☆ is a **curated judgement** that the tie is unambiguous, not a free-floating web claim
+  (Alexander 2026-06-29). `tags: D-INV-2 · indirect-tie`
+- **Withheld — the web claimed it but measurement CONTRADICTS it.** A trait the signals don't bear out is
+  **not stated** (it would mislead). ⟨DECIDE D-30⟩ whether a contradicted facet is silently dropped
+  (recommend) or shown struck-through as a teaching contrast ("web says wide stereo; the signals run narrow").
+  `tags: D-INV-2 · ⟨DECIDE D-30⟩`
+
+**The marks are compact — two glyphs and one footnote, never long per-row labels.** Each facet carries just
+★ or ☆; a single footnote under the plaque explains both once (★ = web said, measurement confirms directly;
+☆ = measurement doesn't show it head-on but it's unambiguously tied to what we measure). No per-row "web said ·
+measured" tag strings — they read long and slow (Alexander 2026-06-29). `tags: compact-marking · D-INV-29`
+
+**What ★ / ☆ are measured against — the direction's CENTROID.** Both marks judge the trait on the
+direction's **cloud centroid** — the same full-dimensional reference point that grounds "leans toward"
+(D-INV-21) — not on any single member track and not on a majority vote, so the plaque and the nearest-centroid
+read can never disagree about what the direction measurably is. It is NOT (yet) a claim about *your* track.
+⟨DECIDE D-31⟩: a richer second mark — "and YOUR track shares this confirmed trait" — is the natural next layer
+(which of the direction's web-described traits you actually have), but v1's ★/☆ stay "true of the direction";
+the per-your-track shared mark is deferred. `tags: D-INV-21 · centroid · ⟨DECIDE D-31⟩`
+
+**Per artist, never blended.** A direction spanning several artists shows each artist's facets
+**separately**, never merged into one claim (the existing per-artist rule, D-INV-2); each artist's facets
+carry their own ★/☆. `tags: D-INV-2`
+
+**No plaque is a valid, silent state.** A web fetch that fails, times out, or finds nothing — or finds only
+claims the facet→signal map can't tie to measurement — leaves the plaque **simply absent** for that direction,
+never a blank box implying "this artist has no style", never a guess. Because there is no untethered web-only
+tier, an empty plaque and a plaque present-but-only-☆ are honestly distinct: *no plaque* (nothing fetched or
+nothing tie-able) ≠ *plaque with ☆ only* (tied indirectly, none directly confirmed) ≠ *plaque with ★* (some
+directly confirmed). `tags: D-INV-2 · liveness`
+
+**Completeness-aware (a direction whose fingerprint is incomplete).** ★/☆ ask a measurement to confirm or
+soundly tie; if the direction's fingerprint is **missing the axis** a facet would need, that facet **cannot be
+★ or ☆** and is simply **not shown** — never auto-starred, never auto-withheld as "contradicted" (missing ≠
+contradicted, the RC-INV-1 trap in star form). It reads the same run manifest as the coach and §D (E.3).
+`tags: RC-INV-1 · RC-INV-5a · E.3 · D-INV-29`
+
+**Recompute, never stale.** ★/☆ are a pure function of (the facet→signal map, the direction's centroid, the
+current normalisation epoch); on a recompute (D-INV-24) a facet that no longer confirms loses its ★ (or drops
+to ☆, or off the plaque) and re-stamps with every other reference placement — the catalog never shows a ★ the
+current geometry no longer supports. The web fetch itself is cached on its own clock (⟨DECIDE D-9⟩), separate
+from the measurement epoch. `tags: D-INV-24 · D-INV-29`
+
+**How it composes across the view ladder.** The plaque is **explanatory detail**, so it lives where detail
+lives: the **read panel** (when you click your track) and the **Detailed** per-track widget. **Simple** keeps
+the prose read without the facet plaque; **quick** shows nothing (no fingerprint, no reference, D-INV-20). The
+**catalog cell never carries the plaque** — too dense for a glance; the cell stays name + cue, and the plaque
+opens with the read. It is governed by the **one show/hide-references switch** (D-INV-23) like every reference
+surface. `tags: view-ladder · D-INV-23 · D-INV-20`
+
+**Never happens (safety), specific to the plaque.** The plaque never shows a web claim the facet→signal map
+can't tie to measurement; **★** appears only when measurement directly confirms and **☆** only when the tie is
+sound and unambiguous (neither is ever decorative); no numbers, no grade (D-INV-25 stance); and "leans toward"
++ its plaque remain observation, never "you should sound like this" (D-INV-1). `D-INV-29`
 
 ## F. Similar in your own library — the DJ column (1.0)
 
@@ -1138,9 +1308,10 @@ people's music out of your signatures; this column only ever lists your own). `t
   (close/medium) siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly
   tinted red (far)** — a last resort, never empty when another track exists (Alexander 2026-06-25). Because
   the red tint reads plainly as "far", it isn't a distant track dressed up as close — that was the worry, and
-  the colour answers it.
-  The reference column likewise always names your nearest *direction* even at a low cue; «no comparison yet»
-  (F-INV-7) is reserved for when there is truly no other placeable track at all. `F-INV-1`
+  the colour answers it. **This own-sibling last-resort red differs from the §D reference list**, which shows
+  "no close direction yet" rather than a far direction (Alexander 2026-06-29, §D.10.1): a far *sibling* is
+  still a real track you might mix, a far *direction* is just noise. «no comparison yet» (F-INV-7) is reserved
+  for when there is truly no other placeable track at all. `F-INV-1`
 - **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
   (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
 - **No number shown — closeness is a colour, not a score.** It names the neighbour tracks, each tinted by the
