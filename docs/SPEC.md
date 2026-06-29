@@ -665,6 +665,46 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 
+### B.15 The view selector as remembered state (2026-06-29, Alexander — one global view, calm on first use)
+The Simple/Detailed selector is the second interactive widget-state machine (beside the player, §B.14). Until
+this pass each widget opened in Simple and **deliberately did NOT restore** a prior choice — the "opens calm by
+default" stance (it was even in the skill's one-liner). Alexander revised that (2026-06-29): the chosen view is
+**remembered and uniform across all tracks**, so opening any track lands you in the view you last used — *but a
+brand-new user still meets the calm screen first.*
+
+- **State + storage.** The current view ∈ {`Simple`, `Detailed`} is a **single global preference** persisted in
+  `localStorage` (`tc_view`), shared by every widget — not per-widget URL-only state. Toggling the selector
+  writes it; the next widget you open reads it. (Quick is a run MODE, not a selectable view — it is never
+  stored as a view choice; a quick run shows its quick rung regardless of `tc_view`.) The `localStorage`
+  reach across `file://` widgets is **verify-by-deed** (browser-dependent); if it doesn't share, an equivalent
+  global-scope mechanism stands in — the rule is "one remembered view", not the specific store. `INV-31`
+- **Write rule (only a toggle persists).** **Only an explicit view toggle writes `tc_view`**; resolving the
+  open view from a URL hash or from the calm default **never writes the store**. So a shared `#detailed` deep
+  link is genuinely one-shot — it opens Detailed for that visit but never flips your durable preference. `tags:
+  one-shot-hash · INV-31`
+- **Read-on-load, no live cross-tab sync.** A widget reads `tc_view` **once on open**; an already-open widget
+  does **not** retro-change when another widget toggles. Uniformity is across the NEXT open, not live across two
+  open tabs — two simultaneously-open widgets may briefly differ until reload, by design (simplest, no
+  cross-tab listener). `tags: read-on-load · INV-31`
+- **Degrade-safe.** If the store is unavailable or throws (private mode, a `file://` restriction), the selector
+  **degrades to calm-default-per-open and never errors view initialisation** — the old always-calm behaviour is
+  the safe floor; a store failure can never leave the widget with no view class / broken layout. `tags:
+  degrade-safe · INV-31`
+- **On open (precedence).** A widget picks its initial view by: (1) a one-shot **URL hash override**
+  (`#detailed`/`#simple`) if present — the entry-focus pattern, for a shared/deep link; else (2) the remembered
+  `tc_view`; else (3) **calm (Simple)** on the first-ever open, before any choice exists. So a newcomer still
+  meets the calm screen; a returning user lands where they left off. The hash is a one-shot entry, not a
+  persisted channel; the remembered preference is the durable one. (Alexander 2026-06-29: remember last,
+  first-use calm.) `tags: view-state · entry-override · calm-first-use · INV-31`
+- **It does NOT touch the ladder.** This changes only WHERE the initial view comes from, never WHAT is visible
+  at each rung — `quick ⊆ Simple ⊆ Detailed` (INV-18/22) is untouched, and entering Simple still resets the
+  per-stem mix (§B.14) so no soloed part strands. Remembering Detailed never makes a Simple-hidden surface
+  visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-31`
+- **Why it matters for the reference read.** The reference read + web plaque live in Detailed (depth, §D.10.3),
+  and Simple hides `#refRead`. With the old always-calm open they were invisible unless you switched every
+  time — the reason a producer couldn't find them. Remembering Detailed is what makes them reliably present.
+  `tags: INV-31 · D-INV-30`
+
 ## D. Reference & Compare — «хочу как Aphex Twin» (0.9)
 
 Point track-coach at someone else's music as a *direction* you're reaching toward, see where your track
@@ -1254,6 +1294,21 @@ only the parts we can tie to measurement.** When the read is focused on a direct
 harmony, wide stereo pads…). It is the visible face of the web-descriptor layer — **web suggests, measurement
 decides** (D-INV-2). `D-INV-29`
 
+**It is a READABLE panel in the widget, not only glyphs on bars (Alexander 2026-06-29 — "I don't see the
+internet info anywhere").** Until now the only web trace in the widget was the ★/☆ glyph riding a facet bar;
+the actual web *text* lived only on the side `reference_notes.html` page, so a producer reading the widget never
+saw "what the web said". This folds it in: a **collapsible panel** ("What the web says about ⟨artist⟩"),
+**sitting last in the read, right after the centroid read** (§D.10.3 order), **collapsed by default** (it is the
+most external layer — depth you open when you want it), listing each shown web facet as a short readable phrase
+with **the measured axis it was tied to** and its **★/☆ mark** ("wide stereo pads — stereo-width ★", "dubby,
+underwater — low-pass + reverb tail ☆"). The same curated web-descriptor data that builds the side page feeds
+this panel, so the two never disagree. **One disclosure per direction**, with an **artist sub-header per
+artist inside it** for a multi-artist direction (one collapse, artist sections within — never one box per
+artist, D-INV-2), never blended. The **same ★/☆ appears both inline on the centroid bar and here** — they are
+one fact from two angles, kept on purpose, not a duplication to dedupe: the **bar's glyph** marks the facet you
+measurably share/diverge on, the **panel's glyph** marks the web *phrase* measurement confirmed. `tags:
+web-panel · collapsible · read-order · one-disclosure-per-direction · D-INV-29`
+
 **What gets onto the plaque — only facets a curated map ties to a measured signal.** A web phrase is shown
 **only if** the curated **facet→signal map** connects it to a measured fingerprint axis; everything else the
 web says is dropped, never shown as untethered prose. Two marks, by how the tie holds:
@@ -1306,11 +1361,13 @@ current geometry no longer supports. The web fetch itself is cached on its own c
 from the measurement epoch. `tags: D-INV-24 · D-INV-29`
 
 **How it composes across the view ladder.** The plaque is **explanatory detail**, so it lives where detail
-lives: the **read panel** (when you click your track) and the **Detailed** per-track widget. **Simple** keeps
-the prose read without the facet plaque; **quick** shows nothing (no fingerprint, no reference, D-INV-20). The
-**catalog cell never carries the plaque** — too dense for a glance; the cell stays name + cue, and the plaque
-opens with the read. It is governed by the **one show/hide-references switch** (D-INV-23) like every reference
-surface. `tags: view-ladder · D-INV-23 · D-INV-20`
+lives: the **read panel** (when you click your track) and the **Detailed** per-track widget, **last in the read
+order (after the centroid, §D.10.3) and collapsed by default** — open it when you want the web's view, it never
+crowds the measured read above it. **Simple** keeps the prose read without the facet plaque; **quick** shows
+nothing (no fingerprint, no reference, D-INV-20). The **catalog cell never carries the plaque** — too dense for
+a glance; the cell stays name + cue, and the plaque opens with the read. It is governed by the **one
+show/hide-references switch** (D-INV-23) like every reference surface. `tags: view-ladder · collapsible ·
+D-INV-23 · D-INV-20`
 
 **Never happens (safety), specific to the plaque.** The plaque never shows a web claim the facet→signal map
 can't tie to measurement; **★** appears only when measurement directly confirms and **☆** only when the tie is
@@ -1324,6 +1381,14 @@ word, but the geometry of how your track sits against the focused direction's **
 of that artist's cloud in fingerprint space. This is where "the centroid and all that" is shown, for a
 producer who reads vectors. It is **not a map** (dropped, D-INV-11); it is a per-facet decomposition plus the
 overall closeness.
+
+**Where it sits in the read — the fixed order (Alexander 2026-06-29).** The Detailed read runs top-to-bottom
+in this order, so the eye moves from your own track outward to the reference and only then to the web: **(1) the
+producer's read** (the worded observation, §B.12) → **(2) tonal balance** (the spectrum) → **(3) the centroid
+reference read** (this section's per-facet bars) → **(4) the web-info plaque** (§D.10.2, what the web says about
+the direction's artist, tied to the axes it was confirmed on). The reference read therefore comes **after**
+tonal balance (today they are reversed in the shipped widget — this re-orders them) and **before** the web
+plaque, which is the last and most external layer. `tags: read-order · D-INV-30 · D-INV-29`
 
 **What it shows (Detailed, against the focused direction).**
 - **Per-facet comparison — your value vs the centroid, axis by axis.** For each producer facet (a fingerprint
