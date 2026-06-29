@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.33"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.34"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -47,10 +47,50 @@ _AXIS_LABELS = {
     "pad_notes":    "Pad note rate",
     "pad_bright":   "Pad brightness",
 }
+# Axis → category chip (Mix / Balance / Character), matching the explorer groupings
+_AXIS_CATEGORY = {
+    "tempo":        "Mix",
+    "dynamics":     "Mix",
+    "stereo":       "Mix",
+    "brightness":   "Mix",
+    "density":      "Mix",
+    "energy_build": "Mix",
+    "drums_share":  "Balance",
+    "bass_share":   "Balance",
+    "other_share":  "Balance",
+    "lead_share":   "Balance",
+    "bass_sustain": "Character",
+    "pad_sustain":  "Character",
+    "pad_notes":    "Character",
+    "pad_bright":   "Character",
+}
+_CHAR_AXES   = {"bass_sustain", "pad_sustain", "pad_notes", "pad_bright"}
+_CAT_COLORS  = {"Mix": "#5b6472", "Balance": "#7a6cab", "Character": "#c08a3e"}
 _REF_LEVEL_COLOR = {"close": "#2e9e5b", "mid": "#d8932a"}
-_REF_BAR_COLOR   = "#6b5fa0"   # muted purple track-offset bar
 _REF_MAX_Z       = 3.0         # z-offsets beyond this clip to full bar width
 _REF_MAX_PCT     = 44          # max half-bar width in %
+
+
+def _bar_color(offset_abs: float) -> str:
+    """Gradient colour for a reference-read bar: green=close, amber=moderate, red=far."""
+    if offset_abs < 0.6:
+        return "#3ddc97"    # green — matched / close
+    if offset_abs < 1.5:
+        return "#e8b24a"    # amber — moderate
+    return "#e0594f"        # red — far
+
+
+def _words(offset: float) -> str:
+    """Plain-English words for a signed z-offset from the direction centroid."""
+    a = abs(offset)
+    direction = "higher" if offset > 0 else "lower"
+    if a < 0.4:
+        return "matched"
+    if a < 0.9:
+        return f"a bit {direction}"
+    if a < 1.6:
+        return f"noticeably {direction}"
+    return f"much {direction}"
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -2172,9 +2212,14 @@ def _read_html(narrative_md):
     return "".join(block(b) for b in re.split(r"\n{2,}", narrative_md))
 
 
-def _refread_bars_html(track_z, centroid_z):
+def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     """Compute per-facet bar rows HTML for one direction centroid. Pure. Returns (rows_html, summary)
-    or ('', '') when no shared measured axes exist (RC-INV-1)."""
+    or ('', '') when no shared measured axes exist (RC-INV-1).
+
+    conf_entries: list of {axis, expect: high|low, tier: direct|indirect} for the current
+    direction (from facet_confirmation.json). When provided, rows earn ★ (direct, confirmed)
+    or ☆ (indirect, confirmed); contradicted/near-mean axes get no mark. confirm_z is the
+    minimum |centroid_z| to count as confirmed (default 0.4 per D-INV-24)."""
     import fingerprints as FP
 
     offsets = []
@@ -2204,25 +2249,63 @@ def _refread_bars_html(track_z, centroid_z):
     summary = (f"Closest on: {' · '.join(closest_labels)}"
                f" · Furthest on: {' · '.join(furthest_labels)}")
 
+    # Build ★/☆ map from curated confirmation entries for this direction.
+    # star_map[axis] → 'star' (★, direct) | 'half' (☆, indirect) | absent (no mark)
+    star_map = {}
+    if conf_entries:
+        for entry in conf_entries:
+            axis   = entry.get("axis")
+            expect = entry.get("expect")
+            tier   = entry.get("tier")
+            if not axis or not expect or not tier:
+                continue
+            cz = float(centroid_z.get(axis, 0.0))
+            agrees = (expect == "high" and cz >= confirm_z) or (expect == "low" and cz <= -confirm_z)
+            if agrees:
+                star_map[axis] = "star" if tier == "direct" else "half"
+            # else: contradicted or near mean → no mark (D-INV-24)
+
     rows_html = []
     for axis, offset in offsets:
         label = _AXIS_LABELS.get(axis, axis)
-        pct = min(abs(offset) / _REF_MAX_Z, 1.0) * _REF_MAX_PCT
+        cat   = _AXIS_CATEGORY.get(axis, "")
+        cat_color = _CAT_COLORS.get(cat, "#5b6472")
+
+        pct       = min(abs(offset) / _REF_MAX_Z, 1.0) * _REF_MAX_PCT
         bar_left  = 50.0 if offset >= 0 else 50.0 - pct
         bar_width = pct
+        bar_color = _bar_color(abs(offset))
+        words     = _words(offset)
+
+        # ★/☆ inside the label span (child spans so the outer text-only regex still captures the label)
+        mark = star_map.get(axis)
+        star_html = ""
+        if mark == "star":
+            star_html = '<span class="refread-star" title="Web-described trait, confirmed directly by measurement">★</span>'
+        elif mark == "half":
+            star_html = '<span class="refread-star refread-halfstar" title="Web-described trait, indirectly confirmed by measurement">☆</span>'
+
+        char_chip_html = ('<span class="refread-chip" title="Character axis — assessed without loudness weighting">char</span>'
+                          if axis in _CHAR_AXES else "")
+
+        # data-confirmed keeps class="refread-row" intact so existing count tests aren't broken
+        confirmed_attr = ' data-confirmed="1"' if mark else ""
+
         rows_html.append(
-            f'<div class="refread-row">'
-            f'<span class="refread-label">{_esc(label)}</span>'
+            f'<div class="refread-row"{confirmed_attr}>'
+            f'<span class="refread-cat" style="background:{cat_color}">{_esc(cat)}</span>'
+            f'<span class="refread-label">{_esc(label)}{star_html}{char_chip_html}</span>'
             f'<div class="refread-barwrap">'
             f'<div class="refread-center"></div>'
-            f'<div class="refread-bar" style="left:{bar_left:.1f}%;width:{max(bar_width, 0.5):.1f}%"></div>'
+            f'<div class="refread-bar" style="left:{bar_left:.1f}%;width:{max(bar_width, 0.5):.1f}%;background:{bar_color}"></div>'
             f'</div>'
+            f'<span class="refread-words">{_esc(words)}</span>'
             f'</div>'
         )
     return ''.join(rows_html), summary
 
 
-def render_reference_read(track_raw_fp, directions, norm):
+def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
     Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
@@ -2232,6 +2315,10 @@ def render_reference_read(track_raw_fp, directions, norm):
       • fingerprint can't be normalised (all axes missing);
       • no direction qualifies (all FAR — nothing honest to show per SPEC §D.10.1).
     No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
+
+    confirmation: optional dict {dir_name: [{axis, expect, tier}, …]} from facet_confirmation.json.
+    When supplied, rows earn ★ (direct, centroid agrees) or ☆ (indirect, centroid agrees);
+    contradicted / near-mean axes get no mark. confirm_z is the minimum |centroid z| to confirm.
 
     When 1 direction qualifies: single header, no tab bar (monotonic ladder: 1 tab = no tabs).
     When 2–3 qualify: tab buttons (nearest-first, each coloured by its own level), default = nearest.
@@ -2261,8 +2348,11 @@ def render_reference_read(track_raw_fp, directions, norm):
     panels_html = []
     for i, lean in enumerate(leans):
         level_color = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
-        centroid_z = directions[lean.direction]
-        rows_html, summary = _refread_bars_html(track_z, centroid_z)
+        centroid_z  = directions[lean.direction]
+        conf_entries = (confirmation or {}).get(lean.direction, [])
+        rows_html, summary = _refread_bars_html(track_z, centroid_z,
+                                                conf_entries=conf_entries,
+                                                confirm_z=confirm_z)
         if not rows_html:
             continue                                        # no shared measured axes — skip this direction
         hidden = ' style="display:none"' if i > 0 else ""
@@ -2306,24 +2396,36 @@ def render_reference_read(track_raw_fp, directions, norm):
             '})()</script>'
         )
 
+    # Legend — explains ★/☆ and the char chip. Always shown when the block renders.
+    legend_html = (
+        '<div class="refread-legend">'
+        '<span><b>★</b> The web describes this as the artist\'s signature — and our measurement of their tracks confirms it directly.</span>'
+        '<span><b>☆</b> The web describes it — our measurement confirms it indirectly but soundly.</span>'
+        '<span>(no mark) A normal facet — not a web-described signature.</span>'
+        '<span><span class="refread-chip">char</span> Character axis — assessed without loudness weighting (a quiet pad equals a loud kick).</span>'
+        '</div>'
+    )
+
     return (
         '<div id="refRead" class="panel">'
         '<h2>How you sit vs the direction</h2>'
         + tabs_html
         + ''.join(panels_html)
         + tab_js
+        + legend_html
         + '</div>'
     )
 
 
 def _ref_read_html(run_dir):
-    """§D.10.3 — load fingerprint from disk + reference_directions.json, delegate to
-    render_reference_read. Returns '' when any input is missing or I/O fails."""
+    """§D.10.3 — load fingerprint from disk + reference_directions.json + facet_confirmation.json,
+    delegate to render_reference_read. Returns '' when any input is missing or I/O fails."""
     import fingerprints as FP
 
     if not run_dir:
         return ""
-    ref_path = Path(__file__).resolve().parent.parent / "data" / "reference_directions.json"
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    ref_path  = data_dir / "reference_directions.json"
     if not ref_path.exists():
         return ""
     try:
@@ -2337,7 +2439,19 @@ def _ref_read_html(run_dir):
     raw_fp = FP.fingerprint_from_run_dir(run_dir)
     if raw_fp is None:
         return ""
-    return render_reference_read(raw_fp, directions, norm)
+    # Load curated web-facet confirmation map (best-effort; works without it)
+    confirmation = {}
+    confirm_z    = 0.4
+    conf_path    = data_dir / "facet_confirmation.json"
+    if conf_path.exists():
+        try:
+            conf_data  = json.loads(conf_path.read_text(encoding="utf-8"))
+            confirm_z  = float(conf_data.get("_confirm_z", 0.4))
+            confirmation = {k: v for k, v in conf_data.items() if not k.startswith("_")}
+        except Exception:
+            pass
+    return render_reference_read(raw_fp, directions, norm,
+                                 confirmation=confirmation, confirm_z=confirm_z)
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -2406,12 +2520,29 @@ body.simple #refRead{display:none!important}
 #refRead .reftab:hover{opacity:.85}
 #refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
-#refRead .refread-bars{display:flex;flex-direction:column;gap:8px}
-#refRead .refread-row{display:flex;align-items:center;gap:12px}
-#refRead .refread-label{flex:0 0 140px;font-size:12.5px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#refRead .refread-bars{display:flex;flex-direction:column;gap:7px}
+/* Row = [cat-chip][label + ★][bar][words]. class stays plain "refread-row" — data-confirmed for tinting */
+#refRead .refread-row{display:flex;align-items:center;gap:8px;border-radius:4px;padding:1px 2px}
+#refRead .refread-row[data-confirmed]{background:rgba(255,177,63,.05)}
+#refRead .refread-row[data-confirmed] .refread-label{color:var(--ink)}
+#refRead .refread-cat{display:inline-block;width:64px;flex:0 0 64px;font-size:9.5px;color:#fff;
+ text-align:center;border-radius:4px;padding:1.5px 0;font-weight:600;letter-spacing:.02em}
+#refRead .refread-label{flex:0 0 155px;font-size:12.5px;color:var(--muted);text-align:right;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#refRead .refread-label .refread-star{font-size:11px;margin-left:3px;color:#ffb13f}
+#refRead .refread-label .refread-halfstar{color:#a0a8bc}
+#refRead .refread-label .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
+ color:#6fdfb8;padding:0 4px;border-radius:5px;margin-left:3px;cursor:help;
+ font-weight:500;vertical-align:1px}
 #refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden}
 #refRead .refread-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:#3a3f52}
-#refRead .refread-bar{position:absolute;top:1px;height:10px;background:#6b5fa0;border-radius:4px;min-width:2px}
+#refRead .refread-bar{position:absolute;top:1px;height:10px;border-radius:4px;min-width:2px}
+#refRead .refread-words{flex:0 0 110px;font-size:11.5px;color:var(--muted);padding-left:4px}
+#refRead .refread-legend{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;
+ display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
+#refRead .refread-legend b{color:var(--ink)}
+#refRead .refread-legend .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
+ color:#6fdfb8;padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -2747,10 +2878,15 @@ const META=D.meta||{};
  tg.setAttribute("aria-label",T.view_aria||"Detail level");
  tg.innerHTML=`<button data-v="simple">${T.view_simple||"Simple"}</button>`+
   `<button data-v="full">${T.view_full||"Detailed"}</button>`;
+ // _viewInited: only update the URL hash on USER toggles, not on the initial apply() call.
+ let _viewInited=false;
  function apply(v){document.body.classList.toggle("simple",v==="simple");
   tg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
   if(v==="simple"&&window.__resetMix)window.__resetMix();  // SPEC §B.14: Simple hides the stem grid (M/S controls) → reset to full mix, never strand a hidden solo/mute
   try{localStorage.setItem("tc_view",v);}catch(e){}
+  // JOB-2: reflect view in URL hash so the state is shareable and the page opens in the right view.
+  // Only update after init (on actual toggles) to keep the URL clean on first load.
+  if(_viewInited){try{history.replaceState(null,'',v==='simple'?'#simple':'#detailed');}catch(e){}}
   // let every canvas relayout for its new width / lane count
   window.dispatchEvent(new Event("resize"));}
  tg.querySelectorAll("button").forEach(b=>b.onclick=()=>apply(b.dataset.v));
@@ -2760,7 +2896,7 @@ const META=D.meta||{};
  // in-session.
  let init="simple";const h=(location.hash||"").toLowerCase();
  if(h.indexOf("full")>=0||h.indexOf("detail")>=0)init="full";
- apply(init);})();
+ apply(init);_viewInited=true;})();
 // The Producer's read (#readTitle/#readBody) is rendered SERVER-SIDE (see _read_html in
 // build_widget.py) and already present in the markup — no client-side markdown parsing here.
 document.getElementById("arrTitle").textContent=T.arr_title;

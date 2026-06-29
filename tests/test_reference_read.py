@@ -441,5 +441,234 @@ class LazySparksNearestDirection(unittest.TestCase):
                       "reference read for Lazy Sparks must show 'Leans toward'")
 
 
+class ReferenceReadRichLook(unittest.TestCase):
+    """Category chips, plain-words column, ★/☆ marks — the rich look ported from the explorer.
+    Tests covering D-INV-25 (no raw numbers) and the confirmation map logic (D-INV-24).
+    """
+
+    # ── fixtures ──────────────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def _html_no_conf(cls):
+        """Single direction, NO confirmation data → chips + words but NO star marks."""
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            {"Near": _zfp(tempo=0.2)},
+            _norm_identity(),
+        )
+
+    @classmethod
+    def _html_direct_agrees(cls):
+        """Centroid z=-0.8 on tempo (expect=low) → agrees with direct → ★"""
+        centroid = _zfp(tempo=-0.8)
+        conf = {"TestDir": [{"axis": "tempo", "expect": "low", "tier": "direct"}]}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            {"TestDir": centroid},
+            _norm_identity(),
+            confirmation=conf,
+            confirm_z=0.4,
+        )
+
+    @classmethod
+    def _html_indirect_agrees(cls):
+        """Centroid z=-0.8 on tempo (expect=low) + tier=indirect → ☆"""
+        centroid = _zfp(tempo=-0.8)
+        conf = {"TestDir": [{"axis": "tempo", "expect": "low", "tier": "indirect"}]}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            {"TestDir": centroid},
+            _norm_identity(),
+            confirmation=conf,
+            confirm_z=0.4,
+        )
+
+    @classmethod
+    def _html_contradicted(cls):
+        """Centroid z=+0.8 on tempo but expect=low → contradicted → no star."""
+        centroid = _zfp(tempo=0.8)
+        conf = {"TestDir": [{"axis": "tempo", "expect": "low", "tier": "direct"}]}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            {"TestDir": centroid},
+            _norm_identity(),
+            confirmation=conf,
+            confirm_z=0.4,
+        )
+
+    @classmethod
+    def _html_near_mean(cls):
+        """Centroid z=-0.1 on tempo (|z|<0.4) → near mean → no star even if expect=low."""
+        centroid = _zfp(tempo=-0.1)
+        conf = {"TestDir": [{"axis": "tempo", "expect": "low", "tier": "direct"}]}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            {"TestDir": centroid},
+            _norm_identity(),
+            confirmation=conf,
+            confirm_z=0.4,
+        )
+
+    # ── category chips ────────────────────────────────────────────────────────────────────
+
+    def test_category_chips_present(self):
+        """Every row must have a category chip (Mix / Balance / Character)."""
+        html = self._html_no_conf()
+        self.assertIn('class="refread-cat"', html,
+                      "refread rows must carry category chips")
+
+    def test_mix_chip_appears(self):
+        html = self._html_no_conf()
+        self.assertIn(">Mix<", html, "Mix category chip text must appear")
+
+    def test_balance_chip_appears(self):
+        html = self._html_no_conf()
+        self.assertIn(">Balance<", html, "Balance category chip text must appear")
+
+    def test_character_chip_appears(self):
+        html = self._html_no_conf()
+        self.assertIn(">Character<", html, "Character category chip text must appear")
+
+    # ── plain-words column ────────────────────────────────────────────────────────────────
+
+    def test_words_column_present(self):
+        """refread-words span must appear in every rendered block."""
+        html = self._html_no_conf()
+        self.assertIn('class="refread-words"', html,
+                      "plain-words column must be present in every row")
+
+    def test_words_column_contains_human_text(self):
+        """Words column must contain one of the five agreed terms."""
+        html = self._html_no_conf()
+        self.assertTrue(
+            any(w in html for w in ["matched", "higher", "lower"]),
+            "words column must contain 'matched', 'higher', or 'lower'",
+        )
+
+    def test_char_chip_on_character_axes(self):
+        """'char' chip must appear for Character axes (pad_sustain, bass_sustain, etc.)."""
+        html = self._html_no_conf()
+        self.assertIn('refread-chip"', html,
+                      "'char' chip must appear for Character axes")
+
+    # ── no raw numbers ────────────────────────────────────────────────────────────────────
+
+    def test_no_raw_decimal_numbers_in_visible_text(self):
+        """D-INV-25: no bare decimals in visible text of the reference-read block.
+        Bar widths live in CSS style attributes (stripped before check)."""
+        import re
+        html = self._html_no_conf()
+        m = re.search(r'id="refRead"', html)
+        self.assertIsNotNone(m, "refRead block must be present")
+        # Strip all HTML tags (removes style="...", attr="...") so only visible text remains
+        stripped = re.sub(r"<[^>]+>", " ", html)
+        self.assertNotRegex(
+            stripped,
+            r"\b\d+\.\d+\b",
+            "raw decimal numbers must not appear as visible text in refRead (D-INV-25)",
+        )
+
+    # ── ★ marks (tier=direct, centroid agrees) ────────────────────────────────────────────
+    # NOTE: literal ★/☆ chars also appear in the legend, so we detect row-level stars via the
+    # CSS class (refread-star / refread-halfstar) and the data-confirmed attribute instead.
+
+    def test_star_appears_when_direct_centroid_agrees(self):
+        """Direct, agreed centroid → row marked with data-confirmed + non-halfstar star span."""
+        html = self._html_direct_agrees()
+        # data-confirmed marks a ★/☆ row (not the legend)
+        self.assertIn('data-confirmed="1"', html,
+                      "data-confirmed must be present when tier=direct and centroid agrees")
+        # The direct star is a refread-star span WITHOUT the halfstar class
+        self.assertIn(
+            'title="Web-described trait, confirmed directly by measurement">★',
+            html,
+            "★ span with 'confirmed directly' title must be present",
+        )
+
+    def test_confirmed_row_has_data_confirmed_attr(self):
+        """A confirmed row must carry data-confirmed=1 (used for CSS tinting)."""
+        html = self._html_direct_agrees()
+        self.assertIn('data-confirmed="1"', html,
+                      "confirmed rows must have data-confirmed attribute for CSS tinting")
+
+    # ── ☆ marks (tier=indirect, centroid agrees) ─────────────────────────────────────────
+
+    def test_halfstar_appears_when_indirect_centroid_agrees(self):
+        """Indirect, agreed centroid → data-confirmed + refread-halfstar span."""
+        html = self._html_indirect_agrees()
+        self.assertIn('data-confirmed="1"', html,
+                      "data-confirmed must be present for indirect confirmation")
+        # The indirect star uses the refread-halfstar class
+        self.assertIn("refread-halfstar", html,
+                      "refread-halfstar class must be present for indirect tier")
+        # The row must NOT have a plain (direct) star title
+        self.assertNotIn(
+            "confirmed directly",
+            html,
+            "indirect confirmation must not emit a direct-star title",
+        )
+
+    # ── no mark when contradicted or near mean ────────────────────────────────────────────
+
+    def test_no_star_when_centroid_contradicts(self):
+        """data-confirmed must be absent when the centroid contradicts the expect."""
+        html = self._html_contradicted()
+        self.assertNotIn('data-confirmed', html,
+                         "data-confirmed must not appear when centroid contradicts expect")
+
+    def test_no_star_when_centroid_near_mean(self):
+        """data-confirmed must be absent when |centroid z| < confirm_z."""
+        html = self._html_near_mean()
+        self.assertNotIn('data-confirmed', html,
+                         "data-confirmed must not appear when centroid is near the mean")
+
+    # ── legend ───────────────────────────────────────────────────────────────────────────
+
+    def test_legend_present(self):
+        """A refread-legend div explaining ★/☆ and the char chip must be in the block."""
+        html = self._html_no_conf()
+        self.assertIn('class="refread-legend"', html,
+                      "refread-legend must be present in the reference-read block")
+
+
+class ViewURLHash(unittest.TestCase):
+    """JOB-2: URL hash encodes the view state — #detailed opens Detailed on load;
+    toggling calls history.replaceState to keep the hash in sync."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_urlhash_"))
+        out = tmp / "widget.html"
+        run_dir = _make_run_dir(str(tmp))
+        build_widget.build_html(_minimal_core(), {}, None, None, str(out), "URLHashTest",
+                                build_widget.STRINGS, run_dir=run_dir)
+        cls.html = out.read_text(encoding="utf-8")
+
+    def test_url_hash_detailed_read_on_load(self):
+        """The JS must detect #detailed / #full in location.hash to open Detailed view."""
+        self.assertIn("detail", self.html,
+                      "JS must check 'detail' keyword in location.hash")
+
+    def test_apply_calls_replace_state(self):
+        """The apply() function must call history.replaceState to update the URL hash on toggle."""
+        self.assertIn("replaceState", self.html,
+                      "apply() must call history.replaceState to update the URL hash")
+
+    def test_view_inited_flag_present(self):
+        """A guard flag must prevent replaceState from firing on the initial apply() call."""
+        self.assertIn("_viewInited", self.html,
+                      "a _viewInited guard must prevent URL write on initial load")
+
+    def test_simple_hash_written_on_toggle(self):
+        """The 'simple' hash string must be referenced in the toggle JS."""
+        self.assertIn("'#simple'", self.html,
+                      "replaceState must write '#simple' when toggling to Simple view")
+
+    def test_detailed_hash_written_on_toggle(self):
+        """The 'detailed' hash string must be referenced in the toggle JS."""
+        self.assertIn("'#detailed'", self.html,
+                      "replaceState must write '#detailed' when toggling to Detailed view")
+
+
 if __name__ == "__main__":
     unittest.main()
