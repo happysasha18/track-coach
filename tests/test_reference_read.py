@@ -672,5 +672,115 @@ class ViewURLHash(unittest.TestCase):
                       "replaceState must write '#detailed' when toggling to Detailed view")
 
 
+# §D.10.2 / §D.10.3 — read order + web-info plaque (s28 redesign)
+
+class ReadOrderWithRefRead(unittest.TestCase):
+    """§D.10.3 read order: #tonalPanel must precede #refRead, which must precede #webPanel.
+    Asserts on the REAL rendered widget HTML (with run_dir so refRead is present).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_rr_order_"))
+        out = tmp / "widget.html"
+        run_dir = _make_run_dir(str(tmp))
+        build_widget.build_html(_minimal_core(), {}, None, None, str(out), "ReadOrderTest",
+                                build_widget.STRINGS, run_dir=run_dir)
+        cls.html = out.read_text(encoding="utf-8")
+
+    def test_tonal_before_refread(self):
+        """tonalPanel must appear in the HTML BEFORE refRead (§D.10.3 order)."""
+        tonal_pos = self.html.find('id="tonalPanel"')
+        refread_pos = self.html.find('id="refRead"')
+        self.assertGreater(tonal_pos, 0, "tonalPanel must be in the HTML")
+        self.assertGreater(refread_pos, 0, "refRead must be in the HTML when run_dir is supplied")
+        self.assertLess(tonal_pos, refread_pos,
+                        "tonalPanel must come BEFORE refRead (§D.10.3 read order)")
+
+    def test_refread_before_web_panel_summary(self):
+        """If the web panel element is present, refRead must precede it in the HTML."""
+        refread_pos = self.html.find('id="refRead"')
+        # Search for the webPanel element id, not the CSS comment that also says "What the web says"
+        web_pos = self.html.find('id="webPanel"')
+        if web_pos > 0:
+            self.assertLess(refread_pos, web_pos,
+                            "refRead must come BEFORE the #webPanel element in the HTML")
+
+
+class WebPanelRendering(unittest.TestCase):
+    """§D.10.2 web-info plaque — collapsed, summary, artist header, ★/☆ facet lines with phrases.
+    Asserts on the OUTPUT of render_reference_read (the real shipped function), not source.
+    """
+
+    @classmethod
+    def _html_with_web_data(cls):
+        """render_reference_read with synthetic data that guarantees ★ for one direct facet."""
+        dirs = {"TestArtist": _zfp(tempo=-0.8)}   # centroid z=-0.8 on tempo, expect=low → agrees
+        conf = {"TestArtist": [
+            {"axis": "tempo",  "expect": "low", "tier": "direct",   "phrase": "slow meditative tempo"},
+            {"axis": "stereo", "expect": "low", "tier": "indirect", "phrase": "narrow stereo"},
+        ]}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            dirs,
+            _norm_identity(),
+            confirmation=conf,
+            confirm_z=0.4,
+        )
+
+    def test_web_panel_present_when_facet_earns_mark(self):
+        html = self._html_with_web_data()
+        self.assertIn('id="webPanel"', html,
+                      "web panel must be present when ≥1 facet earns ★ or ☆")
+
+    def test_web_panel_collapsed_no_open_attr(self):
+        """Panel must be collapsed — <details> must NOT carry the `open` attribute."""
+        html = self._html_with_web_data()
+        import re
+        # `<details id="webPanel"` must NOT be followed immediately by ` open`
+        self.assertNotRegex(html, r'<details\s+id="webPanel"\s+open',
+                            "web panel <details> must not carry the `open` attribute (stays collapsed)")
+
+    def test_web_panel_summary_names_artist(self):
+        html = self._html_with_web_data()
+        self.assertIn("What the web says about TestArtist", html,
+                      "web panel summary must name the focused artist")
+
+    def test_web_panel_has_artist_sub_header(self):
+        html = self._html_with_web_data()
+        self.assertIn('class="web-artist-hdr"', html,
+                      "web panel must carry an artist sub-header element")
+
+    def test_web_panel_has_phrase_and_glyph(self):
+        """At least one facet line must carry the phrase text and a ★ or ☆ glyph."""
+        html = self._html_with_web_data()
+        self.assertIn("slow meditative tempo", html,
+                      "the phrase from confirmation data must appear in the web panel")
+        self.assertIn("★", html,
+                      "★ glyph must appear for a confirmed direct facet")
+
+    def test_web_panel_in_refread_region(self):
+        """The web panel must appear in the HTML after the #refRead block (within the REFREAD slot)."""
+        html = self._html_with_web_data()
+        refread_pos = html.find('id="refRead"')
+        webpanel_pos = html.find('id="webPanel"')
+        self.assertGreater(refread_pos, 0, "refRead block must be present")
+        self.assertGreater(webpanel_pos, refread_pos,
+                           "webPanel must appear after (within the same __REFREAD__ slot as) refRead")
+
+    def test_web_panel_absent_when_no_marks(self):
+        """No ★/☆ possible — contradicted facet → panel absent."""
+        dirs = {"TestArtist": _zfp(tempo=0.8)}   # centroid z=+0.8, expect=low → CONTRADICTED
+        conf = {"TestArtist": [
+            {"axis": "tempo", "expect": "low", "tier": "direct", "phrase": "slow tempo"},
+        ]}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity(),
+            confirmation=conf, confirm_z=0.4,
+        )
+        self.assertNotIn('id="webPanel"', html,
+                         "web panel must be absent when no facet earns ★ or ☆")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.1] — 2026-06-30
+
+### Added
+- **Global remembered view (Simple/Detailed).** The widget now remembers which view you were in (stored in `localStorage`) and opens in that view next time — so opening any track lands you in Simple or Detailed depending on what you last used. A brand-new user still sees Simple (calm) on first open; a shared `#detailed` link is a one-shot entry that doesn't change your stored preference. Degrade-safe: if the store is unavailable the old calm-default behaviour applies. (SPEC §B.15 / INV-31.)
+- **Readable "What the web says" panel in the widget.** The ★/☆ web-style confirmation marks on the reference read bars now have a companion collapsible panel ("What the web says about ⟨artist⟩") sitting after the centroid bars. It lists each confirmed web facet as a plain phrase — axis label — ★/☆ mark; collapsed by default so it never crowds the measured read. Detailed-only, governed by the same references switch. (SPEC §D.10.2.)
+
+### Changed
+- **Reference read re-ordered: producer read → tonal balance → centroid read → web panel.** Previously tonal balance appeared after the centroid reference read (the order was reversed). Fixed to match §D.10.3's defined read order so the eye moves from your own track outward to the reference and only then to the web.
+
 ## [0.9.0] — 2026-06-29
 
 ### Added

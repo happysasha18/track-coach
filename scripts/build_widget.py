@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.0"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.1"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2305,6 +2305,60 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     return ''.join(rows_html), summary
 
 
+def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4):
+    """§D.10.2 — collapsible 'What the web says about <artist>' panel.
+
+    Uses the same ★/☆ rule as _refread_bars_html (same confirm_z, same tier logic).
+    Reads the 'phrase' field from each conf entry (2–4 word human description from web research).
+    Returns '' when no facets earn ★ or ☆, or when inputs are missing (silent absence per spec).
+    Collapsed by default (no `open`). Detailed-only via body.simple #webPanel CSS rule.
+    """
+    if not conf_entries or not centroid_z:
+        return ""
+    rows = []
+    for entry in conf_entries:
+        axis   = entry.get("axis")
+        expect = entry.get("expect")
+        tier   = entry.get("tier")
+        phrase = entry.get("phrase", "")
+        if not axis or not expect or not tier:
+            continue
+        cz = centroid_z.get(axis)
+        if cz is None:
+            continue
+        try:
+            cz = float(cz)
+            if math.isnan(cz):
+                continue
+        except (TypeError, ValueError):
+            continue
+        agrees = (expect == "high" and cz >= confirm_z) or (expect == "low" and cz <= -confirm_z)
+        if not agrees:
+            continue
+        glyph = "★" if tier == "direct" else "☆"
+        axis_label = _AXIS_LABELS.get(axis, axis)
+        display_phrase = phrase if phrase else axis_label
+        rows.append(
+            f'<li class="web-facet-row">{_esc(display_phrase)} — {_esc(axis_label)} {glyph}</li>'
+        )
+    if not rows:
+        return ""
+    artist_section = (
+        f'<p class="web-artist-hdr">{_esc(direction_name)}</p>'
+        f'<ul class="web-facets">{"".join(rows)}</ul>'
+        f'<p class="web-note">'
+        f'★ web-described, confirmed by measurement · '
+        f'☆ web-described, soundly tied to measurement'
+        f'</p>'
+    )
+    return (
+        f'<details id="webPanel">'
+        f'<summary>What the web says about {_esc(direction_name)}</summary>'
+        f'<div class="web-panel-body">{artist_section}</div>'
+        f'</details>'
+    )
+
+
 def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
@@ -2406,7 +2460,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         '</div>'
     )
 
-    return (
+    refread_div = (
         '<div id="refRead" class="panel">'
         '<h2>How you sit vs the direction</h2>'
         + tabs_html
@@ -2415,6 +2469,15 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         + legend_html
         + '</div>'
     )
+
+    # §D.10.2 — web-info plaque for the focused (nearest) direction, collapsed by default.
+    # Uses the same ★/☆ rule; absent when no facet earns a mark (silent per spec).
+    focused = leans[0]
+    focused_centroid = directions[focused.direction]
+    focused_conf = (confirmation or {}).get(focused.direction, [])
+    web_panel = _web_panel_html(focused.direction, focused_conf, focused_centroid, confirm_z)
+
+    return refread_div + ("\n" + web_panel if web_panel else "")
 
 
 def _ref_read_html(run_dir):
@@ -2543,6 +2606,20 @@ body.simple #refRead{display:none!important}
 #refRead .refread-legend b{color:var(--ink)}
 #refRead .refread-legend .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
  color:#6fdfb8;padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
+/* Web-info plaque (§D.10.2, "What the web says") — collapsed <details>, Detailed-only, after #refRead */
+body.simple #webPanel{display:none!important}
+#webPanel{margin:10px 0 0}
+#webPanel>summary{font-size:13px;color:var(--muted);cursor:pointer;padding:7px 10px;
+ background:var(--panel2);border-radius:6px;border:1px solid var(--line);list-style:none;user-select:none}
+#webPanel>summary::-webkit-details-marker{display:none}
+#webPanel>summary::before{content:"▸ ";font-size:10px;opacity:.6}
+#webPanel[open]>summary::before{content:"▾ "}
+#webPanel .web-panel-body{padding:12px 14px 8px;background:var(--panel2);
+ border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px}
+#webPanel .web-artist-hdr{font-size:12.5px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+#webPanel .web-facets{margin:0 0 10px;padding:0 0 0 16px;display:flex;flex-direction:column;gap:5px}
+#webPanel .web-facet-row{font-size:12.5px;color:var(--muted);list-style:none}
+#webPanel .web-note{font-size:11px;color:var(--muted);opacity:.65;margin:6px 0 0;font-style:italic}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -2769,18 +2846,19 @@ __MODENOTE__
  <div id="readBody">__READBODY__</div>
 </div>
 
-<!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
-     per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
-     Empty string when quick mode, no run_dir, or lean is far. -->
-__REFREAD__
-
-<!-- Tonal balance — pulled OUT of the Evidence drawer (Sasha: "он прикольный") so it's always
-     visible, sitting last before the collapsible. -->
+<!-- Tonal balance — sits between the producer's read and the reference read (§D.10.3 order:
+     producer read → tonal balance → centroid read → web panel). Always visible. -->
 <div class="panel" id="tonalPanel">
  <h2>Tonal balance — average spectrum of the mix</h2>
  <p class="hint">Each bar is one octave band's level across the whole track (0 dB = loudest band). A band that sticks out from its neighbours is a resonance (boxy/harsh); a dip is a hole (dull/thin).</p>
  <canvas id="tonal" height="170"></canvas>
 </div>
+
+<!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
+     per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
+     Empty string when quick mode, no run_dir, or lean is far. Followed by the web-info
+     panel (§D.10.2, "What the web says") which is also emitted server-side as part of __REFREAD__. -->
+__REFREAD__
 
 <details class="more" id="evidence">
  <summary>Evidence &amp; detail — the project arrangement, automation, stem↔track map, rhythm and transcribed notes</summary>
@@ -2878,25 +2956,33 @@ const META=D.meta||{};
  tg.setAttribute("aria-label",T.view_aria||"Detail level");
  tg.innerHTML=`<button data-v="simple">${T.view_simple||"Simple"}</button>`+
   `<button data-v="full">${T.view_full||"Detailed"}</button>`;
- // _viewInited: only update the URL hash on USER toggles, not on the initial apply() call.
+ /* VIEW_LOGIC_START — pure DOM-free view helpers (SPEC §B.15/INV-31); node-executed by test_view_logic */
+ function resolveView(hash,stored){
+  var h=(hash||"").toLowerCase();
+  if(h.indexOf("full")>=0||h.indexOf("detail")>=0)return "detailed";
+  if(h.indexOf("simple")>=0||h.indexOf("calm")>=0)return "simple";
+  if(stored==="detailed")return "detailed";
+  if(stored==="simple")return "simple";
+  return "simple";
+ }
+ function safeGetView(){try{return localStorage.getItem("tc_view");}catch(e){return null;}}
+ function safeSetView(v){try{localStorage.setItem("tc_view",v);}catch(e){}}
+ if(typeof module!=="undefined")module.exports={resolveView,safeGetView,safeSetView};
+ /* VIEW_LOGIC_END */
+ // _viewInited: only update the URL hash on USER toggles, not on the initial applyView() call.
  let _viewInited=false;
- function apply(v){document.body.classList.toggle("simple",v==="simple");
-  tg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+ function applyView(v){document.body.classList.toggle("simple",v==="simple");
+  tg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v||(v==="detailed"&&b.dataset.v==="full")));
   if(v==="simple"&&window.__resetMix)window.__resetMix();  // SPEC §B.14: Simple hides the stem grid (M/S controls) → reset to full mix, never strand a hidden solo/mute
-  try{localStorage.setItem("tc_view",v);}catch(e){}
   // JOB-2: reflect view in URL hash so the state is shareable and the page opens in the right view.
   // Only update after init (on actual toggles) to keep the URL clean on first load.
   if(_viewInited){try{history.replaceState(null,'',v==='simple'?'#simple':'#detailed');}catch(e){}}
   // let every canvas relayout for its new width / lane count
   window.dispatchEvent(new Event("resize"));}
- tg.querySelectorAll("button").forEach(b=>b.onclick=()=>apply(b.dataset.v));
- // initial view: ALWAYS open Simple (the calm default) unless the URL hash explicitly
- // asks for Detailed (#full/#detailed). We deliberately do NOT restore a previous
- // Detailed choice from localStorage — every fresh open is calm; the toggle still works
- // in-session.
- let init="simple";const h=(location.hash||"").toLowerCase();
- if(h.indexOf("full")>=0||h.indexOf("detail")>=0)init="full";
- apply(init);_viewInited=true;})();
+ tg.querySelectorAll("button").forEach(b=>b.onclick=()=>{applyView(b.dataset.v);safeSetView(b.dataset.v==="full"?"detailed":b.dataset.v);});
+ // INV-31: initial view from URL hash (one-shot) > remembered preference > calm default.
+ // Only a toggle writes tc_view; loading from hash or default never persists a preference.
+ applyView(resolveView(location.hash,safeGetView()));_viewInited=true;})();
 // The Producer's read (#readTitle/#readBody) is rendered SERVER-SIDE (see _read_html in
 // build_widget.py) and already present in the markup — no client-side markdown parsing here.
 document.getElementById("arrTitle").textContent=T.arr_title;

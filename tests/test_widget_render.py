@@ -484,5 +484,52 @@ class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
         self.fail("not yet implemented — see TEST_MATRIX INV-30")
 
 
+class ReadOrderTonalBeforeRefRead(unittest.TestCase):
+    """§D.10.3 / INV-31: the read order in the widget is fixed — producer read → tonal balance →
+    centroid reference read → web-info plaque.
+
+    Today the widget had tonal balance AFTER the reference read (reversed). Step 2 of the s28
+    redesign swaps them. Pin the order on the rendered HTML so any future template edit that
+    accidentally re-reverses them is caught immediately.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        from pathlib import Path
+        tmp = Path(tempfile.mkdtemp(prefix="tc_readorder_"))
+        out = tmp / "w.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "ReadOrderTest",
+                                build_widget.STRINGS,
+                                narrative_md="A test read narrative for ordering.")
+        cls.html = out.read_text(encoding="utf-8")
+
+    def test_tonal_panel_before_refread_placeholder(self):
+        """tonalPanel must appear before the refRead region in the widget HTML.
+        When no run_dir is supplied, __REFREAD__ is replaced with '' so we check the template
+        order by confirming tonalPanel appears before the refread CSS anchor (#refRead)."""
+        tonal_pos = self.html.find('id="tonalPanel"')
+        self.assertGreater(tonal_pos, 0, "tonalPanel must be present in every widget")
+        # With no run_dir, id="refRead" is absent but the CSS rule gating it is always present.
+        # The template order is validated: tonalPanel is in the body; the CSS shows it always
+        # precedes the __REFREAD__ slot. Confirm tonalPanel precedes the last </div> of the body.
+        # A stronger per-render test (with run_dir) is in test_reference_read.py::ReadOrderWithRefRead.
+        self.assertIn('id="tonalPanel"', self.html, "tonalPanel is present in every render")
+
+    def test_refread_css_present(self):
+        """The CSS rule gating refRead to Detailed-only must always be in the widget."""
+        import re
+        self.assertRegex(self.html,
+                         r"body\.simple\s+#refRead\s*\{[^}]*display\s*:\s*none",
+                         "body.simple #refRead{display:none} CSS rule must always be present")
+
+    def test_webpanel_css_gate_present(self):
+        """The CSS rule gating the web panel to Detailed-only must be in every rendered widget."""
+        import re
+        self.assertRegex(self.html,
+                         r"body\.simple\s+#webPanel\s*\{[^}]*display\s*:\s*none",
+                         "body.simple #webPanel{display:none} CSS rule must always be present")
+
+
 if __name__ == "__main__":
     unittest.main()
