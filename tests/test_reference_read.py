@@ -150,6 +150,7 @@ class ReferenceReadHeader(unittest.TestCase):
         self.assertEqual(html, "", "None fingerprint → empty string")
 
 
+# D-INV-30 — per-facet reference read vs centroid
 class ReferenceReadBars(unittest.TestCase):
     """Per-facet bar rows: at least one row, count matches measured axes per panel, bars are in HTML.
 
@@ -441,6 +442,7 @@ class LazySparksNearestDirection(unittest.TestCase):
                       "reference read for Lazy Sparks must show 'Leans toward'")
 
 
+# D-INV-29 — web-style ★/☆ plaque (facets tied to measurement)
 class ReferenceReadRichLook(unittest.TestCase):
     """Category chips, plain-words column, ★/☆ marks — the rich look ported from the explorer.
     Tests covering D-INV-25 (no raw numbers) and the confirmation map logic (D-INV-24).

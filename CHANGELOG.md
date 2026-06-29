@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.0] — 2026-06-29
+
+### Added
+- **Reference & compare — the descriptive «leans toward» layer.** Point analysis at other artists as a *direction*: the catalog gains a "leans toward" column (up to three nearest reference directions, nearest-first, colour-cued), and the Detailed widget gains a per-direction reference read (per-facet bars vs the direction's centroid) with selectable direction tabs and a web-style ★/☆ plaque ("web suggests, measurement confirms"). Descriptive only — computed automatically from the fingerprints, no setup. (Aiming a track at a direction, and authoring reference directions, come later.)
+
+### Changed
+- The §D reference spec was hardened in a preventive-maintenance audit before this minor bump: explicit 0.9-vs-later scope split, the catalog cell documented as an inline link stack, a single colour-cue formula, a corrected column-presence rule, defined recompute/empty-panel behaviour, and switch-control placement across views.
+
 ## [0.8.31] — 2026-06-24
 
 ### Fixed

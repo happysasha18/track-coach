@@ -1,5 +1,7 @@
 # track-coach — SPEC + TEST MATRIX (source of truth)
 
+> **Two invariant namespaces — don't conflate.** `INV-n` (bare) = §B per-stem + source-file-header invariants. `D-INV-n` = the §D reference layer. They overlap in number (both reach 27–30) but are different surfaces; always write the `D-` prefix for reference rows. (A grep in s28 mis-mapped D-INV-27..30 onto the bare INV-27..30 per-stem tests — hence this note.)
+
 This one document is both the **spec** (what the product must do & why) and the **test matrix** (that
 spec projected into a checkable grid). Same truth, two altitudes: the prose head is the spec; the grids
 are the spec made enumerable; the invariants are the cross-cutting rules a flat grid can't see. Tests
@@ -203,7 +205,7 @@ pure-logic invariants are unit-tested NOW, the surface-rendering ones land with 
 | RC-INV-7a | the rung→promised-surface list is the single authority | not built — keys off §B.14/INV-18/22 |
 | RC-INV-8 | same missing axis reads identically across coach/catalog/§D | not built — lands with the manifest render |
 | RC-INV-9 | pick most-complete run; run-id in content-hash (D-INV-14) | not built — lands with run selection + §D placement |
-| RC-INV-10 | gap → re-measure, never impute; ⟨DECIDE E-1⟩ auto vs flag | not built — re-measure command (backlog) |
+| RC-INV-10 | gap → re-measure, never impute; ⟨DECIDE E-1⟩ auto vs flag | partial-run logic **built+tested** — `test_completeness::PartialRunIsAnError`; UI re-measure command not built (backlog) |
 | RC-INV-11 | significance has a third `unknown (not measured)` state | `test_completeness::SignificanceHasUnknown` ✓ |
 | RC-INV-12 | one per-run completeness line so absence≠all-clear | not built — lands with the coach render |
 
@@ -229,6 +231,10 @@ ride the already-shipped `completeness.py` (axis-count-fair nearest, RC-INV-5b) 
 | D-INV-24 | recompute + re-stamp on library/epoch change; catalog never shows a stale "leans toward" | not built — composes with D-INV-12/14 placement code |
 | D-INV-25 | never a NUMBER — no raw distance / score / rank / % / "match %"; only a direction name + a coarse cue | not built — assert rendered chip carries no numeric token at all |
 | D-INV-26 | cue = coarse closeness shown by COLOUR only (green close / amber mid / red far) — no words, no number, not a grade (red=far, not worse). Reference basis = RELATIVE lean (D-28); §F basis = library distribution (D-27). §F red only as last resort. Reference runner-up DEFERRED (D-24) | geometry **BUILT+TESTED** `test_similarity_columns::RelativeLeanBuckets` + `NearestOwnRedIsLastResort`; colour render: not built — assert §D reference cell carries a greyscale-safe glyph tier (●●●/●●○/●○○) beside colour, §F uses nearest-first order, both carry a hover label; no numeric/word closeness token on any cell |
+| D-INV-27 | **Up-to-three nearest directions as a nearest-first list, not a single name + crammed runner-up tint.** Lists up to the 3 nearest reference clouds that clear the lean bar, ranked nearest-first; order carries the rank, each entry tinted by its own gap-to-next colour cue; never pads to 3 with weak/far filler ("no close direction yet" instead). Descriptive (ships 0.9, no mapping needed); the aim glyph / pinned-aimed entry / re-flavouring are deferred until the mapping input ⟨D-2⟩. | `test_similarity_columns::TopKBasics` (built+tested) |
+| D-INV-28 | **Every name is a navigation link; the read-panel direction tab is ephemeral, never a persisted selection.** Catalog: track→open, own sibling→scroll (F-INV-4), direction→open read focused. Read panel: tabs default to nearest and re-target the read+plaque; tab is ephemeral (not written to the URL) — cross-page entry-focus is a one-shot URL param read once on load. On a recompute that drops the focused direction the read falls back to nearest; if it empties entirely the open panel collapses to "no close direction yet" (tabs+bars removed, prose kept), re-stamped. | read-panel tabs: built. Catalog click-to-focus wiring + recompute-empties: **0.9.x design** (href placeholder in 0.9). By-ID test: TODO punch-list |
+| D-INV-29 | **The web-style plaque shows only facets a curated facet→signal map ties to measurement; ★ = directly confirmed on the direction's centroid, ☆ = soundly indirect, contradicted = withheld.** Two glyphs + one footnote (never long per-row tags); judged on the cloud centroid (D-INV-21); per-artist, never blended; an absent plaque is a valid silent state; completeness-aware (a missing axis ⇒ not ★/☆, not shown). | `ReferenceReadRichLook` (built+tested — file::class from Step 2) |
+| D-INV-30 | **The reference read decomposes per-facet vs the direction's centroid — signed z-normalised bars, most-divergent first, no raw distance/score.** Detailed-only; reads against the focused direction tab, falls back on recompute; a missing facet is omitted, never drawn at zero. | `ReferenceReadBars` (built+tested — file::class from Step 2) |
 
 ### Similar-in-your-own-library, the DJ column (SPEC §F)
 | code | rule (1-line) | owning test / status |

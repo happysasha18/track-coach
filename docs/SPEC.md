@@ -1091,10 +1091,13 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   never promised reference, so the empty cell is silent, never an error and never blank-implying-"no
   direction". A catalog row collapses a version's runs, so the column reads the version's **most-complete
   run** (E.4); "full analysis only" shows only when that version has **no** full run at all.
-  **The column appears whenever at least ONE track in the library has a leans-toward** (Alexander 2026-06-25:
-  don't hide it if there's data for even one track); only when NO track has any reference data at all is the
-  whole column absent — so a brand-new column never reads as a missing feature, and an all-quick library
-  doesn't carry an all-empty column. It sits as one of the **last two columns** with a slightly smaller font
+  **The column appears whenever at least ONE version has a computed reference RESULT** — a lean, a "no close
+  direction yet", or a "can't compare" (Alexander 2026-06-25: don't hide it if there's data for even one
+  track); it is **absent only when no version has any reference computation at all** (an all-quick library, or
+  no directions defined). "Has a result" is the presence test, NOT "has a *lean*" — a library where every
+  track computes to "no close direction yet" still has reference data and still shows the column (it is not the
+  same as no-data). So a brand-new column never reads as a missing feature, and an all-quick library doesn't
+  carry an all-empty column. It sits as one of the **last two columns** with a slightly smaller font
   than the spec columns, as long as the look holds (placement P-1). `D-INV-22`
 - **Completeness (a full run that couldn't measure everything).** A version whose fingerprint is **missing an
   axis is not comparable** — its cell and chip read "can't compare — ⟨missing signals⟩", never a fabricated
@@ -1105,6 +1108,10 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
 - **The switch.** The reference line is a reference surface in both placements, so it is governed by the **one
   show/hide-references switch** (D-INV-6) shared by the catalog column and the plaque chip: hiding references
   hides the column and the chip together, and the switch never strands the line where you can't see or restore it. The switch is **one global persisted flag** that both the catalog page and a track's widget read, so hiding references on either page hides both — one flag, never a per-page toggle (⟨DECIDE D-16⟩ resolved).
+  **The toggle CONTROL renders wherever a reference surface renders** — the catalog page, and **both** the
+  Simple and Detailed widget (since Simple already shows reference prose, §D.7) — every instance reads and
+  writes the one global flag. So content and its off-switch are never separated: a producer who works only in
+  Simple still has the control beside the reference prose, and never sees references with no way to hide them.
   (The §F own-library column is NOT reference content and is NOT under this switch.) `D-INV-23`
 - **Unmapped tracks.** Because leans-toward is descriptive, it CAN show for a track you've written no mapping
   for. Whether it does by default is ⟨DECIDE D-22⟩ (tied to D-11) — recommend showing the descriptive line for
@@ -1148,6 +1155,13 @@ HAS an order, and the order carries the ranking exactly as §F's own-library lis
 direction are no longer a confusing second tint in one cell but their own clearly-ordered, clearly-cued
 entries. The runner-up is resolved by listing, not by tinting (⟨DECIDE D-24⟩ resolved). `D-INV-27`
 
+**Scope split (what ships in 0.9 vs what waits on the mapping input ⟨D-2⟩).** The **descriptive** rows below —
+the up-to-three nearest *clouds* ranked by fingerprint distance, the per-entry colour/glyph cue, "no close
+direction yet", and the inline links — ship in **0.9**: they need no aspiration mapping, only the measured
+fingerprints. The **aim-dependent** rows — the aim glyph, the pinned-aimed-direction entry, and re-flavouring
+(§D.6) — are **inert until the mapping input surface (⟨DECIDE D-2⟩) exists**; they are authored here so the
+composition is proven, but a 0.9 build neither renders nor tests them. `tags: scope-0.9-descriptive · ⟨DECIDE D-2⟩`
+
 **What the list holds and how it's cued.**
 - **Up to the three nearest reference clouds that are a REAL lean** — ranked nearest-first, in the **same
   full-dimensional fingerprint geometry** as the single-nearest (D-INV-21). The list shows only the directions
@@ -1159,11 +1173,13 @@ entries. The runner-up is resolved by listing, not by tinting (⟨DECIDE D-24⟩
   sibling* is still a real track you might mix. With no directions defined at all, "no direction yet" (D-INV-22).
   `tags: fewer-not-filler · supersedes-F-INV-1-for-§D · D-INV-27`
 - **Each shown direction is tinted by its OWN closeness, order carries the rank.** Each entry's colour + glyph
-  cue (D-INV-26) reflects **how close THAT direction is to the track** (its own relative lean against the field
-  of all the track's directions — the gap from it to the next, not just "is it the single winner"); the
-  nearest-first order carries which is closest. So the cue is defined for every entry shown, not only the top
-  one, and a list of two amber entries reads honestly as "two mild leans, neither strong". `tags: D-INV-26 ·
-  per-entry-cue · D-INV-27`
+  cue (D-INV-26) reflects **how close THAT direction is to the track**, by **one fixed formula at every list
+  position: the gap from this entry to the NEXT-shown entry** (the relative-lean basis, ⟨DECIDE D-28⟩,
+  z-normalised) — a big gap to the next reads as a strong lean, a small gap as a mild one. (Not "stand apart
+  from the whole field" — that's a different number; the gap-to-next is the one we use, so two builders paint
+  the same colours.) The nearest-first order carries which is closest. So the cue is defined for every entry
+  shown, not only the top one, and a list of two amber entries reads honestly as "two mild leans, neither
+  strong". `tags: D-INV-26 · per-entry-cue · gap-to-next · D-INV-27`
 - **No numbers, no "#1/#2/#3".** Position in the list IS the ranking; the surface never prints a rank number,
   distance, or score (D-INV-25 unchanged).
 - **Ties resolve deterministically.** When two directions sit at the same distance, the order — and which is
@@ -1175,15 +1191,26 @@ carries no lingering "which one is selected" state on the catalog (Alexander 202
 like the own-track column). `D-INV-28`
 - **On the catalog (the library list).** Every name is a link: clicking your **track** opens it; clicking an
   **own sibling** scrolls to that track's row (F-INV-4); clicking a **direction** opens THIS track's read
-  panel already focused on that direction. The catalog cell, collapsed, shows the **nearest** direction with
-  its cue and expands to the up-to-three list; the list is for the glance and the links, not a stateful picker.
-  Because every click is a jump, nothing on the list page can strand. `tags: clickable-navigation · F-INV-4`
+  panel already focused on that direction. The catalog cell shows the up-to-three nearest directions **inline,
+  as a nearest-first vertical stack of coloured links** (no collapse/expand gesture — what shipped, owner-approved
+  2026-06-29) — the order IS the ranking and the stack IS the glance; it is a row of links, never a stateful
+  picker. Because every click is a jump, nothing on the list page can strand. **Click-to-focus wiring (a
+  direction link opening the read pre-focused on it) is 0.9.x** — in 0.9 the links render (`href` placeholder)
+  and carry the colour/order; the cross-page focus hand-off is specified below (URL entry-focus) and wired next.
+  `tags: clickable-navigation · inline-stack · F-INV-4`
 - **In the per-track read panel.** Here the up-to-three list is a set of **direction tabs**: the read defaults
   to the **nearest**, and switching a tab re-targets the read's in-zone/diverge words and the web-style plaque
   (§D.10.2) to that direction. The tab is **ephemeral view state** (it changes no analysis, and does not
-  persist across a reload — like the view ladder itself). On a recompute (D-INV-24) that drops the focused
-  direction out of the shown list, the read **falls back to the nearest** — it never leaves the read comparing
-  against a direction no longer on screen. `tags: ephemeral-view-state · no-strand · D-INV-24 · D-INV-28`
+  persist across a reload — like the view ladder itself). **The catalog → widget focus hand-off is a one-shot
+  URL *entry* parameter, not persisted tab state:** arriving from a catalog direction-link, the widget reads
+  the wanted direction once on load and opens that tab; thereafter clicking tabs does NOT write back to the URL
+  (the tab stays ephemeral, D-INV-28). So "opens focused on that direction" is buildable across the page
+  boundary without contradicting the not-in-URL rule — entry-focus on load ≠ tab persisted in the URL. On a
+  recompute (D-INV-24) that drops the focused direction out of the shown list, the read **falls back to the
+  nearest**; and if the recompute leaves **no direction clearing the lean bar at all**, the open reference read
+  **collapses to the "no close direction yet" state** — tabs and the §D.10.3 per-facet bars are removed, the
+  one-line prose read is retained, and it re-stamps — so an open panel never strands on a vanished direction
+  and never shows empty tabs. `tags: ephemeral-view-state · url-entry-focus · no-strand · recompute-empties · D-INV-24 · D-INV-28`
 - **The aim glyph rides the list.** A direction you've *aimed at* (D-INV-4) is marked with the aim glyph
   wherever it appears. Because aspiration is many-to-many, several directions can be aimed at; when **none of
   the aimed is among the shown nearest**, the surface pins **only the single nearest of the aimed ones** as an
@@ -1193,10 +1220,11 @@ like the own-track column). `D-INV-28`
   resolved). `tags: D-INV-4 · intent-not-filler · ⟨DECIDE D-29⟩`
 
 **How it composes across the axes.**
-- **The catalog column (run mode).** A full-run row shows the **nearest** in the cell with its cue, and the
-  cell **expands to the up-to-three list** (the column stays glanceable by default; the list of links is one
-  interaction away — links, not a stateful picker). Quick-only rows read "full analysis only" (D-INV-20); the
-  column appears whenever ≥1 track has a leans-toward (D-INV-22). `tags: view-ladder · D-INV-22`
+- **The catalog column (run mode).** A full-run row shows the up-to-three nearest directions **inline, as a
+  nearest-first stack of coloured links** (no collapse/expand — the shipped cell). Quick-only rows read "full
+  analysis only" (D-INV-20); the column appears whenever ≥1 version has a **computed reference result** — a
+  lean, "no close direction yet", or "can't compare" — not only when ≥1 has a *lean* (D-INV-22). `tags:
+  view-ladder · inline-stack · D-INV-22`
 - **The per-track widget (view ladder).** **Quick** shows nothing (no fingerprint). **Simple** keeps the
   single **nearest** as prose in the read (§D.7) — no tabs; the ladder's bottom rung stays a one-line glance.
   **Detailed adds the up-to-three direction tabs and the 2nd/3rd directions**, monotonically — Detailed only
