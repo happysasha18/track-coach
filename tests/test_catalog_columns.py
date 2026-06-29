@@ -26,7 +26,7 @@ def _e(track, sha="sha1", stamp="2026-06-20_2100", mtime=1000, **kw):
          "widget": f"{track}-{stamp}.html", "mode": "full",
          "bpm": 123, "arc": [0.1, 0.5, 1.0],
          "title": track.replace("_", " "),
-         "_lean": None, "_siblings": []}
+         "_leans": [], "_siblings": []}
     e.update(kw)
     return e
 
@@ -41,41 +41,66 @@ class ColumnHeaders(unittest.TestCase):
 
 
 class LeanCellRendering(unittest.TestCase):
-    """Direction name coloured by level; no red for the reference column (owner rule 2026-06-29)."""
+    """Direction name(s) coloured by level; no red for the reference column (owner rule 2026-06-29).
+    Cell now accepts a list of up to 3 Lean objects (§D.10.1)."""
 
-    def _render(self, lean):
-        return catalog.render_catalog_html([_e("T", _lean=lean)])
+    def _render(self, leans):
+        return catalog.render_catalog_html([_e("T", _leans=leans)])
 
     def test_close_lean_shows_green_direction_name(self):
         lean = S.Lean(direction="DeepChord", level=S.CLOSE, runner=None, n_shared=12)
-        html = self._render(lean)
+        html = self._render([lean])
         self.assertIn("#2e9e5b", html, "close lean must use green #2e9e5b")
         self.assertIn("DeepChord", html, "direction name must appear")
         self.assertIn("sim-dir", html, "direction must be rendered as .sim-dir link")
 
     def test_mid_lean_shows_amber_direction_name(self):
         lean = S.Lean(direction="SCSI-9", level=S.MID, runner=None, n_shared=11)
-        html = self._render(lean)
+        html = self._render([lean])
         self.assertIn("#d8932a", html, "mid lean must use amber #d8932a")
         self.assertIn("SCSI-9", html)
 
-    def test_far_lean_shows_no_close_message(self):
-        lean = S.Lean(direction="SCSI-9", level=S.FAR, runner=None, n_shared=10)
-        html = self._render(lean)
-        self.assertIn("no close direction yet", html, "far lean must show the grey message")
-        # Red (#c2503d) must NOT appear in the direction cell when level is FAR
-        self.assertNotIn("#c2503d", html, "red must NOT appear for a far direction (owner rule 2026-06-29)")
+    def test_far_lean_not_in_list_shows_no_close_message(self):
+        # leans_toward_topk never passes FAR to the renderer; empty list → grey message.
+        html = self._render([])
+        self.assertIn("no close direction yet", html, "empty list must show the grey message")
+        self.assertNotIn("#c2503d", html, "red must NOT appear in the direction cell (owner rule 2026-06-29)")
 
-    def test_none_lean_shows_no_close_message(self):
-        html = self._render(None)
-        self.assertIn("no close direction yet", html, "None lean must show the grey message")
+    def test_none_lean_list_shows_no_close_message(self):
+        html = self._render([])
+        self.assertIn("no close direction yet", html, "empty list must show the grey message")
 
     def test_direction_link_is_an_anchor(self):
         lean = S.Lean(direction="Venetian Snares", level=S.CLOSE, runner=None, n_shared=14)
-        html = self._render(lean)
+        html = self._render([lean])
         # The direction must be a clickable <a> element
         self.assertIn("<a", html)
         self.assertIn("Venetian Snares", html)
+
+    def test_up_to_three_directions_all_shown(self):
+        """§D.10.1: all qualifying directions shown, each coloured by its own level."""
+        leans = [
+            S.Lean(direction="Venetian Snares", level=S.CLOSE, runner=None, n_shared=14),
+            S.Lean(direction="DeepChord",       level=S.MID,   runner=None, n_shared=12),
+            S.Lean(direction="SCSI-9",          level=S.MID,   runner=None, n_shared=11),
+        ]
+        html = self._render(leans)
+        self.assertIn("Venetian Snares", html)
+        self.assertIn("DeepChord", html)
+        self.assertIn("SCSI-9", html)
+        # Nearest (CLOSE) must use green; others (MID) must use amber
+        self.assertIn("#2e9e5b", html, "closest direction must be green")
+        self.assertIn("#d8932a", html, "mid direction must be amber")
+
+    def test_two_directions_both_shown(self):
+        leans = [
+            S.Lean(direction="DeepChord", level=S.CLOSE, runner=None, n_shared=12),
+            S.Lean(direction="SCSI-9",    level=S.MID,   runner=None, n_shared=11),
+        ]
+        html = self._render(leans)
+        self.assertIn("DeepChord", html)
+        self.assertIn("SCSI-9", html)
+        self.assertEqual(html.count('<a class="sim-dir"'), 2, "two direction links expected")
 
 
 class SiblingCellRendering(unittest.TestCase):

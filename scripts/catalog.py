@@ -217,16 +217,21 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
-def _lean_cell(lean) -> str:
-    """Render the 'leans toward' TD for a row.
-    If the lean is None or level is FAR, show a grey 'no close direction yet' message.
-    Otherwise colour the direction name (close=green, mid=amber) as a clickable link.
+def _lean_cell(leans) -> str:
+    """Render the 'leans toward' TD for a row (§D.10.1).
+
+    Accepts a list of up to 3 Lean objects (nearest-first, CLOSE/MID only — FAR never
+    reaches here, leans_toward_topk already excluded them). Each direction is a coloured
+    clickable link stacked vertically. Empty list → grey 'no close direction yet'.
     No red for the reference column — owner decision 2026-06-29."""
-    if lean is None or lean.level == SC.FAR:
+    if not leans:
         return '<td class="c-sim c-lean"><span class="sim-none">no close direction yet</span></td>'
-    col = _SIM_COL[lean.level]
-    dn = html.escape(lean.direction)
-    return f'<td class="c-sim c-lean"><a class="sim-dir" href="#" style="color:{col}">{dn}</a></td>'
+    chips = ""
+    for lean in leans:
+        col = _SIM_COL.get(lean.level, "#8b94a8")
+        dn = html.escape(lean.direction)
+        chips += f'<a class="sim-dir" href="#" style="color:{col}">{dn}</a>'
+    return f'<td class="c-sim c-lean">{chips}</td>'
 
 
 def _siblings_cell(siblings, title_map: dict, href_map: dict) -> str:
@@ -325,7 +330,7 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
- {_lean_cell(e.get('_lean'))}
+ {_lean_cell(e.get('_leans') or [])}
  {_siblings_cell(e.get('_siblings') or [], title_map or {{}}, href_map or {{}})}
 </tr>"""
 
@@ -444,7 +449,7 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 /* Similarity columns (§D.10 / §F — added 2026-06-29) */
 .c-sim{{min-width:110px;font-size:11.5px;vertical-align:middle}}
 .sim-none{{color:var(--muted);font-style:italic;font-size:11px}}
-.sim-dir{{font-weight:600;text-decoration:none}}
+.sim-dir{{display:block;font-weight:600;text-decoration:none;line-height:1.6}}
 .sim-dir:hover{{text-decoration:underline}}
 .sib-chip{{display:inline-block;background:var(--panel2);border:1px solid;border-radius:6px;
  padding:1px 7px;margin:0 3px 3px 0;font-size:10.5px;text-decoration:none;white-space:nowrap}}
@@ -613,10 +618,10 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
         key = e.get("track")
         fp = z_library.get(key)
         if fp and directions:
-            e["_lean"] = SC.leans_toward(fp, directions)
+            e["_leans"] = SC.leans_toward_topk(fp, directions)  # up to 3, CLOSE/MID only (§D.10.1)
             e["_siblings"] = SC.nearest_own(key, z_library)
         else:
-            e["_lean"] = None
+            e["_leans"] = []
             e["_siblings"] = []
 
     html_str = render_catalog_html(entries)

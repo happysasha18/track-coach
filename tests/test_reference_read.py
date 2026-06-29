@@ -151,11 +151,15 @@ class ReferenceReadHeader(unittest.TestCase):
 
 
 class ReferenceReadBars(unittest.TestCase):
-    """Per-facet bar rows: at least one row, count matches measured axes, bars are in the HTML."""
+    """Per-facet bar rows: at least one row, count matches measured axes per panel, bars are in HTML.
+
+    Uses a SINGLE-direction fixture so the bar count is unambiguous (one panel = len(FP.AXES) bars).
+    Multi-direction tab tests live in ReferenceReadTabSelector."""
 
     @classmethod
     def setUpClass(cls):
-        dirs = {"Near": _zfp(tempo=0.2), "FarDir": _zfp(tempo=9.0)}
+        # Single direction → 1 panel → bar count is exactly len(FP.AXES) for a fully-measured track.
+        dirs = {"Near": _zfp(tempo=0.2)}
         cls.html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES},
             dirs,
@@ -167,9 +171,10 @@ class ReferenceReadBars(unittest.TestCase):
                       "at least one facet bar row must be rendered")
 
     def test_bar_count_equals_all_axes_when_fully_measured(self):
+        # Single direction → 1 panel → exactly len(FP.AXES) bars.
         n_bars = self.html.count('class="refread-row"')
         self.assertEqual(n_bars, len(FP.AXES),
-                         f"expected {len(FP.AXES)} bars (all axes measured), got {n_bars}")
+                         f"expected {len(FP.AXES)} bars (all axes measured, 1 panel), got {n_bars}")
 
     def test_bars_use_bar_html_structure(self):
         self.assertIn('class="refread-barwrap"', self.html,
@@ -192,12 +197,14 @@ class ReferenceReadBars(unittest.TestCase):
 
 
 class ReferenceReadOmitsMissingAxes(unittest.TestCase):
-    """RC-INV-1: an axis the run did not measure must be omitted, never drawn at zero."""
+    """RC-INV-1: an axis the run did not measure must be omitted, never drawn at zero.
+
+    Both tests use a SINGLE-direction fixture so bar counts are unambiguous (1 panel)."""
 
     def test_nan_axis_is_omitted_from_bars(self):
         raw = {ax: 0.0 for ax in FP.AXES}
         raw["pad_bright"] = float("nan")   # unmeasured
-        dirs = {"Near": _zfp(tempo=0.2), "FarDir": _zfp(tempo=9.0)}
+        dirs = {"Near": _zfp(tempo=0.2)}    # single direction → 1 panel
         html = build_widget.render_reference_read(raw, dirs, _norm_identity())
         n_bars = html.count('class="refread-row"')
         expected = len(FP.AXES) - 1   # all but pad_bright
@@ -208,9 +215,8 @@ class ReferenceReadOmitsMissingAxes(unittest.TestCase):
 
     def test_axis_missing_from_centroid_is_omitted(self):
         raw = {ax: 0.0 for ax in FP.AXES}
-        # Centroid missing 'bass_share'
-        dirs = {"Near": {ax: 0.0 for ax in FP.AXES if ax != "bass_share"},
-                "FarDir": _zfp(tempo=9.0)}
+        # Centroid missing 'bass_share' — single direction → 1 panel → unambiguous count
+        dirs = {"Near": {ax: 0.0 for ax in FP.AXES if ax != "bass_share"}}
         html = build_widget.render_reference_read(raw, dirs, _norm_identity())
         n_bars = html.count('class="refread-row"')
         self.assertEqual(n_bars, len(FP.AXES) - 1,
@@ -261,6 +267,93 @@ class ReferenceReadMostDivergentFirst(unittest.TestCase):
         self.assertTrue(labels, "must have at least one label")
         self.assertEqual(labels[0], "Brightness",
                          f"most-divergent axis (Brightness) must be first; got {labels[0]}")
+
+
+class ReferenceReadTabSelector(unittest.TestCase):
+    """§D.10.1 tab selector: up to 3 direction tabs, nearest first, coloured by own level.
+    1 direction → no tab bar; 2–3 → tab buttons present; JS switches panels client-side."""
+
+    def _two_dir_html(self):
+        """2 qualifying directions: Near (CLOSE) and FarDir (MID as last)."""
+        dirs = {"Near": _zfp(tempo=0.2), "FarDir": _zfp(tempo=9.0)}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
+        )
+
+    def test_single_direction_no_tab_bar(self):
+        """1 qualifying direction → no .reftabs element (monotonic ladder: 1 tab = no tab bar)."""
+        dirs = {"Near": _zfp(tempo=0.2)}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
+        )
+        self.assertNotIn('class="reftabs"', html,
+                         "single direction must produce no tab bar")
+        self.assertIn('class="refpanel"', html,
+                      "single direction must still produce a refpanel content block")
+
+    def test_two_directions_produce_tab_buttons(self):
+        html = self._two_dir_html()
+        self.assertIn('class="reftabs"', html,
+                      "two qualifying directions must produce a .reftabs tab bar")
+        self.assertIn('class="reftab active"', html,
+                      "first (nearest) tab must be active by default")
+        self.assertIn('class="reftab"', html,
+                      "at least one non-active tab must be present")
+
+    def test_two_directions_produce_two_panels(self):
+        html = self._two_dir_html()
+        self.assertEqual(html.count('class="refpanel"'), 2,
+                         "two qualifying directions must produce exactly two .refpanel elements")
+
+    def test_first_panel_visible_by_default(self):
+        """Nearest direction panel has no display:none (default active)."""
+        html = self._two_dir_html()
+        # The first panel has no style="display:none"; subsequent ones do.
+        import re
+        panels = re.findall(r'<div class="refpanel"([^>]*)>', html)
+        self.assertTrue(panels, "must have at least one refpanel")
+        self.assertNotIn('display:none', panels[0],
+                         "first (active) panel must not be hidden")
+        if len(panels) > 1:
+            self.assertIn('display:none', panels[1],
+                          "second panel must be hidden until tab is clicked")
+
+    def test_nearest_tab_coloured_by_close_level(self):
+        """The nearest direction tab is coloured green (#2e9e5b) when level is CLOSE."""
+        dirs = {"Near": _zfp(tempo=0.1), "FarDir": _zfp(tempo=9.0)}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
+        )
+        import re
+        lean = SC.leans_toward(_zfp(), dirs)
+        if lean and lean.level == SC.CLOSE:
+            self.assertIn("#2e9e5b", html, "CLOSE nearest tab must use green")
+
+    def test_tab_js_present_for_multi_direction(self):
+        """Client-side JS for tab switching must be present when ≥2 tabs exist."""
+        html = self._two_dir_html()
+        self.assertIn('querySelectorAll(".reftab")', html,
+                      "tab-switching JS must be embedded for multi-direction selector")
+        self.assertIn('querySelectorAll(".refpanel")', html,
+                      "panel-switching JS must be embedded")
+
+    def test_no_tab_js_for_single_direction(self):
+        """No tab-switching JS when only 1 direction qualifies."""
+        dirs = {"Near": _zfp(tempo=0.2)}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
+        )
+        self.assertNotIn('querySelectorAll(".reftab")', html,
+                         "no tab JS for single-direction (no tabs to switch)")
+
+    def test_bar_count_per_panel_equals_axes_count(self):
+        """Each panel must contain bars for all fully-measured axes (len(FP.AXES) per panel)."""
+        html = self._two_dir_html()
+        n_bars = html.count('class="refread-row"')
+        n_panels = html.count('class="refpanel"')
+        self.assertGreater(n_panels, 0, "must have at least one panel")
+        self.assertEqual(n_bars, n_panels * len(FP.AXES),
+                         f"expected {n_panels}×{len(FP.AXES)}={n_panels*len(FP.AXES)} bars, got {n_bars}")
 
 
 class ReferenceReadDetailedOnly(unittest.TestCase):

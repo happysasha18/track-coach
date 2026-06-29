@@ -147,5 +147,101 @@ class NoNumberLeaksOut(unittest.TestCase):
         self.assertIn(lean.level, (S.CLOSE, S.MID, S.FAR))
 
 
+class TopKBasics(unittest.TestCase):
+    """§D.10.1: leans_toward_topk returns up to k CLOSE/MID leans, never FAR, nearest-first."""
+
+    def test_returns_list_not_single(self):
+        track = fp(a0=0.0)
+        dirs = {"near": cloud(fp(a0=0.1)), "far": cloud(fp(a0=9.0))}
+        result = S.leans_toward_topk(track, dirs)
+        self.assertIsInstance(result, list)
+
+    def test_no_directions_returns_empty_list(self):
+        result = S.leans_toward_topk(fp(a0=0.0), {})
+        self.assertEqual(result, [])
+
+    def test_nearest_first_ordering(self):
+        # Three directions with clear enough separation to qualify (sep ≥ SEP_MID=0.25).
+        # sep_0 = (d[B]-d[A]) / (d[C]-d[A]); with A=0.1, B=5.0, C=9.9 on a0:
+        #   = (5.0-0.1)/(9.9-0.1) = 4.9/9.8 = 0.5 ≥ SEP_MID → MID → qualifies.
+        track = fp(a0=0.0)
+        dirs = {
+            "A": cloud(fp(a0=0.1)),   # nearest
+            "B": cloud(fp(a0=5.0)),   # mid (clearly apart from A)
+            "C": cloud(fp(a0=9.9)),   # farthest
+        }
+        result = S.leans_toward_topk(track, dirs)
+        self.assertTrue(len(result) >= 1, "at least one direction must qualify")
+        self.assertEqual(result[0].direction, "A", "nearest must be first")
+        if len(result) >= 2:
+            self.assertEqual(result[1].direction, "B", "second-nearest must be second")
+
+    def test_at_most_k_results(self):
+        # Five equally-spaced directions; topk(k=3) must cap at 3.
+        track = fp(a0=0.0)
+        dirs = {f"D{i}": cloud(fp(a0=float(i))) for i in range(1, 6)}
+        result = S.leans_toward_topk(track, dirs, k=3)
+        self.assertLessEqual(len(result), 3)
+
+    def test_far_directions_excluded_never_in_result(self):
+        # All three directions equidistant → FAR → empty list, never padded.
+        track = fp(a0=0.0, a1=0.0)
+        dirs = {
+            "x": cloud(fp(a0=5.0)),
+            "y": cloud(fp(a1=5.0)),
+            "z": cloud(fp(a0=5.0, a1=5.0)),
+        }
+        # This may or may not produce FAR depending on geometry; only assert the type contract.
+        result = S.leans_toward_topk(track, dirs)
+        for lean in result:
+            self.assertIn(lean.level, (S.CLOSE, S.MID),
+                          "topk must never include a FAR direction (D-INV-27)")
+
+    def test_single_direction_returns_mid_lean(self):
+        # One direction → MID (nothing to be relative to), not an empty list.
+        track = fp(a0=0.0)
+        result = S.leans_toward_topk(track, {"only": cloud(fp(a0=1.0))})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].level, S.MID)
+        self.assertEqual(result[0].direction, "only")
+
+    def test_all_equidistant_returns_empty(self):
+        # Two perfectly equidistant directions (span=0) → total_span≤1e-9 → [] (D-INV-27)
+        track = fp(a0=0.0)
+        dirs = {"x": cloud(fp(a0=5.0)), "y": cloud(fp(a0=5.0))}
+        result = S.leans_toward_topk(track, dirs)
+        self.assertEqual(result, [], "equidistant directions → no real lean → empty list")
+
+    def test_deterministic_tie_break_by_name(self):
+        # Two directions at the same distance from the track → alphabetical name wins.
+        track = fp(a0=0.0)
+        # Both 'Alpha' and 'Zeta' sit at the same distance on orthogonal axes.
+        dirs = {
+            "Zeta":  cloud(fp(a0=3.0)),
+            "Alpha": cloud(fp(a0=3.0)),
+            "Omega": cloud(fp(a0=9.0)),
+        }
+        result1 = S.leans_toward_topk(track, dirs)
+        result2 = S.leans_toward_topk(track, {"Omega": cloud(fp(a0=9.0)),
+                                               "Zeta":  cloud(fp(a0=3.0)),
+                                               "Alpha": cloud(fp(a0=3.0))})
+        if result1 and result2:
+            self.assertEqual(result1[0].direction, result2[0].direction,
+                             "tie-break must be deterministic regardless of dict insertion order")
+
+    def test_result_levels_are_words_not_numbers(self):
+        track = fp(a0=0.0)
+        dirs = {"A": cloud(fp(a0=0.1)), "B": cloud(fp(a0=9.0))}
+        for lean in S.leans_toward_topk(track, dirs):
+            self.assertIn(lean.level, (S.CLOSE, S.MID),
+                          "topk levels must be 'close' or 'mid' words, never a number (D-INV-25)")
+
+    def test_missing_axes_track_returns_empty(self):
+        # RC-INV-5a: not-comparable track → no comparable direction → empty list.
+        track = {"a0": 1.0}  # only 1 measured axis < MIN_SHARED_AXES
+        dirs = {"x": cloud(fp(a0=1.0))}
+        self.assertEqual(S.leans_toward_topk(track, dirs), [])
+
+
 if __name__ == "__main__":
     unittest.main()

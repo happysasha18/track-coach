@@ -62,6 +62,43 @@ def leans_toward(track, directions, min_shared=C.MIN_SHARED_AXES):
     return Lean(scored[0][1], level, None, scored[0][2])
 
 
+def leans_toward_topk(track, directions, k=3, min_shared=C.MIN_SHARED_AXES):
+    """§D.10.1. Up to k Lean objects, nearest-first, ONLY CLOSE or MID directions (never FAR).
+
+    Returns [] when no direction qualifies — surface shows 'no close direction yet'.
+    Never pads to k with weak/far filler (D-INV-27).
+
+    Level per entry: the gap from d[i] to d[i+1], divided by the FULL span d[-1]−d[0], using
+    the same SEP_CLOSE / SEP_MID thresholds as _lean_level (D-INV-26). The last direction in the
+    scored list (nothing further to compare against) gets MID, matching the single-direction rule.
+    Collection stops at the first FAR: if direction i doesn't stand apart from direction i+1,
+    nothing further qualifies either (the gap only gets smaller in relative terms).
+
+    Ties are broken by direction name for deterministic ordering (D-INV-27 / deterministic-order).
+    """
+    scored = C.nearest(track, directions, min_shared)        # ascending, axis-count-fair
+    if not scored:
+        return []
+    # Deterministic secondary sort by name so equal-distance directions always list in the same order.
+    scored = sorted(scored, key=lambda t: (t[0], t[1]))
+    n = len(scored)
+    total_span = scored[-1][0] - scored[0][0]
+    result = []
+    for i in range(min(k, n)):
+        if i == n - 1:
+            level = MID                                      # last remaining: lean, nothing to compare to
+        elif total_span <= 1e-9:
+            # All directions equidistant (including the two-direction tie case) — no real lean.
+            break
+        else:
+            sep = (scored[i + 1][0] - scored[i][0]) / total_span
+            level = CLOSE if sep >= SEP_CLOSE else (MID if sep >= SEP_MID else FAR)
+        if level == FAR:
+            break                                            # nearest doesn't stand apart → none qualify
+        result.append(Lean(scored[i][1], level, None, scored[i][2]))
+    return result
+
+
 def _own_buckets(track_id, library, min_shared):
     """Distances from `track_id` to every OTHER comparable library track, ascending, with the
     library-wide tercile cuts used to bucket them (D-27 basis)."""

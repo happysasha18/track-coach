@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.32"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.33"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2172,45 +2172,11 @@ def _read_html(narrative_md):
     return "".join(block(b) for b in re.split(r"\n{2,}", narrative_md))
 
 
-def render_reference_read(track_raw_fp, directions, norm):
-    """§D.10.3 — pure-ish reference-read HTML block.
+def _refread_bars_html(track_z, centroid_z):
+    """Compute per-facet bar rows HTML for one direction centroid. Pure. Returns (rows_html, summary)
+    or ('', '') when no shared measured axes exist (RC-INV-1)."""
+    import fingerprints as FP
 
-    Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
-    and the z-norm params {"mu":{}, "sd":{}}. Returns the complete <div id="refRead">
-    HTML, or '' when:
-      • track_raw_fp or directions are absent;
-      • fingerprint can't be normalised (all axes missing);
-      • the lean is FAR — nothing honest to show per SPEC §D.10.3.
-    No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
-    """
-    import fingerprints as FP          # same scripts/ dir; lazy to avoid hard dep at import time
-    import similarity_columns as SC
-
-    if not track_raw_fp or not directions:
-        return ""
-
-    # Z-normalise the track using the same norm used to build the centroids
-    track_z = FP.normalize_fingerprint(track_raw_fp, norm)
-
-    # Find nearest direction
-    lean = SC.leans_toward(track_z, directions)
-    if lean is None:
-        return ""
-
-    level_color = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
-    if lean.level == SC.FAR:
-        return (
-            '<div id="refRead" class="panel">'
-            '<h2>Reference direction</h2>'
-            '<p class="refread-hdr" style="color:#8b94a8">No close direction yet</p>'
-            '</div>'
-        )
-
-    direction = lean.direction
-    centroid_z = directions[direction]
-
-    # Per-facet signed z-offsets: track_z[axis] − centroid_z[axis].
-    # Omit any axis missing from either side (RC-INV-1: missing ≠ "same as them").
     offsets = []
     for axis in FP.AXES:
         tv = track_z.get(axis)
@@ -2225,7 +2191,7 @@ def render_reference_read(track_raw_fp, directions, norm):
         offsets.append((axis, float(tv) - float(cv)))
 
     if not offsets:
-        return ""
+        return "", ""
 
     # Most-divergent first (largest |offset| at top).
     offsets.sort(key=lambda t: abs(t[1]), reverse=True)
@@ -2238,7 +2204,6 @@ def render_reference_read(track_raw_fp, directions, norm):
     summary = (f"Closest on: {' · '.join(closest_labels)}"
                f" · Furthest on: {' · '.join(furthest_labels)}")
 
-    # Bar rows — centroid at 50% (zero), track as signed offset.
     rows_html = []
     for axis, offset in offsets:
         label = _AXIS_LABELS.get(axis, axis)
@@ -2254,15 +2219,100 @@ def render_reference_read(track_raw_fp, directions, norm):
             f'</div>'
             f'</div>'
         )
+    return ''.join(rows_html), summary
+
+
+def render_reference_read(track_raw_fp, directions, norm):
+    """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
+
+    Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
+    and the z-norm params {"mu":{}, "sd":{}}. Returns the complete <div id="refRead">
+    HTML, or '' when:
+      • track_raw_fp or directions are absent;
+      • fingerprint can't be normalised (all axes missing);
+      • no direction qualifies (all FAR — nothing honest to show per SPEC §D.10.1).
+    No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
+
+    When 1 direction qualifies: single header, no tab bar (monotonic ladder: 1 tab = no tabs).
+    When 2–3 qualify: tab buttons (nearest-first, each coloured by its own level), default = nearest.
+    JS switches panels client-side — ephemeral view state, no analysis recompute (D-INV-28).
+    """
+    import fingerprints as FP          # same scripts/ dir; lazy to avoid hard dep at import time
+    import similarity_columns as SC
+
+    if not track_raw_fp or not directions:
+        return ""
+
+    # Z-normalise the track using the same norm used to build the centroids
+    track_z = FP.normalize_fingerprint(track_raw_fp, norm)
+
+    # Up to 3 qualifying directions, nearest-first, CLOSE/MID only (§D.10.1)
+    leans = SC.leans_toward_topk(track_z, directions)
+
+    if not leans:
+        return (
+            '<div id="refRead" class="panel">'
+            '<h2>Reference direction</h2>'
+            '<p class="refread-hdr" style="color:#8b94a8">No close direction yet</p>'
+            '</div>'
+        )
+
+    # Build one content panel per qualifying direction
+    panels_html = []
+    for i, lean in enumerate(leans):
+        level_color = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
+        centroid_z = directions[lean.direction]
+        rows_html, summary = _refread_bars_html(track_z, centroid_z)
+        if not rows_html:
+            continue                                        # no shared measured axes — skip this direction
+        hidden = ' style="display:none"' if i > 0 else ""
+        panels_html.append(
+            f'<div class="refpanel" data-didx="{i}"{hidden}>'
+            f'<p class="refread-hdr">Leans toward'
+            f' <strong style="color:{level_color}">{_esc(lean.direction)}</strong></p>'
+            f'<p class="refread-summary">{_esc(summary)}</p>'
+            f'<div class="refread-bars">{rows_html}</div>'
+            f'</div>'
+        )
+
+    if not panels_html:
+        return ""   # all directions had no shared axes (degenerate)
+
+    # Tab buttons: only rendered when ≥2 panels (1 qualifying direction → no tab bar)
+    tabs_html = ""
+    if len(panels_html) > 1:
+        btns = ""
+        for i, lean in enumerate(leans[:len(panels_html)]):
+            col = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
+            active = ' class="reftab active"' if i == 0 else ' class="reftab"'
+            btns += (f'<button{active} data-didx="{i}" style="color:{col}">'
+                     f'{_esc(lean.direction)}</button>')
+        tabs_html = f'<div class="reftabs">{btns}</div>'
+
+    # Inline tab-switching JS (ephemeral view state, D-INV-28 — never persists across reload)
+    tab_js = ""
+    if len(panels_html) > 1:
+        tab_js = (
+            '<script>(function(){'
+            'var rd=document.getElementById("refRead");if(!rd)return;'
+            'var btns=rd.querySelectorAll(".reftab");'
+            'var panels=rd.querySelectorAll(".refpanel");'
+            'btns.forEach(function(b){'
+            'b.addEventListener("click",function(){'
+            'var idx=b.dataset.didx;'
+            'btns.forEach(function(x){x.classList.toggle("active",x.dataset.didx===idx);});'
+            'panels.forEach(function(p){p.style.display=p.dataset.didx===idx?"":"none";});'
+            '});});'
+            '})()</script>'
+        )
 
     return (
         '<div id="refRead" class="panel">'
-        '<h2>How you sit vs the nearest direction</h2>'
-        f'<p class="refread-hdr">Leans toward'
-        f' <strong style="color:{level_color}">{_esc(direction)}</strong></p>'
-        f'<p class="refread-summary">{_esc(summary)}</p>'
-        '<div class="refread-bars">' + ''.join(rows_html) + '</div>'
-        '</div>'
+        '<h2>How you sit vs the direction</h2>'
+        + tabs_html
+        + ''.join(panels_html)
+        + tab_js
+        + '</div>'
     )
 
 
@@ -2346,8 +2396,14 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
    repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
    The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
-/* Reference read (§D.10.3): per-facet bar chart vs nearest direction — Detailed-only */
+/* Reference read (§D.10.1/§D.10.3): up-to-3 tab selector + per-facet bars — Detailed-only */
 body.simple #refRead{display:none!important}
+#refRead .reftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+#refRead .reftab{background:var(--panel2);border:1px solid var(--line);border-radius:20px;
+ padding:3px 13px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s}
+#refRead .reftab.active{border-color:currentColor;opacity:1}
+#refRead .reftab:not(.active){opacity:.55}
+#refRead .reftab:hover{opacity:.85}
 #refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
 #refRead .refread-bars{display:flex;flex-direction:column;gap:8px}
