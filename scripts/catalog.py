@@ -26,6 +26,17 @@ from pathlib import Path
 
 import library  # same scripts/ dir; reuses load_index + the pure metric/version helpers
 import build_widget  # for TC_VERSION only (stdlib-only import) — stamp the catalog with its version
+import fingerprints as FP  # 14-axis extraction + z-normalisation
+import similarity_columns as SC  # leans_toward / nearest_own geometry
+
+# Path to the pre-built reference-direction centroids + normalization params.
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+_REF_FILE = _DATA_DIR / "reference_directions.json"
+
+# Level → colour for the two similarity columns (owner decision 2026-06-29).
+# Reference column: close=green, mid=amber, far → "no close direction yet" (grey, no red).
+# Sibling column:   close=green, mid=amber, far=red (allowed as last-resort per F-INV-1).
+_SIM_COL = {"close": "#2e9e5b", "mid": "#d8932a", "far": "#c2503d"}
 
 PALETTE = {  # slim copy of the build_widget dark theme so the catalog feels like the widgets
     "bg": "#0c0e14", "panel": "#141822", "panel2": "#1b2030", "line": "#2a3142",
@@ -206,6 +217,34 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
+def _lean_cell(lean) -> str:
+    """Render the 'leans toward' TD for a row.
+    If the lean is None or level is FAR, show a grey 'no close direction yet' message.
+    Otherwise colour the direction name (close=green, mid=amber) as a clickable link.
+    No red for the reference column — owner decision 2026-06-29."""
+    if lean is None or lean.level == SC.FAR:
+        return '<td class="c-sim c-lean"><span class="sim-none">no close direction yet</span></td>'
+    col = _SIM_COL[lean.level]
+    dn = html.escape(lean.direction)
+    return f'<td class="c-sim c-lean"><a class="sim-dir" href="#" style="color:{col}">{dn}</a></td>'
+
+
+def _siblings_cell(siblings, title_map: dict, href_map: dict) -> str:
+    """Render the 'similar in your library' TD for a row.
+    Up to 3 siblings, each as a coloured chip link. FAR siblings are allowed here (F-INV-1).
+    Uses title_map for display labels and href_map for widget links."""
+    if not siblings:
+        return '<td class="c-sim c-sibs"><span class="sim-none">—</span></td>'
+    chips = ""
+    for sib in siblings:
+        col = _SIM_COL[sib.level]
+        label = html.escape(title_map.get(sib.track) or sib.track.replace("_", " "))
+        href = html.escape(href_map.get(sib.track) or "#")
+        chips += (f'<a class="sib-chip" href="{href}" '
+                  f'style="border-color:{col}66;color:{col}">{label}</a>')
+    return f'<td class="c-sim c-sibs">{chips}</td>'
+
+
 def _tag_chips(mood, style, source):
     chips = "".join(f'<span class="tag mood">{html.escape(str(t))}</span>' for t in (mood or []))
     chips += "".join(f'<span class="tag style">{html.escape(str(t))}</span>' for t in (style or []))
@@ -252,7 +291,7 @@ def _open_href(e, widgets_rel):
     return f"{widgets_rel}/{widget}" if widget else ""
 
 
-def _row(track, ver, widgets_rel, uid=0, mix_uri=None):
+def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=None):
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
     href = _open_href(e, widgets_rel)
@@ -286,6 +325,8 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None):
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
+ {_lean_cell(e.get('_lean'))}
+ {_siblings_cell(e.get('_siblings') or [], title_map or {{}}, href_map or {{}})}
 </tr>"""
 
 
@@ -296,21 +337,39 @@ _HEADERS = [
     ("track", "Track"), ("version", "Version"), ("date", "Date"), (None, "Signature"),
     ("bpm", "BPM"), ("key", "Key"), ("len", "Length"), ("lufs", "LUFS"),
     (None, "Mood / style"), ("mode", "Mode"),
+    (None, "Leans toward"), (None, "Similar in library"),
 ]
 _NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the header count
 
 
 def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library") -> str:
-    """Render the whole catalog page from index entries. PURE (no filesystem)."""
+    """Render the whole catalog page from index entries. PURE (no filesystem).
+
+    Sim data (`_lean`, `_siblings`) is expected pre-injected into each entry dict by
+    build_catalog (same pattern as `mix_uri`). Gracefully degrades when absent (old entries
+    without run dirs show 'no close direction yet' / '—').
+    """
     groups = library.group_versions(entries)
     n_tracks = len(groups)
     n_versions = sum(len(v) for v in groups.values())
+
+    # Pre-build lookup maps from ALL entries (pure: _open_href is pure).
+    # Used to resolve sibling display labels and widget links.
+    _title_map = {}
+    _href_map = {}
+    for e in entries:
+        t = e.get("track")
+        if t:
+            _title_map[t] = e.get("title") or t.replace("_", " ")
+            _href_map[t] = _open_href(e, widgets_rel)
+
     body_rows = []
     uid = 0
     for track in sorted(groups, key=str.lower):
         for ver in groups[track]:
             body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
-                                  mix_uri=ver["rep"].get("mix_uri")))
+                                  mix_uri=ver["rep"].get("mix_uri"),
+                                  title_map=_title_map, href_map=_href_map))
             uid += 1
     rows_html = "\n".join(body_rows) or (
         f'<tr><td colspan="{_NCOLS}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
@@ -382,13 +441,23 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .tag.draft{{background:transparent;border:1px dashed var(--line);color:var(--muted);font-style:italic}}
 .mode{{font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}}
 .mode.full{{background:rgba(70,211,154,.14);color:var(--good)}}.mode.quick{{background:rgba(255,209,102,.14);color:var(--bright)}}
-/* Responsive columns: on a non-maximised window the 10-col table doesn't fit, and nowrap cells
+/* Similarity columns (§D.10 / §F — added 2026-06-29) */
+.c-sim{{min-width:110px;font-size:11.5px;vertical-align:middle}}
+.sim-none{{color:var(--muted);font-style:italic;font-size:11px}}
+.sim-dir{{font-weight:600;text-decoration:none}}
+.sim-dir:hover{{text-decoration:underline}}
+.sib-chip{{display:inline-block;background:var(--panel2);border:1px solid;border-radius:6px;
+ padding:1px 7px;margin:0 3px 3px 0;font-size:10.5px;text-decoration:none;white-space:nowrap}}
+.sib-chip:hover{{opacity:.85}}
+/* Responsive columns: on a non-maximised window the 12-col table doesn't fit, and nowrap cells
    would force an ugly horizontal-scroll clip (Sasha 2026-06-20: "если не на полный экран таблица
-   странно показывается"). Progressively drop the least-important columns — mood/style + mode → date —
-   keeping the core spec (signature, BPM, key, length, LUFS). overflow-x:auto is the last-resort
-   fallback below the smallest breakpoint. */
+   странно показывается"). Progressively drop the least-important columns — sim cols + mood/style +
+   mode → date — keeping the core spec (signature, BPM, key, length, LUFS). overflow-x:auto is the
+   last-resort fallback below the smallest breakpoint. */
 @media(max-width:1100px){{thead th:nth-child(9),tbody td:nth-child(9),
- thead th:nth-child(10),tbody td:nth-child(10){{display:none}}}}                              /* mood/style + mode */
+ thead th:nth-child(10),tbody td:nth-child(10),
+ thead th:nth-child(11),tbody td:nth-child(11),
+ thead th:nth-child(12),tbody td:nth-child(12){{display:none}}}}      /* mood/style + mode + sim cols */
 @media(max-width:880px){{thead th:nth-child(3),tbody td:nth-child(3){{display:none}};
  .wrap{{padding:18px 12px 48px}};tbody td,thead th{{padding:6px 8px}}}}                        /* date */
 .empty{{text-align:center;color:var(--muted);padding:40px}}
@@ -496,6 +565,39 @@ def _mix_uri_for(e) -> str | None:
     return mix.as_uri() if mix.exists() else None
 
 
+def _load_sim_data(entries: list) -> tuple[dict, dict]:
+    """Load reference directions + z-norm params, build z-normalised own-track library.
+    Returns (directions_dict, z_library_dict). Both are empty when the reference file is
+    absent — sim columns gracefully show 'no close direction yet' / '—' for all rows."""
+    if not _REF_FILE.exists():
+        return {}, {}
+    try:
+        raw = json.loads(_REF_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}, {}
+    norm = raw.get("_norm") or {}
+    # Replace JSON null with float('nan') so completeness.is_missing() works
+    import math
+    def _fix_none(v):
+        return float("nan") if v is None else v
+    directions = {}
+    for k, v in raw.items():
+        if k.startswith("_") or not isinstance(v, dict):
+            continue
+        directions[k] = {ax: _fix_none(vv) for ax, vv in v.items()}
+
+    z_library = {}
+    for e in entries:
+        key = e.get("track")
+        src = e.get("src_run_dir")
+        if not key or not src:
+            continue
+        fp = FP.fingerprint_from_run_dir(src)
+        if fp and norm:
+            z_library[key] = FP.normalize_fingerprint(fp, norm)
+    return directions, z_library
+
+
 def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     """Read index.json, write index.html into the library root. Returns the path."""
     root = Path(root) if root else library.library_root()
@@ -503,6 +605,20 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     entries = idx.get("entries", [])
     for e in entries:                      # probe each run for a playable web mix (graceful if none)
         e["mix_uri"] = _mix_uri_for(e)
+
+    # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here,
+    # pure renderer reads the pre-computed fields via e["_lean"] / e["_siblings"]).
+    directions, z_library = _load_sim_data(entries)
+    for e in entries:
+        key = e.get("track")
+        fp = z_library.get(key)
+        if fp and directions:
+            e["_lean"] = SC.leans_toward(fp, directions)
+            e["_siblings"] = SC.nearest_own(key, z_library)
+        else:
+            e["_lean"] = None
+            e["_siblings"] = []
+
     html_str = render_catalog_html(entries)
     out = root / "index.html"
     root.mkdir(parents=True, exist_ok=True)

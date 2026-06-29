@@ -28,7 +28,29 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.8.31"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.8.32"   # Track Coach analyzer version (early; bump as it matures)
+
+# ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
+_AXIS_LABELS = {
+    "tempo":        "Tempo",
+    "dynamics":     "Dynamic range",
+    "stereo":       "Stereo width",
+    "brightness":   "Brightness",
+    "density":      "Density",
+    "energy_build": "Energy build",
+    "drums_share":  "Drums share",
+    "bass_share":   "Bass share",
+    "other_share":  "Synth / pad share",
+    "lead_share":   "Lead share",
+    "bass_sustain": "Bass sustain",
+    "pad_sustain":  "Pad sustain",
+    "pad_notes":    "Pad note rate",
+    "pad_bright":   "Pad brightness",
+}
+_REF_LEVEL_COLOR = {"close": "#2e9e5b", "mid": "#d8932a"}
+_REF_BAR_COLOR   = "#6b5fa0"   # muted purple track-offset bar
+_REF_MAX_Z       = 3.0         # z-offsets beyond this clip to full bar width
+_REF_MAX_PCT     = 44          # max half-bar width in %
 
 BAND_ORDER = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 BAND_LABEL = {  # frequency ranges — language-neutral, never translated
@@ -1815,7 +1837,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
                back_href=None, audio_mix_rel=None, per_stem_selfsim=None, per_stem_notes=None,
-               per_stem_core=None):
+               per_stem_core=None, run_dir=None):
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -2060,6 +2082,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     # and the toggle JS bails on quick so the body never enters Simple → evidence + recs stay visible.
     view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
                    if _q else '<div class="viewtoggle" id="viewToggle"></div>')
+    # §D.10.3 — reference read: Detailed-only; skipped for quick (no fingerprint) and when run_dir absent.
+    ref_read_html = _ref_read_html(run_dir) if not _q else ""
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
             .replace("__BODYCLASS__", "quick" if _q else "")
             .replace("__MODEBADGE__", badge_html)
@@ -2068,6 +2092,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             .replace("__READTITLE__", read_title)
             .replace("__READPANELSTYLE__", read_panel_style)
             .replace("__READBODY__", read_body)
+            .replace("__REFREAD__", ref_read_html)
             .replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False)))
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved: {out_path}  (Track Coach v{TC_VERSION})")
@@ -2147,6 +2172,124 @@ def _read_html(narrative_md):
     return "".join(block(b) for b in re.split(r"\n{2,}", narrative_md))
 
 
+def render_reference_read(track_raw_fp, directions, norm):
+    """§D.10.3 — pure-ish reference-read HTML block.
+
+    Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
+    and the z-norm params {"mu":{}, "sd":{}}. Returns the complete <div id="refRead">
+    HTML, or '' when:
+      • track_raw_fp or directions are absent;
+      • fingerprint can't be normalised (all axes missing);
+      • the lean is FAR — nothing honest to show per SPEC §D.10.3.
+    No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
+    """
+    import fingerprints as FP          # same scripts/ dir; lazy to avoid hard dep at import time
+    import similarity_columns as SC
+
+    if not track_raw_fp or not directions:
+        return ""
+
+    # Z-normalise the track using the same norm used to build the centroids
+    track_z = FP.normalize_fingerprint(track_raw_fp, norm)
+
+    # Find nearest direction
+    lean = SC.leans_toward(track_z, directions)
+    if lean is None:
+        return ""
+
+    level_color = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
+    if lean.level == SC.FAR:
+        return (
+            '<div id="refRead" class="panel">'
+            '<h2>Reference direction</h2>'
+            '<p class="refread-hdr" style="color:#8b94a8">No close direction yet</p>'
+            '</div>'
+        )
+
+    direction = lean.direction
+    centroid_z = directions[direction]
+
+    # Per-facet signed z-offsets: track_z[axis] − centroid_z[axis].
+    # Omit any axis missing from either side (RC-INV-1: missing ≠ "same as them").
+    offsets = []
+    for axis in FP.AXES:
+        tv = track_z.get(axis)
+        cv = centroid_z.get(axis)
+        if tv is None or cv is None:
+            continue
+        try:
+            if math.isnan(float(tv)) or math.isnan(float(cv)):
+                continue
+        except (TypeError, ValueError):
+            continue
+        offsets.append((axis, float(tv) - float(cv)))
+
+    if not offsets:
+        return ""
+
+    # Most-divergent first (largest |offset| at top).
+    offsets.sort(key=lambda t: abs(t[1]), reverse=True)
+
+    # Summary: top 2–3 furthest + bottom 2–3 closest.
+    n = len(offsets)
+    n_ext = min(3, max(1, (n + 2) // 4))   # 1 for tiny, 2 for mid, 3 for full fingerprints
+    furthest_labels = [_AXIS_LABELS.get(ax, ax) for ax, _ in offsets[:n_ext]]
+    closest_labels  = [_AXIS_LABELS.get(ax, ax) for ax, _ in reversed(offsets[-n_ext:])]
+    summary = (f"Closest on: {' · '.join(closest_labels)}"
+               f" · Furthest on: {' · '.join(furthest_labels)}")
+
+    # Bar rows — centroid at 50% (zero), track as signed offset.
+    rows_html = []
+    for axis, offset in offsets:
+        label = _AXIS_LABELS.get(axis, axis)
+        pct = min(abs(offset) / _REF_MAX_Z, 1.0) * _REF_MAX_PCT
+        bar_left  = 50.0 if offset >= 0 else 50.0 - pct
+        bar_width = pct
+        rows_html.append(
+            f'<div class="refread-row">'
+            f'<span class="refread-label">{_esc(label)}</span>'
+            f'<div class="refread-barwrap">'
+            f'<div class="refread-center"></div>'
+            f'<div class="refread-bar" style="left:{bar_left:.1f}%;width:{max(bar_width, 0.5):.1f}%"></div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    return (
+        '<div id="refRead" class="panel">'
+        '<h2>How you sit vs the nearest direction</h2>'
+        f'<p class="refread-hdr">Leans toward'
+        f' <strong style="color:{level_color}">{_esc(direction)}</strong></p>'
+        f'<p class="refread-summary">{_esc(summary)}</p>'
+        '<div class="refread-bars">' + ''.join(rows_html) + '</div>'
+        '</div>'
+    )
+
+
+def _ref_read_html(run_dir):
+    """§D.10.3 — load fingerprint from disk + reference_directions.json, delegate to
+    render_reference_read. Returns '' when any input is missing or I/O fails."""
+    import fingerprints as FP
+
+    if not run_dir:
+        return ""
+    ref_path = Path(__file__).resolve().parent.parent / "data" / "reference_directions.json"
+    if not ref_path.exists():
+        return ""
+    try:
+        ref_data = json.loads(ref_path.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    norm       = ref_data.get("_norm", {})
+    directions = {k: v for k, v in ref_data.items() if k != "_norm"}
+    if not directions:
+        return ""
+    raw_fp = FP.fingerprint_from_run_dir(run_dir)
+    if raw_fp is None:
+        return ""
+    return render_reference_read(raw_fp, directions, norm)
+
+
 TEMPLATE = r"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Track Coach · __TITLE__</title>
@@ -2203,6 +2346,16 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
    repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
    The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
+/* Reference read (§D.10.3): per-facet bar chart vs nearest direction — Detailed-only */
+body.simple #refRead{display:none!important}
+#refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
+#refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+#refRead .refread-bars{display:flex;flex-direction:column;gap:8px}
+#refRead .refread-row{display:flex;align-items:center;gap:12px}
+#refRead .refread-label{flex:0 0 140px;font-size:12.5px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden}
+#refRead .refread-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:#3a3f52}
+#refRead .refread-bar{position:absolute;top:1px;height:10px;background:#6b5fa0;border-radius:4px;min-width:2px}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -2428,6 +2581,11 @@ __MODENOTE__
  <h2 id="readTitle">__READTITLE__</h2>
  <div id="readBody">__READBODY__</div>
 </div>
+
+<!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
+     per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
+     Empty string when quick mode, no run_dir, or lean is far. -->
+__REFREAD__
 
 <!-- Tonal balance — pulled OUT of the Evidence drawer (Sasha: "он прикольный") so it's always
      visible, sitting last before the collapsible. -->
@@ -3332,13 +3490,15 @@ def main():
         "analyzed_at": args.analyzed_at or datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     catalog = json.loads(Path(args.catalog).read_text()) if args.catalog and Path(args.catalog).exists() else None
+    # Derive run_dir from --core so the reference-read block can load the fingerprint (§D.10.3).
+    run_dir = str(Path(args.core).resolve().parent) if args.core else None
     build_html(core, detail, masking, als, args.out, args.title, S,
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,
                narrative_md=narrative_md, selfsim=selfsim, meta=meta, verdict=args.verdict, catalog=catalog,
                mode=args.mode, back_href=args.back_href, audio_mix_rel=args.audio_mix_rel,
                per_stem_selfsim=per_stem_selfsim or None, per_stem_notes=per_stem_notes or None,
-               per_stem_core=per_stem_core or None)
+               per_stem_core=per_stem_core or None, run_dir=run_dir)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
     try:

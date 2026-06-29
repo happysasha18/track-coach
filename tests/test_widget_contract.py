@@ -105,12 +105,12 @@ class SimpleViewGating(unittest.TestCase):
     """What the Simple view hides via CSS — the one thing the JSON payload can't tell us. The recurring
     incident was panels (player, read) silently CSS-hidden in Simple while their data still shipped."""
 
-    def test_gated_set_is_exactly_the_known_three(self):
+    def test_gated_set_is_exactly_the_known_four(self):
         # INV-18 (Sasha, 2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
-        # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey) and the recs panel filtered to
-        # non-timecoded cards (#recs). It must never creep to the transport, the read, or evidence.
+        # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey), the recs panel filtered to
+        # non-timecoded cards (#recs), and the reference read (#refRead — §D.10.3 Detailed-only).
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE))
-        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs"},
+        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refRead"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
 
     def test_evidence_drawer_is_always_visible(self):

@@ -1289,6 +1289,37 @@ can't tie to measurement; **★** appears only when measurement directly confirm
 sound and unambiguous (neither is ever decorative); no numbers, no grade (D-INV-25 stance); and "leans toward"
 + its plaque remain observation, never "you should sound like this" (D-INV-1). `D-INV-29`
 
+### D.10.3 The reference read — how you sit vs the direction's centroid, per facet — 0.9
+
+When you click your track in the catalog, the per-track widget opens a **reference read**: not a coloured
+word, but the geometry of how your track sits against the focused direction's **centroid** — the mean point
+of that artist's cloud in fingerprint space. This is where "the centroid and all that" is shown, for a
+producer who reads vectors. It is **not a map** (dropped, D-INV-11); it is a per-facet decomposition plus the
+overall closeness.
+
+**What it shows (Detailed, against the focused direction).**
+- **Per-facet comparison — your value vs the centroid, axis by axis.** For each producer facet (a fingerprint
+  axis), a small signed bar places the direction's centroid at zero and **your track as an offset** (more /
+  less), z-normalised so axes are comparable. You read where you overlap and where you part — "denser, but
+  darker and narrower than DeepChord" — dimension by dimension, never collapsed into one number. `D-INV-30`
+- **Ordered most-divergent first**, so "where you part from them" is at the top and the overlapping facets
+  sit below. `tags: most-divergent-first`
+- **The overall closeness is the same level/colour as the catalog** (D-INV-21/26) — one geometry shown twice;
+  a short honest summary names the extremes ("closest on groove, density · furthest on brightness, stereo").
+  No raw distance number on the surface (D-INV-25).
+- **The angle is the bars.** Which axes diverge and which way IS the per-facet decomposition (the direction of
+  the gap, not just its size); v1 shows no separate angle number. `tags: angle-as-decomposition`
+
+**How it composes.** Detailed-only — the deep read is depth (quick ⊆ Simple ⊆ Detailed): **Simple** keeps the
+one-line "leans toward X" prose, **quick** shows nothing (no fingerprint, D-INV-20). It reads against the
+direction the §D.10.1 tabs focus, and falls back to the nearest on a recompute that drops the focused one
+(D-INV-28). Completeness-aware: a facet the run didn't measure is **omitted, not drawn at zero** (missing ≠
+"same as them", RC-INV-1). Under the one references switch (D-INV-23). `tags: view-ladder · RC-INV-1 ·
+D-INV-23 · D-INV-28`
+
+**Never happens (safety).** No raw distance, score, or percentage; observation, never a grade (D-INV-1/25); a
+missing facet is never drawn as zero-divergence (it is left out). `D-INV-30`
+
 ## F. Similar in your own library — the DJ column (1.0)
 
 A second catalog column, sitting beside the reference one (§D.10), that answers a different question:

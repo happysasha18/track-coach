@@ -68,9 +68,10 @@ HIDE_QUICK = _hide_set(QUICK, "quick")
 HIDE_DETAILED = _hide_set(FULL, "detailed")
 
 # Elements Simple hides that quick does NOT CSS-hide are allowed ONLY if they are data-absent in quick
-# (the stem viz: quick has stems=none ⇒ #stemlanes/#seqKey are not produced — §5 data gate). A NEW
+# (the stem viz: quick has stems=none ⇒ #stemlanes/#seqKey are not produced — §5 data gate;
+# #refRead: quick skips _ref_read_html so __REFREAD__ is replaced with '' — §D.10.3 data gate). A NEW
 # element hidden in Simple but visible in quick that is NOT in this set is a ladder inversion.
-DATA_ABSENT_IN_QUICK = {"stemlanes", "seqKey"}
+DATA_ABSENT_IN_QUICK = {"stemlanes", "seqKey", "refRead"}
 
 
 class CssGatingContract(unittest.TestCase):
@@ -84,9 +85,10 @@ class CssGatingContract(unittest.TestCase):
         self.assertNotRegex(FULL, r"\.detailed\b[^{]*\{[^}]*display\s*:\s*none",
                             "INV-22: no .detailed display:none rule may exist")
 
-    def test_simple_hide_set_is_exactly_the_known_three(self):
-        # INV-22 + INV-18: Simple hides ONLY the deep stem viz and the non-timecoded recs.
-        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs"},
+    def test_simple_hide_set_is_exactly_the_known_four(self):
+        # INV-22 + INV-18: Simple hides ONLY the deep stem viz, the non-timecoded recs, and the
+        # reference read (§D.10.3 — Detailed-only).
+        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refRead"},
                          f"INV-22: Simple hide-set drifted: {sorted(HIDE_SIMPLE)}")
 
     def test_quick_hide_set_is_only_recs(self):
@@ -143,6 +145,7 @@ class LadderIsMonotonic(unittest.TestCase):
             "recs(non-timecoded)":     (0, 0, 1),   # quick+Simple show timecoded only; Detailed adds
             "recs(timecoded)":         (1, 1, 1),
             "readPanel":               (1, 1, 1),
+            "refRead":                 (0, 0, 1),   # §D.10.3 — Detailed-only; absent in quick (no fp)
             "tonalPanel":              (1, 1, 1),
             "evidence":                (1, 1, 1),   # INV-18 — every view
             "catalogPanel":            (1, 1, 1),
