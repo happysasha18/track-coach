@@ -1,138 +1,168 @@
 # track-coach
 
-**A full-stack compositional coach for music producers — a [Claude Code](https://claude.com/claude-code) skill.**
+**A local, fully-offline compositional coach for music producers — a [Claude Code](https://claude.com/claude-code) skill.**
 
-> ⚡ **It's a Claude Code skill, not a standalone app.** Drop the folder into `~/.claude/skills/track-coach/`, run `./setup.sh` once ([details ↓](#install)), then just talk to Claude about your track — *"why does this sound stuck?"*, *"analyse this project"*.
+Drop the folder into `~/.claude/skills/track-coach/`, run `./setup.sh` once, then just talk to Claude about your track. Point it at an audio file (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one self-contained offline HTML widget**.
 
-Give it a track (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one offline, self-contained HTML widget** with a synced multi-stem player, the real arrangement on a timeline, masking and rhythm diagnostics, and concrete, specific feedback — not *"energy is low,"* but *"bass masks the mids in 250–500 Hz during bars 8–24"* and *"the cutoff automation ends at 2:45 but brightness keeps rising to 3:10."*
+The widget is not a dashboard of numbers. It's a mirror: the synced player, the arrangement from your project, the graphs, and the cards all live on one page, all pointing at the same moments in the track — so you can hear what you're looking at.
 
-> **Status:** early. macOS-first. Built and refined hands-on. <sub>(the exact version is printed in every widget's footer and tracked in [`CHANGELOG.md`](CHANGELOG.md) — not pinned here, so it can't drift)</sub>
-
-![The calm Simple view — verdict, vitals, and the song at a glance](docs/hero.png)
+> **Status:** early and actively evolving. macOS-first (v1). The exact version is printed in every widget's footer and tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
-## What you get
+## Philosophy
 
-Everything runs by default — no need to ask for a "deep mode." You point it at a track; you get back one page that answers *what is this track, what's working, and what's holding it back* — with the receipts.
+The coach does two things, and keeps them distinct.
 
-- **The song at a glance.** A one-line verdict, a spec-sheet of vitals (BPM, key, length, LUFS), and a colour-coded **structure bar** — a returning section keeps its colour *and* its letter, so reprises are obvious — over the power curve broken into the lanes that drive it (energy, brightness, density, modulation, stereo width).
-- **Hear what you see.** A synced **multi-stem player** — play / seek / mute / solo, with the playhead linked to every chart. Click anywhere on a graph to jump there.
-- **What to change, ranked — with the receipts.** The few things that stood out, most important first: red = worth fixing, green = working, yellow = a creative choice. Each card is tied to a moment in the track *and* shows what it's based on — the signal or the combination behind it — so it's a specific move, never a vague *"add more energy."*
-- **A read of how the track moves.** Alongside the cards, a plain-language read of *how* the track develops — which dimensions actually grow (louder, brighter, busier, wider) and which sit idle — so you can see the shape of the arc, not just the numbers.
-- **It reads your project, not just the audio.** Point it at your Ableton set and the arrangement, automation envelopes and locators come straight from the `.als` — ground truth that stem separation can only approximate.
-- **Your whole catalog, one page.** Every analysis lands in a searchable **Library** of your body of work — one row per version, each with a spectral signature, the spec, and a **one-button player** so you can audition a track without even opening it.
+**The mirror** — player, graphs, arrangement, automation — shows what is actually there. It reads your project file directly rather than guessing from audio alone, so the arrangement view is ground truth, not an approximation.
 
-![The Library — one sortable row per track/version, each with a spectral-signature thumbnail, a one-button player, tags, and the spec numbers](docs/catalog.png)
+**The cards** fire selectively: where a section stalls, where a strong move is worth naming, where intention and result have visibly drifted apart. A card names the signal behind it (*"the bass and the lead overlapping around 290 Hz for half the track"*) so you always see what the advice rests on.
 
-<sub>**One row per version** (re-analyses of the same bounce collapse automatically, numbered v1…vN with LUFS/length/BPM deltas). Each row carries a **signature** — a spectral ribbon (height = energy, colour = brightness, weight = density) over a 9-band tonal strip — plus a **▶ preview player** whose scrubber rides the ribbon (click along the time-axis to seek), mood/style tags, the spec, and a **click on the track name** to open the full widget. Responsive (it sheds its least-important columns on a narrow window instead of clipping). Browse it offline; **← Library** in each widget brings you back.</sub>
+Three layers, always kept separate:
+
+1. **Measured** — exact numbers from `librosa` and Demucs, nothing inferred
+2. **What it means** — a concrete reading: not *"energy is low"* but *"bass dominates 250–500 Hz in the first two minutes; the mids are present but buried"*
+3. **Your call** — the creative decision stays yours; the coach names the pattern and shows its evidence
+
+The same track gives the same answer every time — it reports what it measured, not a re-improvised opinion.
 
 ---
 
-## A look at the output
+## What it analyses
 
-| The stem player (Detailed view) | What to change, ranked |
+**From the audio:**
+
+- Energy, brightness, density, modulation and stereo-width arcs over time; section structure (self-similarity / recurrence)
+- Demucs stem separation — up to 6 stems (htdemucs or htdemucs_6s); per-stem character labels derived from measurement (`kick`, `bass`, `lead`, `chord`, `pad`…), not raw Demucs names
+- Frequency masking between stems (e.g. *"bass masks mid in 250–500 Hz during bars 8–24"*)
+- Per-stem rhythm: onset density, timing, syncopation, separation confidence
+- Drum-hit breakdown: kick / snare / hat density in the drums stem
+- Note transcription (basic-pitch): pitch content per stem, polyphony, mono vs chord character
+- Vitals: tempo, key/scale, length, LUFS, true-peak dBTP, dynamic range, stereo width, phase correlation
+
+**From the Ableton `.als` (when provided):**
+
+- Every arrangement track: MIDI clips (note density → brightness) and audio clips, aligned to the rendered audio
+- Automation envelopes by target parameter (filter cutoff, gain, pitch, sends…)
+- Locators and time-signature changes
+- The render offset — which locator the bounce starts from — so project time and audio time line up exactly
+
+**Reference layer:**
+
+- The track is compared to named reference directions (other artists / styles). Each direction is a measured fingerprint; the widget shows how far the track "leans toward" each one, per facet.
+- Web-described style traits for each direction are cross-checked against measurement: ★ confirmed directly, ☆ confirmed indirectly, or flagged as "web says; our tracks don't show it." The web suggests — measurement decides.
+
+---
+
+## The widget
+
+One self-contained HTML file. Everything is offline; data is embedded. The player needs the co-located `stems_web/` folder for audio.
+
+**Synced player.** Play / seek / mute / solo; the playhead is linked to every chart. Click anywhere on any graph to jump there. In full mode, each stem has its own lane with stacked frequency bands (low / mid / high) so you can see *what* is playing, not just *that* something is.
+
+**Arrangement.** The real project arrangement straight from the `.als`: MIDI blocks (brightness = note density), audio-clip strips, and labelled locators — all aligned to the rendered audio on the same timeline as the player.
+
+**Intention vs. result.** Automation envelopes from the `.als` — filter, gain, pitch, sends — each scaled to its own range, plotted against the measured brightness arc. Where a curve flattens but the sound keeps moving, you can see where they drifted apart.
+
+**Stem ↔ project map.** Each Demucs stem is correlated against the real project tracks by envelope similarity. Confident matches are shown; ambiguous or near-silent stems are labelled honestly.
+
+**Reference read.** Per-facet bars comparing the track to each reference direction, with selectable direction tabs. Followed by a "What the web says about [artist]" panel: genre/era, a prose blurb, and the full trait list sorted by evidence strength. Both the widget panel and the standalone reference side page render from the same source, so they can't drift.
+
+**Recommendations.** A short ranked list — most important first — with the evidence behind each card and a concrete move. Timecoded cards seek the player to their moment on click.
+
+**Producer's read.** A plain-language account of how the track develops: which dimensions actually trend (louder, brighter, busier, wider) and which sit idle. Written into the widget from the analysis.
+
+All content panels are collapsible. The Evidence drawer (arrangement, stem map, rhythm, transcribed notes, tonal balance) is collapsed by default — available when you want the depth, out of the way when you don't.
+
+---
+
+## Views
+
+Three views on a monotonic ladder — each adds to the one before; nothing visible in a lighter view disappears in a heavier one.
+
+| View | What you see |
 |---|---|
-| ![the whole song decomposed into stem lanes under one transport](docs/stems.png) | ![ranked, colour-coded recommendations](docs/recommendations.png) |
+| **Quick read** | Verdict, vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. A note says what a full run adds. |
+| **Simple** (default, full analysis) | Everything in Quick, plus the full per-stem player. The Evidence drawer is available but collapsed. |
+| **Detailed** | Adds the per-stem visualisation lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
 
-<sub>**Left — the song decomposed:** the colour-coded structure bar and power curve over its driving lanes, then every stem on its own lane under one transport (play / seek / mute / solo, playhead linked to every chart). **Right — concrete feedback:** the few things that stood out, most important first. Specific and timestamped, never "energy is low."</sub>
+The view preference is remembered in `localStorage` — open any track and it lands in whichever view you used last. A first-time open defaults to Simple (calm). A `#detailed` link is a one-shot entry that doesn't change the stored preference.
 
-### It reads your project, not just the audio
-
-Point it at your Ableton set and it stops guessing. The arrangement comes straight from the `.als` — the ground truth that stem separation can only approximate.
-
-![The real arrangement from the .als — every project track, MIDI and audio, aligned to the audio](docs/arrangement.png)
-
-<sub>**Arrangement, from the project:** which real tracks actually play, and when. Solid blocks = MIDI (brightness = note density), thin strips = audio clips, labelled lines = locators — all aligned to the rendered audio.</sub>
-
-### Intention vs. result
-
-Your automation is what you *meant* to happen; the audio is what *did*. Track Coach plots the real envelopes from the `.als` — filter, gain, pitch, sends — each scaled to its own range, against the measured brightness (the faint dashed line in every lane). Where a curve flattens but the sound keeps moving, intention and result have drifted apart.
-
-![Automation envelopes from the project, each scaled to its own range, with the measured brightness arc ghosted behind every lane](docs/automation.png)
-
-<sub>**The "intention" layer:** real automation envelopes aligned to the audio, with the Brightness arc ghosted into each lane for direct comparison. It's where the *"the cutoff stops moving at 2:45 but brightness keeps rising to 3:10"* recommendation comes from — now you can see it, not just read it.</sub>
-
-### Three views, one ladder
-
-The views stack — each adds to the one below, so nothing visible in a lighter view ever disappears in a heavier one:
-
-- **Quick read** (fast, no stem separation) — the lightest: the verdict, vitals, structure bar + power curve, the player, the read, and the **brief** recommendations (the ones pinned to a moment on the graph). No toggle (there's no stem detail to reveal), just a note that a full run adds it.
-- **Simple** (the calm view of a full analysis) — the same calm overview, with the full per-stem player and the **Evidence drawer** (collapsed, opt-in) available at the bottom.
-- **Detailed** — adds the heavy layer on top: the per-stem visualisation lanes, the extra **modulation** curve on the graph, and the full (not just timecoded) recommendation list.
-
-The **Evidence drawer is reachable in every view** — it's a collapsed, opt-in drawer, so it never clutters the calm read; only the genuinely dense per-stem visualisation is detailed-only.
+The Simple/Detailed toggle is pure client-side JS — it never recomputes or hits the network, so flipping it is free and instant.
 
 ---
 
-## Three layers, never blurred
+## Commands
 
-Everything it tells you sits in one of three layers, and it labels which is which — so you always know if you're looking at a fact, an interpretation of that fact, or a question for you:
+**`/tc`** — full deep analysis. Runs Demucs stem separation, all analysis steps, and builds the widget with the per-stem player and full evidence. Takes a few minutes (Demucs runs on Apple MPS on Apple Silicon — fast).
 
-1. **Measured** — exact numbers, straight from `librosa` and `Demucs`. Nothing inferred, nothing rounded into a vibe.
-2. **What it means** — a concrete reading of those numbers. Not *"energy is low,"* but *"bass dominates 250–500 Hz for the first two minutes; the mids are there but buried."*
-3. **Your call** — the creative decision stays yours. It points out the pattern and shows its evidence; it never tells you what the track should be.
+**`/tc-quick`** — fast calm read, no stems. Runs core + detail analysis only, encodes a single-track mix player, and builds the widget in seconds. Can be upgraded to a full run later without re-running what's already there.
 
-The analysis lives in deterministic scripts (the orchestration just conducts), so the same track gives the same answer every time instead of being re-improvised — a machine that reports what it measured, not one pretending to have taste.
-
-> Built for my own music as **[Total Reboot](https://totalreboot.com)**. More about me: [github.com/happysasha18](https://github.com/happysasha18).
+The skill triggers automatically when you mention a track, a mix, an arrangement, an `.als` file, or ask things like *"why does this sound stuck?"* or *"analyse my project."* No need to use the slash command explicitly — just talk about your track.
 
 ---
 
 ## Install
 
-macOS (v1). Requires Python 3.11, `ffmpeg`, and the deps in `requirements.txt`.
+macOS only (v1). Requires Python 3.11 (managed by `uv`), `ffmpeg`, and the pinned Python deps.
 
 ```bash
-./setup.sh
+bash setup.sh
 ```
 
-`setup.sh` is a short, readable bash script — skim it before you run it. It installs [Homebrew](https://brew.sh) (only if missing), `ffmpeg`, and [`uv`](https://github.com/astral-sh/uv), then the pinned Python deps. The single password prompt is Homebrew's own (your Mac login), and only fires if Homebrew isn't already there.
+`setup.sh` is idempotent — safe to re-run; already-installed tools are detected and skipped in seconds. What it does, in order:
 
-Prefer not to run it? Already have `ffmpeg` and a Python 3.11 env? Install the deps from `requirements.txt` yourself and skip the script entirely.
+1. **Homebrew** — installs it if missing. This is the only step that may prompt for your Mac login password (once, from the Homebrew installer itself). Everything after is hands-off.
+2. **ffmpeg** — via `brew install ffmpeg` (needed for audio transcoding).
+3. **uv** — Python package and runtime manager; installs to `~/.local/bin` without sudo.
+4. **Python 3.11** — `uv` can fetch its own, so this is a convenience check, not a hard requirement.
+5. **node / npm** — optional; only needed if you want to (re)install Claude Code itself.
+6. **Package cache warm-up** — pre-fetches the analysis packages (~200 MB on first run: librosa, torch, Demucs, basic-pitch) so the first real track starts instantly.
 
-See [`references/install_troubleshooting.md`](references/install_troubleshooting.md) if anything fails.
+If anything fails, the script prints the exact command to fix it. See [`references/install_troubleshooting.md`](references/install_troubleshooting.md) if you hit an issue.
 
-## Usage
+**Key Python deps (pinned):** `numpy==1.26.4`, `librosa==0.10.2`, `scipy==1.13.1`, `scikit-learn==1.5.1`, `pyloudnorm==0.1.1`; deep mode adds `torch==2.3.1`, `torchaudio==2.3.1`, `demucs==4.0.1`; note transcription adds `basic-pitch[onnx]`. Full list in [`requirements.txt`](requirements.txt).
 
-Drop the folder into `~/.claude/skills/track-coach/` and just talk to Claude about your track:
-
-> *"why does my track sound stuck?"* · *"analyse this project"* · *"compare these two versions"*
-
-Claude grabs the audio (and `.als` if available), runs the pipeline, and opens the widget. Point it at a whole project folder and it'll find the latest render and `.als` itself.
+Already have `ffmpeg` and a Python 3.11 environment? Install the deps from `requirements.txt` yourself and skip the script entirely.
 
 ---
 
-## What's new
+## Usage
 
-**v0.8.27 — the coach started thinking like a composer.** Two additions that make the feedback sharper *and* more honest:
+Drop the folder into `~/.claude/skills/track-coach/` and talk to Claude:
 
-- **A read of how the track develops.** The Producer's read now opens with one plain line naming *how* the track grows — *"it gets louder and brightens, but density and stereo width sit idle"* — each move with its direction, and a gentle nudge toward the dimension you're leaving on the table. It's computed from the measured trends, so it reads the same way every time and stays silent when a track genuinely doesn't develop.
-- **Every card shows its evidence.** A quiet *Based on …* line under each recommendation names the signal — or the combination of signals — behind it, in plain words: *"the master's true-peak meter,"* *"the bass and the lead overlapping around 290 Hz for half the track."* You always see what the advice is built on, never a bare number floating on its own.
+> *"why does my track sound stuck?"*  
+> *"analyse this project"*  
+> *"compare these two versions"*
 
-**Before that — per-part feedback.** The coach splits your track into its parts and talks about each one against the whole: which part carries the development while the others loop, where a part pulls against the arc, the exact frequency where the bass buries your lead, and which part is more compressed — or wider — than the rest.
+Claude finds the latest render and `.als` from a project folder automatically, runs the pipeline, and opens the widget. While Demucs runs it narrates what it's looking for.
 
-**And the foundations:** a measured character label on every stem (`kick` · `bass` · `lead` · `chord` · `pad`), read from the audio rather than the Demucs track name; the **view ladder** (quick → calm → detailed, each adding to the last, nothing ever lost); and the offline **Library** of your whole body of work. All of it backed by a regression suite that asserts on the real shipped HTML.
+The pipeline runs as three steps: **measure** (deterministic scripts, same input → same output) → **interpret** (the skill writes the producer's read) → **render** (builds the widget once, deposits it to the global library).
 
-→ **Full history in [CHANGELOG.md](CHANGELOG.md).**
+---
+
+## Output
+
+**The widget** — a self-contained HTML file per run, versioned and timestamped so re-analysing the same track never overwrites a previous result. The player needs the co-located `stems_web/` folder; everything else is embedded.
+
+**The global library** — every finished widget is deposited automatically to `~/.track-coach/library/`. A global catalog page (`index.html`) gives a sortable, searchable row per track/version: spectral signature ribbon, vitals, mood/style tags, and a one-button preview player. Open it with `scripts/library.py catalog --open`.
 
 ---
 
 ## Under the hood
 
-The producer-facing stuff is above; here's what's actually doing the work.
-
 | | |
 |---|---|
-| `SKILL.md` | Orchestration — how Claude runs the pipeline and writes the read-out |
-| `scripts/track_analyzer.py` | The one-command engine — `analyze` (measure) and `build` (render once), driving every step below |
-| `scripts/` | The analysis units (Python): `analyze_core`, `masking`, `separate` (Demucs), `parse_als`, `self_similarity`, `transcribe` (basic-pitch), `build_widget`, `catalog`/`library` (the global Library), plus `tc_uv.sh`, the dependency-pinned runner every step goes through |
-| `tests/` | Dependency-free regression suite (`python3 -m unittest discover tests`) — asserts on the rendered HTML, backed by `docs/TEST_MATRIX.md` |
-| `references/` | `methodology.md` (the conceptual framework), `interpretation.md` (numeric ranges), troubleshooting |
-| `docs/` | Screenshots + the spec/test matrix |
+| `SKILL.md` | Orchestration — how Claude runs the pipeline and writes the read |
+| `scripts/track_analyzer.py` | One-command entrypoint: `analyze` (measure) then `build` (render) |
+| `scripts/` | Analysis units: `analyze_core`, `analyze_detail`, `masking`, `separate` (Demucs), `parse_als`, `self_similarity`, `transcribe` (basic-pitch), `rhythm_quality`, `drum_breakdown`, `map_stems`, `make_web_stems`, `build_widget`, `library` |
+| `data/reference_web_notes.json` | One source for reference web notes (widget panel + side page) |
+| `tests/` | Regression suite (run with `pytest` inside the project's pinned `uv` environment) — asserts on the real rendered HTML, not source fragments |
+| `references/` | `methodology.md`, `interpretation.md`, `install_troubleshooting.md` |
+| `docs/` | Screenshots, `SPEC.md`, `TEST_MATRIX.md` |
 | `setup.sh` · `requirements.txt` | Environment setup, pinned deps |
 
-Built on [`librosa`](https://librosa.org) (analysis), [Demucs](https://github.com/facebookresearch/demucs) (stem separation), [basic-pitch](https://github.com/spotify/basic-pitch) (transcription) and `ffmpeg` — all run deterministically through `uv`.
+Built on [`librosa`](https://librosa.org) (analysis), [Demucs](https://github.com/facebookresearch/demucs) (stem separation), [basic-pitch](https://github.com/spotify/basic-pitch) (note transcription), and `ffmpeg` — all run deterministically through [`uv`](https://github.com/astral-sh/uv).
 
 ---
 

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.3"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.4"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2342,9 +2342,11 @@ def render_reference_notes(artist_entry):
     # Prose blurb
     blurb_html = f'<p class="tc-rn-blurb">{_esc(blurb)}</p>' if blurb else ""
 
-    # Trait list
+    # Trait list — sorted by evidence strength: direct=0, indirect=1, web-only=2, not-measurable=3
+    _TIER_RANK = {"direct": 0, "indirect": 1, "web-only": 2, "not-measurable": 3}
     traits_html = ""
     if traits:
+        traits = sorted(traits, key=lambda t: _TIER_RANK.get(t.get("tier", "none"), 2))
         rows = []
         for t in traits:
             tier  = t.get("tier", "none")

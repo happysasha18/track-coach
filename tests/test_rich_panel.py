@@ -298,5 +298,65 @@ class SidePageParity(unittest.TestCase):
                         "side page must start with <!DOCTYPE html>")
 
 
+# ── §D.10.2 — trait sort order and glyph mapping (0.9.4) ─────────────────────────────────
+
+class TraitSortOrder(unittest.TestCase):
+    """Traits must be sorted by evidence strength: direct first, then indirect,
+    then web-only, then not-measurable.  Glyph (★ / ☆) must appear in the
+    correct pill text for each tier."""
+
+    @classmethod
+    def setUpClass(cls):
+        notes = _load_notes()
+        # DeepChord: has direct AND web-only traits (in mixed JSON order)
+        cls.dc_html = build_widget.render_reference_notes(notes["DeepChord"])
+        # Venetian Snares: has direct AND not-measurable traits
+        cls.vs_html = build_widget.render_reference_notes(notes["Venetian Snares"])
+
+    # -- sort: direct before web-only ------------------------------------------
+    def test_direct_before_webonly_in_render(self):
+        """A tc-rn-pill is-direct row must appear before the first is-webonly row."""
+        direct_pos  = self.dc_html.find("tc-rn-pill is-direct")
+        webonly_pos = self.dc_html.find("tc-rn-pill is-webonly")
+        self.assertGreater(direct_pos,  -1, "is-direct pill must be present")
+        self.assertGreater(webonly_pos, -1, "is-webonly pill must be present")
+        self.assertLess(
+            direct_pos, webonly_pos,
+            "is-direct row must appear before first is-webonly row (sort: direct=0 < web-only=2)",
+        )
+
+    # -- sort: direct before not-measurable ------------------------------------
+    def test_direct_before_na_in_render(self):
+        """A tc-rn-pill is-direct row must appear before any is-na row."""
+        direct_pos = self.vs_html.find("tc-rn-pill is-direct")
+        na_pos     = self.vs_html.find("tc-rn-pill is-na")
+        self.assertGreater(direct_pos, -1, "is-direct pill must be present in Venetian Snares")
+        self.assertGreater(na_pos,     -1, "is-na pill must be present in Venetian Snares")
+        self.assertLess(
+            direct_pos, na_pos,
+            "is-direct row must appear before is-na row (sort: direct=0 < not-measurable=3)",
+        )
+
+    # -- glyph mapping ---------------------------------------------------------
+    def test_glyph_in_pill_text(self):
+        """★ must appear in is-direct pill text; ☆ in is-indirect pill text (no glyph for web-only/na)."""
+        # is-direct pill carries ★
+        import re
+        direct_pills = re.findall(r'<span class="tc-rn-pill is-direct">([^<]*)</span>', self.dc_html)
+        self.assertTrue(direct_pills, "at least one is-direct pill must be present")
+        for pill_text in direct_pills:
+            self.assertIn("★", pill_text, f"★ glyph must appear in is-direct pill: {pill_text!r}")
+
+        # is-indirect pill carries ☆ (build a synthetic entry that has an indirect trait)
+        entry = {"artist": "SynGlyph", "blurb": "test",
+                 "traits": [{"title": "Indirect trait", "tier": "indirect"},
+                             {"title": "Direct trait",  "tier": "direct"}]}
+        html = build_widget.render_reference_notes(entry)
+        indirect_pills = re.findall(r'<span class="tc-rn-pill is-indirect">([^<]*)</span>', html)
+        self.assertTrue(indirect_pills, "at least one is-indirect pill must be present")
+        for pill_text in indirect_pills:
+            self.assertIn("☆", pill_text, f"☆ glyph must appear in is-indirect pill: {pill_text!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

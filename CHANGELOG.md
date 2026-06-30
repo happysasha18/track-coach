@@ -5,6 +5,12 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.4] — 2026-06-30
+
+### Changed
+- **"What the web says" traits are now sorted by evidence strength.** Within each artist the traits render in the order: ★ confirmed directly by measurement → ☆ confirmed indirectly → "web says; our tracks don't show it" → "not measurable with our axes". The sort lives in the shared renderer, so the in-widget panel and the standalone side page order identically.
+- **README rewritten for the 0.9 product** — honest, scannable, sourced from SKILL.md / setup.sh / the changelog (no unbuilt claims).
+
 ## [0.9.3] — 2026-06-30
 
 ### Added
