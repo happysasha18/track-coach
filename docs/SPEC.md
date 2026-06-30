@@ -1058,8 +1058,10 @@ structural holes:
   single nearest of the aimed** ones, as an additive entry (it never displaces a nearer one), shown **even if it
   tints far** because a declared aim is intent, not filler; the other aimed directions live in the read panel.
   At most one pinned aimed entry. `§D.10.1`
-- ⟨DECIDE D-30⟩ a web facet the measurement **contradicts** — silently **dropped** (recommend) or shown
-  **struck-through** as a teaching contrast ("web says wide stereo; the signals run narrow")? `§D.10.2`
+- ⟨DECIDE D-30⟩ a web facet the measurement **contradicts** (or can't measure) — **RESOLVED 2026-06-30
+  (Alexander): SHOW it, labeled** "web says · our tracks don't show it", sorted into the bottom tier of the web
+  panel, never silently dropped. The teaching contrast (web suggested, measurement didn't bear it out) is the
+  value he wants. Stays observation about the reference centroid, not a grade of your track (D-INV-1). `§D.10.2`
 - ⟨DECIDE D-32⟩ where the **facet→signal map** lives and how it's curated — the table tying a web style phrase
   to a measured axis (★ direct) or a sound indirect signal (☆). It's authored, not learned; recommend a
   versioned in-repo table maintained like the other frozen constants, reviewed when a new ☆ tie is claimed.
@@ -1294,20 +1296,45 @@ only the parts we can tie to measurement.** When the read is focused on a direct
 harmony, wide stereo pads…). It is the visible face of the web-descriptor layer — **web suggests, measurement
 decides** (D-INV-2). `D-INV-29`
 
-**It is a READABLE panel in the widget, not only glyphs on bars (Alexander 2026-06-29 — "I don't see the
-internet info anywhere").** Until now the only web trace in the widget was the ★/☆ glyph riding a facet bar;
-the actual web *text* lived only on the side `reference_notes.html` page, so a producer reading the widget never
-saw "what the web said". This folds it in: a **collapsible panel** ("What the web says about ⟨artist⟩"),
-**sitting last in the read, right after the centroid read** (§D.10.3 order), **collapsed by default** (it is the
-most external layer — depth you open when you want it), listing each shown web facet as a short readable phrase
-with **the measured axis it was tied to** and its **★/☆ mark** ("wide stereo pads — stereo-width ★", "dubby,
-underwater — low-pass + reverb tail ☆"). The same curated web-descriptor data that builds the side page feeds
-this panel, so the two never disagree. **One disclosure per direction**, with an **artist sub-header per
-artist inside it** for a multi-artist direction (one collapse, artist sections within — never one box per
-artist, D-INV-2), never blended. The **same ★/☆ appears both inline on the centroid bar and here** — they are
-one fact from two angles, kept on purpose, not a duplication to dedupe: the **bar's glyph** marks the facet you
-measurably share/diverge on, the **panel's glyph** marks the web *phrase* measurement confirmed. `tags:
-web-panel · collapsible · read-order · one-disclosure-per-direction · D-INV-29`
+**It is a READABLE, RICH panel — the side page's depth, folded into the widget (Alexander 2026-06-29/30 — "I
+don't see the internet info anywhere" + "I hoped for more info").** The first cut showed only the 4 confirmed
+★ lines; Alexander wants the fuller picture the side `reference_notes.html` already has (Image: artist blurb +
+a full trait list, each badged). This brings that in: a **collapsible panel** ("What the web says about
+⟨artist⟩"), **sitting last in the read, right after the centroid read** (§D.10.3 order), **collapsed by
+default**. Per artist of the focused direction it shows:
+- **a one-line genre / era** + **a short prose blurb** of what the web says the artist's sound IS (e.g. "DeepChord —
+  dub/ambient techno, Detroit; the second-wave Basic Channel sound, ambient-led, kick added last");
+- **the FULL trait list, not only the confirmed ones** — each trait = a short readable phrase + the measured
+  axis it ties to (or "—" if unmeasurable) + a **status badge**.
+
+**Sorted by status, strongest evidence first (Alexander 2026-06-30 — "отсортировать по тому что показываем и по
+тому что нашли и подтверждается").** The order is: (1) **★ measurement confirms** — the web trait our centroid
+bears out; (2) **☆ soundly tied** — confirmed indirectly; (3) **"web says · our tracks don't show it"** — a web
+trait our measurement does NOT bear out, or that our axes can't measure (the teaching contrast: web suggested,
+measurement didn't find it). This **RESOLVES ⟨D-30⟩ in favour of show-labeled, not silent-drop** (Alexander
+2026-06-30): the unconfirmed traits are SHOWN, clearly badged as web-only, never silently dropped — that
+contrast is the value. It stays observation, never a grade about *your* track (D-INV-1): "our tracks don't show
+it" describes the REFERENCE centroid vs the web claim, not your music. Within a tier the order is a stable key
+(axis, then phrase) so it never flickers. `tags: rich-panel · sorted-by-status · ⟨D-30⟩-resolved · D-INV-29`
+
+**One source feeds the panel AND the side page — never two truths.** The rich content (per direction: artist,
+genre/era, blurb, and traits[{phrase, axis-or-null, tier: direct|indirect|none}]) lives in **one curated data
+file** (`data/reference_web_notes.json`, superseding the phrase-only `facet_confirmation.json`): the widget
+panel, the side `reference_notes.html`, AND the ★/☆ computation all read it, so they can never disagree. ★/☆ is
+still a pure function of (this file's tier+axis, the direction's centroid, the epoch): direct+confirmed → ★,
+indirect+agrees → ☆, none / contradicted / axis-not-measured → the "web says · our tracks don't show it" tier
+(missing ≠ contradicted — both land in the honest bottom tier, neither auto-★, RC-INV-1). `tags: one-source ·
+D-INV-2 · RC-INV-1`
+
+**Header styled like its sibling drawers (Alexander 2026-06-30).** The panel's `<summary>` uses the **same
+visual style as the other collapsibles** (the Evidence drawer, the catalog) — same weight, same disclosure
+arrow — not a fainter, smaller heading; it reads as a peer drawer, not an afterthought. `tags: consistent-summary`
+
+**One disclosure per direction**, with an **artist sub-header per artist inside it** for a multi-artist
+direction (one collapse, artist sections within — never one box per artist, D-INV-2), never blended. The
+**same ★/☆ appears both inline on the centroid bar and here** — one fact from two angles, kept on purpose: the
+**bar's glyph** marks the facet you measurably share/diverge on, the **panel's glyph** marks the web *phrase*
+measurement confirmed. `tags: web-panel · collapsible · read-order · one-disclosure-per-direction · D-INV-29`
 
 **What gets onto the plaque — only facets a curated map ties to a measured signal.** A web phrase is shown
 **only if** the curated **facet→signal map** connects it to a measured fingerprint axis; everything else the
@@ -1319,10 +1346,12 @@ web says is dropped, never shown as untethered prose. Two marks, by how the tie 
   argument even though no axis confirms it head-on (e.g. "underwater, dubby" ↔ a steep low-pass + long
   reverb tail). ☆ is a **curated judgement** that the tie is unambiguous, not a free-floating web claim
   (Alexander 2026-06-29). `tags: D-INV-2 · indirect-tie`
-- **Withheld — the web claimed it but measurement CONTRADICTS it.** A trait the signals don't bear out is
-  **not stated** (it would mislead). ⟨DECIDE D-30⟩ whether a contradicted facet is silently dropped
-  (recommend) or shown struck-through as a teaching contrast ("web says wide stereo; the signals run narrow").
-  `tags: D-INV-2 · ⟨DECIDE D-30⟩`
+- **"web says · our tracks don't show it" — the web claimed it but our measurement doesn't bear it out, or our
+  axes can't measure it.** SHOWN, in the panel's bottom tier, plainly badged (⟨D-30⟩ resolved 2026-06-30:
+  show-labeled, not silent-drop — the contrast "web suggested, measurement didn't find it" is the teaching
+  value). It describes the reference centroid vs the web claim, never grades your track (D-INV-1). Contradicted
+  and not-measurable both land here, distinct from a confirmed ★/☆ (missing ≠ contradicted, RC-INV-1).
+  `tags: D-INV-2 · ⟨D-30⟩-resolved`
 
 **The marks are compact — two glyphs and one footnote, never long per-row labels.** Each facet carries just
 ★ or ☆; a single footnote under the plaque explains both once (★ = web said, measurement confirms directly;
@@ -1341,12 +1370,14 @@ the per-your-track shared mark is deferred. `tags: D-INV-21 · centroid · ⟨DE
 **separately**, never merged into one claim (the existing per-artist rule, D-INV-2); each artist's facets
 carry their own ★/☆. `tags: D-INV-2`
 
-**No plaque is a valid, silent state.** A web fetch that fails, times out, or finds nothing — or finds only
-claims the facet→signal map can't tie to measurement — leaves the plaque **simply absent** for that direction,
-never a blank box implying "this artist has no style", never a guess. Because there is no untethered web-only
-tier, an empty plaque and a plaque present-but-only-☆ are honestly distinct: *no plaque* (nothing fetched or
-nothing tie-able) ≠ *plaque with ☆ only* (tied indirectly, none directly confirmed) ≠ *plaque with ★* (some
-directly confirmed). `tags: D-INV-2 · liveness`
+**No panel is a valid, silent state.** A web fetch that fails, times out, or finds **nothing at all** (no
+blurb, no traits) leaves the panel **simply absent** for that direction — never a blank box implying "this
+artist has no style", never a guess. (Superseded the earlier "absent if only un-tie-able claims": since
+⟨D-30⟩ resolved to show-labeled, un-tie-able / unconfirmed claims now DO show, in the bottom "web says · our
+tracks don't show it" tier — so the panel is absent ONLY when there is no web content whatsoever.) The states
+stay honestly distinct: *no panel* (nothing fetched) ≠ *panel with only the bottom tier* (web described it,
+measurement didn't bear it out) ≠ *panel with ☆* (tied indirectly) ≠ *panel with ★* (directly confirmed).
+`tags: D-INV-2 · liveness · ⟨D-30⟩-resolved`
 
 **Completeness-aware (a direction whose fingerprint is incomplete).** ★/☆ ask a measurement to confirm or
 soundly tie; if the direction's fingerprint is **missing the axis** a facet would need, that facet **cannot be
@@ -1616,6 +1647,12 @@ not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thres
 
 ## Glossary (plain-language definitions; expand it whenever a term needed explaining)
 - **red on the band strip** = high energy shown on the per-stem band strip.
+- **"stale" / outdated catalog row (INV-12)** = the widget that row links to was built on an OLDER analyzer
+  version than the one installed now (e.g. the row's widget is v0.6.2 but the tool is v0.9.1), so it may be
+  missing newer analysis (e.g. the reference read). It is NOT about the music being old — only the analysis.
+  **UI clarity fix (Alexander 2026-06-30 — "I didn't get what stale is"):** don't show the bare word "stale";
+  show a plain, self-explaining marker WITH the version, e.g. **"older analysis · v0.6.2 → re-analyse"**, so
+  the meaning + the fix are visible without hovering. The bare-jargon chip was the confusion. `INV-12`
 - **drop** = a `Drop`-named scene.
 - **empty stem** = a stem below the validity floor (near-silent; omitted from per-stem analysis).
 - **Demucs label vs identity** = the raw Demucs stem name (`vocals`/`guitar`/…) is NOT the real
