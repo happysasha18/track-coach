@@ -782,5 +782,157 @@ class WebPanelRendering(unittest.TestCase):
                          "web panel must be absent when no facet earns ★ or ☆")
 
 
+# §D.10.2 rich panel — blurb, genre_era, sorted tiers, bar ★/☆ regression (s28 / 0.9.2)
+
+class WebPanelRichRendering(unittest.TestCase):
+    """§D.10.2 rich panel via web_notes: blurb + genre_era + full sorted trait list.
+    Tests assert on the rendered HTML from render_reference_read (the real shipped function).
+
+    Coverage:
+    - blurb and genre_era appear in the panel body
+    - a ★ tier row (direct+confirmed) appears
+    - a 'web says · our tracks don't show it' row (none-tier) appears
+    - ★ row appears BEFORE the 'web says' row in the HTML (sorted correctly)
+    - panel absent when direction has no blurb and no traits (liveness rule §D.10.2)
+    - bar ★/☆ (inline in centroid bars) still renders when web_notes is the sole source
+      — one-source principle: confirmation auto-derived from web_notes (§D.10.2)
+    - contradicted direct trait lands in 'web says' tier, not shown as ★
+    """
+
+    @classmethod
+    def _rich_html(cls):
+        """render_reference_read with web_notes that yields ★ (confirmed), ☆ (indirect confirmed),
+        and a 'web says' row (none-tier) — for the focused direction 'TestArtist'."""
+        # tempo centroid z=-0.8 → confirms expect=low (★ for direct).
+        # energy_build centroid z=-0.8 → confirms expect=low (☆ for indirect).
+        # brightness centroid z=0.0 → does NOT confirm expect=high (→ 'web says' for direct).
+        # odd_trait: tier=none, axis=null → always 'web says'.
+        dirs = {"TestArtist": _zfp(tempo=-0.8, energy_build=-0.8)}
+        web_notes = {"TestArtist": {
+            "artist": "TestArtist",
+            "genre_era": "Test genre / era",
+            "blurb": "A short test blurb about this artist.",
+            "traits": [
+                {"phrase": "slow tempo",         "axis": "tempo",        "expect": "low",  "tier": "direct"},
+                {"phrase": "constant intensity",  "axis": "energy_build", "expect": "low",  "tier": "indirect"},
+                {"phrase": "bright highs",        "axis": "brightness",   "expect": "high", "tier": "direct"},
+                {"phrase": "odd time signatures", "axis": None,           "expect": None,   "tier": "none"},
+            ]
+        }}
+        return build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            dirs,
+            _norm_identity(),
+            web_notes=web_notes,
+            confirm_z=0.4,
+        )
+
+    def test_blurb_in_panel(self):
+        """Blurb text must appear in the rich panel body."""
+        html = self._rich_html()
+        self.assertIn("A short test blurb about this artist.", html,
+                      "blurb must appear in the rich web panel")
+
+    def test_genre_era_in_panel(self):
+        """Genre/era line must appear in the rich panel body."""
+        html = self._rich_html()
+        self.assertIn("Test genre / era", html,
+                      "genre_era must appear in the rich web panel")
+
+    def test_star_row_appears_for_confirmed_direct(self):
+        """A directly confirmed trait (centroid agrees) must appear with ★ glyph."""
+        html = self._rich_html()
+        self.assertIn("slow tempo", html, "confirmed direct phrase must be in the panel")
+        self.assertIn("★", html, "★ glyph must appear for confirmed direct trait")
+
+    def test_halfstar_row_appears_for_confirmed_indirect(self):
+        """An indirectly confirmed trait (centroid agrees) must appear with ☆ glyph."""
+        html = self._rich_html()
+        self.assertIn("constant intensity", html, "confirmed indirect phrase must be in the panel")
+        self.assertIn("☆", html, "☆ glyph must appear for confirmed indirect trait")
+
+    def test_nosay_row_appears_for_none_tier(self):
+        """A none-tier trait must appear with 'web says' badge — never silently dropped (⟨D-30⟩)."""
+        html = self._rich_html()
+        self.assertIn("odd time signatures", html,
+                      "none-tier phrase must appear in the panel (show-labeled, not silent-drop)")
+        self.assertIn("web says", html,
+                      "'web says' pill must appear for none-tier traits")
+
+    def test_nosay_row_appears_for_contradicted_direct(self):
+        """A contradicted direct trait must land in the 'web says' tier, not ★."""
+        html = self._rich_html()
+        self.assertIn("bright highs", html,
+                      "contradicted direct phrase must appear in the panel (bottom tier)")
+        # It must appear in a web-facet-nosay row (after the ★ rows)
+        self.assertIn("web-facet-nosay", html,
+                      "contradicted trait must be in a web-facet-nosay element")
+
+    def test_star_row_before_nosay_row(self):
+        """★ tier row must appear BEFORE 'web says' row (sorted by status, strongest first)."""
+        html = self._rich_html()
+        star_pos  = html.find("slow tempo")
+        nosay_pos = html.find("odd time signatures")
+        self.assertGreater(star_pos, 0, "★-tier phrase must be in the HTML")
+        self.assertGreater(nosay_pos, 0, "'web says' phrase must be in the HTML")
+        self.assertLess(star_pos, nosay_pos,
+                        "★ row must appear BEFORE 'web says' row in the HTML (sorted by tier)")
+
+    def test_panel_absent_when_no_web_content(self):
+        """A direction with empty blurb and empty traits → panel absent (§D.10.2 liveness rule)."""
+        dirs = {"EmptyDir": _zfp(tempo=-0.8)}
+        web_notes = {"EmptyDir": {
+            "artist": "EmptyDir",
+            "genre_era": "",
+            "blurb": "",
+            "traits": []
+        }}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity(),
+            web_notes=web_notes, confirm_z=0.4,
+        )
+        self.assertNotIn('id="webPanel"', html,
+                         "panel must be absent when direction has no blurb and no traits")
+
+    def test_bar_star_derived_from_web_notes(self):
+        """Bar ★/☆ (in centroid bars) must still render when web_notes is the sole source —
+        confirmation is auto-derived from web_notes' direct/indirect traits (one-source principle)."""
+        dirs = {"TestArtist": _zfp(tempo=-0.8)}
+        web_notes = {"TestArtist": {
+            "artist": "TestArtist",
+            "genre_era": "test",
+            "blurb": "test blurb",
+            "traits": [
+                {"phrase": "slow tempo", "axis": "tempo", "expect": "low", "tier": "direct"},
+            ]
+        }}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity(),
+            web_notes=web_notes, confirm_z=0.4,
+        )
+        self.assertIn('data-confirmed="1"', html,
+                      "bar ★ must appear when web_notes drives both the panel and the bar marks")
+
+    def test_panel_present_when_only_nosay_traits(self):
+        """Panel must show even when all traits are in the 'web says' tier (panel absent only with
+        no content at all — §D.10.2 liveness rule after ⟨D-30⟩ resolution)."""
+        dirs = {"TestArtist": _zfp(tempo=0.8)}     # centroid agrees with NOTHING (all contradicted)
+        web_notes = {"TestArtist": {
+            "artist": "TestArtist",
+            "genre_era": "genre",
+            "blurb": "blurb text",
+            "traits": [
+                {"phrase": "slow tempo", "axis": "tempo", "expect": "low", "tier": "direct"},
+            ]
+        }}
+        html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity(),
+            web_notes=web_notes, confirm_z=0.4,
+        )
+        self.assertIn('id="webPanel"', html,
+                      "panel must be present even when all traits land in the 'web says' tier "
+                      "(panel absent only when there is no web content whatsoever)")
+
+
 if __name__ == "__main__":
     unittest.main()

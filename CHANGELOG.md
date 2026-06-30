@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.2] — 2026-06-30
+
+### Added
+- **Richer "What the web says" panel (§D.10.2).** The web panel now shows the full picture from the research draft — not just the 4 confirmed ★ lines. For each direction it shows: genre/era line + a short prose blurb + the FULL trait list sorted by evidence strength: (1) ★ measurement confirms directly, (2) ☆ confirmed indirectly, (3) "web says · our tracks don't show it" (none-tier or contradicted). Unconfirmed traits are shown and labelled, never silently dropped (resolves ⟨D-30⟩). Data lives in `data/reference_web_notes.json` (one source for the panel, the side page, and ★/☆ computation).
+
+### Changed
+- **Web panel header styled like a peer drawer.** The `#webPanel>summary` now uses the same font-weight (620), size (15 px), ink colour, and purple disclosure arrow as the Evidence drawer and catalog — it reads as a peer drawer, not a faint afterthought. (SPEC §D.10.2 `consistent-summary`.)
+- **Catalog stale chip is now self-explaining.** Instead of the bare word "stale", out-of-date catalog rows now show "older analysis · v{version} → re-analyse" — the meaning and the fix are visible without hovering. The title tooltip is kept. (Glossary 'stale', UI clarity fix.)
+
 ## [0.9.1] — 2026-06-30
 
 ### Added

@@ -305,26 +305,29 @@ class ResponsiveTable(unittest.TestCase):
 
 class StaleWidgetFlag(unittest.TestCase):
     """INV-12 (KI-1): a catalog row whose linked widget was built on an OLDER TC_VERSION than the current
-    one is flagged 'stale' — so an out-of-date deposit is visible, never silently opened (the bug where
-    the catalog quietly opened pre-fix 0.7.5 widgets). Parsed from the widget filename; no schema change."""
+    one is flagged with a self-explaining 'older analysis · vX.Y.Z → re-analyse' chip — so an out-of-date
+    deposit is visible without hovering (Glossary 'stale', UI clarity fix 2026-06-30).
+    The chip carries class='stale' and the version number in its text; the title tooltip is also kept."""
 
     def test_current_version_is_not_flagged(self):
         cur = catalog.build_widget.TC_VERSION
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
                src_run_dir="/r", src_widget=f"analysis_widget_v{cur}.html")
-        self.assertNotIn(">stale<", catalog.render_catalog_html([e]))
+        self.assertNotIn('class="stale"', catalog.render_catalog_html([e]))
 
     def test_older_version_is_flagged(self):
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
                src_run_dir="/r", src_widget="analysis_widget_v0.0.1.html")
         html = catalog.render_catalog_html([e])
-        self.assertIn(">stale<", html, "an out-of-date deposit must be flagged stale")
-        self.assertIn("re-analyse to refresh", html, "the stale chip must explain what to do")
+        self.assertIn('class="stale"', html, "an out-of-date deposit must carry the stale chip element")
+        self.assertIn("older analysis", html, "chip text must say 'older analysis' (not just the bare word 'stale')")
+        self.assertIn("v0.0.1", html, "chip text must include the specific old version number")
+        self.assertIn("re-analyse to refresh", html, "the tooltip must explain what to do")
 
     def test_unparseable_widget_name_is_not_flagged(self):
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
                src_widget="analysis_widget.html")  # no _vX.Y.Z, no stored version → unknown, don't cry wolf
-        self.assertNotIn(">stale<", catalog.render_catalog_html([e]))
+        self.assertNotIn('class="stale"', catalog.render_catalog_html([e]))
 
     def test_stored_tc_version_flags_stale_even_with_unparseable_filename(self):
         # KI-7 / INV-12 option-b: the hole — a versionless filename used to slip through. A version
@@ -332,14 +335,15 @@ class StaleWidgetFlag(unittest.TestCase):
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0],
                src_run_dir="/r", src_widget="analysis_widget.html", tc_version="0.0.1")
         html = catalog.render_catalog_html([e])
-        self.assertIn(">stale<", html, "a stored older version must be flagged even with no version in the name")
+        self.assertIn('class="stale"', html, "a stored older version must be flagged even with no version in the name")
+        self.assertIn("older analysis", html, "chip text must say 'older analysis'")
 
     def test_stored_tc_version_is_preferred_over_the_filename(self):
         # the deposit-time version is authoritative: a current-looking filename can't mask an older build
         cur = catalog.build_widget.TC_VERSION
         e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0], src_run_dir="/r",
                src_widget=f"analysis_widget_v{cur}.html", tc_version="0.0.1")
-        self.assertIn(">stale<", catalog.render_catalog_html([e]))
+        self.assertIn('class="stale"', catalog.render_catalog_html([e]))
 
 
 class FmtDate(unittest.TestCase):

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.1"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.2"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2305,14 +2305,118 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     return ''.join(rows_html), summary
 
 
-def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4):
+def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_data=None):
     """§D.10.2 — collapsible 'What the web says about <artist>' panel.
 
-    Uses the same ★/☆ rule as _refread_bars_html (same confirm_z, same tier logic).
-    Reads the 'phrase' field from each conf entry (2–4 word human description from web research).
-    Returns '' when no facets earn ★ or ☆, or when inputs are missing (silent absence per spec).
-    Collapsed by default (no `open`). Detailed-only via body.simple #webPanel CSS rule.
+    Two rendering modes:
+
+    Rich mode (web_data is a dict with keys artist / genre_era / blurb / traits):
+      Shows genre/era line, prose blurb, and ALL traits sorted into three tiers:
+      (1) ★ direct+confirmed, (2) ☆ indirect+confirmed,
+      (3) 'web says · our tracks don't show it' (none-tier, contradicted, or axis unmeasured).
+      Within each tier: stable sort by (axis, phrase). Panel is absent only when both blurb
+      and traits list are empty (no web content at all — §D.10.2 liveness rule).
+
+    Simple mode (web_data is None, uses conf_entries list):
+      Shows only confirmed (★/☆) traits — backward-compatible with facet_confirmation.json.
+      Panel is absent when no facet earns a mark.
+
+    Both modes: collapsed by default (no `open`). Detailed-only via body.simple #webPanel CSS.
     """
+    if web_data and isinstance(web_data, dict):
+        # ── Rich mode (reference_web_notes.json source) ──────────────────────────────────
+        artist    = web_data.get("artist", direction_name)
+        genre_era = web_data.get("genre_era", "")
+        blurb     = web_data.get("blurb", "")
+        traits    = web_data.get("traits", [])
+        if not traits and not blurb:
+            return ""                                   # no web content → panel absent (§D.10.2)
+
+        def _cz_agrees(t):
+            """True when the direction centroid agrees with the trait's expect by >= confirm_z."""
+            if not centroid_z:
+                return False
+            axis   = t.get("axis")
+            expect = t.get("expect")
+            if not axis or not expect:
+                return False
+            cz = centroid_z.get(axis)
+            if cz is None:
+                return False
+            try:
+                cz = float(cz)
+                if math.isnan(cz):
+                    return False
+            except (TypeError, ValueError):
+                return False
+            return (expect == "high" and cz >= confirm_z) or (expect == "low" and cz <= -confirm_z)
+
+        tier1, tier2, tier3 = [], [], []
+        for t in traits:
+            tier = t.get("tier", "none")
+            if tier == "none" or not t.get("axis"):
+                tier3.append(t)
+            elif _cz_agrees(t):
+                if tier == "direct":
+                    tier1.append(t)
+                elif tier == "indirect":
+                    tier2.append(t)
+                else:
+                    tier3.append(t)
+            else:
+                tier3.append(t)                        # contradicted or near mean → "web says" tier
+
+        def _sort_key(t):
+            return (t.get("axis") or "", t.get("phrase", ""))
+
+        tier1.sort(key=_sort_key)
+        tier2.sort(key=_sort_key)
+        tier3.sort(key=_sort_key)
+
+        rows_html = ""
+        for t in tier1:
+            al = _AXIS_LABELS.get(t.get("axis"), "—")
+            ph = t.get("phrase", "")
+            rows_html += (
+                f'<li class="web-facet-row">{_esc(ph)} — {_esc(al)} ★</li>'
+            )
+        for t in tier2:
+            al = _AXIS_LABELS.get(t.get("axis"), "—")
+            ph = t.get("phrase", "")
+            rows_html += (
+                f'<li class="web-facet-row">{_esc(ph)} — {_esc(al)} ☆</li>'
+            )
+        for t in tier3:
+            ax = t.get("axis")
+            al = _AXIS_LABELS.get(ax, "—") if ax else "—"
+            ph = t.get("phrase", "")
+            rows_html += (
+                f'<li class="web-facet-row web-facet-nosay">{_esc(ph)} — {_esc(al)}'
+                f' <span class="web-nosay">web says · our tracks don’t show it</span></li>'
+            )
+
+        genre_html  = f'<p class="web-genre-era">{_esc(genre_era)}</p>'  if genre_era else ""
+        blurb_html  = f'<p class="web-blurb">{_esc(blurb)}</p>'          if blurb     else ""
+        facets_html = f'<ul class="web-facets">{rows_html}</ul>'          if rows_html else ""
+        note_html   = (
+            '<p class="web-note">'
+            '★ web-described, confirmed by measurement directly · '
+            '☆ confirmed indirectly but soundly'
+            '</p>'
+        ) if (tier1 or tier2) else ""
+
+        body = (
+            f'<p class="web-artist-hdr">{_esc(artist)}</p>'
+            + genre_html + blurb_html + facets_html + note_html
+        )
+        return (
+            f'<details id="webPanel">'
+            f'<summary>What the web says about {_esc(artist)}</summary>'
+            f'<div class="web-panel-body">{body}</div>'
+            f'</details>'
+        )
+
+    # ── Simple mode (backward-compat: only confirmed ★/☆ traits from conf_entries) ─────────
     if not conf_entries or not centroid_z:
         return ""
     rows = []
@@ -2335,7 +2439,7 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4):
         agrees = (expect == "high" and cz >= confirm_z) or (expect == "low" and cz <= -confirm_z)
         if not agrees:
             continue
-        glyph = "★" if tier == "direct" else "☆"
+        glyph      = "★" if tier == "direct" else "☆"
         axis_label = _AXIS_LABELS.get(axis, axis)
         display_phrase = phrase if phrase else axis_label
         rows.append(
@@ -2359,7 +2463,8 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4):
     )
 
 
-def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4):
+def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4,
+                          web_notes=None):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
     Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
@@ -2370,14 +2475,28 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
       • no direction qualifies (all FAR — nothing honest to show per SPEC §D.10.1).
     No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
 
-    confirmation: optional dict {dir_name: [{axis, expect, tier}, …]} from facet_confirmation.json.
+    confirmation: optional dict {dir_name: [{axis, expect, tier}, …]} for bar ★/☆ marks.
     When supplied, rows earn ★ (direct, centroid agrees) or ☆ (indirect, centroid agrees);
     contradicted / near-mean axes get no mark. confirm_z is the minimum |centroid z| to confirm.
+
+    web_notes: optional dict {dir_name: {artist, genre_era, blurb, traits:[…]}} from
+    reference_web_notes.json. Drives the rich §D.10.2 web panel (blurb + sorted full trait list).
+    When supplied and confirmation is None, direct/indirect traits are also extracted from
+    web_notes to derive the bar ★/☆ marks (one-source principle, §D.10.2).
 
     When 1 direction qualifies: single header, no tab bar (monotonic ladder: 1 tab = no tabs).
     When 2–3 qualify: tab buttons (nearest-first, each coloured by its own level), default = nearest.
     JS switches panels client-side — ephemeral view state, no analysis recompute (D-INV-28).
     """
+    # One-source principle: if web_notes supplied but no explicit confirmation, derive it.
+    if web_notes and confirmation is None:
+        confirmation = {}
+        for dn, wd in web_notes.items():
+            if isinstance(wd, dict):
+                entries = [t for t in wd.get("traits", [])
+                           if t.get("tier") in ("direct", "indirect")]
+                if entries:
+                    confirmation[dn] = entries
     import fingerprints as FP          # same scripts/ dir; lazy to avoid hard dep at import time
     import similarity_columns as SC
 
@@ -2471,18 +2590,25 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     )
 
     # §D.10.2 — web-info plaque for the focused (nearest) direction, collapsed by default.
-    # Uses the same ★/☆ rule; absent when no facet earns a mark (silent per spec).
+    # Rich mode when web_notes provides data; simple mode (★/☆ only) when only confirmation supplied.
     focused = leans[0]
     focused_centroid = directions[focused.direction]
     focused_conf = (confirmation or {}).get(focused.direction, [])
-    web_panel = _web_panel_html(focused.direction, focused_conf, focused_centroid, confirm_z)
+    focused_web  = (web_notes or {}).get(focused.direction) if web_notes else None
+    web_panel = _web_panel_html(focused.direction, focused_conf, focused_centroid, confirm_z,
+                                web_data=focused_web)
 
     return refread_div + ("\n" + web_panel if web_panel else "")
 
 
 def _ref_read_html(run_dir):
-    """§D.10.3 — load fingerprint from disk + reference_directions.json + facet_confirmation.json,
-    delegate to render_reference_read. Returns '' when any input is missing or I/O fails."""
+    """§D.10.3 — load fingerprint from disk + reference_directions.json + reference_web_notes.json,
+    delegate to render_reference_read. Returns '' when any input is missing or I/O fails.
+
+    Loads reference_web_notes.json as the one-source file (§D.10.2): it drives both the rich
+    web panel and the bar ★/☆ marks (confirmation derived from its direct/indirect traits).
+    Falls back to facet_confirmation.json for bar ★/☆ if reference_web_notes.json is absent.
+    """
     import fingerprints as FP
 
     if not run_dir:
@@ -2502,19 +2628,35 @@ def _ref_read_html(run_dir):
     raw_fp = FP.fingerprint_from_run_dir(run_dir)
     if raw_fp is None:
         return ""
-    # Load curated web-facet confirmation map (best-effort; works without it)
-    confirmation = {}
-    confirm_z    = 0.4
-    conf_path    = data_dir / "facet_confirmation.json"
-    if conf_path.exists():
+
+    # Primary source: reference_web_notes.json (supersedes facet_confirmation.json)
+    web_notes = {}
+    confirm_z = 0.4
+    notes_path = data_dir / "reference_web_notes.json"
+    if notes_path.exists():
         try:
-            conf_data  = json.loads(conf_path.read_text(encoding="utf-8"))
-            confirm_z  = float(conf_data.get("_confirm_z", 0.4))
-            confirmation = {k: v for k, v in conf_data.items() if not k.startswith("_")}
+            notes_data = json.loads(notes_path.read_text(encoding="utf-8"))
+            confirm_z  = float(notes_data.get("_confirm_z", 0.4))
+            web_notes  = {k: v for k, v in notes_data.items() if not k.startswith("_")}
         except Exception:
             pass
+
+    # Fallback: facet_confirmation.json for bar ★/☆ only (no rich panel)
+    confirmation = None
+    if not web_notes:
+        conf_path = data_dir / "facet_confirmation.json"
+        if conf_path.exists():
+            try:
+                conf_data    = json.loads(conf_path.read_text(encoding="utf-8"))
+                confirm_z    = float(conf_data.get("_confirm_z", 0.4))
+                confirmation = {k: v for k, v in conf_data.items() if not k.startswith("_")}
+            except Exception:
+                pass
+
     return render_reference_read(raw_fp, directions, norm,
-                                 confirmation=confirmation, confirm_z=confirm_z)
+                                 confirmation=confirmation,
+                                 confirm_z=confirm_z,
+                                 web_notes=web_notes if web_notes else None)
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -2609,16 +2751,24 @@ body.simple #refRead{display:none!important}
 /* Web-info plaque (§D.10.2, "What the web says") — collapsed <details>, Detailed-only, after #refRead */
 body.simple #webPanel{display:none!important}
 #webPanel{margin:10px 0 0}
-#webPanel>summary{font-size:13px;color:var(--muted);cursor:pointer;padding:7px 10px;
- background:var(--panel2);border-radius:6px;border:1px solid var(--line);list-style:none;user-select:none}
+/* Peer-drawer summary: same weight, size, and disclosure arrow as .more>summary and .catalog>summary */
+#webPanel>summary{cursor:pointer;list-style:none;user-select:none;
+ color:var(--ink);font-size:15px;font-weight:620;
+ padding:7px 10px;background:var(--panel2);border-radius:6px;border:1px solid var(--line)}
 #webPanel>summary::-webkit-details-marker{display:none}
-#webPanel>summary::before{content:"▸ ";font-size:10px;opacity:.6}
+#webPanel>summary::before{content:"▸ ";color:var(--wob)}
 #webPanel[open]>summary::before{content:"▾ "}
 #webPanel .web-panel-body{padding:12px 14px 8px;background:var(--panel2);
  border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px}
-#webPanel .web-artist-hdr{font-size:12.5px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+#webPanel .web-artist-hdr{font-size:12.5px;font-weight:600;margin:0 0 4px;color:var(--ink)}
+#webPanel .web-genre-era{font-size:11.5px;color:var(--muted);margin:0 0 6px;font-style:italic}
+#webPanel .web-blurb{font-size:12.5px;color:var(--ink);margin:0 0 10px;line-height:1.55}
 #webPanel .web-facets{margin:0 0 10px;padding:0 0 0 16px;display:flex;flex-direction:column;gap:5px}
 #webPanel .web-facet-row{font-size:12.5px;color:var(--muted);list-style:none}
+#webPanel .web-facet-nosay{opacity:.75}
+#webPanel .web-nosay{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;
+ padding:1px 5px;border-radius:10px;background:rgba(139,148,168,.12);color:var(--muted);
+ letter-spacing:.04em;vertical-align:middle;margin-left:3px}
 #webPanel .web-note{font-size:11px;color:var(--muted);opacity:.65;margin:6px 0 0;font-style:italic}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;

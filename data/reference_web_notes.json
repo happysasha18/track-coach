@@ -1,0 +1,58 @@
+{
+  "_note": "One-source data file for the rich web panel (SPEC §D.10.2), side page, and ★/☆ computation. Supersedes facet_confirmation.json. Source: ~/.track-coach/explore/web_facets_draft.md (web research 2026-06-29), curated 2026-06-30. Each direction: artist, genre/era, 2-3 sentence blurb (faithfully condensed from the draft, no new claims), and traits [{phrase, axis, expect, tier}]. Render rule: tier=direct AND centroid agrees by >= _confirm_z → ★; tier=indirect AND agrees → ☆; tier=none OR contradicted/unmeasured → 'web says · our tracks don't show it'. _confirm_z: minimum |centroid z| to count as confirmed.",
+  "_confirm_z": 0.4,
+  "DeepChord": {
+    "artist": "DeepChord",
+    "genre_era": "Dub techno / ambient techno, Detroit. Mid-1990s–present.",
+    "blurb": "Second-wave Basic Channel sound with heavier ambient and field-recording influence than most dub techno. Rod Modell processes sounds through deep reverb, Eventide Orville, Korg Stage Echos, and spring reverbs until 'little of the original remains', producing spatial, dronal textures. Tracks always start with the ambient parts — described as 'sounds like 4am' — and the kick drum is added last as a metronome under the ambience.",
+    "traits": [
+      {"phrase": "slow meditative tempo", "axis": "tempo",        "expect": "low",  "tier": "direct"},
+      {"phrase": "deep bass anchor",       "axis": "bass_share",  "expect": "high", "tier": "direct"},
+      {"phrase": "deep sustained bass",    "axis": "bass_sustain","expect": "high", "tier": "direct"},
+      {"phrase": "restrained flat dynamics","axis": "dynamics",   "expect": "low",  "tier": "direct"},
+      {"phrase": "wide stereo field",      "axis": "stereo",      "expect": "high", "tier": "direct"},
+      {"phrase": "ambient pads dominate",  "axis": "other_share", "expect": "high", "tier": "direct"},
+      {"phrase": "long sustained pads",    "axis": "pad_sustain", "expect": "high", "tier": "direct"},
+      {"phrase": "dark, muted",            "axis": "brightness",  "expect": "low",  "tier": "direct"},
+      {"phrase": "dark pad timbre",        "axis": "pad_bright",  "expect": "low",  "tier": "direct"},
+      {"phrase": "sparse minimal drums",   "axis": "drums_share", "expect": "low",  "tier": "direct"},
+      {"phrase": "very sparse arrangement","axis": "density",     "expect": "low",  "tier": "direct"},
+      {"phrase": "held pad, no melody",    "axis": "pad_notes",   "expect": "low",  "tier": "direct"}
+    ]
+  },
+  "Venetian Snares": {
+    "artist": "Venetian Snares",
+    "genre_era": "Breakcore / IDM / glitch, Winnipeg, Canada. Late 1990s–present.",
+    "blurb": "Aaron Funk is widely credited with defining breakcore — hyper-fast (180–200+ BPM) mutilated amen breaks assembled into 'organized chaos' with obsessive rhythmic complexity. His style splits sharply by album: breakcore works are a constant terrorizing barrage, while orchestral-fusion albums (notably Rossz Csillag Alatt Született) pair shredded drums with long sampled strings from Bartók, Mahler, and Elgar.",
+    "traits": [
+      {"phrase": "hyper-fast tempo",       "axis": "tempo",       "expect": "high", "tier": "direct"},
+      {"phrase": "drum-driven texture",    "axis": "drums_share", "expect": "high", "tier": "direct"},
+      {"phrase": "dense, busy",            "axis": "density",     "expect": "high", "tier": "direct"},
+      {"phrase": "compressed, loud",       "axis": "dynamics",    "expect": "low",  "tier": "direct"},
+      {"phrase": "bright staccato highs",  "axis": "brightness",  "expect": "high", "tier": "direct"},
+      {"phrase": "constant intensity",     "axis": "energy_build","expect": "low",  "tier": "indirect"},
+      {"phrase": "long sustained pads",    "axis": "pad_sustain", "expect": "high", "tier": "direct"},
+      {"phrase": "high orchestral share",  "axis": "other_share", "expect": "high", "tier": "direct"},
+      {"phrase": "bright orchestral pads", "axis": "pad_bright",  "expect": "high", "tier": "direct"},
+      {"phrase": "odd time signatures (7/4)", "axis": null,       "expect": null,   "tier": "none"}
+    ]
+  },
+  "SCSI-9": {
+    "artist": "SCSI-9",
+    "genre_era": "Deep house / tech-house / minimal techno, Moscow, Russia. Active from ~2001.",
+    "blurb": "Duo Anton Kubikov and Maxim Milyutenko, released on Kompakt and Force Tracks. Resident Advisor describes their sound as 'hypermelodic tech-house': wistful melodic synth phrases and 'bell-tone droplets' over warm bass pulses, with 'kaleidoscopic dub effects' and 'spacey reverb' in the background. Described as 'geometric but above all analog' — mathematical minimalism deliberately not sweaty or frenetic.",
+    "traits": [
+      {"phrase": "punchy short bass",             "axis": "bass_sustain","expect": "low",  "tier": "direct"},
+      {"phrase": "melodic lead synths",           "axis": "lead_share",  "expect": "high", "tier": "direct"},
+      {"phrase": "ambient pad bed",               "axis": "other_share", "expect": "high", "tier": "direct"},
+      {"phrase": "wide stereo field",             "axis": "stereo",      "expect": "high", "tier": "direct"},
+      {"phrase": "bright pad timbre",             "axis": "pad_bright",  "expect": "high", "tier": "direct"},
+      {"phrase": "bright mix overall",            "axis": "brightness",  "expect": "high", "tier": "direct"},
+      {"phrase": "sparse but detailed",           "axis": "density",     "expect": "low",  "tier": "direct"},
+      {"phrase": "gentle energy rise",            "axis": "energy_build","expect": "high", "tier": "indirect"},
+      {"phrase": "mid-tempo groove (~122-128 BPM)","axis": "tempo",      "expect": null,   "tier": "none"},
+      {"phrase": "warm mid-bass pulse",           "axis": "bass_share",  "expect": null,   "tier": "none"},
+      {"phrase": "moderate controlled dynamics",  "axis": "dynamics",    "expect": null,   "tier": "none"}
+    ]
+  }
+}

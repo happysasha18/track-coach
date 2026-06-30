@@ -274,13 +274,15 @@ def _widget_version(e):
 
 
 def _stale_chip(e):
-    """A small 'stale' marker when the row's linked widget was built on an older TC_VERSION than the
-    current one — so an out-of-date deposit is visible, not silently opened (INV-12). '' when current
-    or unknown."""
+    """A self-explaining 'older analysis' marker when the row's linked widget was built on an older
+    TC_VERSION than the current one (INV-12). Shows the version in the chip text so the meaning and
+    the fix are visible without hovering (Glossary 'stale' — UI clarity fix 2026-06-30). '' when
+    current or unknown (don't cry wolf)."""
     wv = _widget_version(e)
     if wv and wv != build_widget.TC_VERSION:
         return (f'<span class="stale" title="opens a v{wv} widget; current is '
-                f'v{build_widget.TC_VERSION} — re-analyse to refresh">stale</span>')
+                f'v{build_widget.TC_VERSION} — re-analyse to refresh">'
+                f'older analysis · v{wv} → re-analyse</span>')
     return ""
 
 
@@ -434,7 +436,7 @@ a.ttl:hover{{color:var(--wob);text-decoration:underline}}
 .c-num{{font-variant-numeric:tabular-nums;white-space:nowrap}}
 .c-ver{{color:var(--bright);font-weight:600;white-space:nowrap}}.runs{{color:var(--muted);font-weight:400;font-size:11px}}
 .stale{{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;
- letter-spacing:.04em;padding:1px 6px;border-radius:20px;background:rgba(255,180,84,.16);color:var(--warn);cursor:help}}
+ letter-spacing:.04em;padding:1px 6px;border-radius:20px;background:rgba(255,180,84,.16);color:var(--warn);cursor:help;white-space:nowrap}}
 .c-date,.c-key{{color:var(--muted);white-space:nowrap}}
 svg.arc{{width:130px;height:30px;display:block}}.noarc{{color:var(--muted)}}
 svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
