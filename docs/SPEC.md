@@ -1806,6 +1806,68 @@ These were the open ⟨DECIDE⟩ points; all are now settled and folded into the
   the named pre-1.0 path `<audio_parent>/track-coach-output/index.json`; disclose the split only if it isn't
   found (G-INV-12).
 
+## H. Commands, library management & cleanup (1.0)
+
+The command surface a user actually types, plus the safe-cleanup commands. All destructive verbs obey §G's
+rails (dry-run by default G-INV-8; only under the configured output root G-INV-7; keep referenced + best
+undeposited runs G-INV-10/15; all-or-clean-report G-INV-11). Written human-first; `tags` are prover/matrix
+handles. `tags: §G`
+
+### H.0 The command surface, named once
+
+What exists today (real, shipped): `analyze` (measure → result JSON + stems), `build` (rebuild a run's widget +
+auto-deposit), `migrate` (consolidate pre-1.0 runs under $HOME, §G G-INV-16), and on the library: `list`,
+`deposit`, `catalog`, `clean`. The 1.0 additions below fill the gaps Alexander named: real remove, scratch
+`gc`, explicit version pruning, an Ableton-tail sweep, and a full `reset`.
+
+### H.1 Listing & removing — managing what's in the library
+
+**`list` shows every track and its versions.** One line per track with its versions/stamps, so the user can see
+what the library holds before removing anything. (Exists; `library list`.) `H-INV-1`
+
+**`remove` prunes a chosen track or a single version — never silently.** Removing names exactly what goes
+(which catalog rows, which widget copies, whether the backing run dir is also deleted) and asks/`--apply`
+before doing it. Removing one version of a track leaves the others and the track's history intact; removing a
+whole track takes all its versions. The library index and catalog are rewritten in one step (no half state,
+G-INV-11). Auto-deposit stays the default ingest (H-INV-7) — `remove` is the counterpart for taking things
+out. `H-INV-2`
+
+### H.2 Cleanup — gc, version pruning, Ableton-sweep, reset
+
+**`gc` prunes scratch, never the keep-half.** It removes orphaned/old run dirs, separated stems, and superseded
+intermediate output under the output root — keeping every deposited member's referenced run and the
+most-complete undeposited run per track (§G G-INV-9/10/15). Dry-run by default; `--apply` to act. `H-INV-3`
+
+**Old versions are kept by default; pruning them is a separate, explicit, dry-run-first verb.** Per Alexander
+(s31): the library keeps ALL versions and ALL run results as a feature (any version opens from the per-track
+plaque). gc must NOT drop versions automatically. A distinct `prune-versions` (e.g. "keep newest N per track")
+exists only as an explicit command, shows what it would drop, and never runs as part of routine gc. `H-INV-4`
+
+**An Ableton-tail sweep removes only truly-orphaned leftovers, and only after showing them.** After `migrate`,
+old `track-coach-output/` folders in Ableton projects can hold a dangling `latest` symlink and a stale
+`index.json` — but they may ALSO still hold real undeposited/older run data (verified by deed s31: those
+folders held whole extra runs, not just empty tails). The sweep therefore distinguishes *empty / dangling-only*
+tails (safe to delete) from *folders that still contain real runs* (listed, never auto-deleted), and shows
+everything in dry-run before any removal. It operates outside the output root by design, so it requires an
+explicit target/confirm and never touches non-track-coach files (the user's audio/`.als`). `H-INV-5`
+
+**`reset` is the all-the-way wipe — explicit, confirmed, recoverable by re-analysis.** A full `reset` clears
+everything under `~/.track-coach/` (analyses, stems, the library). It demands an explicit confirm (not just
+`--apply`), states plainly that source `.als`/audio are untouched and the analyses rebuild by re-running, and
+reports exactly what it removed. It is the dogfood path Alexander uses to verify cleanup end-to-end before
+re-accumulating versions. `H-INV-6`
+
+**Ingest stays automatic; the user manages the exits.** A successful `build` auto-deposits (§G G-INV-17); the
+user never has to remember to save. The management verbs (`remove`, `gc`, `prune-versions`, `reset`) are the
+deliberate, dry-run-guarded ways to take things back out. `H-INV-7`
+
+### H.3 Open
+
+- ⟨DECIDE H-1⟩ `prune-versions` default keep-count N (suggest: prompt, no silent default — keep-all stands until
+  the user names N).
+- ⟨DECIDE H-2⟩ does `remove` of a version also delete its run dir by default, or only the library entry (run dir
+  left for gc)? Lean: only the library entry; gc reclaims the run dir later.
+
 ## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
