@@ -5,6 +5,11 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.7] — 2026-07-01
+
+### Added
+- **Cleanup & library-management commands.** `reset` (full wipe of your analyses + library — dry-run unless `--yes-wipe-everything`; your `.als`/audio are never touched), `gc` (prune scratch run dirs while keeping every catalogued track + the best undeposited run), `gc --ableton-tails` (sweep leftover folders in old Ableton project dirs — only the truly-empty ones, never folders that still hold real analyses), `remove` (drop a track or one version from the library), and `prune-versions --keep N` (explicitly trim old versions). Every destructive command is dry-run by default.
+
 ## [0.9.6] — 2026-06-30
 
 ### Fixed
