@@ -536,6 +536,33 @@ def cmd_build(args):
 
 # ── cli ───────────────────────────────────────────────────────────────────────────────
 
+def cmd_migrate(args):
+    """Consolidate pre-1.0 run dirs from Ableton project folders into the shared output root.
+
+    DRY-RUN by default: prints the from→to plan without moving anything.
+    Pass ``--apply`` to actually move files and rewrite the library index (G-INV-16).
+    """
+    import library as lib
+    lib_root = lib.library_root()
+    output_root = (Path(args.base).expanduser().resolve()
+                   if args.base else Path.home() / ".track-coach")
+    plan = lib.migrate_plan(lib_root, output_root)
+    if not plan:
+        print("migrate: nothing to do — all analysis data is already inside the output root.")
+        return
+    mode = "DRY-RUN" if not args.apply else "APPLY"
+    n = len(plan)
+    print(f"migrate ({mode}) — {n} run dir{'s' if n != 1 else ''} to move:")
+    for item in plan:
+        print(f"  from: {item['src']}")
+        print(f"    to: {item['dst']}")
+    if not args.apply:
+        print(f"\nRe-run with --apply to move the files and update the library index.")
+        return
+    moved = lib.migrate_apply(lib_root, output_root)
+    print(f"\nDone: moved {len(moved)} run dir{'s' if len(moved) != 1 else ''}; library index updated.")
+
+
 def main():
     p = argparse.ArgumentParser(prog="track-analyzer", description="track-analyzer engine (measure + render)")
     p.add_argument("--version", action="version", version=f"track-analyzer {tc_version()}")
@@ -552,7 +579,7 @@ def main():
     a.add_argument("--model", default="htdemucs_6s", help="Demucs model (6s gives guitar+piano stems)")
     a.add_argument("--track-version", default=None, help="REAL version from the source name only; never invent")
     a.add_argument("--bpm", type=float, default=None, help="override tempo for rhythm (default: from core)")
-    a.add_argument("--base", default=None, help="output base (default: <audio_dir>/track-coach-output)")
+    a.add_argument("--base", default=None, help="output base (default: ~/.track-coach/projects)")
     a.add_argument("--skip-transcribe", action="store_true")
     a.add_argument("--dry-run", action="store_true", help="print the plan; run nothing")
     a.set_defaults(func=cmd_analyze)
@@ -577,6 +604,15 @@ def main():
     b.add_argument("--no-deposit", action="store_true", help="don't copy the widget into the global library")
     b.add_argument("--dry-run", action="store_true")
     b.set_defaults(func=cmd_build)
+
+    m = sub.add_parser(
+        "migrate",
+        help="consolidate pre-1.0 run dirs (in Ableton project folders) into ~/.track-coach/projects/ (G-INV-16)")
+    m.add_argument("--apply", action="store_true",
+                   help="actually move files + rewrite the library index (dry-run by default)")
+    m.add_argument("--base", default=None,
+                   help="output root (default: ~/.track-coach/); migrate into <base>/projects/<slug>/")
+    m.set_defaults(func=cmd_migrate)
 
     args = p.parse_args()
     args.func(args)

@@ -290,7 +290,15 @@ def _open_href(e, widgets_rel):
     """Where 'open →' points. Prefer the ORIGINAL widget in its run dir — its stems sit next to
     it, so the player actually plays. The library copy is stem-less (a deposit is a single .html),
     so opening it leaves a dead player. Fall back to the relative copy for old entries that predate
-    `src_widget` (backward-compat). PURE (no filesystem)."""
+    `src_widget` (backward-compat).
+
+    G-INV-14: when ``build_catalog`` detects ``src_run_dir`` is missing on disk, it injects
+    ``_lib_href`` into the entry (the library's own HTML copy as a ``file://`` URI). This function
+    prefers that over the dead original link. PURE (no filesystem — the probe is in build_catalog).
+    """
+    # G-INV-14: library HTML copy fallback pre-computed by build_catalog
+    if e.get("_lib_href"):
+        return e["_lib_href"]
     src_dir, src_widget = e.get("src_run_dir"), e.get("src_widget")
     if src_dir and src_widget:
         return (Path(src_dir) / src_widget).as_uri()  # absolute file:// (encodes spaces/[brackets])
@@ -349,12 +357,16 @@ _HEADERS = [
 _NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the header count
 
 
-def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library") -> str:
+def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library",
+                        migrate_banner: int = 0) -> str:
     """Render the whole catalog page from index entries. PURE (no filesystem).
 
     Sim data (`_lean`, `_siblings`) is expected pre-injected into each entry dict by
     build_catalog (same pattern as `mix_uri`). Gracefully degrades when absent (old entries
     without run dirs show 'no close direction yet' / '—').
+
+    ``migrate_banner``: when > 0, a passive banner is shown prompting the user to run
+    ``migrate`` to consolidate analysis data out of Ableton project folders (G-INV-16 support).
     """
     groups = library.group_versions(entries)
     n_tracks = len(groups)
@@ -385,6 +397,16 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
          if k else f'<th>{html.escape(label)}</th>')
         for k, label in _HEADERS)
     p = PALETTE
+    # G-INV-16 passive migrate warning: emit when members still live in Ableton folders
+    n_outside = migrate_banner
+    migrate_html = ""
+    if n_outside > 0:
+        n_word = f"{n_outside} track{'s' if n_outside != 1 else ''}"
+        has_have = "have" if n_outside != 1 else "has"
+        migrate_html = (
+            f'<div class="migrate-banner">{n_word} {has_have} analysis data in project folders'
+            f' — run <code>migrate</code> to consolidate.</div>'
+        )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(title)}</title>
@@ -470,6 +492,10 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .empty{{text-align:center;color:var(--muted);padding:40px}}
 .foot{{color:var(--muted);font-size:11px;margin-top:18px;text-align:center}}
 tr.hide{{display:none}}
+.migrate-banner{{background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.35);
+ border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--bright)}}
+.migrate-banner code{{background:rgba(255,209,102,.15);border-radius:4px;padding:1px 5px;
+ font-family:monospace;font-size:12px}}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute"><defs>
  <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
@@ -479,7 +505,7 @@ tr.hide{{display:none}}
  <div class="brand">Track Coach</div>
  <h1>Library</h1>
  <p class="sub">{n_versions} version{'s' if n_versions!=1 else ''} across {n_tracks} track{'s' if n_tracks!=1 else ''} · click a header to sort, search to filter.</p>
- <div class="controls">
+{migrate_html} <div class="controls">
   <input id="q" type="search" placeholder="Search tracks…" autocomplete="off">
   <div class="seg" id="modeseg">
    <button data-mode="" class="on">All</button>
@@ -610,8 +636,33 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     root = Path(root) if root else library.library_root()
     idx = library.load_index(root)
     entries = idx.get("entries", [])
-    for e in entries:                      # probe each run for a playable web mix (graceful if none)
+
+    # The output root for the purposes of G-INV-14 and G-INV-16:
+    # library lives at <output_root>/library/; its parent is the output root.
+    output_root = root.parent
+
+    for e in entries:
+        # Probe each run for a playable web mix (graceful if none).
         e["mix_uri"] = _mix_uri_for(e)
+
+        # G-INV-14: when src_run_dir is missing on disk, inject the library HTML copy path so
+        # _open_href can fall back to it (pre-computed here; _open_href stays pure).
+        sd = e.get("src_run_dir")
+        if sd and not Path(sd).exists():
+            widget = e.get("widget", "")
+            lib_copy = root / "widgets" / widget
+            if lib_copy.exists():
+                e["_lib_href"] = lib_copy.as_uri()
+
+    # G-INV-16 passive banner: count members whose src_run_dir is outside the output root.
+    migrate_banner = 0
+    for e in entries:
+        sd = e.get("src_run_dir")
+        if sd:
+            try:
+                Path(sd).relative_to(output_root)
+            except ValueError:
+                migrate_banner += 1
 
     # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here,
     # pure renderer reads the pre-computed fields via e["_lean"] / e["_siblings"]).
@@ -626,7 +677,7 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
             e["_leans"] = []
             e["_siblings"] = []
 
-    html_str = render_catalog_html(entries)
+    html_str = render_catalog_html(entries, migrate_banner=migrate_banner)
     out = root / "index.html"
     root.mkdir(parents=True, exist_ok=True)
     out.write_text(html_str, encoding="utf-8")

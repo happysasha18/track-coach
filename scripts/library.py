@@ -381,6 +381,73 @@ def _cmd_clean(args):
     print(f"removed {len(remove)}; {len(keep)} left.")
 
 
+def migrate_plan(root: Path, output_root: Path) -> list:
+    """Return a plan list for members whose src_run_dir lives outside ``output_root``.
+
+    Each plan item is a dict: {entry, src (Path), dst (Path), slug (str)}.
+    Dry-run safe — reads the index but changes nothing.  G-INV-16.
+    """
+    root = Path(root)
+    output_root = Path(output_root)
+    idx = load_index(root)
+    plan = []
+    for e in idx.get("entries", []):
+        if not isinstance(e, dict):
+            continue
+        sd = e.get("src_run_dir", "")
+        if not sd:
+            continue
+        src = Path(sd)
+        try:
+            src.relative_to(output_root)
+            continue  # already inside the output root — nothing to do
+        except ValueError:
+            pass
+        slug = e.get("track", "")
+        if not slug:
+            continue
+        # Destination: <output_root>/projects/<slug>/<run_folder_name>
+        dst = output_root / "projects" / slug / src.name
+        plan.append({"entry": e, "src": src, "dst": dst, "slug": slug})
+    return plan
+
+
+def migrate_apply(root: Path, output_root: Path) -> list:
+    """Move run dirs outside the output root into ``<output_root>/projects/<slug>/`` and rewrite
+    the library index.  The index is only rewritten AFTER all moves succeed (G-INV-16
+    all-or-clean-report).
+
+    Returns the list of moved plan items (same shape as ``migrate_plan``).
+    Raises ``RuntimeError`` on the first move failure; already-moved dirs are left in place but
+    the index is NOT updated for the failed member.
+    """
+    plan = migrate_plan(root, output_root)
+    if not plan:
+        return []
+
+    moved = []
+    for item in plan:
+        src, dst = item["src"], item["dst"]
+        if not src.exists():
+            raise RuntimeError(
+                f"migrate: source run dir not found on disk (already moved?): {src}")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dst))
+        moved.append(item)
+
+    # All moves succeeded — rewrite the index atomically (single write).
+    root = Path(root)
+    idx = load_index(root)
+    new_sdr = {str(item["src"]): str(item["dst"]) for item in moved}
+    for e in idx.get("entries", []):
+        if isinstance(e, dict):
+            sd = e.get("src_run_dir", "")
+            if sd in new_sdr:
+                e["src_run_dir"] = new_sdr[sd]
+    save_index(root, idx)
+    return moved
+
+
 def _cmd_catalog(args):
     """Delegate to catalog.py (the view layer) so `library.py catalog` just works."""
     import catalog

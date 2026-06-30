@@ -1675,12 +1675,14 @@ use and tests, but the *default* is the safe one (this is the behaviour change �
 `track-coach-output/` dir beside the audio). `G-INV-1`
 
 **One track = one slug, so a track's versions keep one continuous history.** Identity is the slug
-`slugify(audio file name)` with version tags stripped — so `Track_v2.wav` and `Track_v3.wav` both reduce to
-slug `track` and share one history; the version label lives in the run-dir's `<version>__<stamp>` name, not in
-the slug. (This is the *real, shipped* rule — identity comes from the audio name, not the `.als` stem.) Every
-version of the same track resolves to the same `~/.track-coach/projects/<slug>/`, and the shared
-`projects/index.json` accrues the full run history across versions (which the version-history / sibling-narrative
-features rely on). `G-INV-2`
+`slugify(audio file name)` (run_dir.py): it drops a **bracketed** version tag like `[v2]`/`(v0.6.2)` and
+sanitises the rest to word chars, **case preserved**. So `Mix [v2].wav` and `Mix [v3].wav` both reduce to slug
+`Mix` and share one history; the version label lives in the run-dir's `<version>__<stamp>` name, not the slug.
+(This is the *real, shipped* rule — identity is the audio name, not the `.als` stem. Known limit: a **bare**
+suffix like `Mix_v3.wav` is *not* stripped, so it forms its own slug unless the user groups versions with a
+bracketed tag or `--track-version`.) Every version that shares a slug resolves to the same
+`~/.track-coach/projects/<slug>/`, and the shared `projects/index.json` accrues the run history across those
+versions (which the version-history / sibling-narrative features rely on). `G-INV-2`
 
 **Collision: two genuinely different tracks that slug to the same name get disambiguated, never co-mingled.**
 Because the runs base is now shared across every project (it used to be per-Ableton-folder), two unrelated

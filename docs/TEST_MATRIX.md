@@ -360,3 +360,19 @@ state hides the reference column but leaves the DJ column visible; owning test l
 
 - **Process:** every demo I OPEN must be a real, COMPLETE `build` render (playbook + memory). Two partial
   hand-fed renders this session read as real bugs.
+
+## §G — Storage relocation (SPEC §G → G-INV-1…17)
+
+Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.py`.
+
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| G-INV-1 | Default output base is `~/.track-coach/projects/`, NOT next to the audio file | `test_storage_relocation::RelocationDefault::test_default_base_is_home_projects` |
+| G-INV-3 | `--base` flag still overrides the default; path shape `base/slug/stamp` preserved | `test_storage_relocation::RelocationDefault::test_base_flag_still_overrides` |
+| G-INV-2 | One track = one slug; a track re-run reuses the same slug dir | `test_storage_relocation::CollisionDisambiguation::test_same_source_reuses_slug` |
+| G-INV-2b | Two different audios that slug the same get `<slug>-2` (+warn), never co-mingled | `test_storage_relocation::CollisionDisambiguation::test_different_source_gets_slug_2` |
+| G-INV-12 | First post-move run seeds shared index from old per-folder index so history stays one file | `test_storage_relocation::SeedFromOldIndex::test_old_index_entries_appear_in_new_index` |
+| G-INV-14 | Catalog open-link falls back to library HTML copy when `src_run_dir` is missing on disk | `test_storage_relocation::CatalogFallback::test_open_href_falls_back_to_library_copy` |
+| G-INV-16 (warn) | Catalog page shows a banner counting members with `src_run_dir` outside the output root | `test_storage_relocation::MigrateWarning::test_banner_counts_outside_root_members` |
+| G-INV-11 | Run-index selector skips entries whose run dir is missing on disk; only returns existing dirs | `test_storage_relocation::DiskPresenceCheck::test_missing_run_dir_is_skipped` |
+| G-INV-16 | `migrate` dry-run prints from→to plan and moves nothing; `--apply` moves + rewrites src_run_dir | `test_storage_relocation::MigrateCommand::test_dry_run_changes_nothing`, `::test_migrate_apply_moves_and_rewrites` |

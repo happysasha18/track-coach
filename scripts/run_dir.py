@@ -7,7 +7,7 @@ and the widget never showed WHICH file was analysed or WHEN.
 
 Layout this enforces:
 
-    <base>/                                  (default: <audio_dir>/track-coach-output)
+    <base>/                                  (default: ~/.track-coach/projects)
       <track-slug>/
         <version>__<YYYY-MM-DD_HHMM>/        one run — never reused
           result_*.json, stems*/, analysis_widget.html, run_meta.json
@@ -53,14 +53,32 @@ def slugify(name: str) -> str:
     return stem or "track"
 
 
+def existing_runs(runs_list: list) -> list:
+    """Filter an index runs-list to entries whose run dir exists on disk (G-INV-11 / RC-INV-9).
+
+    Accepts either run_dir.py index entries (key ``run_dir``) or library index entries
+    (key ``src_run_dir``).  Non-dict items (legacy string slugs) are silently skipped.
+    Never trusts index membership alone — a crash, prune, or hand-delete can leave stale entries.
+    """
+    out = []
+    for e in runs_list:
+        if not isinstance(e, dict):
+            continue
+        rd = e.get("run_dir") or e.get("src_run_dir", "")
+        if rd and Path(rd).exists():
+            out.append(e)
+    return out
+
+
 def detect_version(name: str) -> str:
     m = re.search(r"v?(\d+\.\d+(?:\.\d+)?)", Path(name).stem)
     return ("v" + m.group(1)) if m else ""
 
 
 def base_dir(args, audio: Path) -> Path:
+    # G-INV-1: default is ~/.track-coach/projects/ — NOT next to the audio file.
     return Path(args.base).expanduser().resolve() if args.base \
-        else (audio.parent / "track-coach-output")
+        else (Path.home() / ".track-coach" / "projects")
 
 
 def track_root(args, audio: Path) -> Path:
@@ -90,8 +108,13 @@ def update_symlink(root: Path, target: Path):
         pass  # symlinks can fail on some filesystems; the folder itself is the source of truth
 
 
-def update_index(base: Path, slug: str, run_dir: Path, meta: dict):
-    """Append this run to base/index.json — honest history, never overwritten."""
+def update_index(base: Path, slug: str, run_dir: Path, meta: dict, *, audio: Path = None):
+    """Append this run to base/index.json — honest history, never overwritten.
+
+    ``audio`` is used to locate a pre-1.0 index at
+    ``<audio.parent>/track-coach-output/index.json`` and seed it into the new shared index
+    on the first post-move run for this slug (G-INV-12).
+    """
     idx_path = base / "index.json"
     idx = {"runs": []}
     if idx_path.exists():
@@ -100,6 +123,21 @@ def update_index(base: Path, slug: str, run_dir: Path, meta: dict):
         except (ValueError, OSError):
             idx = {"runs": []}
     idx.setdefault("runs", [])
+
+    # G-INV-12: seed from old per-folder index on the very first post-move run for this slug.
+    if audio is not None:
+        existing_slugs = {r.get("track") for r in idx["runs"] if isinstance(r, dict)}
+        if slug not in existing_slugs:
+            old_idx_path = audio.parent / "track-coach-output" / "index.json"
+            if old_idx_path.exists():
+                try:
+                    old_data = json.loads(old_idx_path.read_text())
+                    for r in old_data.get("runs", []):
+                        if isinstance(r, dict) and r.get("track") == slug:
+                            idx["runs"].append(r)
+                except (ValueError, OSError):
+                    pass  # can't read old index — disclose the split rather than crashing
+
     entry = {
         "track": slug,
         "version": meta.get("track_version", ""),
@@ -108,6 +146,7 @@ def update_index(base: Path, slug: str, run_dir: Path, meta: dict):
         "mode": meta.get("mode"),
         "audio": meta.get("audio"),
         "als": meta.get("als"),
+        "source_identity": meta.get("source_identity", ""),
     }
     idx["runs"].append(entry)
     idx["latest"] = entry
@@ -115,12 +154,62 @@ def update_index(base: Path, slug: str, run_dir: Path, meta: dict):
     idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2))
 
 
+def _stored_identity(root: Path) -> "str | None":
+    """Read source_identity from the most recent run in a slug dir.
+
+    Falls back to ``als_path``/``audio_path`` from run_meta.json so old runs (without an
+    explicit ``source_identity`` field) are still matched by their stored paths (G-INV-2b).
+    Returns None when no run_meta.json is readable.
+    """
+    newest = newest_run(root)
+    if newest is None:
+        return None
+    try:
+        meta = json.loads((newest / "run_meta.json").read_text())
+        return (meta.get("source_identity") or
+                meta.get("als_path") or
+                meta.get("audio_path"))
+    except (ValueError, OSError):
+        return None
+
+
+def _resolve_slug(base: Path, audio: Path, als_path: "Path | None") -> tuple:
+    """Return (slug, warn_msg_or_None) for this run, disambiguating same-name collisions.
+
+    G-INV-2b: two different tracks that slug the same get ``<slug>-2`` (then -3, …) and a
+    warning; same source (same audio/als path) reuses the existing slug.  Source identity is
+    the als full path when provided, else the audio full path.
+    """
+    identity = str(als_path) if als_path else str(audio)
+    base_slug = slugify(audio.name)
+    candidate = base_slug
+    n = 2
+    while True:
+        root = base / candidate
+        if not root.exists():
+            return candidate, None          # fresh slot — no collision
+        stored = _stored_identity(root)
+        if stored is None or stored == identity:
+            return candidate, None          # same source or unreadable → reuse
+        # Different stored identity → try the next numbered slot
+        warn = (f"  ⚠  slug '{candidate}' is used by a different track "
+                f"(stored: {stored!r}); using '{base_slug}-{n}'")
+        candidate = f"{base_slug}-{n}"
+        n += 1
+
+
 def cmd_init(args):
     audio = Path(args.audio).expanduser().resolve()
     if not audio.exists():
         sys.exit(f"audio not found: {audio}")
     base = base_dir(args, audio)
-    slug = slugify(audio.name)
+    als = Path(args.als).expanduser().resolve() if args.als else None
+
+    # G-INV-2/2b: resolve slug with collision-disambiguation
+    slug, warn = _resolve_slug(base, audio, als)
+    if warn:
+        print(warn, file=sys.stderr)
+
     root = base / slug
     version = args.track_version or detect_version(audio.name)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -133,7 +222,8 @@ def cmd_init(args):
         n += 1
     run_dir.mkdir(parents=True)
 
-    als = Path(args.als).expanduser().resolve() if args.als else None
+    # G-INV-2b: source_identity = als path if provided, else audio full path
+    source_identity = str(als) if als else str(audio)
     meta = {
         "track": slug,
         "track_version": version,
@@ -144,10 +234,12 @@ def cmd_init(args):
         "mode": args.mode,
         "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "run_dir": str(run_dir),
+        "source_identity": source_identity,  # G-INV-2b: stable identity for collision check
     }
     (run_dir / "run_meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     update_symlink(root, run_dir)
-    update_index(base, slug, run_dir, meta)
+    # Pass audio so update_index can seed from the old per-folder index (G-INV-12)
+    update_index(base, slug, run_dir, meta, audio=audio)
 
     # human note on stderr, machine-readable path on the LAST stdout line
     print(f"New run folder (won't overwrite earlier runs):\n  {run_dir}", file=sys.stderr)
@@ -223,7 +315,7 @@ def main():
     pi.add_argument("--als", default=None)
     pi.add_argument("--track-version", default=None)
     pi.add_argument("--mode", default="full", choices=["quick", "full"])
-    pi.add_argument("--base", default=None, help="output base dir (default: <audio_dir>/track-coach-output)")
+    pi.add_argument("--base", default=None, help="output base dir (default: ~/.track-coach/projects)")
     pi.set_defaults(func=cmd_init)
     pr = sub.add_parser("resume", help="find the newest run for this track + what it already has")
     pr.add_argument("--audio", required=True)
