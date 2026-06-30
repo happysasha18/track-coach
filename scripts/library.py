@@ -32,6 +32,19 @@ def library_root() -> Path:
     return Path(env).expanduser() if env else Path.home() / ".track-coach" / "library"
 
 
+def output_root() -> Path:
+    """The configured output root (`~/.track-coach/`). Parent of library/ and projects/.
+
+    Override with TRACK_COACH_ROOT env var (used in tests to avoid touching the real root).
+    G-INV-7: reset/gc must never touch anything outside this root.
+    """
+    env = os.environ.get("TRACK_COACH_ROOT")
+    if env:
+        return Path(env).expanduser()
+    # Default: derive from library_root's parent (~/.track-coach)
+    return library_root().parent
+
+
 def sanitize(s: str) -> str:
     """Filesystem-safe token: keep word chars, dash, dot; collapse the rest to '-'."""
     s = (s or "").strip()
@@ -448,6 +461,482 @@ def migrate_apply(root: Path, output_root: Path) -> list:
     return moved
 
 
+# ── size utilities ────────────────────────────────────────────────────────────────────────
+
+def _dir_size(p: Path) -> int:
+    """Sum of all non-symlink file sizes under p, recursively. Touches the FS."""
+    total = 0
+    try:
+        for f in p.rglob("*"):
+            if f.is_file() and not f.is_symlink():
+                try:
+                    total += f.stat().st_size
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total
+
+
+def _fmt_size(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} GB"  # pragma: no cover
+
+
+# ── gc: prune scratch, keep referenced + best-undeposited (H-INV-3) ─────────────────────
+
+def _count_result_files(run_dir: Path) -> int:
+    """Count result_*.json files in a run dir (completeness proxy for RC-INV-9)."""
+    return len(list(run_dir.glob("result_*.json")))
+
+
+def _best_undeposited_run(slug_dir: Path, referenced: set) -> "Path | None":
+    """Return the most-complete run dir under slug_dir that is NOT referenced in the library.
+
+    'Most complete' = most result_*.json files; tiebreak = newest name (lexicographic).
+    Returns None if slug_dir has no undeposited runs.
+    G-INV-15 / RC-INV-9.
+    """
+    best, best_key = None, (-1, "")
+    for item in slug_dir.iterdir():
+        if item.name == "latest" or item.is_symlink():
+            continue
+        if not item.is_dir():
+            continue
+        if str(item) in referenced or str(item.resolve()) in referenced:
+            continue
+        n = _count_result_files(item)
+        k = (n, item.name)
+        if k > best_key:
+            best_key = k
+            best = item
+    return best
+
+
+def gc_plan(projects_dir: Path, lib_root: Path) -> dict:
+    """Classify run dirs under projects_dir as orphan vs keep.
+
+    Returns {
+        'orphan': [Path, …],          # can be pruned (not referenced, not best undeposited)
+        'keep_referenced': [Path, …], # referenced by a library member (G-INV-10)
+        'keep_best': [Path, …],       # best undeposited per slug (G-INV-15)
+    }
+
+    Only scans run dirs under projects_dir; library members that live OUTSIDE projects_dir
+    (pre-migration) are noted in referenced but not touched. G-INV-7.
+    """
+    projects_dir = Path(projects_dir)
+    idx = load_index(lib_root)
+    # Collect referenced run dirs from library index (raw string + resolved)
+    referenced: set = set()
+    for e in idx.get("entries", []):
+        if isinstance(e, dict) and e.get("src_run_dir"):
+            sd = e["src_run_dir"]
+            referenced.add(sd)
+            try:
+                referenced.add(str(Path(sd).resolve()))
+            except OSError:
+                pass
+
+    result: dict = {"orphan": [], "keep_referenced": [], "keep_best": []}
+    if not projects_dir.exists():
+        return result
+
+    for slug_dir in sorted(projects_dir.iterdir()):
+        if not slug_dir.is_dir() or slug_dir.is_symlink():
+            continue
+        best = _best_undeposited_run(slug_dir, referenced)
+        for run_dir in sorted(slug_dir.iterdir()):
+            if run_dir.name == "latest" or run_dir.is_symlink():
+                continue
+            if not run_dir.is_dir():
+                continue
+            rd_str = str(run_dir)
+            rd_res = str(run_dir.resolve())
+            is_ref = rd_str in referenced or rd_res in referenced
+            is_best = (best is not None and
+                       (run_dir == best or run_dir.resolve() == best.resolve()))
+            if is_ref:
+                result["keep_referenced"].append(run_dir)
+            elif is_best:
+                result["keep_best"].append(run_dir)
+            else:
+                result["orphan"].append(run_dir)
+    return result
+
+
+# ── Ableton-tail sweep (H-INV-5) ─────────────────────────────────────────────────────────
+
+def _slug_dir_has_real_runs(slug_dir: Path) -> bool:
+    """True if slug_dir contains at least one real (non-symlink) run subdirectory.
+
+    'Safe' slug dirs contain only dangling symlinks and index.json — no real run dirs.
+    H-INV-5.
+    """
+    for item in slug_dir.iterdir():
+        if item.name == "index.json":
+            continue
+        if item.is_symlink():
+            continue  # dangling or live symlink — not a real run dir itself
+        if item.is_dir():
+            return True
+    return False
+
+
+def ableton_tail_scan(tco_dirs: list) -> dict:
+    """Classify slug dirs within track-coach-output/ directories.
+
+    Returns {
+        'safe': [(tco_dir, slug_dir), …],      # empty/dangling-only — safe to remove
+        'real_runs': [(tco_dir, slug_dir), …], # has real run content — NEVER auto-delete
+        'missing': [tco_dir, …],               # tco_dir does not exist on disk
+    }
+    H-INV-5: distinguishes safe tails from slug dirs with real runs.
+    """
+    result: dict = {"safe": [], "real_runs": [], "missing": []}
+    for tco_dir in tco_dirs:
+        tco_dir = Path(tco_dir)
+        if not tco_dir.exists():
+            result["missing"].append(tco_dir)
+            continue
+        for slug_dir in sorted(tco_dir.iterdir()):
+            if not slug_dir.is_dir() or slug_dir.is_symlink():
+                continue
+            if _slug_dir_has_real_runs(slug_dir):
+                result["real_runs"].append((tco_dir, slug_dir))
+            else:
+                result["safe"].append((tco_dir, slug_dir))
+    return result
+
+
+def _tco_dirs_from_library(lib_root: Path, oroot: Path) -> list:
+    """Discover track-coach-output/ dirs from pre-migration library members.
+
+    A pre-migration src_run_dir lives OUTSIDE oroot.
+    The tco_dir = src_run_dir.parent.parent (slug dir's parent = tco dir).
+    H-INV-5.
+    """
+    idx = load_index(lib_root)
+    seen: set = set()
+    result: list = []
+    for e in idx.get("entries", []):
+        if not isinstance(e, dict):
+            continue
+        sd = e.get("src_run_dir", "")
+        if not sd:
+            continue
+        src = Path(sd)
+        try:
+            src.relative_to(oroot)
+            continue  # inside output root — skip
+        except ValueError:
+            pass
+        tco = src.parent.parent
+        key = str(tco)
+        if key not in seen:
+            seen.add(key)
+            result.append(tco)
+    return result
+
+
+# ── remove: drop a track or one version from the library (H-INV-2) ─────────────────────
+
+def remove_plan(entries: list, track: str, version: "str | None" = None) -> tuple:
+    """Decide which library entries to remove for a track (and optional version). PURE.
+
+    - version=None → remove ALL entries for that track
+    - version=<str> → remove only entries whose stamp or version field matches
+
+    Returns (keep, to_remove). Run dirs are NOT deleted (gc reclaims them). H-INV-2.
+    """
+    keep: list = []
+    to_remove: list = []
+    for e in entries:
+        if not isinstance(e, dict):
+            keep.append(e)
+            continue
+        if e.get("track") != track:
+            keep.append(e)
+            continue
+        if version is None:
+            to_remove.append(e)
+        elif e.get("stamp") == version or e.get("version") == version:
+            to_remove.append(e)
+        else:
+            keep.append(e)
+    return keep, to_remove
+
+
+# ── prune-versions: explicit old-version pruning (H-INV-4) ───────────────────────────────
+
+def prune_versions_plan(entries: list, keep_n: int) -> tuple:
+    """Keep only the newest N audio versions per track; return (keep, to_drop). PURE.
+
+    A 'version' is a distinct audio_sha group (same logic as group_versions).
+    All entries in a dropped version group are dropped together.
+    keep_n=0 → drops all versions for every track.
+    Caller must always supply keep_n (no silent default). H-INV-4.
+
+    Returns (keep, to_drop).
+    """
+    if keep_n < 0:
+        raise ValueError(f"keep_n must be >= 0, got {keep_n}")
+    by_track: dict = {}
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        by_track.setdefault(e.get("track", "?"), []).append(e)
+
+    to_drop_ids: set = set()
+    for track_name, es in by_track.items():
+        # Group by audio_sha (mirrors group_versions)
+        by_sha: dict = {}
+        for e in es:
+            key = e.get("audio_sha") or e.get("widget", "")
+            by_sha.setdefault(key, []).append(e)
+        # Sort versions oldest→newest
+        versions: list = []
+        for sha, grp in by_sha.items():
+            rep = max(grp, key=lambda e: (e.get("stamp", ""), e.get("deposited_at", "")))
+            okey = rep.get("audio_mtime") or rep.get("stamp", "")
+            versions.append({"sha": sha, "entries": grp, "okey": okey})
+        versions.sort(key=lambda v: (v["okey"] == "", v["okey"]))  # oldest first; unknowns last
+        # Keep the newest keep_n versions; drop the rest
+        keep_shas = {v["sha"] for v in versions[-keep_n:]} if keep_n > 0 else set()
+        for v in versions:
+            if v["sha"] not in keep_shas:
+                for e in v["entries"]:
+                    to_drop_ids.add(id(e))
+
+    keep = [e for e in entries if id(e) not in to_drop_ids]
+    to_drop = [e for e in entries if id(e) in to_drop_ids]
+    return keep, to_drop
+
+
+# ── shared catalog regen helper ───────────────────────────────────────────────────────────
+
+def _regen_catalog():
+    """Try to regenerate the catalog HTML after a library change. Best-effort."""
+    try:
+        import catalog  # noqa: PLC0415
+        out = catalog.build_catalog()
+        print(f"  catalog regenerated: {out}", file=sys.stderr)
+    except Exception as exc:
+        print(f"  (catalog regen skipped: {exc})", file=sys.stderr)
+
+
+# ── reset (H-INV-6) ──────────────────────────────────────────────────────────────────────
+
+def _cmd_reset(args):
+    """Full wipe of everything under the output root. Dry-run unless --yes-wipe-everything."""
+    base = Path(args.base).expanduser().resolve() if args.base else output_root()
+    projects = base / "projects"
+    library_dir = base / "library"
+
+    targets = [(d, _dir_size(d)) for d in (projects, library_dir) if d.exists()]
+    total = sum(sz for _, sz in targets)
+
+    if not targets:
+        print(f"reset: nothing under {base} — already clean.")
+        return
+
+    print(f"reset would remove under {base}:")
+    for d, sz in targets:
+        print(f"  {d}  ({_fmt_size(sz)})")
+    print(f"  Total: {_fmt_size(total)}")
+    print("  Source .als/audio files are UNTOUCHED. Re-analyse to rebuild.")
+
+    if not args.yes_wipe_everything:
+        print("(dry-run — pass --yes-wipe-everything to actually wipe)")
+        return
+
+    removed = []
+    for d, _ in targets:
+        shutil.rmtree(d)
+        removed.append(d)
+    print(f"reset: removed {[str(d) for d in removed]}")
+
+
+# ── gc (H-INV-3) + Ableton-tail mode (H-INV-5) ───────────────────────────────────────────
+
+def _cmd_gc(args):
+    """Prune orphaned run dirs (gc) or Ableton tco tail dirs (--ableton-tails)."""
+    if args.ableton_tails:
+        _gc_ableton_tails(args)
+        return
+
+    base = Path(args.base).expanduser().resolve() if args.base else output_root()
+    projects_dir = base / "projects"
+    lib_root = library_root()
+
+    plan = gc_plan(projects_dir, lib_root)
+    orphans = plan["orphan"]
+
+    if not orphans:
+        print("gc: nothing to prune — no orphaned run dirs found.")
+        if plan["keep_referenced"]:
+            print(f"  (keeping {len(plan['keep_referenced'])} referenced run(s))")
+        if plan["keep_best"]:
+            print(f"  (keeping {len(plan['keep_best'])} best-undeposited run(s))")
+        return
+
+    total_sz = sum(_dir_size(p) for p in orphans)
+    verb = "removing" if args.apply else "would remove"
+    print(f"gc {verb} {len(orphans)} orphaned run dir(s) ({_fmt_size(total_sz)}):")
+    for p in orphans:
+        print(f"  {p}  ({_fmt_size(_dir_size(p))})")
+    if plan["keep_referenced"]:
+        print(f"  keeping {len(plan['keep_referenced'])} referenced run(s) (library members, G-INV-10)")
+    if plan["keep_best"]:
+        print(f"  keeping {len(plan['keep_best'])} best-undeposited run(s) per slug (G-INV-15)")
+
+    if not args.apply:
+        print("(dry-run — pass --apply to prune)")
+        return
+
+    # G-INV-7: paranoid check — only delete under our output root
+    for p in orphans:
+        try:
+            p.relative_to(base)
+        except ValueError:
+            sys.exit(f"gc: refusing to delete {p} — outside output root {base}")
+        shutil.rmtree(p)
+    print(f"gc: removed {len(orphans)} orphaned run dir(s), reclaimed {_fmt_size(total_sz)}.")
+
+
+def _gc_ableton_tails(args):
+    """H-INV-5: sweep track-coach-output/ tails outside the output root."""
+    if args.scan_dir:
+        tco_dirs = [Path(args.scan_dir).expanduser().resolve()]
+    else:
+        oroot = Path(args.base).expanduser().resolve() if args.base else output_root()
+        tco_dirs = _tco_dirs_from_library(library_root(), oroot)
+
+    if not tco_dirs:
+        print("gc --ableton-tails: no track-coach-output/ dirs found to scan.")
+        return
+
+    scan = ableton_tail_scan(tco_dirs)
+
+    for tco, slug in scan["real_runs"]:
+        print(f"  KEEP (has real runs): {slug}")
+    verb = "remove" if args.apply else "would remove"
+    for tco, slug in scan["safe"]:
+        print(f"  {verb} (empty/dangling only): {slug}")
+    for tco in scan["missing"]:
+        print(f"  (not found on disk): {tco}")
+
+    if not scan["safe"]:
+        print("gc --ableton-tails: nothing safe to remove.")
+        return
+    if not args.apply:
+        print(f"({len(scan['safe'])} safe slug dir(s) — pass --apply to remove)")
+        return
+
+    for _, slug in scan["safe"]:
+        shutil.rmtree(slug)
+    print(f"gc --ableton-tails: removed {len(scan['safe'])} safe slug dir(s).")
+
+
+# ── remove (H-INV-2) ──────────────────────────────────────────────────────────────────────
+
+def _cmd_remove(args):
+    """Remove a track (or one version) from the library. Dry-run by default. H-INV-2."""
+    root = library_root()
+    idx = load_index(root)
+    wdir = root / "widgets"
+    track = args.track
+    version = args.version if hasattr(args, "version") else None
+
+    keep, to_remove = remove_plan(idx["entries"], track, version)
+
+    if not to_remove:
+        desc = f"version={version!r}" if version else "any version"
+        print(f"remove: nothing found for track={track!r} ({desc})")
+        return
+
+    verb = "removing" if args.apply else "would remove"
+    vdesc = f" version {version!r}" if version else " (all versions)"
+    print(f"remove {verb} {len(to_remove)} entr{'y' if len(to_remove)==1 else 'ies'}"
+          f" for {track!r}{vdesc}:")
+    for e in to_remove:
+        wf = wdir / e["widget"]
+        ex = "exists" if wf.exists() else "missing"
+        print(f"  · {e.get('stamp','?'):<18} {e.get('mode','?'):<5} widget={e['widget']} [{ex}]")
+    print("  (run dirs NOT deleted — run `gc` afterwards to reclaim scratch)")
+
+    if not args.apply:
+        print("(dry-run — pass --apply to remove)")
+        return
+
+    # Delete widget files + rewrite index in one step (G-INV-11)
+    for e in to_remove:
+        wf = wdir / e["widget"]
+        if wf.exists():
+            wf.unlink()
+    idx["entries"] = keep
+    save_index(root, idx)
+    print(f"removed {len(to_remove)} entr{'y' if len(to_remove)==1 else 'ies'}; {len(keep)} left.")
+    _regen_catalog()
+
+
+# ── prune-versions (H-INV-4) ─────────────────────────────────────────────────────────────
+
+def _cmd_prune_versions(args):
+    """Keep only the newest N versions per track. Dry-run by default; --apply acts. H-INV-4."""
+    root = library_root()
+    idx = load_index(root)
+    entries = idx["entries"]
+
+    # No --keep → show current counts, do nothing (H-INV-4: no silent default)
+    if args.keep is None:
+        versions = group_versions([e for e in entries if isinstance(e, dict)])
+        if not versions:
+            print("library is empty.")
+            return
+        print("Current versions per track (newest first; pass --keep N to prune):")
+        for track, vs in sorted(versions.items()):
+            print(f"  {track}: {len(vs)} version(s) — {', '.join(v['label'] for v in vs)}")
+        return
+
+    keep_n = args.keep
+    if keep_n < 0:
+        sys.exit("prune-versions: --keep must be >= 0")
+
+    keep, to_drop = prune_versions_plan(entries, keep_n)
+
+    if not to_drop:
+        print(f"prune-versions: nothing to drop (all tracks already <= {keep_n} version(s)).")
+        return
+
+    wdir = root / "widgets"
+    verb = "dropping" if args.apply else "would drop"
+    print(f"prune-versions {verb} {len(to_drop)} entr{'y' if len(to_drop)==1 else 'ies'}"
+          f" (keeping newest {keep_n} version(s) per track):")
+    for e in to_drop:
+        wf = wdir / e["widget"]
+        ex = "exists" if wf.exists() else "missing"
+        print(f"  · {e.get('track','?'):<22} stamp={e.get('stamp','?'):<18} [{ex}]")
+    print("  (run dirs NOT deleted — run `gc` afterwards to reclaim scratch)")
+
+    if not args.apply:
+        print(f"(dry-run — pass --apply to prune)")
+        return
+
+    # Delete widget files, rewrite index, regen catalog — all in one step (G-INV-11)
+    for e in to_drop:
+        wf = wdir / e["widget"]
+        if wf.exists():
+            wf.unlink()
+    idx["entries"] = keep
+    save_index(root, idx)
+    print(f"pruned {len(to_drop)} entr{'y' if len(to_drop)==1 else 'ies'}; {len(keep)} left.")
+    _regen_catalog()
+
+
 def _cmd_catalog(args):
     """Delegate to catalog.py (the view layer) so `library.py catalog` just works."""
     import catalog
@@ -478,6 +967,35 @@ def main():
     c.add_argument("--yes", action="store_true", help="actually delete (required for destructive)")
     c.add_argument("--dry-run", action="store_true", help="preview only")
     c.set_defaults(func=_cmd_clean)
+    # reset (H-INV-6)
+    rst = sub.add_parser("reset", help="wipe everything under the output root (dry-run by default)")
+    rst.add_argument("--base", default=None, help="output root to wipe (default: ~/.track-coach)")
+    rst.add_argument("--yes-wipe-everything", action="store_true", dest="yes_wipe_everything",
+                     help="actually wipe — required; a bare reset is always a dry-run")
+    rst.set_defaults(func=_cmd_reset)
+    # gc (H-INV-3 / H-INV-5)
+    g = sub.add_parser("gc", help="prune orphaned run dirs under the output root (dry-run by default)")
+    g.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")
+    g.add_argument("--apply", action="store_true", help="actually delete (default: dry-run)")
+    g.add_argument("--ableton-tails", action="store_true", dest="ableton_tails",
+                   help="sweep track-coach-output/ tails outside the output root (H-INV-5)")
+    g.add_argument("--scan-dir", default=None, dest="scan_dir",
+                   help="explicit track-coach-output/ dir to scan (default: auto from library index)")
+    g.set_defaults(func=_cmd_gc)
+    # remove (H-INV-2)
+    rm = sub.add_parser("remove", help="remove a track (or one version) from the library")
+    rm.add_argument("track", help="track name (as shown by `library list`)")
+    rm.add_argument("version", nargs="?", default=None,
+                    help="version stamp or label (omit to remove all versions)")
+    rm.add_argument("--apply", action="store_true", help="actually remove (default: dry-run)")
+    rm.set_defaults(func=_cmd_remove)
+    # prune-versions (H-INV-4)
+    pv = sub.add_parser("prune-versions",
+                        help="keep only the newest N versions per track (dry-run by default)")
+    pv.add_argument("--keep", type=int, default=None, metavar="N",
+                    help="versions to keep per track (omit to inspect; no silent default)")
+    pv.add_argument("--apply", action="store_true", help="actually prune (default: dry-run)")
+    pv.set_defaults(func=_cmd_prune_versions)
     args = p.parse_args()
     args.func(args)
 

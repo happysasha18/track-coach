@@ -377,6 +377,36 @@ Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.p
 | G-INV-11 | Run-index selector skips entries whose run dir is missing on disk; only returns existing dirs | `test_storage_relocation::DiskPresenceCheck::test_missing_run_dir_is_skipped` |
 | G-INV-16 | `migrate` dry-run prints from→to plan and moves nothing; `--apply` moves + rewrites src_run_dir | `test_storage_relocation::MigrateCommand::test_dry_run_changes_nothing`, `::test_migrate_apply_moves_and_rewrites` |
 
+## §H — Commands, library management & cleanup (SPEC §H → H-INV-1..7, 2026-07-01 s31)
+
+All owned by `tests/test_cleanup.py`.
+
+| code | rule (1-line) | owning test |
+|---|---|---|
+| H-INV-6 (dry-run) | Bare `reset` prints plan (paths + size + recovery note) and removes nothing | `test_cleanup::ResetDryRun::test_dry_run_removes_nothing`, `::test_dry_run_prints_plan` |
+| H-INV-6 (apply) | `reset --yes-wipe-everything` removes projects/ + library/ under the output root | `test_cleanup::ResetApply::test_wipe_removes_projects_and_library` |
+| G-INV-7 via H-INV-6 | reset never touches files outside the configured output root | `test_cleanup::ResetApply::test_wipe_leaves_sibling_dir_untouched` |
+| H-INV-6 (--base) | `reset --base DIR` wipes a custom output root | `test_cleanup::ResetApply::test_base_flag_overrides_root` |
+| H-INV-3 (plan) | `gc_plan` classifies runs as orphan / keep_referenced / keep_best | `test_cleanup::GcPlan::test_orphan_classified_correctly`, `::test_empty_projects_dir_returns_empty_plan` |
+| H-INV-3 (dry-run) | `gc` without --apply lists orphans, removes nothing | `test_cleanup::GcCommand::test_dry_run_removes_nothing` |
+| G-INV-10 + H-INV-3 | `gc --apply` deletes orphan but keeps referenced run (library member) | `test_cleanup::GcCommand::test_apply_deletes_only_orphan` |
+| G-INV-15 + H-INV-3 | `gc --apply` keeps the best-undeposited run (most result files per slug) | `test_cleanup::GcCommand::test_apply_deletes_only_orphan` |
+| H-INV-5 (classify) | `ableton_tail_scan` correctly classifies safe vs has-real-runs slug dirs | `test_cleanup::AbletonTailScan::test_dry_run_reports_safe_and_real_correctly` |
+| H-INV-5 (apply) | Removing safe slug dirs leaves has-real-runs slug dirs intact | `test_cleanup::AbletonTailScan::test_apply_removes_only_safe_leaves_real_runs` |
+| H-INV-5 (missing) | Missing tco dir reported in scan['missing'], no crash | `test_cleanup::AbletonTailScan::test_missing_tco_dir_reported_as_missing` |
+| H-INV-5 (helpers) | `_slug_dir_has_real_runs` returns True for real subdir, False for dangling-symlink-only | `test_cleanup::AbletonTailScan::test_slug_dir_has_real_runs_positive`, `::test_slug_dir_has_real_runs_negative_dangling_symlink` |
+| H-INV-5 (gc cmd) | `gc --ableton-tails --scan-dir` dry-run removes nothing; --apply removes only safe dirs | `test_cleanup::GcAbletonTailsCommand::test_dry_run_does_not_remove`, `::test_apply_removes_safe_dirs` |
+| H-INV-2 (pure) | `remove_plan` removes whole track, or one version by stamp/label; others untouched | `test_cleanup::RemovePlan::test_remove_whole_track`, `::test_remove_one_version_by_stamp`, `::test_remove_one_version_by_version_label`, `::test_other_tracks_untouched`, `::test_no_match_returns_empty_remove` |
+| H-INV-2 (dry-run) | `remove` without --apply deletes nothing | `test_cleanup::RemoveCommand::test_dry_run_removes_nothing` |
+| H-INV-2 + G-INV-11 | `remove --apply` one version: widget deleted, other versions + index entry updated atomically | `test_cleanup::RemoveCommand::test_remove_one_version_leaves_others_and_updates_index` |
+| H-INV-2 (all versions) | `remove --apply` (no version): all track widgets deleted, other tracks intact | `test_cleanup::RemoveCommand::test_remove_whole_track` |
+| H-INV-2 / ⟨H-2⟩ | `remove` does NOT delete the backing run dir (only library entry + widget copy) | `test_cleanup::RemoveCommand::test_remove_does_not_delete_run_dir` |
+| H-INV-4 (pure) | `prune_versions_plan`: keep newest N by sha group; older groups dropped together | `test_cleanup::PruneVersionsPlan::test_keep_1_drops_two_oldest`, `::test_keep_2_drops_oldest_only`, `::test_keep_n_ge_count_drops_nothing`, `::test_negative_keep_raises`, `::test_other_tracks_handled_independently`, `::test_same_sha_entries_are_dropped_together` |
+| H-INV-4 (dry-run) | `prune-versions --keep N` without --apply removes nothing | `test_cleanup::PruneVersionsCommand::test_dry_run_removes_nothing` |
+| H-INV-4 (apply) | `prune-versions --keep 1 --apply`: only newest widget + index entry remain | `test_cleanup::PruneVersionsCommand::test_apply_keeps_only_newest` |
+| H-INV-4 (no default) | `prune-versions` with no --keep shows current versions, makes no changes | `test_cleanup::PruneVersionsCommand::test_no_keep_flag_does_nothing` |
+| H-INV-4 / ⟨H-2⟩ | `prune-versions --apply` does NOT delete backing run dirs | `test_cleanup::PruneVersionsCommand::test_apply_does_not_delete_run_dirs` |
+
 ## §E-s31 — Bug fixes (build item E, 2026-06-30)
 
 Three targeted bugs fixed; each owns tests asserting the REAL rendered artifact.
