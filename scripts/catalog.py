@@ -217,20 +217,25 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
-def _lean_cell(leans) -> str:
+def _lean_cell(leans, widget_href=None) -> str:
     """Render the 'leans toward' TD for a row (§D.10.1).
 
     Accepts a list of up to 3 Lean objects (nearest-first, CLOSE/MID only — FAR never
     reaches here, leans_toward_topk already excluded them). Each direction is a coloured
     clickable link stacked vertically. Empty list → grey 'no close direction yet'.
-    No red for the reference column — owner decision 2026-06-29."""
+    No red for the reference column — owner decision 2026-06-29.
+
+    widget_href: the row's own widget URL (from _open_href). Direction links navigate to
+    that widget's #refRead section (D-INV-28: 'direction → open read focused').
+    When None, falls back to '#refRead' (in-page no-op but never the dead bare '#')."""
     if not leans:
         return '<td class="c-sim c-lean"><span class="sim-none">no close direction yet</span></td>'
     chips = ""
     for lean in leans:
         col = _SIM_COL.get(lean.level, "#8b94a8")
         dn = html.escape(lean.direction)
-        chips += f'<a class="sim-dir" href="#" style="color:{col}">{dn}</a>'
+        dir_href = html.escape(f"{widget_href}#refRead") if widget_href else "#refRead"
+        chips += f'<a class="sim-dir" href="{dir_href}" style="color:{col}">{dn}</a>'
     return f'<td class="c-sim c-lean">{chips}</td>'
 
 
@@ -340,7 +345,7 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
- {_lean_cell(e.get('_leans') or [])}
+ {_lean_cell(e.get('_leans') or [], widget_href=href)}
  {_siblings_cell(e.get('_siblings') or [], title_map or {{}}, href_map or {{}})}
 </tr>"""
 

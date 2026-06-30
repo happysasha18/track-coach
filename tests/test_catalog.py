@@ -504,5 +504,68 @@ class CrossPageModeAgreement(unittest.TestCase):
                              f"INV-20: mode={mode} colour differs — catalog {cat_col} vs widget {wid_col}")
 
 
+class DirectionLinkIsReal(unittest.TestCase):
+    """Bug E-s31 / item E bug 3: catalog 'leans toward' direction links used `href="#"` (a dead
+    no-op). Per D-INV-28 ('direction → open read focused'), clicking a direction should navigate
+    to the track's widget focused on the #refRead reference-read section.
+
+    Fix: _lean_cell now accepts widget_href and emits `<widget_href>#refRead`; _row passes href.
+    Guard: rendered direction links must NOT be bare '#'; they must contain '#refRead' as the
+    anchor, pointing at the focused reference read section of the row's widget."""
+
+    def _entry_with_lean(self, widget_href=None):
+        """A catalog entry pre-injected with a synthetic Lean so _lean_cell is exercised."""
+        import similarity_columns as SC
+        e = _e("test_track", "h1", "2026-01-01_0900", 1000,
+               arc=[0.1, 0.5, 1.0], mode="full",
+               title="Test Track")
+        # Inject a synthetic lean (as build_catalog does at runtime)
+        e["_leans"] = [SC.Lean(direction="Venetian Snares", level="close", runner=None, n_shared=10)]
+        if widget_href:
+            e["src_run_dir"] = widget_href.replace("/widget.html", "")
+            e["src_widget"] = "widget.html"
+        return e
+
+    def test_direction_link_href_is_not_dead(self):
+        """When leans are present, the sim-dir links must NOT use bare '#' as the href.
+        Bug: href="#" scrolls nowhere; Fix: href="<widget>#refRead"."""
+        e = self._entry_with_lean()
+        # Call _lean_cell directly with a widget href (mirrors what _row does after the fix)
+        import similarity_columns as SC
+        leans = e["_leans"]
+        cell = catalog._lean_cell(leans, widget_href="file:///test/widget.html")
+        hrefs = re.findall(r'href="([^"]*)"', cell)
+        self.assertTrue(hrefs, "direction cell must contain at least one href")
+        for href in hrefs:
+            self.assertNotEqual(href, "#",
+                                f"direction link href must not be bare '#' (dead link); got {href!r}. "
+                                f"Fix: wire to the widget's #refRead section per D-INV-28.")
+
+    def test_direction_link_points_to_refread_anchor(self):
+        """Direction links must point to the #refRead anchor on the track's widget (D-INV-28:
+        'direction → open read focused'). The anchor must be '#refRead', not a bare '#'."""
+        import similarity_columns as SC
+        leans = [SC.Lean(direction="Test Direction", level="close", runner=None, n_shared=8)]
+        cell = catalog._lean_cell(leans, widget_href="file:///some/path/widget.html")
+        self.assertIn("#refRead", cell,
+                      "direction link must include the '#refRead' anchor so the page opens "
+                      "at the reference-read section (D-INV-28 'open read focused')")
+
+    def test_rendered_catalog_direction_link_not_dead(self):
+        """Smoke test: render a full catalog HTML and confirm no sim-dir link has bare '#'."""
+        e = self._entry_with_lean(widget_href="file:///test/widget.html")
+        # Build a proper entry with the src fields so _open_href resolves
+        e["src_run_dir"] = "/test"
+        e["src_widget"] = "widget.html"
+        html = catalog.render_catalog_html([e])
+        # Find all sim-dir anchor hrefs in the rendered HTML
+        sim_dir_hrefs = re.findall(r'<a class="sim-dir" href="([^"]*)"', html)
+        if sim_dir_hrefs:  # direction present in rendered output
+            for href in sim_dir_hrefs:
+                self.assertNotEqual(href, "#",
+                                    f"sim-dir href in rendered catalog must not be bare '#'; "
+                                    f"got {href!r}. The direction link must navigate, not scroll to top.")
+
+
 if __name__ == "__main__":
     unittest.main()

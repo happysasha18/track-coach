@@ -376,3 +376,13 @@ Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.p
 | G-INV-16 (warn) | Catalog page shows a banner counting members with `src_run_dir` outside the output root | `test_storage_relocation::MigrateWarning::test_banner_counts_outside_root_members` |
 | G-INV-11 | Run-index selector skips entries whose run dir is missing on disk; only returns existing dirs | `test_storage_relocation::DiskPresenceCheck::test_missing_run_dir_is_skipped` |
 | G-INV-16 | `migrate` dry-run prints from→to plan and moves nothing; `--apply` moves + rewrites src_run_dir | `test_storage_relocation::MigrateCommand::test_dry_run_changes_nothing`, `::test_migrate_apply_moves_and_rewrites` |
+
+## §E-s31 — Bug fixes (build item E, 2026-06-30)
+
+Three targeted bugs fixed; each owns tests asserting the REAL rendered artifact.
+
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| E-BUG-1 | **No dead commented-out refRead/webPanel block in the rendered widget.** `id="refRead"` and `id="webPanel"` each appear EXACTLY ONCE. Root cause: the HTML comment at the `__REFREAD__` slot referenced `__REFREAD__` by name, causing the template substitution to embed a full copy inside the `<!-- … -->` block. Fix: removed `__REFREAD__` from the comment text so only the live slot is substituted. | `test_widget_render::NoDeadRefReadComment::test_refread_appears_exactly_once`, `::test_webpanel_appears_exactly_once`, `::test_no_html_comment_contains_refread_id` |
+| E-BUG-2 | **`char` chip has a visible legend explaining it = 'Character axis — assessed without loudness weighting'.** The chip appears on per-row items in the refRead bars (only a hover tooltip per item); a legend block at the bottom of the refRead panel provides the visible explanation. Investigation: legend was already present at `build_widget.py:2586` — no code change needed; test added as regression guard. | `test_reference_read::CharLegend::test_char_legend_explains_the_chip`, `::test_char_chip_has_tooltip` |
+| E-BUG-3 | **Catalog 'leans toward' direction links navigate to the track's widget focused on the #refRead section (D-INV-28), not `href="#"`.** Fix: `_lean_cell` now accepts `widget_href`; emits `<widget_href>#refRead`; `_row` passes the resolved `href`. Fallback (no widget): `#refRead` in-page anchor (never bare `#`). | `test_catalog::DirectionLinkIsReal::test_direction_link_href_is_not_dead`, `::test_direction_link_points_to_refread_anchor`, `::test_rendered_catalog_direction_link_not_dead` |

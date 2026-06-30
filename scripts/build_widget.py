@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.5"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.6"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -3030,7 +3030,7 @@ __MODENOTE__
 <!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
      per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
      Empty string when quick mode, no run_dir, or lean is far. Followed by the web-info
-     panel (§D.10.2, "What the web says") which is also emitted server-side as part of __REFREAD__. -->
+     panel (§D.10.2, "What the web says") — both emitted server-side via the REFREAD substitution. -->
 __REFREAD__
 
 <details class="tc-panel" id="evidence">

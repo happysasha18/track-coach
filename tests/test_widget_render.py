@@ -531,6 +531,72 @@ class ReadOrderTonalBeforeRefRead(unittest.TestCase):
                          "body.simple #webPanel{display:none} CSS rule must always be present")
 
 
+class NoDeadRefReadComment(unittest.TestCase):
+    """Bug E-s31 / item E bug 1: the HTML comment at the __REFREAD__ slot used to include
+    '__REFREAD__' as literal text, causing the template substitution to embed a full copy of
+    the refRead+webPanel HTML inside the comment — a dead, commented-out duplicate.
+
+    Guard: id="refRead" and id="webPanel" must each appear EXACTLY ONCE in the rendered widget
+    when a run_dir is provided (so the live block is actually emitted). No commented-out copy."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_nodup_refread_"))
+        import json as _json
+        run_dir = tmp / "run"
+        run_dir.mkdir()
+        core = {
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2,
+        }
+        (run_dir / "result_core.json").write_text(_json.dumps(core))
+        masking = {
+            "band_rms_db": {
+                "drums": {"sub": [-30]*8, "low": [-25]*8, "low_mid": [-28]*8,
+                          "mid": [-35]*8, "hi_mid": [-40]*8, "air": [-60]*8},
+                "bass":  {"sub": [-20]*8, "low": [-18]*8, "low_mid": [-30]*8,
+                          "mid": [-45]*8, "hi_mid": [-60]*8, "air": [-80]*8},
+                "other": {"sub": [-50]*8, "low": [-45]*8, "low_mid": [-30]*8,
+                          "mid": [-25]*8, "hi_mid": [-20]*8, "air": [-25]*8},
+            },
+            "stems_analysed": ["drums", "bass", "other"],
+            "duration_s": 48.0,
+            "sustain": {"bass": 0.5, "other": 0.4},
+            "spectral_centroid": {"other": 800.0},
+            "total_windows": 8,
+        }
+        (run_dir / "result_masking.json").write_text(_json.dumps(masking))
+        out = tmp / "widget.html"
+        build_widget.build_html(
+            _synthetic_core(), {}, None, None, str(out), "DupTest",
+            build_widget.STRINGS, run_dir=str(run_dir)
+        )
+        cls.html = out.read_text(encoding="utf-8")
+
+    def test_refread_appears_exactly_once(self):
+        """id="refRead" must appear exactly once — not zero (would miss the live block) and
+        not two (the old bug: template comment duplicated it inside <!-- ... -->)."""
+        count = self.html.count('id="refRead"')
+        self.assertEqual(count, 1,
+                         f'id="refRead" appeared {count} time(s); expected exactly 1. '
+                         f'Count > 1 means the dead commented-out duplicate is back.')
+
+    def test_webpanel_appears_exactly_once(self):
+        """id="webPanel" must appear exactly once — same guard as refRead."""
+        count = self.html.count('id="webPanel"')
+        self.assertEqual(count, 1,
+                         f'id="webPanel" appeared {count} time(s); expected exactly 1. '
+                         f'Count > 1 means the dead commented-out duplicate is back.')
+
+    def test_no_html_comment_contains_refread_id(self):
+        """No HTML comment (<!-- ... -->) must contain id="refRead" — that is the dead copy."""
+        import re
+        for m in re.finditer(r'<!--.*?-->', self.html, re.DOTALL):
+            self.assertNotIn('id="refRead"', m.group(0),
+                             'A commented-out copy of #refRead was found in the rendered HTML. '
+                             'Fix: do not use __REFREAD__ placeholder inside an HTML comment.')
+
+
 class RecordHistorySurvivesLegacyStrEntry(unittest.TestCase):
     """build_widget._record_history must not crash when the per-project index.json holds a legacy
     bare-string run entry (an old run-init wrote a slug string instead of a metadata dict — the real

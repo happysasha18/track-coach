@@ -407,9 +407,9 @@ class LazySparksNearestDirection(unittest.TestCase):
     """Lazy Sparks must lean toward Venetian Snares — matches what the catalog column shows.
     Skipped when the run dir is not present (CI-safe)."""
 
-    LAZY_RUN_DIR = ("/Users/sashaabramovich/Desktop/Projects/Lazy_Sparks/"
-                    "Lazy_Sparks Project/track-coach-output/"
-                    "Total_Reboot_Lazy_Sparks_edit2026/2026-06-20_2100")
+    # Relocated under $HOME by the §G migration (was in the Lazy_Sparks Ableton folder).
+    LAZY_RUN_DIR = str(Path.home() / ".track-coach" / "projects" /
+                       "Total_Reboot_Lazy_Sparks_edit2026" / "2026-06-20_2100")
 
     @unittest.skipUnless(Path(LAZY_RUN_DIR).exists(),
                          "Lazy Sparks run dir not on this machine")
@@ -937,6 +937,56 @@ class WebPanelRichRendering(unittest.TestCase):
         self.assertIn('id="webPanel"', html,
                       "panel must be present even when all traits land in the 'web says' tier "
                       "(panel absent only when there is no web content whatsoever)")
+
+
+class CharLegend(unittest.TestCase):
+    """Bug E-s31 / item E bug 2: the 'char' chip (a CHARACTER axis without loudness weighting)
+    appears on per-row items in the reference read bars. A visible legend must explain what it
+    means — not just a hover tooltip.
+
+    Investigation result: the legend IS already present at line 2586 of build_widget.py, inside
+    the refread-legend div. This test is a REGRESSION GUARD confirming the legend exists and
+    explains the chip. No code change was needed; the bug as described ('with no explanation')
+    did not hold — the legend was already there.
+
+    Guard: the rendered reference read HTML must contain the char chip together with an inline
+    explanation of 'Character axis' and 'without loudness weighting' inside the legend block."""
+
+    @classmethod
+    def setUpClass(cls):
+        # Single direction with a char-axis row so the chip and legend are both rendered.
+        dirs = {"Near": _zfp(tempo=0.2)}   # close lean → refRead block renders
+        cls.html = build_widget.render_reference_read(
+            {ax: 0.0 for ax in FP.AXES},
+            dirs,
+            _norm_identity(),
+        )
+
+    def test_char_legend_explains_the_chip(self):
+        """The refread-legend block must contain a span with the char chip AND inline explanation."""
+        # Extract just the legend div to keep the assertion scoped
+        import re
+        legend_m = re.search(r'class="refread-legend">(.*?)</div>', self.html, re.DOTALL)
+        self.assertIsNotNone(legend_m, "refread-legend div must be present in the rendered HTML")
+        legend_html = legend_m.group(1)
+        self.assertIn('refread-chip', legend_html,
+                      "the char chip must appear inside the legend section")
+        self.assertIn("Character axis", legend_html,
+                      "the legend must name 'Character axis' to explain the chip abbreviation")
+        self.assertIn("without loudness weighting", legend_html,
+                      "the legend must explain the chip means 'without loudness weighting'")
+
+    def test_char_chip_has_tooltip(self):
+        """Per-row char chips must carry a title tooltip as an additional affordance."""
+        import re
+        # The per-row chip (not the legend one) must have a title attribute
+        chip_with_title = re.search(
+            r'<span class="refread-chip" title="[^"]*(?:without loudness weighting)[^"]*">char</span>',
+            self.html
+        )
+        self.assertIsNotNone(chip_with_title,
+                             "per-row char chips must have a title tooltip explaining 'without "
+                             "loudness weighting' so hover gives the explanation inline")
 
 
 if __name__ == "__main__":
