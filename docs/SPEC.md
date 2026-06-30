@@ -1637,6 +1637,173 @@ comparison, shown as "not measured"). ⟨DECIDE E-1⟩ **RESOLVED — flag-and-r
 - **E-2 — SETTLED:** `MIN_SHARED_AXES` = **10**. Below 10 shared measured axes a pair is not comparable
   (RC-INV-5a) — guards against too little DATA (quick vs full), not against dissimilar music.
 
+## G. Where things live on disk — output locations, the library, and cleanup (1.0)
+
+Every analysis writes files: separated stems, web-preview audio, result JSONs, the built widget. Until now those
+landed **inside the user's Ableton project folder** (a `track-coach-output/` dir next to the audio). Alexander
+flagged that as both ugly and unsafe for 1.0: it clutters the project folder, and a user tidying their Ableton
+project can delete the analysis by accident. This section moves all output to a personal home under `$HOME`,
+keyed per project, and adds a safe way to clean up — without ever touching the user's own files. It is the one
+place that says where things live, so the analyzer, the library, and the catalog all agree. `tags: RC-INV-9 · D-INV-14`
+
+### G.0 The pieces, named once
+
+- **Output root** — the single top directory under which *all* track-coach output lives. Default
+  `~/.track-coach/`. Everything below is inside it.
+- **Project / track** — one piece of music the user is working on, across all its rendered versions over time.
+  Its identity is a single **slug** (see G-INV-2), and that slug is the unit that owns a history of runs. There
+  is one slug per track — no separate "project id" and "track slug"; they are the same thing.
+- **Runs base** — `~/.track-coach/projects/`. Holds the shared `index.json` (the run history, keyed by slug)
+  and one subdir per slug. (Code calls this the run dir's *base*; `--base` overrides it.)
+- **Run dir** — one analysis run, at `<runs base>/<slug>/<version>__<stamp>/`. Holds the run's stems,
+  `stems_web/`, `mix_web/`, `result_*.json`, `run_meta.json`, and the built `analysis_widget_*.html`. This is
+  **scratch**: large, regenerable, safe to prune.
+- **The library** — the durable deposit at `~/.track-coach/library/`: the catalogued widgets (HTML copied at
+  deposit time) plus its own `index.json`/the catalog page. This is the **keep** half — it survives cleanup.
+- **`src_run_dir`** — the absolute path to the run a library member was built from, stored in the library
+  index at deposit, and read back to open the original widget, play its preview audio, and compute similarity.
+- **Deposit** — copying a finished run's widget HTML into the library. It happens **automatically** at the end
+  of every successful `build`, unless `--no-deposit` is passed; it is not a separate manual step. `G-INV-17`
+
+### G.1 Output never lands in the user's project folder
+
+**By default, track-coach writes nothing into the Ableton project folder — all output goes under `$HOME`.**
+The default runs base is `~/.track-coach/projects/`, and a track's runs live at
+`~/.track-coach/projects/<slug>/<version>__<stamp>/`. The folder beside the user's `.als`/audio stays clean, and
+the analysis can't be lost to a folder tidy-up. The existing `--base` flag still overrides the base for advanced
+use and tests, but the *default* is the safe one (this is the behaviour change — the old default put output in a
+`track-coach-output/` dir beside the audio). `G-INV-1`
+
+**One track = one slug, so a track's versions keep one continuous history.** Identity is the slug
+`slugify(audio file name)` with version tags stripped — so `Track_v2.wav` and `Track_v3.wav` both reduce to
+slug `track` and share one history; the version label lives in the run-dir's `<version>__<stamp>` name, not in
+the slug. (This is the *real, shipped* rule — identity comes from the audio name, not the `.als` stem.) Every
+version of the same track resolves to the same `~/.track-coach/projects/<slug>/`, and the shared
+`projects/index.json` accrues the full run history across versions (which the version-history / sibling-narrative
+features rely on). `G-INV-2`
+
+**Collision: two genuinely different tracks that slug to the same name get disambiguated, never co-mingled.**
+Because the runs base is now shared across every project (it used to be per-Ableton-folder), two unrelated
+tracks that reduce to the same slug (e.g. both named `Untitled.wav`) would otherwise land in one slug dir with
+one mixed history. On a new run whose slug already exists, the tool compares the incoming source identity (the
+`.als` path if present, else the audio's full path) against the one stored for that slug; if they differ it
+uses `<slug>-2` (then `-3`, …) and warns the user, rather than mixing two tracks' histories. The source identity
+is stored in `run_meta.json`/the index for this check. `G-INV-2b`
+
+**The path shape `base / slug / version__stamp` is preserved; only the base moves.** Code that walks up from a
+run dir to its base or `index.json` (`parent.parent`) keeps working unchanged — only the *base* moves from the
+audio's folder to `$HOME`. The `index.json` sits at the runs base (shared across slugs), exactly as it sat at
+the old per-folder base. `G-INV-3`
+
+### G.2 What moves and what stays put
+
+**Existing pre-1.0 runs are never moved or deleted automatically — relocation is going-forward only.** Runs
+already on disk inside Ableton folders stay where they are unless the user runs `migrate` (G-INV-16); the
+library index keeps pointing at them by their stored `src_run_dir`, so their catalog links and preview players
+keep working. Only *new* analyses land under `$HOME` by default. `G-INV-4`
+
+**An optional `migrate` command consolidates pre-1.0 runs under `$HOME`.** `migrate` physically moves run dirs
+that live outside the output root (in old Ableton folders) into `~/.track-coach/projects/<slug>/` and rewrites
+the matching library `src_run_dir` pointers, so everything ends up in one clean place. Like all destructive
+commands it is **dry-run by default** (G-INV-8): a bare `migrate` reports exactly what it *would* move and
+rewrite; it moves nothing until `--apply`. It is all-or-clean-report (G-INV-11): a member's HTML copy, its
+`src_run_dir`, and the moved files stay consistent, or nothing is changed. `G-INV-16`
+
+**A stored `src_run_dir` is honoured wherever it points.** Every reader of `src_run_dir` (the catalog open-link,
+the preview player, the similarity fingerprint) treats it as an absolute path that may live under the old
+Ableton folder *or* the new `$HOME` base — it never assumes a base or reconstructs the path. So old and new runs
+coexist in one catalog without special-casing. `G-INV-6`
+
+**When a `src_run_dir` is gone, the catalog falls back to the library's own HTML copy.** The deposited HTML copy
+inside `library/` exists precisely so the open-link never dies: if `src_run_dir` is unreachable (pruned, or its
+old Ableton folder deleted by the user), the catalog opens the library copy instead of a broken link, and the
+preview player and similarity show *"analysis data not available — re-analyse to restore"* rather than failing
+silently. `G-INV-14`
+
+**The library stays at `~/.track-coach/library/`.** The durable deposit home does not move (it was already under
+`$HOME`); only the transient run dirs relocate. `G-INV-5`
+
+### G.3 Reset & gc — cleaning up safely
+
+The project accumulates scratch over time (old run dirs, separated stems, `data/*_progress.md` working notes,
+superseded versions). A `gc` / `reset` command prunes it — but cleanup near a user's music files demands hard
+safety rails.
+
+**Cleanup never touches the user's own files.** A reset/gc operates **only** under the *configured output root*
+(`~/.track-coach/` by default, or whatever `--base` resolves to) — never under an Ableton project folder, source
+audio, or `.als` that lies outside it. The safe boundary follows the configured root rather than a hardcoded
+path, so the rule stays enforceable when `--base` is used: gc refuses to delete anything not under the root it
+was given. (The user's only remaining responsibility is not pointing `--base` at their own music folder and then
+running gc there.) `G-INV-7`
+
+**Destructive cleanup is dry-run by default.** Any command that would delete shows exactly what it *would*
+remove (paths, counts, reclaimed size) and removes nothing until the user confirms with an explicit flag
+(e.g. `--apply`/`--force`). A bare invocation is always safe to run. `G-INV-8`
+
+**The library is durable; run dirs are scratch.** gc prunes run dirs, stems, web-preview audio, and superseded
+intermediate output; it **never** removes a deposited library member (a catalogued widget + its index entry)
+without an explicit, separate force. The default `gc` can leave the library wholly intact. `G-INV-9`
+
+**gc keeps referenced runs by default, and names all three losses before pruning one.** A library member's
+preview audio, its original widget, *and* its similarity data (`result_*.json`) all live in its `src_run_dir`.
+So gc, by default, **keeps** run dirs still referenced by a library member. When the user explicitly overrides
+that, the warning names every casualty — not just "preview/audio": for each affected catalog row, *preview audio
+goes silent · the open-link falls back to the library's HTML copy (G-INV-14) · the track becomes "can't compare"
+in the cloud/siblings (§D/§F) until re-analysed.* Understating it to "you just lose the audio" would be a silent
+loss of comparability. `G-INV-10`
+
+**gc also protects the best *undeposited* run.** The most-complete run for a track (the one §E.4/RC-INV-9 reads
+from) may never have been deposited — e.g. a scratch re-run done to get transcription on more stems. G-INV-10's
+keep-guard only covers *referenced* runs, so this one is invisible to it. gc therefore preserves, for each
+slug, the run RC-INV-9 would select; if the user forces it anyway, the dry-run names it: *"the current best run
+for ⟨track⟩ — pruning downgrades coaching to ⟨N⟩ fewer axes."* `G-INV-15`
+
+**Cleanup is all-or-clean-report, including the index.** A reset/gc either completes and reports precisely what
+it removed and how much space it reclaimed, or it aborts having removed nothing — it never leaves a half-deleted
+run dir that would read as a partial/incomplete run (§E). Because the shared `index.json` can drift from disk for
+any reason (a crash mid-prune, a folder the user deleted by hand), RC-INV-9 does **not** trust index membership
+alone: it checks the selected run dir actually exists on disk before reading it, and skips index entries whose
+run dir is gone. `G-INV-11`
+
+### G.4 How it composes
+
+**With the `src_run_dir` readers (§D.10 / §F similarity, the catalog open-link, the preview player).** Because
+old runs aren't moved (G-INV-4) and paths are honoured as-stored (G-INV-6), relocating the default root changes
+nothing for already-deposited members; only freshly analysed tracks resolve under `$HOME`. A gc that prunes a
+referenced run is the one interaction that can break a reader — handled by G-INV-10's keep-by-default + warning.
+
+**With the per-track history in `index.json`.** Because identity is stable (G-INV-2), all of a track's versions
+share one history — *except* a track analysed both before and after the move, whose history splits across the
+old per-folder `index.json` and the new shared one. On the first post-move run for such a track, the tool
+**seeds** the new `~/.track-coach/projects/index.json` from the old one so the history stays one continuous file
+(rather than presenting the split as a gap or a reset). The old index is found at the named pre-1.0 path —
+`<audio_parent>/track-coach-output/index.json` (the exact location the old default wrote to) — reachable from
+the run's audio/`.als` path; if it isn't there, the tool discloses the split instead of guessing. Seeding also
+keeps the §D.3/D-INV-14 content-hash honest: the hash is computed over the merged index, so pre-move run IDs are
+included and a placement recomputes correctly when those runs change. `G-INV-12`
+
+**With §E run completeness.** Relocation and gc never change a measurement's *measured / missing* state: a
+pruned run is simply absent (not a "missing measurement" to flag), and a relocated run carries the same manifest
+it always had. Cleanup operates on whole runs, never on individual measurements, so §E's per-axis honesty is
+untouched. `G-INV-13`
+
+### G.5 Decisions made (Alexander, 2026-06-30)
+
+These were the open ⟨DECIDE⟩ points; all are now settled and folded into the invariants above.
+
+- **G-1 — identity.** Identity = `slugify(audio file name)` with version tags stripped (the real, shipped rule),
+  **not** the `.als` stem. Version-stripping already groups a track's versions into one history without needing
+  the `.als`. Same-slug collision between two genuinely different tracks is handled by source-identity
+  disambiguation (`-2`/`-3` + warn), G-INV-2/G-INV-2b — not left as a "rare" risk.
+- **G-2 — pre-1.0 runs.** Build the optional `migrate` (G-INV-16), and run it on Alexander's three existing
+  library tracks so everything consolidates under `$HOME`. Relocation stays going-forward-only by default;
+  `migrate` is the explicit, dry-run-first way to bring the old ones over.
+- **G-3 — pruning a referenced run.** Keep-by-default and warn (G-INV-10); the warning names all three losses
+  (preview, open-link fallback, comparability).
+- **G-4 — split history.** Seed the new shared index from the old per-folder one on the first post-move run, from
+  the named pre-1.0 path `<audio_parent>/track-coach-output/index.json`; disclose the split only if it isn't
+  found (G-INV-12).
+
 ## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
