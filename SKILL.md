@@ -199,12 +199,23 @@ AUDIO="<path to audio file>"
 # Make a fresh run folder; capture its absolute path. MODE is quick or full (see below).
 OUT_DIR="$(python3 "$SKILL_DIR/scripts/run_dir.py" init --audio "$AUDIO" \
             ${ALS:+--als "$ALS"} --mode full)"
-echo "$OUT_DIR"   # e.g. .../track-coach-output/My_Track/v0.6.2__2026-06-16_2231
+echo "$OUT_DIR"   # e.g. ~/.track-coach/projects/my_track/v0.6.2__2026-06-16_2231
 ```
 
 This writes `run_meta.json` (audio + .als filename, track version, date), appends the
-run to `track-coach-output/index.json` (honest append-only history), and points a
-`latest` symlink at it. Use this `$OUT_DIR` for the WHOLE run below.
+run to the shared `~/.track-coach/projects/index.json` (honest append-only history, keyed by slug), and
+points a `latest` symlink at it. Use this `$OUT_DIR` for the WHOLE run below.
+
+**Default output base (0.9.5+):** run directories live under `~/.track-coach/projects/`
+— outside Ableton project folders so a tidy-up can't delete analysis history. Override
+with `--base <dir>` if you need output elsewhere. To consolidate any pre-0.9.5 run dirs
+that still live inside Ableton project folders:
+```bash
+python3 "$SKILL_DIR/scripts/track_analyzer.py" migrate          # dry-run: print the move plan
+python3 "$SKILL_DIR/scripts/track_analyzer.py" migrate --apply  # execute: move + rewrite library index
+```
+Version history is preserved; the catalog's open-link falls back to the library's HTML
+copy if a source run dir is gone.
 
 **Upgrading a quick run to full** (the user looked at the calm view and wants the
 stems/player): don't recompute what's already there. Find the last run and reuse it:
@@ -329,7 +340,7 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/masking.py" \
 ## Step 3 — Run the scripts
 
 Set SKILL_DIR to the absolute path of this skill folder. Set AUDIO to the user's file.
-Set OUT_DIR to a working directory (e.g. a `track-coach-output/` subfolder next to the audio file).
+Set OUT_DIR to the run directory (created by `run_dir.py init` in Step 0c; defaults under `~/.track-coach/projects/`).
 
 **Every Python step runs through `scripts/tc_uv.sh <profile> <script.py> [args…]`** (see the
 shell-safety box in Step 1). Profiles: `core` (analyze_core, +pyloudnorm), `fast` (everything
@@ -517,7 +528,7 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/build_widget.py" \
 into `index.json`), generate the cross-version catalog and rebuild once with `--catalog`
 so the widget gets a collapsible **"All analyses"** list at the bottom — every track and
 every version, with each past verdict and a RELATIVE link to its widget (so the links keep
-working if the whole `track-coach-output/` tree is moved/published):
+working if the whole `~/.track-coach/projects/` tree is moved/published):
 
 ```bash
 CAT="$(python3 "$SKILL_DIR/scripts/run_dir.py" catalog --self "$OUT_DIR")"

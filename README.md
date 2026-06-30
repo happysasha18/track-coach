@@ -143,7 +143,9 @@ The pipeline runs as three steps: **measure** (deterministic scripts, same input
 
 ## Output
 
-**The widget** — a self-contained HTML file per run, versioned and timestamped so re-analysing the same track never overwrites a previous result. The player needs the co-located `stems_web/` folder; everything else is embedded.
+**The widget** — a self-contained HTML file per run, versioned and timestamped so re-analysing the same track never overwrites a previous result. Run directories live under `~/.track-coach/projects/<track-slug>/` — outside your Ableton project folders so a folder tidy-up can't touch them. The player needs the co-located `stems_web/` folder; everything else is embedded.
+
+If you have pre-0.9.5 run directories sitting inside Ableton project folders, consolidate them with `python scripts/track_analyzer.py migrate` (dry-run) or `migrate --apply` (execute). Version history is preserved.
 
 **The global library** — every finished widget is deposited automatically to `~/.track-coach/library/`. A global catalog page (`index.html`) gives a sortable, searchable row per track/version: spectral signature ribbon, vitals, mood/style tags, and a one-button preview player. Open it with `scripts/library.py catalog --open`.
 

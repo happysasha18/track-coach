@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.5] — 2026-06-30
+
+### Changed
+- **Analysis output now lives under `~/.track-coach/projects/`, not inside your Ableton project folders.** Run directories are written there by default — the Ableton folders stay clean and nothing can be lost to a tidy-up. The `--base` flag still overrides.
+
+### Added
+- **`migrate` command** consolidates pre-0.9.5 run directories (those still sitting in your Ableton project folders) into `~/.track-coach/projects/` and updates the library index. Dry-run: `python scripts/track_analyzer.py migrate`; apply: `migrate --apply`. Version history is preserved.
+
+### Fixed
+- Import crash on Python 3.9 in the identity helper (bare `str|None` annotation; did not affect the 3.11 default install).
+
 ## [0.9.4] — 2026-06-30
 
 ### Changed
