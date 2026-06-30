@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.2"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.3"   # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2117,7 +2117,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     # gets this one real line); a flat track with no narrative leaves both empty → the panel hides.
     read_body = _development_html(core) + read_body
     read_title = _esc(_ui.get("read_title", "")) if read_body else ""
-    read_panel_style = "" if read_body else ' style="display:none"'
+    read_panel_style = " open" if read_body else ' style="display:none"'
     # View toggle: full gets the (JS-wired) Simple/Detailed control; quick gets a hint in its place,
     # and the toggle JS bails on quick so the body never enters Simple → evidence + recs stay visible.
     view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
@@ -2305,6 +2305,88 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     return ''.join(rows_html), summary
 
 
+def render_reference_notes(artist_entry):
+    """§D.10.2 one-source shared renderer — emits semantic HTML for one artist entry.
+
+    Reads tier directly from the artist_entry dict (pre-computed, per reference_web_notes.json):
+      direct         → ★ pill  "★ measurement confirms"
+      indirect       → ☆ pill  "☆ measurement confirms (indirect)"
+      web-only       → grey    "web says; our tracks don't show it"
+      not-measurable → grey-italic  "not measurable with our axes"
+      none (legacy)  → grey    (treated as web-only for backward compat)
+
+    Returns markup only; theme (dark / light) applied by CSS on tc-rn-* classes.
+    Used by both the in-widget panel (dark theme) and the side-page generator (light theme).
+    """
+    artist    = artist_entry.get("artist", "")
+    real_name = artist_entry.get("real_name", "")
+    genre_era = artist_entry.get("genre_era", "")
+    note      = artist_entry.get("note") or ""
+    blurb     = artist_entry.get("blurb", "")
+    traits    = artist_entry.get("traits", [])
+    sources   = artist_entry.get("sources", [])
+
+    # Header: artist name + real name (muted)
+    rn_html = (f' <span class="tc-rn-realname">({_esc(real_name)})</span>'
+               if real_name else "")
+    head_html = f'<div class="tc-rn-head"><span class="tc-rn-artist">{_esc(artist)}</span>{rn_html}</div>'
+
+    # Genre / era line
+    genre_html = (f'<p class="tc-rn-genre">{_esc(genre_era)}</p>'
+                  if genre_era else "")
+
+    # Note: album-variance callout (left-border)
+    note_html = (f'<div class="tc-rn-note"><strong>Note:</strong> {_esc(note)}</div>'
+                 if note else "")
+
+    # Prose blurb
+    blurb_html = f'<p class="tc-rn-blurb">{_esc(blurb)}</p>' if blurb else ""
+
+    # Trait list
+    traits_html = ""
+    if traits:
+        rows = []
+        for t in traits:
+            tier  = t.get("tier", "none")
+            title = t.get("title") or t.get("phrase", "")
+            if tier == "direct":
+                pill_cls  = "tc-rn-pill is-direct"
+                pill_text = "★ measurement confirms"
+            elif tier == "indirect":
+                pill_cls  = "tc-rn-pill is-indirect"
+                pill_text = "☆ measurement confirms (indirect)"
+            elif tier == "not-measurable":
+                pill_cls  = "tc-rn-pill is-na"
+                pill_text = "not measurable with our axes"
+            else:                        # "web-only" or legacy "none"
+                pill_cls  = "tc-rn-pill is-webonly"
+                pill_text = "web says; our tracks don’t show it"
+            rows.append(
+                f'<li class="tc-rn-trait">'
+                f'<span class="tc-rn-trait-title">{_esc(title)}</span>'
+                f'<span class="{pill_cls}">{pill_text}</span>'
+                f'</li>'
+            )
+        traits_html = (
+            '<p class="tc-rn-traits-label">Key style traits</p>'
+            f'<ul class="tc-rn-traits">{"".join(rows)}</ul>'
+        )
+
+    # Sources list
+    sources_html = ""
+    if sources:
+        links = "".join(
+            f'<li><a href="{_esc(s["url"])}" target="_blank">{_esc(s["label"])}</a></li>'
+            for s in sources
+        )
+        sources_html = (
+            '<p class="tc-rn-sources-label">Sources</p>'
+            f'<ul class="tc-rn-sources">{links}</ul>'
+        )
+
+    return head_html + genre_html + note_html + blurb_html + traits_html + sources_html
+
+
 def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_data=None):
     """§D.10.2 — collapsible 'What the web says about <artist>' panel.
 
@@ -2325,92 +2407,16 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web
     """
     if web_data and isinstance(web_data, dict):
         # ── Rich mode (reference_web_notes.json source) ──────────────────────────────────
-        artist    = web_data.get("artist", direction_name)
-        genre_era = web_data.get("genre_era", "")
-        blurb     = web_data.get("blurb", "")
-        traits    = web_data.get("traits", [])
+        # Body is built by the shared one-source renderer (also used by build_reference_notes.py).
+        # Theme (dark here, light for the side page) is applied by CSS on tc-rn-* classes.
+        artist = web_data.get("artist", direction_name)
+        blurb  = web_data.get("blurb", "")
+        traits = web_data.get("traits", [])
         if not traits and not blurb:
             return ""                                   # no web content → panel absent (§D.10.2)
-
-        def _cz_agrees(t):
-            """True when the direction centroid agrees with the trait's expect by >= confirm_z."""
-            if not centroid_z:
-                return False
-            axis   = t.get("axis")
-            expect = t.get("expect")
-            if not axis or not expect:
-                return False
-            cz = centroid_z.get(axis)
-            if cz is None:
-                return False
-            try:
-                cz = float(cz)
-                if math.isnan(cz):
-                    return False
-            except (TypeError, ValueError):
-                return False
-            return (expect == "high" and cz >= confirm_z) or (expect == "low" and cz <= -confirm_z)
-
-        tier1, tier2, tier3 = [], [], []
-        for t in traits:
-            tier = t.get("tier", "none")
-            if tier == "none" or not t.get("axis"):
-                tier3.append(t)
-            elif _cz_agrees(t):
-                if tier == "direct":
-                    tier1.append(t)
-                elif tier == "indirect":
-                    tier2.append(t)
-                else:
-                    tier3.append(t)
-            else:
-                tier3.append(t)                        # contradicted or near mean → "web says" tier
-
-        def _sort_key(t):
-            return (t.get("axis") or "", t.get("phrase", ""))
-
-        tier1.sort(key=_sort_key)
-        tier2.sort(key=_sort_key)
-        tier3.sort(key=_sort_key)
-
-        rows_html = ""
-        for t in tier1:
-            al = _AXIS_LABELS.get(t.get("axis"), "—")
-            ph = t.get("phrase", "")
-            rows_html += (
-                f'<li class="web-facet-row">{_esc(ph)} — {_esc(al)} ★</li>'
-            )
-        for t in tier2:
-            al = _AXIS_LABELS.get(t.get("axis"), "—")
-            ph = t.get("phrase", "")
-            rows_html += (
-                f'<li class="web-facet-row">{_esc(ph)} — {_esc(al)} ☆</li>'
-            )
-        for t in tier3:
-            ax = t.get("axis")
-            al = _AXIS_LABELS.get(ax, "—") if ax else "—"
-            ph = t.get("phrase", "")
-            rows_html += (
-                f'<li class="web-facet-row web-facet-nosay">{_esc(ph)} — {_esc(al)}'
-                f' <span class="web-nosay">web says · our tracks don’t show it</span></li>'
-            )
-
-        genre_html  = f'<p class="web-genre-era">{_esc(genre_era)}</p>'  if genre_era else ""
-        blurb_html  = f'<p class="web-blurb">{_esc(blurb)}</p>'          if blurb     else ""
-        facets_html = f'<ul class="web-facets">{rows_html}</ul>'          if rows_html else ""
-        note_html   = (
-            '<p class="web-note">'
-            '★ web-described, confirmed by measurement directly · '
-            '☆ confirmed indirectly but soundly'
-            '</p>'
-        ) if (tier1 or tier2) else ""
-
-        body = (
-            f'<p class="web-artist-hdr">{_esc(artist)}</p>'
-            + genre_html + blurb_html + facets_html + note_html
-        )
+        body = render_reference_notes(web_data)
         return (
-            f'<details id="webPanel">'
+            f'<details class="tc-panel" id="webPanel">'
             f'<summary>What the web says about {_esc(artist)}</summary>'
             f'<div class="web-panel-body">{body}</div>'
             f'</details>'
@@ -2456,7 +2462,7 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web
         f'</p>'
     )
     return (
-        f'<details id="webPanel">'
+        f'<details class="tc-panel" id="webPanel">'
         f'<summary>What the web says about {_esc(direction_name)}</summary>'
         f'<div class="web-panel-body">{artist_section}</div>'
         f'</details>'
@@ -2511,10 +2517,10 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
 
     if not leans:
         return (
-            '<div id="refRead" class="panel">'
-            '<h2>Reference direction</h2>'
+            '<details class="tc-panel" id="refRead" open>'
+            '<summary>Reference direction</summary>'
             '<p class="refread-hdr" style="color:#8b94a8">No close direction yet</p>'
-            '</div>'
+            '</details>'
         )
 
     # Build one content panel per qualifying direction
@@ -2580,13 +2586,13 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     )
 
     refread_div = (
-        '<div id="refRead" class="panel">'
-        '<h2>How you sit vs the direction</h2>'
+        '<details class="tc-panel" id="refRead" open>'
+        '<summary>How you sit vs the direction</summary>'
         + tabs_html
         + ''.join(panels_html)
         + tab_js
         + legend_html
-        + '</div>'
+        + '</details>'
     )
 
     # §D.10.2 — web-info plaque for the focused (nearest) direction, collapsed by default.
@@ -2748,18 +2754,10 @@ body.simple #refRead{display:none!important}
 #refRead .refread-legend b{color:var(--ink)}
 #refRead .refread-legend .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
  color:#6fdfb8;padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
-/* Web-info plaque (§D.10.2, "What the web says") — collapsed <details>, Detailed-only, after #refRead */
+/* Web-info plaque (§D.10.2, "What the web says") — collapsed tc-panel, Detailed-only, after #refRead */
 body.simple #webPanel{display:none!important}
 #webPanel{margin:10px 0 0}
-/* Peer-drawer summary: same weight, size, and disclosure arrow as .more>summary and .catalog>summary */
-#webPanel>summary{cursor:pointer;list-style:none;user-select:none;
- color:var(--ink);font-size:15px;font-weight:620;
- padding:7px 10px;background:var(--panel2);border-radius:6px;border:1px solid var(--line)}
-#webPanel>summary::-webkit-details-marker{display:none}
-#webPanel>summary::before{content:"▸ ";color:var(--wob)}
-#webPanel[open]>summary::before{content:"▾ "}
-#webPanel .web-panel-body{padding:12px 14px 8px;background:var(--panel2);
- border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px}
+#webPanel .web-panel-body{padding:4px 0 4px}
 #webPanel .web-artist-hdr{font-size:12.5px;font-weight:600;margin:0 0 4px;color:var(--ink)}
 #webPanel .web-genre-era{font-size:11.5px;color:var(--muted);margin:0 0 6px;font-style:italic}
 #webPanel .web-blurb{font-size:12.5px;color:var(--ink);margin:0 0 10px;line-height:1.55}
@@ -2770,6 +2768,34 @@ body.simple #webPanel{display:none!important}
  padding:1px 5px;border-radius:10px;background:rgba(139,148,168,.12);color:var(--muted);
  letter-spacing:.04em;vertical-align:middle;margin-left:3px}
 #webPanel .web-note{font-size:11px;color:var(--muted);opacity:.65;margin:6px 0 0;font-style:italic}
+/* Rich web panel (§D.10.2) — tc-rn-* semantic markup, dark theme (in-widget). */
+/* Light theme for the same classes lives in build_reference_notes.py (side page). */
+#webPanel .tc-rn-head{margin:0 0 3px}
+#webPanel .tc-rn-artist{font-size:13px;font-weight:700;color:var(--ink)}
+#webPanel .tc-rn-realname{font-size:11.5px;color:var(--muted);margin-left:5px;font-style:italic}
+#webPanel .tc-rn-genre{font-size:11.5px;color:var(--muted);margin:2px 0 10px;font-style:italic}
+#webPanel .tc-rn-note{border-left:3px solid var(--warn);padding:6px 10px;margin:0 0 10px;
+ font-size:12px;color:var(--muted);line-height:1.5;background:rgba(255,180,84,.07);
+ border-radius:0 6px 6px 0}
+#webPanel .tc-rn-blurb{font-size:12.5px;color:var(--ink);margin:0 0 12px;line-height:1.6}
+#webPanel .tc-rn-traits-label{font-size:10px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.07em;color:var(--muted);margin:0 0 6px}
+#webPanel .tc-rn-traits{list-style:none;margin:0 0 12px;padding:0;display:flex;
+ flex-direction:column;gap:5px}
+#webPanel .tc-rn-trait{display:flex;align-items:baseline;justify-content:space-between;
+ gap:8px;font-size:12px;color:var(--ink)}
+#webPanel .tc-rn-trait-title{flex:1;line-height:1.4}
+#webPanel .tc-rn-pill{flex:0 0 auto;font-size:9px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.04em;padding:2px 7px;border-radius:10px;white-space:nowrap}
+#webPanel .tc-rn-pill.is-direct{background:rgba(70,211,154,.18);color:var(--good)}
+#webPanel .tc-rn-pill.is-indirect{background:rgba(70,211,154,.1);color:var(--good);opacity:.8}
+#webPanel .tc-rn-pill.is-webonly{background:rgba(139,148,168,.12);color:var(--muted)}
+#webPanel .tc-rn-pill.is-na{background:rgba(139,148,168,.08);color:var(--muted);font-style:italic}
+#webPanel .tc-rn-sources-label{font-size:10px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.07em;color:var(--muted);margin:0 0 5px}
+#webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+#webPanel .tc-rn-sources a{font-size:11.5px;color:var(--muted);text-decoration:none}
+#webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration:underline}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -2827,9 +2853,15 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 .tag.good{background:rgba(70,211,154,.14);color:var(--good)}
 .tag.warn{background:rgba(255,180,84,.14);color:var(--warn)}
 .tag.bad{background:rgba(255,107,107,.14);color:var(--bad)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:22px}
-.panel h2{font-size:15px;margin:0 0 4px;font-weight:620}
-.panel .hint{color:var(--muted);font-size:12px;margin:0 0 16px}
+/* ── tc-panel: ONE canonical collapsible panel — the single look for every section ────── */
+details.tc-panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+ padding:14px 20px 18px;margin-bottom:22px}
+details.tc-panel>summary{cursor:pointer;list-style:none;user-select:none;
+ color:var(--ink);font-size:15px;font-weight:620;padding:4px 0 10px}
+details.tc-panel>summary::-webkit-details-marker{display:none}
+details.tc-panel>summary::before{content:"▸ ";color:var(--wob)}
+details.tc-panel[open]>summary::before{content:"▾ "}
+.hint{color:var(--muted);font-size:12px;margin:0 0 16px}
 .legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px;font-size:12px}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
@@ -2901,22 +2933,9 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .seqkey .chip{display:inline-flex;align-items:center}
 .seqkey .ms{display:inline-block;min-width:13px;height:13px;line-height:13px;text-align:center;
  border-radius:3px;font-size:8px;font-weight:700;color:#0c0e14;margin-right:4px}
-/* collapsed "evidence & detail" drawer — same framed-card style as the catalog below */
-.more{background:var(--panel);border:1px solid var(--line);border-radius:18px;
- padding:14px 20px 18px;margin:24px 0 0}
-.more>summary{cursor:pointer;list-style:none;color:var(--ink);font-size:15px;font-weight:620;
- padding:6px 0;user-select:none}
-.more>summary::-webkit-details-marker{display:none}
-.more>summary::before{content:"▸ ";color:var(--wob)}
-.more[open]>summary::before{content:"▾ "}
-/* CATALOG — all tracks & versions, collapsible. Lives at the very bottom, both views. */
-.catalog{background:var(--panel);border:1px solid var(--line);border-radius:18px;
- padding:14px 20px 18px;margin:24px 0 0}
-.catalog>summary{cursor:pointer;list-style:none;color:var(--ink);font-size:15px;font-weight:620;
- padding:6px 0;user-select:none}
-.catalog>summary::-webkit-details-marker{display:none}
-.catalog>summary::before{content:"▸ ";color:var(--wob)}
-.catalog[open]>summary::before{content:"▾ "}
+/* Evidence drawer and Catalog: tc-panel chrome, collapsed by default, margin override */
+#evidence,#catalog{margin:24px 0 0}
+/* CATALOG inner tracks */
 .catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
  letter-spacing:.7px;font-weight:700}
 .catrun{display:flex;align-items:baseline;gap:10px;padding:9px 12px;border:1px solid var(--line);
@@ -2963,8 +2982,9 @@ __MODENOTE__
 <div class="verdict" id="verdict" style="display:none"></div>
 
 <!-- 1. VISUAL FIRST: Track Story + player/sequencer is the centrepiece & the proof. -->
-<div class="panel" id="storyPanel">
- <h2 id="storyTitle"></h2><p class="hint" id="storyHint"></p>
+<details class="tc-panel" id="storyPanel" open>
+ <summary><span id="storyTitle"></span></summary>
+ <p class="hint" id="storyHint"></p>
  <canvas id="story" height="300"></canvas>
  <div id="playerControls">
   <canvas id="stemlanes" height="200" style="margin-top:12px;cursor:pointer"></canvas>
@@ -2977,32 +2997,33 @@ __MODENOTE__
   <p class="hint" id="playNote" style="margin:10px 0 0"></p>
   <div id="playAudios" style="display:none"></div>
  </div>
-</div>
+</details>
 
 <!-- 2. RECOMMENDATIONS sit DIRECTLY under the graph — these ARE the cards the timeline
      triangles point to (no separate callout list on the graph any more). Each timecoded
      rec has a matching triangle above; clicking a triangle flashes its card here. Simple
      shows ONLY the timecoded recs (the ones with a triangle); Detailed shows all. -->
-<div class="panel" id="recsPanel">
- <h2 id="recsTitle"></h2><p class="hint" id="recsHint"></p>
+<details class="tc-panel" id="recsPanel" open>
+ <summary><span id="recsTitle"></span></summary>
+ <p class="hint" id="recsHint"></p>
  <div class="legend" id="recLegend" style="margin-bottom:14px"></div>
  <div class="recs" id="recs"></div>
-</div>
+</details>
 
 <!-- 3. THE READ: the diagnosis in prose, the Producer's view. Rendered SERVER-SIDE (markdown→HTML
      in Python) so #readBody is a real, testable artifact and headings never leak a literal '#'. -->
-<div class="panel read" id="readPanel"__READPANELSTYLE__>
- <h2 id="readTitle">__READTITLE__</h2>
+<details class="tc-panel read" id="readPanel"__READPANELSTYLE__>
+ <summary><span id="readTitle">__READTITLE__</span></summary>
  <div id="readBody">__READBODY__</div>
-</div>
+</details>
 
 <!-- Tonal balance — sits between the producer's read and the reference read (§D.10.3 order:
      producer read → tonal balance → centroid read → web panel). Always visible. -->
-<div class="panel" id="tonalPanel">
- <h2>Tonal balance — average spectrum of the mix</h2>
+<details class="tc-panel" id="tonalPanel" open>
+ <summary>Tonal balance — average spectrum of the mix</summary>
  <p class="hint">Each bar is one octave band's level across the whole track (0 dB = loudest band). A band that sticks out from its neighbours is a resonance (boxy/harsh); a dip is a hole (dull/thin).</p>
  <canvas id="tonal" height="170"></canvas>
-</div>
+</details>
 
 <!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
      per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
@@ -3010,45 +3031,50 @@ __MODENOTE__
      panel (§D.10.2, "What the web says") which is also emitted server-side as part of __REFREAD__. -->
 __REFREAD__
 
-<details class="more" id="evidence">
+<details class="tc-panel" id="evidence">
  <summary>Evidence &amp; detail — the project arrangement, automation, stem↔track map, rhythm and transcribed notes</summary>
 
- <div class="panel" id="arrPanel">
-  <h2 id="arrTitle"></h2><p class="hint" id="arrHint"></p>
+ <details class="tc-panel" id="arrPanel" open>
+  <summary><span id="arrTitle"></span></summary>
+  <p class="hint" id="arrHint"></p>
   <div class="legend" id="arrLegend"></div>
   <canvas id="arr" height="300"></canvas>
   <div class="readout" id="arrReadout"></div>
- </div>
+ </details>
 
- <div class="panel" id="autoPanel">
-  <h2 id="autoTitle"></h2><p class="hint" id="autoHint"></p>
+ <details class="tc-panel" id="autoPanel" open>
+  <summary><span id="autoTitle"></span></summary>
+  <p class="hint" id="autoHint"></p>
   <canvas id="auto" height="220"></canvas>
   <div class="readout" id="autoReadout"></div>
- </div>
+ </details>
 
- <div class="panel" id="mapPanel">
-  <h2 id="mapTitle"></h2><p class="hint" id="mapHint"></p>
+ <details class="tc-panel" id="mapPanel" open>
+  <summary><span id="mapTitle"></span></summary>
+  <p class="hint" id="mapHint"></p>
   <div class="mgrid" id="mapRows"></div>
   <div id="mapNotes" style="margin-top:14px"></div>
- </div>
+ </details>
 
- <div class="panel" id="rhyPanel">
-  <h2 id="rhyTitle"></h2><p class="hint" id="rhyHint"></p>
+ <details class="tc-panel" id="rhyPanel" open>
+  <summary><span id="rhyTitle"></span></summary>
+  <p class="hint" id="rhyHint"></p>
   <div class="mgrid" id="rhyRows"></div>
   <div id="rhySep" style="margin-top:14px"></div>
- </div>
+ </details>
 
- <div class="panel" id="notePanel">
-  <h2 id="noteTitle"></h2><p class="hint" id="noteHint"></p>
+ <details class="tc-panel" id="notePanel" open>
+  <summary><span id="noteTitle"></span></summary>
+  <p class="hint" id="noteHint"></p>
   <canvas id="note" height="260"></canvas>
   <div class="readout" id="noteReadout"></div>
- </div>
+ </details>
 </details>
 
 <!-- CATALOG — every track & version analysed. Current track's versions inline; other
      tracks fold open to their own versions. Links are relative (work on GitHub Pages).
      Shown in BOTH Simple and Detailed views. -->
-<details class="catalog" id="catalog" style="display:none">
+<details class="tc-panel" id="catalog" style="display:none">
  <summary id="catSummary"></summary>
  <p class="hint" id="catHint" style="margin:6px 2px 14px"></p>
  <div id="catBody"></div>

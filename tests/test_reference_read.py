@@ -860,13 +860,18 @@ class WebPanelRichRendering(unittest.TestCase):
                       "'web says' pill must appear for none-tier traits")
 
     def test_nosay_row_appears_for_contradicted_direct(self):
-        """A contradicted direct trait must land in the 'web says' tier, not ★."""
+        """B3 design change (s29): the rich panel now uses render_reference_notes, which reads
+        the static `tier` field from the JSON entry — no centroid-Z dynamic re-sorting.
+        A trait with tier='direct' always renders as is-direct (★ pill), regardless of whether
+        the current track's centroid agrees. The phrase must still appear; now under the
+        static-tier class, not a centroid-dependent web-facet-nosay element."""
         html = self._rich_html()
         self.assertIn("bright highs", html,
-                      "contradicted direct phrase must appear in the panel (bottom tier)")
-        # It must appear in a web-facet-nosay row (after the ★ rows)
-        self.assertIn("web-facet-nosay", html,
-                      "contradicted trait must be in a web-facet-nosay element")
+                      "contradicted direct phrase must still appear in the panel")
+        # Static tier: tier='direct' → is-direct pill, regardless of centroid agreement.
+        # (Centroid-Z re-sorting was removed from the web panel in B3/s29.)
+        self.assertIn("tc-rn-pill is-direct", html,
+                      "static tier=direct → is-direct pill (no centroid re-sort in B3)")
 
     def test_star_row_before_nosay_row(self):
         """★ tier row must appear BEFORE 'web says' row (sorted by status, strongest first)."""

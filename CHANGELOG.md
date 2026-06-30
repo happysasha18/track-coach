@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.3] — 2026-06-30
+
+### Added
+- **The web panel is now as rich as the side page.** "What the web says about X" in the widget now shows the full picture: artist + real name, genre/era, the album-variance note callout, the full prose blurb, the "Key style traits" list (each trait with its own status pill — ★ "measurement confirms" / ☆ "measurement confirms (indirect)" / "web says; our tracks don't show it" / "not measurable with our axes"), and the sources. Previously the widget panel was a terse one-line-per-trait list while the side page held all the good detail — now both render from ONE source and ONE renderer.
+- **One source, one renderer for the reference notes.** `data/reference_web_notes.json` carries the full content (real_name, genre_era, note, blurb, traits, sources); `render_reference_notes()` renders it; `scripts/build_reference_notes.py` regenerates the side page `~/.track-coach/explore/reference_notes.html` from the same source — the widget panel and the side page can no longer drift.
+
+### Changed
+- **Every panel is now collapsible, with one unified header style.** All content panels (story, recommendations, the read, tonal balance, the reference read, and the Evidence sub-panels) are now `<details class="tc-panel">` with the same header look (bold title + purple disclosure arrow) — previously only the web/Evidence/catalog drawers collapsed, and headers were styled three different ways. Panel styling is centralized in one CSS block. The top metrics strip stays as-is (no header, not collapsible) by design.
+
 ## [0.9.2] — 2026-06-30
 
 ### Added

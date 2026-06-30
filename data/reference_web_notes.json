@@ -1,58 +1,82 @@
 {
-  "_note": "One-source data file for the rich web panel (SPEC §D.10.2), side page, and ★/☆ computation. Supersedes facet_confirmation.json. Source: ~/.track-coach/explore/web_facets_draft.md (web research 2026-06-29), curated 2026-06-30. Each direction: artist, genre/era, 2-3 sentence blurb (faithfully condensed from the draft, no new claims), and traits [{phrase, axis, expect, tier}]. Render rule: tier=direct AND centroid agrees by >= _confirm_z → ★; tier=indirect AND agrees → ☆; tier=none OR contradicted/unmeasured → 'web says · our tracks don't show it'. _confirm_z: minimum |centroid z| to count as confirmed.",
+  "_note": "One-source data file for the rich web panel (SPEC §D.10.2), side page, and ★/☆ computation. Supersedes facet_confirmation.json. Source: ~/.track-coach/explore/reference_notes.html (hand-curated 2026-06-29), curated/enriched 2026-06-30 (s29). Each direction: artist, real_name, genre_era, note, blurb, traits [{phrase, title, axis, expect, tier}], sources. Render rule: tier=direct → ★ 'measurement confirms'; tier=indirect → ☆ 'measurement confirms (indirect)'; tier=web-only → grey 'web says; our tracks don't show it'; tier=not-measurable → grey-italic 'not measurable with our axes'. _confirm_z: minimum |centroid z| for the bar-chart ★/☆ computation in render_reference_read (still dynamic).",
   "_confirm_z": 0.4,
   "DeepChord": {
     "artist": "DeepChord",
-    "genre_era": "Dub techno / ambient techno, Detroit. Mid-1990s–present.",
-    "blurb": "Second-wave Basic Channel sound with heavier ambient and field-recording influence than most dub techno. Rod Modell processes sounds through deep reverb, Eventide Orville, Korg Stage Echos, and spring reverbs until 'little of the original remains', producing spatial, dronal textures. Tracks always start with the ambient parts — described as 'sounds like 4am' — and the kick drum is added last as a metronome under the ambience.",
+    "real_name": "Rod Modell",
+    "genre_era": "Dub techno / ambient techno — Detroit — mid-1990s to present",
+    "note": null,
+    "blurb": "DeepChord is widely placed in the second wave of the Basic Channel sound, with a heavier lean toward ambience and field recording than most dub techno. Rod Modell starts composition with the ambient parts — processed field recordings, sustained low-frequency chord stabs, textures that can loop indefinitely. The kick drum arrives last, as a metronome underneath rather than a driving feature. The signal chain is extreme: Eventide Orville, Korg Stage Echos, spring reverbs, tape delays work on the source until, as Modell has said, \"little of the original remains.\" The result is a wide, swirling spatial image, a deeply dark tonal palette described as \"sounds like 4am,\" and an almost complete absence of melodic events above the held ambient layer. Tracks exist in a lava-lamp stasis — they develop through micro-variation, not an energy arc.",
     "traits": [
-      {"phrase": "slow meditative tempo", "axis": "tempo",        "expect": "low",  "tier": "direct"},
-      {"phrase": "deep bass anchor",       "axis": "bass_share",  "expect": "high", "tier": "direct"},
-      {"phrase": "deep sustained bass",    "axis": "bass_sustain","expect": "high", "tier": "direct"},
-      {"phrase": "restrained flat dynamics","axis": "dynamics",   "expect": "low",  "tier": "direct"},
-      {"phrase": "wide stereo field",      "axis": "stereo",      "expect": "high", "tier": "direct"},
-      {"phrase": "ambient pads dominate",  "axis": "other_share", "expect": "high", "tier": "direct"},
-      {"phrase": "long sustained pads",    "axis": "pad_sustain", "expect": "high", "tier": "direct"},
-      {"phrase": "dark, muted",            "axis": "brightness",  "expect": "low",  "tier": "direct"},
-      {"phrase": "dark pad timbre",        "axis": "pad_bright",  "expect": "low",  "tier": "direct"},
-      {"phrase": "sparse minimal drums",   "axis": "drums_share", "expect": "low",  "tier": "direct"},
-      {"phrase": "very sparse arrangement","axis": "density",     "expect": "low",  "tier": "direct"},
-      {"phrase": "held pad, no melody",    "axis": "pad_notes",   "expect": "low",  "tier": "direct"}
+      {"phrase": "slow meditative tempo", "title": "Slow, meditative tempo — ~110–125 BPM, often toward the lower end; described as a \"resting heartbeat of a rhythm\"", "axis": "tempo", "expect": "low", "tier": "web-only"},
+      {"phrase": "deep bass anchor", "title": "Devastatingly deep sub-bass pulses as the structural anchor of the mix", "axis": "bass_share", "expect": "high", "tier": "web-only"},
+      {"phrase": "deep sustained bass", "title": "Bass notes held long across bar boundaries — the dub reggae inheritance; bass is \"set adrift\" rather than punchy", "axis": "bass_sustain", "expect": "high", "tier": "direct"},
+      {"phrase": "restrained flat dynamics", "title": "Restrained, heavily processed dynamics — the deep FX chain compresses natural transients flat", "axis": "dynamics", "expect": "low", "tier": "web-only"},
+      {"phrase": "wide stereo field", "title": "Very wide stereo from the dub reverb and delay chain — field recordings swirling in the background", "axis": "stereo", "expect": "high", "tier": "web-only"},
+      {"phrase": "ambient pads dominate", "title": "Ambient pads dominate the mix; the kick is added last as an afterthought, not the lead element", "axis": "other_share", "expect": "high", "tier": "web-only"},
+      {"phrase": "long sustained pads", "title": "Pads sustained for very long durations — dronal, static textures that can loop forever, no melodic phrases", "axis": "pad_sustain", "expect": "high", "tier": "direct"},
+      {"phrase": "dark, muted", "title": "Dark, low-brightness tonal palette — no bright leads; processed field recordings sit below the presence range", "axis": "brightness", "expect": "low", "tier": "direct"},
+      {"phrase": "dark pad timbre", "title": "Pad brightness in the dark / low-mid range — pad material is processed source material, not filter-open synths", "axis": "pad_bright", "expect": "low", "tier": "web-only"},
+      {"phrase": "sparse minimal drums", "title": "Minimal drums share — kick as a metronome, not a sonic feature; drums are an afterthought", "axis": "drums_share", "expect": "low", "tier": "web-only"},
+      {"phrase": "very sparse arrangement", "title": "Very sparse arrangement density — near-minimalist, repetitive loops, few events per bar above the sustained layer", "axis": "density", "expect": "low", "tier": "web-only"},
+      {"phrase": "held pad, no melody", "title": "Pad note rate near zero — pads hold, not play; the loop rate is not a melody", "axis": "pad_notes", "expect": "low", "tier": "web-only"}
+    ],
+    "sources": [
+      {"label": "Wikipedia: Deepchord", "url": "https://en.wikipedia.org/wiki/Deepchord"},
+      {"label": "Inverted Audio feature interview", "url": "https://inverted-audio.com/feature/deepchord/"},
+      {"label": "Vice interview (Rod Modell)", "url": "https://www.vice.com/en/article/get-to-know-deepchords-rod-modell-the-detroit-artist-who-still-wants-to-loop-till-infinity/"},
+      {"label": "Tracklist.live dub techno genre guide", "url": "https://tracklist.live/discover/guide/dub-techno"}
     ]
   },
   "Venetian Snares": {
     "artist": "Venetian Snares",
-    "genre_era": "Breakcore / IDM / glitch, Winnipeg, Canada. Late 1990s–present.",
-    "blurb": "Aaron Funk is widely credited with defining breakcore — hyper-fast (180–200+ BPM) mutilated amen breaks assembled into 'organized chaos' with obsessive rhythmic complexity. His style splits sharply by album: breakcore works are a constant terrorizing barrage, while orchestral-fusion albums (notably Rossz Csillag Alatt Született) pair shredded drums with long sampled strings from Bartók, Mahler, and Elgar.",
+    "real_name": "Aaron Funk",
+    "genre_era": "Breakcore / IDM / glitch — Winnipeg, Canada — late 1990s to present",
+    "note": "Funk's style varies sharply between albums. Breakcore albums (e.g., Winnipeg Is a Frozen Shithole) and orchestral-fusion albums (e.g., Rossz Csillag Alatt Született, 2005) have almost opposite pad and brightness profiles. Traits marked as orchestral-album-specific are called out below.",
+    "blurb": "Aaron Funk is widely credited with defining breakcore as a genre. The core sound is hyper-fast — 180–200+ BPM — built around mutilated amen breaks constructed in Renoise into patterns of \"organized chaos.\" Drums dominate: the breakbeats are shredded, resequenced, and stacked into dense, manic textures that leave the mix with little headroom and constant maximum intensity. There is no conventional build arc; the energy arrives immediately and stays. Bright, staccato high-frequency elements — sci-fi synths, jittery stabs, chime accents — fill the spaces between drum hits. Odd time signatures, notably 7/4, are a recurring structural signature. In a separate body of work, Funk makes orchestral-breakcore albums sampling Bartók, Mahler, and Elgar; these have bright string layers functioning as sustained pads, producing an almost opposite tonal character to the pure breakcore albums.",
     "traits": [
-      {"phrase": "hyper-fast tempo",       "axis": "tempo",       "expect": "high", "tier": "direct"},
-      {"phrase": "drum-driven texture",    "axis": "drums_share", "expect": "high", "tier": "direct"},
-      {"phrase": "dense, busy",            "axis": "density",     "expect": "high", "tier": "direct"},
-      {"phrase": "compressed, loud",       "axis": "dynamics",    "expect": "low",  "tier": "direct"},
-      {"phrase": "bright staccato highs",  "axis": "brightness",  "expect": "high", "tier": "direct"},
-      {"phrase": "constant intensity",     "axis": "energy_build","expect": "low",  "tier": "indirect"},
-      {"phrase": "long sustained pads",    "axis": "pad_sustain", "expect": "high", "tier": "direct"},
-      {"phrase": "high orchestral share",  "axis": "other_share", "expect": "high", "tier": "direct"},
-      {"phrase": "bright orchestral pads", "axis": "pad_bright",  "expect": "high", "tier": "direct"},
-      {"phrase": "odd time signatures (7/4)", "axis": null,       "expect": null,   "tier": "none"}
+      {"phrase": "hyper-fast tempo", "title": "Hyper-fast tempo — 180–200+ BPM, breakcore speed", "axis": "tempo", "expect": "high", "tier": "web-only"},
+      {"phrase": "drum-driven texture", "title": "Drum texture dominates the mix — mutilated amen breaks as the primary sonic element; \"meticulously complex drums\"", "axis": "drums_share", "expect": "high", "tier": "web-only"},
+      {"phrase": "dense, busy", "title": "Extreme per-bar event density — \"manic breakbeats,\" dense sample stacking, organized chaos", "axis": "density", "expect": "high", "tier": "direct"},
+      {"phrase": "constant intensity", "title": "Constant maximum intensity — no conventional build arc; \"terrorizing barrage\" from bar one", "axis": "energy_build", "expect": "low", "tier": "web-only"},
+      {"phrase": "compressed, loud", "title": "Heavily compressed / loud mastering — extreme density leaves no headroom; loudness-war zone dynamic range", "axis": "dynamics", "expect": "low", "tier": "web-only"},
+      {"phrase": "bright staccato highs", "title": "Bright, staccato high-frequency content — jittery stabs, chime accents, sci-fi synths", "axis": "brightness", "expect": "high", "tier": "direct"},
+      {"phrase": "odd time signatures (7/4)", "title": "Odd time signatures (notably 7/4) as a recurring structural device", "axis": null, "expect": null, "tier": "not-measurable"},
+      {"phrase": "long sustained pads", "title": "Orchestral strings as long-sustain pad layer (on classical-fusion albums) — cello and string phrases from Bartók / Mahler samples", "axis": "pad_sustain", "expect": "high", "tier": "web-only"},
+      {"phrase": "high orchestral share", "title": "High synth / pad share on orchestral albums — the string layer occupies a large share of the mix", "axis": "other_share", "expect": "high", "tier": "direct"},
+      {"phrase": "bright orchestral pads", "title": "Pad brightness is high on orchestral albums — Bartók/Mahler/Elgar strings have strong presence in the 2–8 kHz range", "axis": "pad_bright", "expect": "high", "tier": "direct"}
+    ],
+    "sources": [
+      {"label": "Wikipedia: Venetian Snares", "url": "https://en.wikipedia.org/wiki/Venetian_Snares"},
+      {"label": "Bandcamp Daily beginner's guide", "url": "https://daily.bandcamp.com/lists/venetian-snares-guide"},
+      {"label": "Gearspace production methods thread", "url": "https://gearspace.com/board/electronic-music-instruments-and-electronic-music-production/1125569-venetian-snares-breakcore-production-methods.html"},
+      {"label": "staimusic.com biography", "url": "https://staimusic.com/en/blog/venetian-snares-a-musical-biography-of-one-of-the-most-prolific-breakcore-artists_6593.html"}
     ]
   },
   "SCSI-9": {
     "artist": "SCSI-9",
-    "genre_era": "Deep house / tech-house / minimal techno, Moscow, Russia. Active from ~2001.",
-    "blurb": "Duo Anton Kubikov and Maxim Milyutenko, released on Kompakt and Force Tracks. Resident Advisor describes their sound as 'hypermelodic tech-house': wistful melodic synth phrases and 'bell-tone droplets' over warm bass pulses, with 'kaleidoscopic dub effects' and 'spacey reverb' in the background. Described as 'geometric but above all analog' — mathematical minimalism deliberately not sweaty or frenetic.",
+    "real_name": "Anton Kubikov & Maxim Milyutenko",
+    "genre_era": "Deep house / tech-house / minimal techno — Moscow, Russia — active from ~2001",
+    "note": "SCSI-9 is less covered in depth than the other two. No Wikipedia article exists; Resident Advisor reviews are the richest English-language critical source. Coverage confidence is lower, but the \"hypermelodic\" and \"dub-effects\" descriptors are consistent across multiple reviews.",
+    "blurb": "SCSI-9 — Moscow-based duo Anton Kubikov and Maxim Milyutenko — are among the most respected Russian electronic acts internationally, releasing on Kompakt, Force Tracks, and Traum/Trapez. Their signature is melodic foreground synth phrases sitting on top of a sparse but detailed arrangement: \"wistful melodies,\" \"bell-tone droplets,\" \"hypermelodic tech-house.\" The tempo sits mid-range, around 122–128 BPM. The bass is warm and punchy — mid-bass presence rather than deep sub-bass, released between hits rather than held. Below the melody, a harmonic pad bed sits with dub effects in the background: kaleidoscopic reverb, spacey tones, echoing synths. Critics reach for the word \"cheery,\" but in a minimal context it reads more luminous than saccharine. The character is described as \"geometric but above all analog\" — mathematically spare with a handmade warmth.",
     "traits": [
-      {"phrase": "punchy short bass",             "axis": "bass_sustain","expect": "low",  "tier": "direct"},
-      {"phrase": "melodic lead synths",           "axis": "lead_share",  "expect": "high", "tier": "direct"},
-      {"phrase": "ambient pad bed",               "axis": "other_share", "expect": "high", "tier": "direct"},
-      {"phrase": "wide stereo field",             "axis": "stereo",      "expect": "high", "tier": "direct"},
-      {"phrase": "bright pad timbre",             "axis": "pad_bright",  "expect": "high", "tier": "direct"},
-      {"phrase": "bright mix overall",            "axis": "brightness",  "expect": "high", "tier": "direct"},
-      {"phrase": "sparse but detailed",           "axis": "density",     "expect": "low",  "tier": "direct"},
-      {"phrase": "gentle energy rise",            "axis": "energy_build","expect": "high", "tier": "indirect"},
-      {"phrase": "mid-tempo groove (~122-128 BPM)","axis": "tempo",      "expect": null,   "tier": "none"},
-      {"phrase": "warm mid-bass pulse",           "axis": "bass_share",  "expect": null,   "tier": "none"},
-      {"phrase": "moderate controlled dynamics",  "axis": "dynamics",    "expect": null,   "tier": "none"}
+      {"phrase": "mid-tempo groove (~122-128 BPM)", "title": "Mid-tempo deep house / tech-house groove — ~122–128 BPM", "axis": "tempo", "expect": null, "tier": "web-only"},
+      {"phrase": "warm mid-bass pulse", "title": "Warm, present bass pulse — mid-bass presence, not sub-heavy; \"bass allowed a little more time to breathe\"", "axis": "bass_share", "expect": null, "tier": "web-only"},
+      {"phrase": "punchy short bass", "title": "Bass notes released between hits — punchy, rhythmic, not dronal; breathing rather than sustained", "axis": "bass_sustain", "expect": "low", "tier": "web-only"},
+      {"phrase": "melodic lead synths", "title": "Melodic foreground synth phrases — \"wistful melodies,\" \"hypermelodic tech-house,\" \"bell-tone droplets,\" active lead lines", "axis": "lead_share", "expect": "high", "tier": "web-only"},
+      {"phrase": "ambient pad bed", "title": "Ambient pad bed underneath the melody — harmonic support layer with dub effects", "axis": "other_share", "expect": "high", "tier": "web-only"},
+      {"phrase": "wide stereo field", "title": "Wide stereo from kaleidoscopic reverb and delay — \"spacey tones and a whole lot of reverb,\" \"echoing synths\"", "axis": "stereo", "expect": "high", "tier": "web-only"},
+      {"phrase": "moderate controlled dynamics", "title": "Moderate, controlled dynamic range — not compressed flat; \"lava-lamp minimalism,\" deliberately not frenetic", "axis": "dynamics", "expect": null, "tier": "web-only"},
+      {"phrase": "bright pad timbre", "title": "Bright pad / synth timbre — \"cheery synths,\" \"synthetic bells,\" \"shimmering daze,\" upper-mid luminous quality", "axis": "pad_bright", "expect": "high", "tier": "web-only"},
+      {"phrase": "bright mix overall", "title": "Mix reads bright overall — follows from the melodic synth lines and synthetic bells", "axis": "brightness", "expect": "high", "tier": "web-only"},
+      {"phrase": "sparse but detailed", "title": "Low arrangement density — \"straightforward but highly detailed,\" geometric minimalism; events are sparse, not layered", "axis": "density", "expect": "low", "tier": "direct"},
+      {"phrase": "gentle energy rise", "title": "Gentle upward energy arc over track duration — Kompakt deep-house style gradual builds (web-argued, not documented explicitly)", "axis": "energy_build", "expect": "high", "tier": "web-only"}
+    ],
+    "sources": [
+      {"label": "Deeprhythms artist page", "url": "https://deeprhythms.com/artist/scsi-9/"},
+      {"label": "Resident Advisor review — Easy as Down (2008)", "url": "https://ra.co/reviews/5571"},
+      {"label": "Resident Advisor review — The Line of Nine (2006)", "url": "https://ra.co/reviews/3738"},
+      {"label": "Resident Advisor review — Sunny Side Up single", "url": "https://ra.co/reviews/9213"}
     ]
   }
 }
