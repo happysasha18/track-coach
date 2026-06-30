@@ -5,6 +5,12 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.6] — 2026-06-30
+
+### Fixed
+- **The library catalog's "leans toward" links now work.** Clicking a direction opens that track's widget at the reference read (was a dead `#` link).
+- Removed a hidden duplicate of the reference-read panel that was being emitted (commented-out) into every widget's source.
+
 ## [0.9.5] — 2026-06-30
 
 ### Changed
