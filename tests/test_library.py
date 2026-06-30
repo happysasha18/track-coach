@@ -151,5 +151,64 @@ class DepositAtomicity(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class LegacyStrInLibraryEntries(unittest.TestCase):
+    """Regression: 'str' object has no attribute 'get' when a library index.json entry is a bare
+    string (a legacy slug written by old run-init code before the full-metadata format).
+    upsert() and load_index() must both tolerate stray string entries — normalize, don't crash.
+    Bug surface: library.py:upsert (same unguarded .get() pattern as build_widget._record_history
+    that triggered the Wobble history-update-skipped log)."""
+
+    def test_upsert_with_legacy_str_entry_does_not_crash(self):
+        """upsert() must not raise when entries contains a stray string slug (pre-metadata format).
+        This is the RED-on-bug test: before the isinstance guard it raised
+        AttributeError: 'str' object has no attribute 'get'."""
+        entries = ["Total_Reboot_Wobble_Drift_v0.6.2",        # stray legacy string
+                   {"widget": "real.html", "track": "WD"}]
+        result = library.upsert(entries, {"widget": "new.html", "track": "WD"})
+        widgets = [e.get("widget") for e in result if isinstance(e, dict)]
+        self.assertIn("real.html", widgets)    # existing real entry kept
+        self.assertIn("new.html", widgets)     # new entry appended
+
+    def test_load_index_normalizes_str_entries_to_dicts(self):
+        """load_index() must coerce any stray string in 'entries' to a minimal dict so
+        every downstream caller (upsert, clean_plan, group_versions) sees a uniform type."""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            raw = {"entries": ["stray_slug",
+                               {"widget": "real.html", "track": "T", "stamp": "s1"}]}
+            (root / "index.json").write_text(json.dumps(raw))
+            idx = library.load_index(root)
+            # All items must be dicts after normalization
+            self.assertTrue(all(isinstance(e, dict) for e in idx["entries"]),
+                            "load_index must normalize every entry to a dict")
+            self.assertEqual(len(idx["entries"]), 2)
+            # The normalized stray string is preserved as {"widget": "stray_slug"}
+            self.assertEqual(idx["entries"][0].get("widget"), "stray_slug")
+            # The real entry is unchanged
+            self.assertEqual(idx["entries"][1]["track"], "T")
+
+    def test_deposit_into_index_with_legacy_str_entry_succeeds(self):
+        """Full deposit round-trip: even when the library index.json already holds a stray string
+        entry, deposit() must succeed and produce a clean index (all dicts)."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                root = library.library_root()
+                root.mkdir(parents=True)
+                # Seed the index with a stray string entry (simulates the legacy format)
+                (root / "index.json").write_text(
+                    json.dumps({"entries": ["Total_Reboot_Wobble_Drift_v0.6.2"]}))
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                # Before fix: deposit → upsert → 'str'.get() → AttributeError
+                entry = library.deposit_from_run(run, w, {"track": "WD", "mode": "full"})
+                idx = json.loads((root / "index.json").read_text())
+                self.assertTrue(all(isinstance(e, dict) for e in idx["entries"]),
+                                "all index entries must be dicts after deposit")
+                self.assertEqual(entry["track"], "WD")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 if __name__ == "__main__":
     unittest.main()

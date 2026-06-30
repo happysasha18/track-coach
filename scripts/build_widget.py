@@ -3977,6 +3977,8 @@ def _record_history(out_path, verdict):
         return
     idx = json.loads(idx_path.read_text())
     for e in idx.get("runs", []) + ([idx["latest"]] if idx.get("latest") else []):
+        if not isinstance(e, dict):  # legacy index could hold a bare slug string — skip it
+            continue
         if Path(e.get("run_dir", "")).resolve() == out_dir:
             e["verdict"] = verdict or e.get("verdict", "")
             e["widget"] = widget

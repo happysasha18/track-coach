@@ -223,7 +223,12 @@ def load_index(root: Path) -> dict:
     if p.exists():
         try:
             d = json.loads(p.read_text())
-            d.setdefault("entries", [])
+            # Normalize: entries must be dicts. A stray string (legacy slug from an older
+            # run-init that appended a plain slug instead of a metadata dict) is coerced to a
+            # minimal dict so every downstream caller sees a uniform type. Using {"widget": s}
+            # preserves the original string rather than silently discarding it.
+            raw = d.get("entries", [])
+            d["entries"] = [e if isinstance(e, dict) else {"widget": str(e)} for e in raw]
             return d
         except ValueError:
             pass
@@ -236,8 +241,11 @@ def save_index(root: Path, idx: dict):
 
 
 def upsert(entries, entry):
-    """Replace an entry with the same widget filename, else append. Returns the list."""
-    out = [e for e in entries if e.get("widget") != entry["widget"]]
+    """Replace an entry with the same widget filename, else append. Returns the list.
+
+    Non-dict items (legacy string slugs from earlier builds that pre-date the full-metadata
+    format) are dropped: a bare str has no `widget` key and cannot represent a real entry."""
+    out = [e for e in entries if isinstance(e, dict) and e.get("widget") != entry["widget"]]
     out.append(entry)
     return out
 

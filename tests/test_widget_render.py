@@ -531,5 +531,32 @@ class ReadOrderTonalBeforeRefRead(unittest.TestCase):
                          "body.simple #webPanel{display:none} CSS rule must always be present")
 
 
+class RecordHistorySurvivesLegacyStrEntry(unittest.TestCase):
+    """build_widget._record_history must not crash when the per-project index.json holds a legacy
+    bare-string run entry (an old run-init wrote a slug string instead of a metadata dict — the real
+    Wobble case that logged `history update skipped: 'str' object has no attribute 'get'`). The dict
+    siblings (track_analyzer.py, run_dir.py) already guard; this proves build_widget does too."""
+
+    def test_legacy_str_entry_does_not_crash_and_dict_entry_updates(self):
+        base = Path(tempfile.mkdtemp(prefix="tc_hist_"))
+        run_dir = base / "Wobble" / "v0.6.2__2026-06-23_1028"
+        run_dir.mkdir(parents=True)
+        widget = run_dir / "analysis_widget.html"
+        widget.write_text("<html></html>")
+        (run_dir / "run_meta.json").write_text(json.dumps({"track": "Wobble"}))
+        # A legacy bare-string run entry sits next to a real dict entry — the Wobble case.
+        idx = {"runs": ["Total_Reboot_Wobble_Drift_v0.6.2", {"run_dir": str(run_dir)}],
+               "latest": {"run_dir": str(run_dir)}}
+        (base / "index.json").write_text(json.dumps(idx))
+        # Must not raise — the bug raised AttributeError: 'str' object has no attribute 'get'.
+        build_widget._record_history(widget, "Solid groove")
+        idx = json.loads((base / "index.json").read_text())
+        dict_entry = next(e for e in idx["runs"] if isinstance(e, dict))
+        self.assertEqual(dict_entry["verdict"], "Solid groove",
+                         "the matching dict run entry still gets its verdict written")
+        self.assertEqual(idx["runs"][0], "Total_Reboot_Wobble_Drift_v0.6.2",
+                         "the legacy string entry is left untouched, not crashed on")
+
+
 if __name__ == "__main__":
     unittest.main()
