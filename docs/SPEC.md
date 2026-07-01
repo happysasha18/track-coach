@@ -980,6 +980,73 @@ Through all of it the card still stands on its real finding and cites the same "
 changes emphasis and words, never the truth. A track with no mapping is untouched. `tags: D-INV-15 · D-INV-2
 · ⟨DECIDE D-11⟩ recommend off unless mapped`
 
+### D.6.1 The aim picker & the «toward X» panel — set the aim in the widget, get prioritized steps
+
+**You set the aim in the widget, from a dropdown (this resolves where the mapping is stored + edited).** The
+mapping is still always yours — the tool never assigns it (D-INV-4) — and you set it by picking a direction
+from a dropdown in the track's own widget ("aim this track at ⟨direction⟩"), not by editing a file or
+re-running. The choice persists client-side in `localStorage`, keyed **per track**, using the same mechanism
+and the same `file://` share-caution as the `tc_view` preference (INV-31): two widgets opened from `file://`
+must never read each other's aim, so the key carries the track's id. Clearing the dropdown ("no aim") returns
+the track to plain coaching, byte-for-byte as unmapped (D-INV-5). The dropdown offers only directions the
+track can actually be placed against — a direction missing a shared fingerprint axis is shown as unavailable,
+never a half-target (D-INV-9) — and it appears only on a full run, since reference is full-run-only (D-INV-20).
+The picker is the **same one surface** as the §D.10.1 up-to-three-nearest selector (which already chooses a
+direction "one at a time"), extended to persist the choice as the aim — not a second, competing direction
+control. It is **single-select**: you aim at one direction at a time and see its steps. This narrows §D.6's
+"mix all aimed directions at once" to the in-widget interaction — with one selected aim the §D.6 re-order key
+(strongest divergence across the aimed set, D-INV-17) simply has a single member; keeping several aims live at
+once (a multi-select that mixes) is deferred. ⟨DECIDE D-25⟩ whether the picker ever becomes multi-select to
+restore the mix-all model, or single-aim-at-a-time is the final interaction.
+
+**The «toward X» panel is a separate, default-collapsed list of prioritized steps toward the selected aim.**
+Distinct from the in-place re-flavour of §D.6 (which re-orders and re-words the existing cards where they sit),
+this is its own collapsible panel that answers one question: "to sound more like ⟨aim⟩, what do I do first?" It
+lists the track's own findings as an **ordered** sequence — first ⟨Y⟩, then ⟨Z⟩ — ranked by how much each
+would close the gap to the selected aim. It is one named surface, the **aim panel** (`#aimpanel`), referred to
+by that one name everywhere. `D-INV-31`
+
+**Placement is fixed (Alexander, exact).** The aim panel sits right after the «leans toward» centroid line and
+**under** the panel that describes the parameters — the order around there is: centroid line → parameters
+panel → aim panel. It is a `<details>`, **default collapsed**, and is never merged into the read/centroid
+panel.
+
+**Every step is a real finding, re-ordered toward the aim — never invented.** The panel adds no advice that
+isn't already a measured finding in the coaching (D-INV-2): it is the same evidence, selected and ordered. A
+finding enters the list only where moving it would actually reduce the gap to the aim on a facet the track
+**diverges** on; a facet you're already in-zone on is dropped (you're there). The ordering key is per-facet
+divergence toward the selected aim, largest gap first — the same key as §D.6's re-order lever (D-INV-17), so
+the in-place order and the panel order can never disagree. When nothing measured moves toward the aim, the
+panel says so ("already close on what we can measure") rather than inventing filler. Each step still cites its
+real "based-on" evidence, like every other card (D-INV-10). `D-INV-34`
+
+**Switching the aim needs no re-run — the build embeds the WHOLE re-flavoured presentation for every offerable
+direction.** Because the aim is chosen in the browser after the widget is built, the aim is a **client-side
+display selection**, not baked-in content — so everything it changes must be precomputed. The build therefore
+embeds, **per offerable direction, both**: the §D.6 in-place re-flavour (the re-ordered, re-worded, on-style
+card set) *and* the §D.6.1 aim-panel steps. Selecting a direction in the dropdown swaps the entire
+re-flavoured view — cards and panel together — to that direction's precomputed set, instantly and offline.
+"No aim" shows the **baseline**: the un-re-flavoured cards exactly as an unmapped track (D-INV-5). This is the
+one place the earlier "the mapping is content, not view state" framing (§D.7) is refined for the in-widget
+picker: the *set of offerable directions* is content (baked at build from the current epoch), but *which one
+you're currently aiming at* is a per-track display selection persisted in `localStorage` — keyed on the
+track's **slug** (not the run stamp), so the aim survives re-analysis and every version of the track shares it.
+Choosing an aim never triggers analysis, never re-runs the pipeline, and is **not** a D-INV-12 recompute input
+(recompute is keyed on the reference-group members + normalisation epoch, never on your current dropdown pick).
+If the epoch later changes (library or a reference group gains/loses members), the widget is rebuilt and every
+embedded per-direction set recomputes together and re-stamps (D-INV-14) — the client never silently shows a
+stale-epoch set. `D-INV-32`
+
+**Composition — the selection states, and no stranding.** The panel is defined for every aim the dropdown can
+hold: (a) **no aim** — collapsed and empty, coaching unchanged (D-INV-5); (b) **aim = a cloud direction** —
+the full ordered steps toward its centroid, in-zone facets omitted; (c) **aim = a reduced direction** — steps
+toward that single track, no in-zone / «своё» talk (reduced mode, D-INV-16), phrased track-vs-track; (d) **aim
+= an unplaceable direction** — not offered by the dropdown at all, so unreachable from the picker. The
+selected-aim state is **only live where the picker is visible**: a view without the picker, or a quick run,
+neither shows nor strands an aim — the same no-strand rule the switch and the player follow (D-INV-6). Full-run
+only (D-INV-20); the picker + panel live in Detailed alongside the plaque chip and the switch (§D.7), and
+nothing in Simple is absent from Detailed. `D-INV-33`
+
 ### D.7 How it fits the views, the switch, and the player
 
 - **The view ladder (quick ⊆ Simple ⊆ Detailed).** Reference surfaces obey it. **Quick shows none — and not
@@ -1019,7 +1086,10 @@ became reads, not numbers; no hardcoded thresholds, no regression anchors. Still
 structural holes:
 
 - ⟨DECIDE D-1⟩ how many members make a cloud (below it = reduced).
-- ⟨DECIDE D-2⟩ where the mapping is stored + how it's edited.
+- ⟨DECIDE D-2⟩ **SETTLED 2026-07-01 (Alexander):** the aim is set **in the widget, from a dropdown**, and
+  persists per-track in `localStorage` (same mechanism + file:// share-caution as `tc_view`, INV-31). Clearing
+  it returns the track to plain coaching. The dropdown drives the new **aim panel** of prioritized steps
+  (§D.6.1, D-INV-31/32/33/34). Not a file the user hand-edits; not a re-run.
 - ⟨DECIDE D-5⟩ ~~does style ever need a number for the map~~ → **DROPPED 2026-06-26**: the map is gone;
   style stays a label.
 - ⟨DECIDE D-8⟩ what triggers the web fetch.
