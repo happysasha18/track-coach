@@ -693,5 +693,501 @@ class PruneVersionsCommand(unittest.TestCase):
                         "prune-versions must NOT delete backing run dirs (H-INV-4)")
 
 
+# ─── 6. backup (H-INV-8) ────────────────────────────────────────────────────────
+
+class BackupCommand(unittest.TestCase):
+    """_cmd_backup: additive+atomic+stamp-collision+list. H-INV-8."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        os.environ.pop("TRACK_COACH_ROOT", None)
+
+    def _make_curated(self):
+        """Create library/ and explore/ under self.base."""
+        lib = self.base / "library" / "widgets"
+        lib.mkdir(parents=True)
+        (lib / "track_a.html").write_text("<html>widget</html>")
+        library.save_index(self.base / "library", {"entries": []})
+        explore = self.base / "explore"
+        explore.mkdir(parents=True)
+        (explore / "ref.json").write_text('{"ref": true}')
+
+    def test_backup_creates_snapshot_with_curated_tiers(self):
+        """backup copies library/ + explore/ into backups/<stamp>/. H-INV-8."""
+        self._make_curated()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, full=False, list=False)
+        library._cmd_backup(args)
+
+        backups_dir = self.base / "backups"
+        self.assertTrue(backups_dir.exists(), "backups/ must be created")
+        snaps = [d for d in backups_dir.iterdir() if d.is_dir()]
+        self.assertEqual(len(snaps), 1, "exactly one snapshot expected")
+        snap = snaps[0]
+        self.assertTrue((snap / "library").exists(), "snapshot must include library/")
+        self.assertTrue((snap / "explore").exists(), "snapshot must include explore/")
+        self.assertTrue((snap / ".backup_ok").exists(), "snapshot must be marked complete")
+
+    def test_backup_additive_does_not_remove_existing_files(self):
+        """Running backup twice adds a second snapshot; first is untouched. H-INV-8."""
+        self._make_curated()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, full=False, list=False)
+        library._cmd_backup(args)
+        import time
+        time.sleep(1.1)  # ensure different second in stamp
+        library._cmd_backup(args)
+
+        backups_dir = self.base / "backups"
+        snaps = [d for d in backups_dir.iterdir() if d.is_dir()]
+        self.assertEqual(len(snaps), 2, "two snapshots must exist after two backups")
+
+    def test_backup_stamp_collision_gets_suffix(self):
+        """On same-stamp collision, a -2 suffix is used. H-INV-8."""
+        self._make_curated()
+        # Pre-create a snapshot with today's second
+        from datetime import datetime as _dt
+        stamp = _dt.now().strftime("%Y-%m-%d_%H%M%S")
+        existing = self.base / "backups" / stamp
+        existing.mkdir(parents=True)
+        (existing / ".backup_ok").write_text("ok")
+
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, full=False, list=False)
+        library._cmd_backup(args)
+
+        backups_dir = self.base / "backups"
+        collision_snap = backups_dir / f"{stamp}-2"
+        self.assertTrue(collision_snap.exists(),
+                        f"collision stamp must get -2 suffix: {stamp}-2")
+
+    def test_backup_full_also_copies_projects(self):
+        """--full backup includes the projects/ tier. H-INV-8."""
+        self._make_curated()
+        projects = self.base / "projects" / "slug1" / "run1"
+        projects.mkdir(parents=True)
+        (projects / "result.json").write_text("{}")
+
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, full=True, list=False)
+        library._cmd_backup(args)
+
+        backups_dir = self.base / "backups"
+        snaps = [d for d in backups_dir.iterdir() if d.is_dir()]
+        self.assertEqual(len(snaps), 1)
+        snap = snaps[0]
+        self.assertTrue((snap / "projects").exists(),
+                        "--full snapshot must include projects/")
+
+    def test_backup_list_prints_snapshots(self):
+        """backup --list prints existing snapshots without raising. H-INV-8."""
+        self._make_curated()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        # Create a snapshot first
+        args = types.SimpleNamespace(base=None, full=False, list=False)
+        library._cmd_backup(args)
+        # Now list — must not raise
+        args_list = types.SimpleNamespace(base=None, full=False, list=True)
+        library._cmd_backup(args_list)
+
+    def test_backup_atomic_no_partial_on_failure(self):
+        """If copy fails mid-way, no partial _tmp_ dir remains (all-or-clean). H-INV-8."""
+        import unittest.mock as mock
+        self._make_curated()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+
+        with mock.patch("shutil.copytree", side_effect=OSError("forced failure")):
+            with self.assertRaises(library.BackupError):
+                library._do_backup(self.base)
+
+        backups_dir = self.base / "backups"
+        if backups_dir.exists():
+            tmp_dirs = [d for d in backups_dir.iterdir()
+                        if d.name.startswith("_tmp_")]
+            self.assertEqual(tmp_dirs, [],
+                             "no partial _tmp_ dirs must remain after a failed backup (H-INV-8)")
+
+
+# ─── 7. restore (H-INV-9) ────────────────────────────────────────────────────────
+
+class RestoreCommand(unittest.TestCase):
+    """_cmd_restore: dry-run default, round-trip, safety-backup, degraded-warning. H-INV-9."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        os.environ.pop("TRACK_COACH_ROOT", None)
+
+    def _make_state(self):
+        """Create library/ + explore/ under self.base."""
+        lib = self.base / "library" / "widgets"
+        lib.mkdir(parents=True)
+        (lib / "widget.html").write_text("<html>widget</html>")
+        library.save_index(self.base / "library", {"entries": [{"track": "T"}]})
+        explore = self.base / "explore"
+        explore.mkdir(parents=True)
+        (explore / "ref.json").write_text('{"ref": true}')
+
+    def test_restore_dry_run_by_default(self):
+        """Bare restore (no --apply) reports plan and writes nothing. H-INV-9 / G-INV-8."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        snap = library._do_backup(self.base)
+        stamp = snap.name
+
+        # Wipe current state — restore should NOT recreate it without --apply
+        shutil.rmtree(self.base / "library")
+
+        args = types.SimpleNamespace(base=None, stamp=stamp, apply=False, force=False)
+        library._cmd_restore(args)
+
+        self.assertFalse((self.base / "library").exists(),
+                         "dry-run restore must not write library/")
+
+    def test_restore_round_trip(self):
+        """backup then restore --apply --force reproduces original library/ + explore/. H-INV-9."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        snap = library._do_backup(self.base)
+        stamp = snap.name
+
+        shutil.rmtree(self.base / "library")
+        shutil.rmtree(self.base / "explore")
+
+        args = types.SimpleNamespace(base=None, stamp=stamp, apply=True, force=True)
+        library._cmd_restore(args)
+
+        self.assertTrue((self.base / "library").exists(), "library/ must be restored")
+        self.assertTrue((self.base / "explore").exists(), "explore/ must be restored")
+        idx = library.load_index(self.base / "library")
+        self.assertEqual(len(idx["entries"]), 1, "index must be restored with 1 entry")
+
+    def test_restore_latest_resolves_to_most_recent(self):
+        """restore stamp='latest' resolves to the most-recent valid snapshot. H-INV-9."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+
+        snap1 = library._do_backup(self.base)
+        import time
+        time.sleep(1.1)
+        snap2 = library._do_backup(self.base)
+
+        shutil.rmtree(self.base / "library")
+        shutil.rmtree(self.base / "explore")
+
+        args = types.SimpleNamespace(base=None, stamp="latest", apply=True, force=True)
+        library._cmd_restore(args)
+
+        self.assertTrue((self.base / "library").exists(),
+                         "restore latest must restore library/")
+
+    def test_restore_safety_backup_taken_before_overwrite(self):
+        """restore --apply auto-takes safety backup when current state would be overwritten. H-INV-9."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        snap = library._do_backup(self.base)
+        stamp = snap.name
+
+        # Current library/ still exists → restore would overwrite
+        initial_count = len([d for d in (self.base / "backups").iterdir()
+                              if d.is_dir() and (d / ".backup_ok").exists()])
+        import time
+        time.sleep(1.1)
+
+        args = types.SimpleNamespace(base=None, stamp=stamp, apply=True, force=False)
+        library._cmd_restore(args)
+
+        final_snaps = [d for d in (self.base / "backups").iterdir()
+                       if d.is_dir() and (d / ".backup_ok").exists()]
+        self.assertGreater(len(final_snaps), initial_count,
+                           "restore --apply must create a safety backup before overwriting (H-INV-9)")
+
+    def test_restore_force_skips_safety_backup(self):
+        """restore --force skips the auto safety backup. H-INV-9."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        snap = library._do_backup(self.base)
+        stamp = snap.name
+
+        initial_count = len([d for d in (self.base / "backups").iterdir()
+                              if d.is_dir() and (d / ".backup_ok").exists()])
+
+        args = types.SimpleNamespace(base=None, stamp=stamp, apply=True, force=True)
+        library._cmd_restore(args)
+
+        final_snaps = [d for d in (self.base / "backups").iterdir()
+                       if d.is_dir() and (d / ".backup_ok").exists()]
+        self.assertEqual(len(final_snaps), initial_count,
+                         "restore --force must NOT create an additional safety backup")
+
+    def test_restore_degraded_warning_for_non_full_snapshot(self):
+        """Non-full snapshot restore prints degraded-library WARNING. H-INV-9."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        snap = library._do_backup(self.base)  # non-full by default
+        stamp = snap.name
+
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            args = types.SimpleNamespace(base=None, stamp=stamp, apply=False, force=False)
+            library._cmd_restore(args)
+
+        output = buf.getvalue()
+        self.assertIn("WARNING", output,
+                      "non-full snapshot restore must print a degraded-library WARNING (H-INV-9)")
+
+
+# ─── 8. reset (revised) (H-INV-6) ───────────────────────────────────────────────
+
+class ResetRevisedCommand(unittest.TestCase):
+    """Revised _cmd_reset: wipes explore/ + loose files, keeps backups/, auto-safety-backup. H-INV-6."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        os.environ.pop("TRACK_COACH_ROOT", None)
+
+    def _make_state(self):
+        """Set up a typical working state with all tiers present."""
+        (self.base / "library" / "widgets").mkdir(parents=True)
+        library.save_index(self.base / "library", {"entries": []})
+        (self.base / "projects" / "slug1").mkdir(parents=True)
+        (self.base / "explore").mkdir(parents=True)
+        (self.base / "explore" / "ref.json").write_text("{}")
+        (self.base / "resume_autopilot.sh").write_text("#!/bin/bash\necho hi")
+
+    def test_reset_revised_wipes_explore_dir(self):
+        """Revised reset --yes-wipe-everything also removes explore/. H-INV-6."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                     no_backup=True, i_understand=True)
+        library._cmd_reset(args)
+        self.assertFalse((self.base / "explore").exists(),
+                         "revised reset must remove explore/")
+
+    def test_reset_keeps_backups_dir(self):
+        """reset keeps backups/ even when wiping all working tiers. H-INV-6."""
+        self._make_state()
+        backups = self.base / "backups" / "2026-01-01_120000"
+        backups.mkdir(parents=True)
+        (backups / ".backup_ok").write_text("ok")
+
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                     no_backup=True, i_understand=True)
+        library._cmd_reset(args)
+
+        self.assertTrue((self.base / "backups").exists(),
+                        "reset must keep backups/ dir (H-INV-6)")
+        self.assertTrue(backups.exists(),
+                        "existing backup snapshot must survive reset")
+
+    def test_reset_auto_creates_safety_backup(self):
+        """reset --yes-wipe-everything auto-takes safety backup (unless --no-backup). H-INV-6."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                     no_backup=False, i_understand=False)
+        library._cmd_reset(args)
+
+        backups_dir = self.base / "backups"
+        self.assertTrue(backups_dir.exists(), "backups/ must exist after auto-safety-backup")
+        snaps = [d for d in backups_dir.iterdir()
+                 if d.is_dir() and (d / ".backup_ok").exists()]
+        self.assertGreater(len(snaps), 0,
+                           "at least one valid snapshot must exist after reset's auto-safety-backup")
+
+    def test_reset_aborts_if_backup_fails(self):
+        """reset must abort if safety backup fails — library/ must remain untouched. H-INV-6."""
+        import unittest.mock as mock
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+
+        with mock.patch.object(library, "_do_backup",
+                               side_effect=library.BackupError("forced")):
+            with self.assertRaises(SystemExit):
+                args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                             no_backup=False, i_understand=False)
+                library._cmd_reset(args)
+
+        self.assertTrue((self.base / "library").exists(),
+                        "reset must not remove library/ if safety backup fails (H-INV-6)")
+
+    def test_reset_no_backup_no_snapshot_requires_i_understand(self):
+        """--no-backup + no existing snapshot → requires --i-understand; aborts without it. H-INV-6."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+
+        with self.assertRaises(SystemExit):
+            args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                         no_backup=True, i_understand=False)
+            library._cmd_reset(args)
+
+        self.assertTrue((self.base / "library").exists(),
+                        "reset must not wipe when --no-backup + no snapshot + no --i-understand")
+
+    def test_reset_no_backup_with_i_understand_wipes(self):
+        """--no-backup + no snapshot + --i-understand → proceeds with wipe. H-INV-6."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                     no_backup=True, i_understand=True)
+        library._cmd_reset(args)
+
+        self.assertFalse((self.base / "library").exists(),
+                         "--no-backup + --i-understand must wipe library/")
+        self.assertFalse((self.base / "explore").exists(),
+                         "--no-backup + --i-understand must wipe explore/")
+
+    def test_reset_no_backup_with_existing_snapshot_does_not_require_i_understand(self):
+        """--no-backup + existing snapshot → proceeds without --i-understand. H-INV-6."""
+        self._make_state()
+        snap = self.base / "backups" / "2026-01-01_120000"
+        snap.mkdir(parents=True)
+        (snap / ".backup_ok").write_text("ok")
+
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None, yes_wipe_everything=True,
+                                     no_backup=True, i_understand=False)
+        library._cmd_reset(args)
+
+        self.assertFalse((self.base / "library").exists(),
+                         "--no-backup + existing snapshot must wipe library/")
+
+
+# ─── 9. hard-reset (H-INV-10) ────────────────────────────────────────────────────
+
+class HardResetCommand(unittest.TestCase):
+    """_cmd_hard_reset: wipes everything incl. backups; double-confirm; dry-run default. H-INV-10."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        os.environ.pop("TRACK_COACH_ROOT", None)
+
+    def _make_state(self):
+        (self.base / "library").mkdir(parents=True)
+        (self.base / "projects").mkdir(parents=True)
+        snap = self.base / "backups" / "snap1"
+        snap.mkdir(parents=True)
+        (snap / ".backup_ok").write_text("ok")
+
+    def test_hard_reset_dry_run_by_default(self):
+        """Bare hard-reset (no flags) prints plan and removes nothing. H-INV-10."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None,
+                                     yes_wipe_everything=False,
+                                     including_backups=False)
+        library._cmd_hard_reset(args)
+
+        self.assertTrue((self.base / "library").exists(),
+                        "dry-run hard-reset must not remove library/")
+        self.assertTrue((self.base / "backups").exists(),
+                        "dry-run hard-reset must not remove backups/")
+
+    def test_hard_reset_requires_both_confirms(self):
+        """--yes-wipe-everything alone (without --including-backups) does not act. H-INV-10."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None,
+                                     yes_wipe_everything=True,
+                                     including_backups=False)
+        library._cmd_hard_reset(args)
+
+        self.assertTrue((self.base / "backups").exists(),
+                        "without --including-backups, hard-reset must not act")
+
+    def test_hard_reset_wipes_everything_incl_backups(self):
+        """With both confirms, hard-reset wipes all tiers including backups/. H-INV-10."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+        args = types.SimpleNamespace(base=None,
+                                     yes_wipe_everything=True,
+                                     including_backups=True)
+        library._cmd_hard_reset(args)
+
+        self.assertFalse((self.base / "library").exists(),
+                         "hard-reset must remove library/")
+        self.assertFalse((self.base / "backups").exists(),
+                         "hard-reset must remove backups/ (H-INV-10)")
+        self.assertFalse((self.base / "projects").exists(),
+                         "hard-reset must remove projects/")
+
+    def test_hard_reset_names_backups_in_dry_run(self):
+        """hard-reset dry-run output mentions that backups will be destroyed. H-INV-10."""
+        self._make_state()
+        os.environ["TRACK_COACH_ROOT"] = str(self.base)
+
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            args = types.SimpleNamespace(base=None,
+                                         yes_wipe_everything=False,
+                                         including_backups=False)
+            library._cmd_hard_reset(args)
+
+        output = buf.getvalue()
+        self.assertIn("backup", output.lower(),
+                      "hard-reset dry-run must mention backups in its output (H-INV-10)")
+
+
+# ─── 10. gc ignores backups/ (H-INV-8) ──────────────────────────────────────────
+
+class GcIgnoresBackups(unittest.TestCase):
+    """gc_plan must not scan or classify anything under backups/. H-INV-8."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        os.environ.pop("TRACK_COACH_ROOT", None)
+        os.environ.pop("TRACK_COACH_LIBRARY", None)
+
+    def test_gc_ignores_backups_dir(self):
+        """gc_plan scans only projects/; dirs under backups/ are never classified as orphans. H-INV-8."""
+        # Set up a backup snapshot containing run-like dirs (would look like orphans if gc scanned them)
+        snap = self.base / "backups" / "2026-01-01_120000"
+        (snap / "projects" / "slug1" / "run1").mkdir(parents=True)
+        (snap / ".backup_ok").write_text("ok")
+
+        # Real projects/ — empty (so gc has nothing to find there)
+        projects = self.base / "projects"
+        projects.mkdir(parents=True)
+
+        lib_root = self.base / "library"
+        lib_root.mkdir(parents=True)
+        library.save_index(lib_root, {"entries": []})
+
+        plan = library.gc_plan(projects, lib_root)
+
+        orphan_strs = [str(p) for p in plan["orphan"]]
+        for op in orphan_strs:
+            self.assertNotIn("backups", op,
+                             f"gc must not classify anything under backups/ as orphan: {op}")
+        # And there should be zero orphans (projects/ has no runs)
+        self.assertEqual(plan["orphan"], [],
+                         "gc must return no orphans when projects/ is empty")
+
+
 if __name__ == "__main__":
     unittest.main()

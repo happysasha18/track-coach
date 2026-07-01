@@ -406,6 +406,30 @@ All owned by `tests/test_cleanup.py`.
 | H-INV-4 (apply) | `prune-versions --keep 1 --apply`: only newest widget + index entry remain | `test_cleanup::PruneVersionsCommand::test_apply_keeps_only_newest` |
 | H-INV-4 (no default) | `prune-versions` with no --keep shows current versions, makes no changes | `test_cleanup::PruneVersionsCommand::test_no_keep_flag_does_nothing` |
 | H-INV-4 / ⟨H-2⟩ | `prune-versions --apply` does NOT delete backing run dirs | `test_cleanup::PruneVersionsCommand::test_apply_does_not_delete_run_dirs` |
+| H-INV-6 (revised — explore) | Revised `reset --yes-wipe-everything` also removes `explore/` (references tier) | `test_cleanup::ResetRevisedCommand::test_reset_revised_wipes_explore_dir` |
+| H-INV-6 (revised — keeps backups) | `reset` keeps `backups/` even when wiping all working tiers | `test_cleanup::ResetRevisedCommand::test_reset_keeps_backups_dir` |
+| H-INV-6 (auto-backup) | `reset --yes-wipe-everything` auto-takes safety backup before wiping (unless `--no-backup`) | `test_cleanup::ResetRevisedCommand::test_reset_auto_creates_safety_backup` |
+| H-INV-6 (abort-on-fail) | If safety backup fails, `reset` aborts and removes nothing | `test_cleanup::ResetRevisedCommand::test_reset_aborts_if_backup_fails` |
+| H-INV-6 (--no-backup guard) | `--no-backup` + no existing snapshot requires `--i-understand`; aborts without it | `test_cleanup::ResetRevisedCommand::test_reset_no_backup_no_snapshot_requires_i_understand` |
+| H-INV-6 (--no-backup + --i-understand) | `--no-backup --i-understand` proceeds with wipe when no snapshot exists | `test_cleanup::ResetRevisedCommand::test_reset_no_backup_with_i_understand_wipes` |
+| H-INV-6 (--no-backup + existing snap) | `--no-backup` + existing snapshot proceeds without `--i-understand` | `test_cleanup::ResetRevisedCommand::test_reset_no_backup_with_existing_snapshot_does_not_require_i_understand` |
+| H-INV-8 (creates snapshot) | `backup` copies `library/` + `explore/` into `backups/<stamp>/` and marks it complete | `test_cleanup::BackupCommand::test_backup_creates_snapshot_with_curated_tiers` |
+| H-INV-8 (additive) | Running `backup` twice adds a second snapshot; first is untouched | `test_cleanup::BackupCommand::test_backup_additive_does_not_remove_existing_files` |
+| H-INV-8 (stamp collision) | Same-second stamp collision produces `<stamp>-2` suffix | `test_cleanup::BackupCommand::test_backup_stamp_collision_gets_suffix` |
+| H-INV-8 (--full) | `backup --full` adds `projects/` tier to the snapshot | `test_cleanup::BackupCommand::test_backup_full_also_copies_projects` |
+| H-INV-8 (--list) | `backup --list` prints existing snapshots | `test_cleanup::BackupCommand::test_backup_list_prints_snapshots` |
+| H-INV-8 (atomic) | If copy fails mid-way, no partial `_tmp_` dir remains | `test_cleanup::BackupCommand::test_backup_atomic_no_partial_on_failure` |
+| H-INV-8 (gc ignores backups) | `gc_plan` scans only `projects/`; dirs under `backups/` are never classified as orphans | `test_cleanup::GcIgnoresBackups::test_gc_ignores_backups_dir` |
+| H-INV-9 (dry-run default) | Bare `restore` reports plan and writes nothing (G-INV-8) | `test_cleanup::RestoreCommand::test_restore_dry_run_by_default` |
+| H-INV-9 (round-trip) | `backup` then `restore --apply` reproduces original `library/` + `explore/` | `test_cleanup::RestoreCommand::test_restore_round_trip` |
+| H-INV-9 (latest) | `restore latest` resolves to the most-recent valid snapshot | `test_cleanup::RestoreCommand::test_restore_latest_resolves_to_most_recent` |
+| H-INV-9 (safety-backup) | `restore --apply` auto-takes safety backup before overwriting current state | `test_cleanup::RestoreCommand::test_restore_safety_backup_taken_before_overwrite` |
+| H-INV-9 (--force) | `restore --force` skips the auto safety backup | `test_cleanup::RestoreCommand::test_restore_force_skips_safety_backup` |
+| H-INV-9 (degraded warning) | Non-full snapshot restore prints degraded-library warning (previews silent / opens fallback / no compare) | `test_cleanup::RestoreCommand::test_restore_degraded_warning_for_non_full_snapshot` |
+| H-INV-10 (dry-run default) | Bare `hard-reset` lists what would be removed (including backups) and removes nothing | `test_cleanup::HardResetCommand::test_hard_reset_dry_run_by_default` |
+| H-INV-10 (single confirm) | `hard-reset --yes-wipe-everything` alone (without `--including-backups`) does not act | `test_cleanup::HardResetCommand::test_hard_reset_requires_both_confirms` |
+| H-INV-10 (double confirm) | `hard-reset --yes-wipe-everything --including-backups` wipes all tiers including `backups/` | `test_cleanup::HardResetCommand::test_hard_reset_wipes_everything_incl_backups` |
+| H-INV-10 (names backups) | `hard-reset` dry-run output mentions backups will be destroyed | `test_cleanup::HardResetCommand::test_hard_reset_names_backups_in_dry_run` |
 
 ## §E-s31 — Bug fixes (build item E, 2026-06-30)
 

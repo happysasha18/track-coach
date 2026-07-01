@@ -1818,7 +1818,16 @@ handles. `tags: §G`
 What exists today (real, shipped): `analyze` (measure → result JSON + stems), `build` (rebuild a run's widget +
 auto-deposit), `migrate` (consolidate pre-1.0 runs under $HOME, §G G-INV-16), and on the library: `list`,
 `deposit`, `catalog`, `clean`. The 1.0 additions below fill the gaps Alexander named: real remove, scratch
-`gc`, explicit version pruning, an Ableton-tail sweep, and a full `reset`.
+`gc`, explicit version pruning, an Ableton-tail sweep, a `backup`/`restore` safety net, and the two-rung
+`reset` / `hard reset` wipe.
+
+**The data tiers, named once.** Everything under the output root falls in one of four tiers, and the cleanup
+verbs are defined against them: the **keep** tier (`library/` — catalogued deposits, §G G-INV-5); the
+**scratch** tier (`projects/` — run dirs, stems, previews, indexes; regenerable by re-analysis, §G G.0);
+the **references** tier (`explore/` — the reference corpus the user accumulates for §D); and the **backups**
+tier (`backups/<stamp>/` — snapshots made by `backup`). A few **loose** files may also sit at the root (a
+resume script, config). "Curated" work = keep + references; "scratch" = the regenerable tier. The cleanup
+ladder (H-INV-11) is defined entirely in terms of these tiers.
 
 ### H.1 Listing & removing — managing what's in the library
 
@@ -1832,7 +1841,7 @@ whole track takes all its versions. The library index and catalog are rewritten 
 G-INV-11). Auto-deposit stays the default ingest (H-INV-7) — `remove` is the counterpart for taking things
 out. `H-INV-2`
 
-### H.2 Cleanup — gc, version pruning, Ableton-sweep, reset
+### H.2 Cleanup — gc, version pruning, Ableton-sweep, backup/restore, reset & hard reset
 
 **`gc` prunes scratch, never the keep-half.** It removes orphaned/old run dirs, separated stems, and superseded
 intermediate output under the output root — keeping every deposited member's referenced run and the
@@ -1851,15 +1860,70 @@ tails (safe to delete) from *folders that still contain real runs* (listed, neve
 everything in dry-run before any removal. It operates outside the output root by design, so it requires an
 explicit target/confirm and never touches non-track-coach files (the user's audio/`.als`). `H-INV-5`
 
-**`reset` is the all-the-way wipe — explicit, confirmed, recoverable by re-analysis.** A full `reset` clears
-everything under `~/.track-coach/` (analyses, stems, the library). It demands an explicit confirm (not just
-`--apply`), states plainly that source `.als`/audio are untouched and the analyses rebuild by re-running, and
-reports exactly what it removed. It is the dogfood path Alexander uses to verify cleanup end-to-end before
-re-accumulating versions. `H-INV-6`
+**`backup` snapshots the curated work — additive, never destructive.** A `backup` copies the **keep** and
+**references** tiers (`library/` + `explore/`) plus any config into a timestamped `backups/<stamp>/` snapshot,
+and never deletes or moves anything — running it again only adds another snapshot. Like an Ableton project
+backup it captures the *curated* work, not the regenerable renders: the `projects/` scratch (stems, previews,
+run JSONs) is excluded by default because re-analysis rebuilds it; `--full` adds the scratch tier for a
+complete disk image. `backup --list` shows existing snapshots with their dates and sizes. A backup is
+**all-or-clean-report** (like G-INV-11): it either completes and marks the snapshot good, or it discards the
+partial — a half-copied snapshot is never left for `restore`/`reset` to trust. Stamps are unique to the second;
+a `backup` never writes into an existing snapshot dir — on a same-stamp collision it suffixes (`<stamp>-2`).
+Snapshots live under the output root but are neither orphaned run dirs nor superseded output, so no cleanup
+verb descends into `backups/` — `gc` scans only `projects/`, and only `hard reset` removes snapshots (so a
+`--full` snapshot's embedded run-dir copies are never seen by `gc` as prunable orphans). `H-INV-8`
+
+**`restore` is backup's inverse, and never clobbers silently.** `restore <stamp|latest>` brings a chosen
+snapshot's `library/` + `explore/` back into place. It is dry-run by default (G-INV-8): a bare `restore`
+reports exactly what it would overwrite or add, and writes nothing until `--apply`. When restoring would
+overwrite existing keep/reference data it says so and — unless `--force` — first takes a safety `backup` of the
+current state, so a restore is itself undoable. Round-trip holds: restoring a snapshot reproduces exactly the
+tiers `backup` captured (H-INV-8). Because a non-`--full` snapshot omits the scratch tier, a restore names the
+same loss G-INV-10 does: the restored library members' `src_run_dir` point into a `projects/` that wasn't
+captured, so previews go silent, opens fall back to the library HTML copy (G-INV-14), and comparability (§D/§F)
+is dead until re-analysis — a `--full` snapshot restores those too. A restored index is honoured as-stored
+(G-INV-6): if the disk layout moved since the snapshot (e.g. a `migrate` ran after it), the pointers may need a
+re-`migrate` or re-analysis, with the G-INV-14 fallback keeping opens alive meanwhile. `H-INV-9`
+
+**`reset` wipes the working state but keeps the safety net.** A `reset` clears the **keep**, **scratch**, and
+**references** tiers (`library/` + `projects/` + `explore/`) and the known loose track-coach files at the root
+(the resume script, config) — everything the user actively works with — but **keeps `backups/`**, and
+**auto-creates a safety backup first** (unless `--no-backup`). It removes nothing until that safety backup has
+completed successfully (H-INV-8): a failed or partial backup aborts the wipe, so `reset` can never destroy the
+curated work without a good snapshot behind it. What the safety backup recovers is the **curated** work
+(keep + references) via `restore`; the scratch tier is not snapshotted and rebuilds by re-analysis — so
+"recoverable" means the library and references come back, not that stems/previews are restored (they re-render).
+`reset` demands an explicit confirm (`--yes-wipe-everything`, not merely `--apply`), states plainly that source
+`.als`/audio are untouched and the analyses rebuild by re-running, and reports exactly what it removed and
+reclaimed. It stays all-or-clean-report (G-INV-11). When `--no-backup` is combined with no existing snapshot
+covering the curated tiers, `reset` warns that the curated work will be unrecoverable and requires the extra
+acknowledgement (as `hard reset` does), since that combination is as irreversible as a `hard reset` for the
+curated data. It is the dogfood path Alexander uses to verify cleanup end-to-end before re-accumulating
+versions. `H-INV-6`
+
+**`hard reset` is the only irreversible verb — it removes everything, backups included.** Where `reset` keeps
+the safety net, `hard reset` clears the *entire* output root — keep, scratch, references, **and** `backups/` —
+leaving a bare `~/.track-coach/`. It makes no safety backup (there would be nowhere recoverable to put it) and
+so demands the strongest confirm: both `--yes-wipe-everything` and an explicit `--including-backups`
+(equivalently `reset --hard`), and it names that the backups themselves will be destroyed before acting. Like
+every rung it is dry-run by default: a bare `hard reset` (no flags) lists everything it would remove, backups
+included, before either confirm flag is given. After a `hard reset`, nothing on disk recovers the prior state
+except re-analysing the source audio/`.als`. This
+settles the earlier open 'truly-full flag' question: the truly-full wipe is `hard reset`. `H-INV-10`
+
+**The cleanup verbs form one reversibility ladder; only the last rung is irreversible.** Read from safe to
+final: `backup` (additive) → `gc` / `prune-versions` / `remove` (prune scratch or a named member; the keep
+tier and best runs survive, §G G-INV-9/10/15) → `reset` (wipe the working state, but a fresh safety backup +
+`backups/` remain, so `restore` recovers it) → `hard reset` (remove everything, backups included). Every rung
+above `hard reset` is recoverable — the data is either regenerable scratch or sits in a snapshot; `hard reset`
+is the single point of no return, which is why it alone carries the double confirm. All rungs obey §G's rails:
+dry-run by default (G-INV-8), never outside the configured output root (G-INV-7), all-or-clean-report
+(G-INV-11). `H-INV-11`
 
 **Ingest stays automatic; the user manages the exits.** A successful `build` auto-deposits (§G G-INV-17); the
-user never has to remember to save. The management verbs (`remove`, `gc`, `prune-versions`, `reset`) are the
-deliberate, dry-run-guarded ways to take things back out. `H-INV-7`
+user never has to remember to save. The management verbs (`backup`, `restore`, `remove`, `gc`, `prune-versions`,
+`reset`, `hard reset`) are the deliberate, dry-run-guarded ways to snapshot, recover, or take things back out.
+`H-INV-7`
 
 ### H.3 Open
 
@@ -1867,6 +1931,9 @@ deliberate, dry-run-guarded ways to take things back out. `H-INV-7`
   the user names N).
 - ⟨DECIDE H-2⟩ does `remove` of a version also delete its run dir by default, or only the library entry (run dir
   left for gc)? Lean: only the library entry; gc reclaims the run dir later.
+- ⟨DECIDE H-3⟩ RESOLVED (Alexander, 2026-07-01) — the 'truly-full' wipe is a distinct `hard reset` that also
+  removes `backups/` (H-INV-10); plain `reset` keeps the safety net (H-INV-6). Backups capture the curated tiers
+  only (keep + references), scratch excluded unless `--full` (H-INV-8).
 
 ## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse

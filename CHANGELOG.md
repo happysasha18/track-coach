@@ -5,6 +5,21 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.8] — 2026-07-01
+
+### Added
+- **`backup` command** — snapshots your curated work (`library/` + `explore/`) into a timestamped `~/.track-coach/backups/<stamp>/`. Additive (never removes anything); atomic (a failed backup cleans up its partial). `--full` adds the scratch tier (`projects/`). `--list` shows existing snapshots. Every safety backup taken by `reset`/`restore` uses this same mechanism.
+- **`restore` command** — brings a snapshot's `library/` + `explore/` back into place. Dry-run by default; `--apply` to act. Unless `--force`, takes a safety backup of the current state first (so the restore is itself undoable). Prints a clear warning when restoring a non-full snapshot (previews go silent, opens fall back to the HTML copy, reference-compare is dead until re-analysis).
+- **`hard-reset` subcommand** — wipes the entire output root including `backups/`. Dry-run by default; requires BOTH `--yes-wipe-everything` AND `--including-backups` to act. The only irreversible verb — the dry-run always names the backups that will be destroyed.
+
+### Changed
+- **`reset` now wipes `explore/` (references tier) and known loose root files** (`resume_autopilot.sh`, `config.json`) in addition to `library/` and `projects/`. Closes the gap where `explore/` was left behind (0.9.7 behaviour).
+- **`reset` auto-takes a safety backup before wiping** (unless `--no-backup`). If the backup fails, `reset` aborts — it can never destroy curated work without a good snapshot behind it.
+- **`reset --no-backup` with no existing snapshot** now requires `--i-understand` (same irreversibility as `hard-reset` for the curated data).
+
+### Documentation
+- SKILL.md now documents all cleanup verbs (`backup`, `restore`, `gc`, `prune-versions`, `remove`, `ableton-sweep`, `reset`, `hard-reset`) with usage examples and the full reversibility ladder. Closes the owed-docs gap from 0.9.7.
+
 ## [0.9.7] — 2026-07-01
 
 ### Added

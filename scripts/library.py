@@ -63,6 +63,11 @@ class DepositError(ValueError):
     dir never leaves a partial widget copy or a junk index entry behind."""
 
 
+class BackupError(RuntimeError):
+    """A backup failed or was partial. Raised by _do_backup() so callers can abort safely.
+    H-INV-8: a failed backup leaves no partial snapshot."""
+
+
 _STAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{4}")  # the dated run-folder shape, e.g. 2026-06-18_0748
 
 
@@ -728,36 +733,318 @@ def _regen_catalog():
         print(f"  (catalog regen skipped: {exc})", file=sys.stderr)
 
 
+# ── backup / restore helpers (H-INV-8) ────────────────────────────────────────────────────
+
+# Tiers wiped by reset (keep + scratch + references), and known loose root files.
+_RESET_TIERS = ("library", "projects", "explore")
+_RESET_LOOSE_FILES = ("resume_autopilot.sh", "config.json")
+
+
+def _backup_stamp(base: Path) -> str:
+    """Return a unique snapshot stamp for the given output root (unique to the second).
+    On collision, appends -2, -3, … H-INV-8.
+    """
+    backups_dir = base / "backups"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    if not (backups_dir / stamp).exists():
+        return stamp
+    for n in range(2, 10000):
+        candidate = f"{stamp}-{n}"
+        if not (backups_dir / candidate).exists():
+            return candidate
+    raise RuntimeError("backup: could not generate unique stamp after 10000 tries")  # pragma: no cover
+
+
+def _has_valid_backup(base: Path) -> bool:
+    """True if at least one complete backup snapshot exists under base/backups/. H-INV-6."""
+    backups_dir = base / "backups"
+    if not backups_dir.exists():
+        return False
+    try:
+        for snap in backups_dir.iterdir():
+            if snap.is_dir() and (snap / ".backup_ok").exists():
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def _do_backup(base: Path, full: bool = False) -> Path:
+    """Copy curated tiers (library/ + explore/ [+ config]) into a fresh backups/<stamp>/ snapshot.
+
+    Atomic: copies into a _tmp_<stamp>/ dir, then renames into place; any failure cleans up the
+    temp dir and raises BackupError (no partial snapshot ever remains). H-INV-8.
+
+    Returns the Path of the created snapshot on success.
+    """
+    sources = []
+    for tier in ("library", "explore"):
+        d = base / tier
+        if d.exists():
+            sources.append(d)
+    config_f = base / "config.json"
+    if config_f.exists():
+        sources.append(config_f)
+    if full:
+        d = base / "projects"
+        if d.exists():
+            sources.append(d)
+
+    stamp = _backup_stamp(base)
+    backups_dir = base / "backups"
+    dest = backups_dir / stamp
+    tmp_dest = backups_dir / f"_tmp_{stamp}"
+
+    backups_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        tmp_dest.mkdir(parents=True, exist_ok=True)
+        for src in sources:
+            if src.is_dir():
+                shutil.copytree(src, tmp_dest / src.name)
+            else:
+                shutil.copy2(src, tmp_dest / src.name)
+        (tmp_dest / ".backup_ok").write_text("ok")
+        tmp_dest.rename(dest)
+    except Exception as exc:
+        if tmp_dest.exists():
+            shutil.rmtree(tmp_dest, ignore_errors=True)
+        raise BackupError(f"backup failed: {exc}") from exc
+
+    return dest
+
+
+# ── backup command (H-INV-8) ──────────────────────────────────────────────────────────────
+
+def _cmd_backup(args):
+    """Snapshot curated tiers into backups/<stamp>/. Additive; never destructive. H-INV-8."""
+    base = Path(args.base).expanduser().resolve() if getattr(args, "base", None) else output_root()
+
+    if getattr(args, "list", False):
+        backups_dir = base / "backups"
+        if not backups_dir.exists():
+            print("backup: no snapshots yet.")
+            return
+        snaps = sorted(
+            [d for d in backups_dir.iterdir()
+             if d.is_dir() and (d / ".backup_ok").exists()]
+        )
+        if not snaps:
+            print("backup: no complete snapshots yet.")
+            return
+        print(f"backup: {len(snaps)} snapshot(s) under {backups_dir}:")
+        for s in snaps:
+            print(f"  {s.name}  ({_fmt_size(_dir_size(s))})")
+        return
+
+    full = getattr(args, "full", False)
+    try:
+        dest = _do_backup(base, full=full)
+        label = " (full)" if full else ""
+        print(f"backup{label}: snapshot created at {dest}  ({_fmt_size(_dir_size(dest))})")
+    except BackupError as exc:
+        sys.exit(str(exc))
+
+
+# ── restore command (H-INV-9) ─────────────────────────────────────────────────────────────
+
+def _cmd_restore(args):
+    """Restore a snapshot's library/ + explore/ back to the output root. H-INV-9.
+
+    Dry-run by default (G-INV-8); --apply to act. Takes a safety backup of current state
+    unless --force.
+    """
+    base = Path(args.base).expanduser().resolve() if getattr(args, "base", None) else output_root()
+    backups_dir = base / "backups"
+
+    if not backups_dir.exists():
+        sys.exit("restore: no backups/ dir found. Nothing to restore.")
+
+    stamp = getattr(args, "stamp", "latest") or "latest"
+    if stamp == "latest":
+        snaps = sorted(
+            [s for s in backups_dir.iterdir()
+             if s.is_dir() and (s / ".backup_ok").exists()]
+        )
+        if not snaps:
+            sys.exit("restore: no valid snapshots found.")
+        snap_dir = snaps[-1]
+    else:
+        snap_dir = backups_dir / stamp
+        if not snap_dir.exists():
+            sys.exit(f"restore: snapshot {stamp!r} not found under {backups_dir}.")
+        if not (snap_dir / ".backup_ok").exists():
+            sys.exit(f"restore: snapshot {stamp!r} is incomplete (may be partial).")
+
+    # Determine restore plan
+    is_full = (snap_dir / "projects").exists()
+    tiers_to_restore = [src for src in (snap_dir / "library", snap_dir / "explore")
+                        if src.exists()]
+
+    if not tiers_to_restore:
+        print(f"restore: snapshot {snap_dir.name} contains no curated tiers to restore.")
+        return
+
+    # Describe what would happen
+    overwritten = [base / src.name for src in tiers_to_restore if (base / src.name).exists()]
+    added = [base / src.name for src in tiers_to_restore if not (base / src.name).exists()]
+
+    print(f"restore: snapshot {snap_dir.name}")
+    for d in overwritten:
+        print(f"  overwrite: {d}")
+    for d in added:
+        print(f"  add: {d}")
+
+    if not is_full:
+        print("  WARNING: this is a non-full snapshot — previews will go silent, opens fall back "
+              "to the library HTML copy, and comparability is dead until re-analysis (H-INV-9).")
+
+    apply_ = getattr(args, "apply", False)
+    force_ = getattr(args, "force", False)
+
+    if not apply_:
+        print("(dry-run — pass --apply to restore)")
+        return
+
+    # Safety backup of current state before overwriting, unless --force
+    if overwritten and not force_:
+        print("  taking safety backup of current state before overwriting...")
+        try:
+            safety = _do_backup(base)
+            print(f"  safety backup: {safety}")
+        except BackupError as exc:
+            sys.exit(f"restore: safety backup failed — {exc}. Nothing restored.")
+
+    # Perform the restore (G-INV-7: only under the configured root, which snap_dir is)
+    for src in tiers_to_restore:
+        dest = base / src.name
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+
+    print(f"restore: done — {snap_dir.name} → {base}")
+
+
 # ── reset (H-INV-6) ──────────────────────────────────────────────────────────────────────
 
 def _cmd_reset(args):
-    """Full wipe of everything under the output root. Dry-run unless --yes-wipe-everything."""
-    base = Path(args.base).expanduser().resolve() if args.base else output_root()
-    projects = base / "projects"
-    library_dir = base / "library"
+    """Wipe the working state (keep + scratch + references + loose files). Keeps backups/.
 
-    targets = [(d, _dir_size(d)) for d in (projects, library_dir) if d.exists()]
-    total = sum(sz for _, sz in targets)
+    Auto-creates a safety backup first (unless --no-backup). Aborts if safety backup fails
+    (H-INV-8). Dry-run unless --yes-wipe-everything. H-INV-6.
+    """
+    base = Path(args.base).expanduser().resolve() if getattr(args, "base", None) else output_root()
+
+    tier_dirs = [base / t for t in _RESET_TIERS if (base / t).exists()]
+    loose_files = [base / f for f in _RESET_LOOSE_FILES if (base / f).exists()]
+    targets = tier_dirs + loose_files
 
     if not targets:
         print(f"reset: nothing under {base} — already clean.")
         return
 
+    total = sum(_dir_size(d) if d.is_dir() else d.stat().st_size for d in targets)
+
     print(f"reset would remove under {base}:")
-    for d, sz in targets:
+    for d in targets:
+        sz = _dir_size(d) if d.is_dir() else d.stat().st_size
         print(f"  {d}  ({_fmt_size(sz)})")
     print(f"  Total: {_fmt_size(total)}")
     print("  Source .als/audio files are UNTOUCHED. Re-analyse to rebuild.")
+    print("  backups/ is KEPT — use `restore` to recover curated work.")
 
-    if not args.yes_wipe_everything:
+    if not getattr(args, "yes_wipe_everything", False):
         print("(dry-run — pass --yes-wipe-everything to actually wipe)")
         return
 
+    no_backup = getattr(args, "no_backup", False)
+    i_understand = getattr(args, "i_understand", False)
+
+    if not no_backup:
+        # Auto-safety backup first — abort the entire reset if it fails (H-INV-6)
+        print("  creating safety backup before wiping...")
+        try:
+            safety_snap = _do_backup(base)
+            print(f"  safety backup: {safety_snap}")
+        except BackupError as exc:
+            sys.exit(f"reset: safety backup FAILED — {exc}. Nothing removed (H-INV-6).")
+    else:
+        # --no-backup: require --i-understand when there is no existing snapshot (H-INV-6)
+        if not _has_valid_backup(base) and not i_understand:
+            sys.exit(
+                "reset --no-backup: no existing snapshot covers the curated work.\n"
+                "This wipe is as irreversible as hard-reset for your library + references.\n"
+                "Pass --i-understand to proceed anyway."
+            )
+        print("  (--no-backup: skipping safety backup)")
+
+    # G-INV-7: paranoid root-boundary check before any deletion
     removed = []
-    for d, _ in targets:
-        shutil.rmtree(d)
+    for d in targets:
+        try:
+            d.relative_to(base)
+        except ValueError:
+            sys.exit(f"reset: refusing to delete {d} — outside output root {base}")
+        if d.is_dir():
+            shutil.rmtree(d)
+        else:
+            d.unlink()
         removed.append(d)
+
+    total_removed = sum(_dir_size(d) if d.exists() else 0 for d in removed)
     print(f"reset: removed {[str(d) for d in removed]}")
+
+
+# ── hard-reset (H-INV-10) ────────────────────────────────────────────────────────────────
+
+def _cmd_hard_reset(args):
+    """Wipe the ENTIRE output root including backups/. Dry-run by default.
+
+    Requires BOTH --yes-wipe-everything AND --including-backups to act.
+    No safety backup (there is nowhere to put one). H-INV-10.
+    """
+    base = Path(args.base).expanduser().resolve() if getattr(args, "base", None) else output_root()
+
+    if not base.exists():
+        print(f"hard-reset: {base} does not exist — nothing to do.")
+        return
+
+    try:
+        contents = sorted(base.iterdir())
+    except OSError:
+        contents = []
+
+    if not contents:
+        print(f"hard-reset: {base} is already empty.")
+        return
+
+    total = sum(_dir_size(d) if d.is_dir() else d.stat().st_size for d in contents)
+
+    print(f"hard-reset would remove EVERYTHING under {base}:")
+    for d in contents:
+        sz = _dir_size(d) if d.is_dir() else d.stat().st_size
+        print(f"  {d}  ({_fmt_size(sz)})")
+    print(f"  Total: {_fmt_size(total)}")
+    print("  THIS INCLUDES ALL BACKUPS — there is no recovery after this.")
+
+    yes_wipe = getattr(args, "yes_wipe_everything", False)
+    incl_backups = getattr(args, "including_backups", False)
+
+    if not yes_wipe or not incl_backups:
+        print("(dry-run — pass BOTH --yes-wipe-everything AND --including-backups to actually wipe)")
+        return
+
+    # G-INV-7: paranoid root-boundary check
+    for d in contents:
+        try:
+            d.relative_to(base)
+        except ValueError:
+            sys.exit(f"hard-reset: refusing to delete {d} — outside output root {base}")
+        if d.is_dir():
+            shutil.rmtree(d)
+        else:
+            d.unlink()
+
+    print(f"hard-reset: output root {base} cleared — all data destroyed including backups.")
 
 
 # ── gc (H-INV-3) + Ableton-tail mode (H-INV-5) ───────────────────────────────────────────
@@ -968,11 +1255,47 @@ def main():
     c.add_argument("--dry-run", action="store_true", help="preview only")
     c.set_defaults(func=_cmd_clean)
     # reset (H-INV-6)
-    rst = sub.add_parser("reset", help="wipe everything under the output root (dry-run by default)")
+    # backup (H-INV-8)
+    bk = sub.add_parser("backup",
+                         help="snapshot curated tiers (library/ + explore/) — additive, never destructive")
+    bk.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")
+    bk.add_argument("--full", action="store_true",
+                    help="also include projects/ scratch tier (full disk image)")
+    bk.add_argument("--list", action="store_true", dest="list",
+                    help="list existing snapshots with dates and sizes")
+    bk.set_defaults(func=_cmd_backup)
+    # restore (H-INV-9)
+    rs = sub.add_parser("restore",
+                         help="restore a snapshot's library/ + explore/ (dry-run by default)")
+    rs.add_argument("stamp", nargs="?", default="latest",
+                    help="snapshot stamp to restore, or 'latest' (default: latest)")
+    rs.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")
+    rs.add_argument("--apply", action="store_true",
+                    help="actually restore (dry-run without this flag)")
+    rs.add_argument("--force", action="store_true",
+                    help="skip safety backup before overwriting current state")
+    rs.set_defaults(func=_cmd_restore)
+    # reset (H-INV-6) — revised: also wipes explore/ + loose files; auto-backup first
+    rst = sub.add_parser("reset",
+                          help="wipe working state (library/+projects/+explore/) keeping backups/ (dry-run by default)")
     rst.add_argument("--base", default=None, help="output root to wipe (default: ~/.track-coach)")
     rst.add_argument("--yes-wipe-everything", action="store_true", dest="yes_wipe_everything",
                      help="actually wipe — required; a bare reset is always a dry-run")
+    rst.add_argument("--no-backup", action="store_true", dest="no_backup",
+                     help="skip auto-safety backup (requires --i-understand when no snapshot exists)")
+    rst.add_argument("--i-understand", action="store_true", dest="i_understand",
+                     help="acknowledge unrecoverable wipe when --no-backup and no snapshot exists")
     rst.set_defaults(func=_cmd_reset)
+    # hard-reset (H-INV-10)
+    hr = sub.add_parser("hard-reset",
+                         help="wipe ENTIRE output root including backups/ (dry-run by default; "
+                              "requires BOTH --yes-wipe-everything AND --including-backups)")
+    hr.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")
+    hr.add_argument("--yes-wipe-everything", action="store_true", dest="yes_wipe_everything",
+                    help="first confirm (dry-run without it)")
+    hr.add_argument("--including-backups", action="store_true", dest="including_backups",
+                    help="second confirm: explicitly acknowledge backups will be destroyed")
+    hr.set_defaults(func=_cmd_hard_reset)
     # gc (H-INV-3 / H-INV-5)
     g = sub.add_parser("gc", help="prune orphaned run dirs under the output root (dry-run by default)")
     g.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")

@@ -768,3 +768,132 @@ Forbidden in this section:
 - [ ] Demucs wait filled with substantive text (not silence)
 - [ ] All dependency versions pinned
 - [ ] No monetisation language
+
+
+## Library management — cleanup verbs
+
+All cleanup verbs live in `scripts/library.py` and follow the same pattern: **dry-run by default**, `--apply` (or a stronger confirm) to act. Source `.als`/audio files are never touched.
+
+Run any of these with `uv run --python 3.11 ... python scripts/library.py <verb> [flags]`.
+
+---
+
+### backup
+
+Copies `library/` and `explore/` (your accumulated references) into a timestamped snapshot under `~/.track-coach/backups/<stamp>/`. Additive — running it again only adds another snapshot, never removes anything.
+
+```
+library.py backup                # snapshot curated tiers (library/ + explore/)
+library.py backup --full         # also include projects/ (stems, JSONs — for a full disk image)
+library.py backup --list         # list existing snapshots with dates and sizes
+```
+
+The backup is **all-or-complete**: it either finishes and marks the snapshot good, or it cleans up the partial. A crashed/interrupted backup never leaves a half-snapshot for restore to trust.
+
+---
+
+### restore
+
+Brings a snapshot's `library/` and `explore/` back into place. Dry-run by default; `--apply` to act.
+
+```
+library.py restore               # dry-run: show what would be overwritten/added (uses latest snapshot)
+library.py restore latest        # same — 'latest' is the default
+library.py restore 2026-07-01_143022   # restore a specific stamp
+library.py restore latest --apply      # actually restore (takes safety backup of current state first)
+library.py restore latest --apply --force  # skip the auto safety backup
+```
+
+When overwriting existing data, `restore --apply` auto-takes a safety backup of the current state first (so the restore is itself undoable). Pass `--force` to skip that.
+
+A non-full snapshot (the default) omits the scratch tier (`projects/`). After restoring one: previews go silent, opens fall back to the library HTML copy, and the reference-compare feature is dead until you re-analyse the tracks. A `--full` snapshot restores those too.
+
+---
+
+### gc
+
+Prunes orphaned run directories under `~/.track-coach/projects/`. Keeps every run that is referenced by a library member and the best undeposited run per track.
+
+```
+library.py gc                    # dry-run: show orphaned run dirs
+library.py gc --apply            # actually prune them
+library.py gc --ableton-tails    # sweep dangling track-coach-output/ tails in Ableton project folders
+library.py gc --ableton-tails --scan-dir /path/to/tco  # explicit scan target
+```
+
+`gc` scans **only** `projects/`. It never descends into `backups/`.
+
+---
+
+### prune-versions
+
+Keeps only the N newest versions per track in the library. The library keeps all versions by default; this command is the deliberate way to thin it.
+
+```
+library.py prune-versions           # show current version count per track (no changes)
+library.py prune-versions --keep 2  # dry-run: show what would be dropped (keeping 2 newest per track)
+library.py prune-versions --keep 2 --apply  # actually drop old versions
+```
+
+---
+
+### remove
+
+Removes a track (or one version) from the library. The backing run dir in `projects/` is left for `gc` to reclaim later.
+
+```
+library.py remove "Track Name"          # dry-run: show all versions that would be removed
+library.py remove "Track Name" --apply  # remove all versions
+library.py remove "Track Name" s1       # dry-run: remove one version by stamp/label
+library.py remove "Track Name" s1 --apply
+```
+
+---
+
+### ableton-sweep (gc --ableton-tails)
+
+After running `migrate`, old `track-coach-output/` folders in Ableton project directories may hold dangling symlinks and stale `index.json` files. The sweep distinguishes empty/dangling-only tails (safe to delete) from folders that still contain real runs (listed, never auto-deleted).
+
+```
+library.py gc --ableton-tails            # dry-run: classify Ableton tco dirs
+library.py gc --ableton-tails --apply    # remove only the safe (empty/dangling-only) dirs
+```
+
+---
+
+### reset
+
+Wipes the working state — `library/`, `projects/`, `explore/`, and known loose root files (`resume_autopilot.sh`, `config.json`) — but **keeps `backups/`**. Auto-takes a safety backup first (so the reset is recoverable via `restore`).
+
+```
+library.py reset                         # dry-run: show what would be wiped
+library.py reset --yes-wipe-everything   # wipe (auto-backup first)
+library.py reset --yes-wipe-everything --no-backup   # wipe without backup (requires --i-understand if no snapshot exists)
+library.py reset --yes-wipe-everything --no-backup --i-understand
+```
+
+`reset` aborts if the auto-safety-backup fails — it never destroys curated work without a good snapshot behind it. Source audio/`.als` files are never touched.
+
+---
+
+### hard-reset
+
+Wipes the **entire** output root — including `backups/`. No safety backup is taken. This is the single irreversible verb; every other verb above is recoverable.
+
+```
+library.py hard-reset                                            # dry-run: list everything that would be removed
+library.py hard-reset --yes-wipe-everything --including-backups  # wipe everything including backups
+```
+
+Both flags are required to act. The dry-run always names the backups that will be destroyed.
+
+---
+
+### The reversibility ladder (top = safe, bottom = irreversible)
+
+```
+backup                   → additive; never removes anything
+gc / prune-versions / remove  → prune scratch or a named member; library + best runs survive
+reset                    → wipe working state; backups/ + auto-snapshot remain; restore recovers it
+hard-reset               → wipe everything including backups; no recovery except re-analysis
+```
