@@ -1920,6 +1920,16 @@ is the single point of no return, which is why it alone carries the double confi
 dry-run by default (G-INV-8), never outside the configured output root (G-INV-7), all-or-clean-report
 (G-INV-11). `H-INV-11`
 
+**Confirmation is graduated to match how much a verb can destroy — one predictable pattern per risk tier.**
+So a user never has to recall a per-command flag: additive verbs (`backup`, `deposit`, `catalog`) need no
+confirm; anything that prunes a member or scratch (`gc`, `remove`, `prune-versions`, `restore`, `clean`) is
+**dry-run by default and acts on `--apply`**; wiping the working state (`reset`) is dry-run by default and acts
+on the louder `--yes-wipe-everything`; and the catastrophic wipe (`hard reset`) additionally requires
+`--including-backups`. A bare invocation of any destructive verb is always a safe preview. Within the prune
+tier, `clean` is **legacy** — `remove` (drop a track or one version) and `prune-versions` (keep newest N) are
+the preferred, clearly-named verbs; `clean` still works and now takes `--apply` like the rest (its old `--yes`
+remains a silent alias) so the whole tier reads one way. `H-INV-12`
+
 **Ingest stays automatic; the user manages the exits.** A successful `build` auto-deposits (§G G-INV-17); the
 user never has to remember to save. The management verbs (`backup`, `restore`, `remove`, `gc`, `prune-versions`,
 `reset`, `hard reset`) are the deliberate, dry-run-guarded ways to snapshot, recover, or take things back out.

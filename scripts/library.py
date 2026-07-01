@@ -371,11 +371,10 @@ def _cmd_clean(args):
     root = library_root()
     idx = load_index(root)
     wdir = root / "widgets"
-    if args.all and not args.yes:
-        sys.exit("refusing --all without --yes")
     if not any([args.all, args.older_than is not None, args.keep_per_track is not None,
                 args.missing]):
         sys.exit("clean: pick at least one of --all / --older-than / --keep-per-track / --missing")
+    act = args.apply or args.yes  # --apply is canonical; --yes is a silent back-compat alias
     keep, remove = clean_plan(
         idx["entries"], exists=lambda e: (wdir / e["widget"]).exists(),
         older_than_days=args.older_than, keep_per_track=args.keep_per_track,
@@ -384,12 +383,10 @@ def _cmd_clean(args):
         print("nothing to clean.")
         return
     for e in remove:
-        print(f"{'would remove' if args.dry_run else 'remove'}: {e['track']} · {e.get('stamp','?')} ({e['widget']})")
-    if args.dry_run:
-        print(f"({len(remove)} entr{'y' if len(remove)==1 else 'ies'} would be removed)")
+        print(f"{'would remove' if not act else 'remove'}: {e['track']} · {e.get('stamp','?')} ({e['widget']})")
+    if not act:
+        print(f"({len(remove)} entr{'y' if len(remove)==1 else 'ies'} would be removed — pass --apply to act)")
         return
-    if not args.yes:
-        sys.exit(f"refusing to delete {len(remove)} without --yes (use --dry-run to preview)")
     for e in remove:
         f = wdir / e["widget"]
         if f.exists():
@@ -1245,14 +1242,15 @@ def main():
     l.add_argument("--track", default=None)
     l.add_argument("--json", action="store_true")
     l.set_defaults(func=_cmd_list)
-    c = sub.add_parser("clean", help="prune library entries (and their widget files)")
+    c = sub.add_parser("clean", help="prune library entries (legacy — prefer `remove` / `prune-versions`)")
     c.add_argument("--all", action="store_true")
     c.add_argument("--older-than", type=float, default=None, metavar="DAYS")
     c.add_argument("--keep-per-track", type=int, default=None, metavar="N")
     c.add_argument("--track", default=None)
     c.add_argument("--missing", action="store_true", help="drop entries whose widget file is gone")
-    c.add_argument("--yes", action="store_true", help="actually delete (required for destructive)")
-    c.add_argument("--dry-run", action="store_true", help="preview only")
+    c.add_argument("--apply", action="store_true", help="actually delete (default: dry-run)")
+    c.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)  # back-compat alias for --apply
+    c.add_argument("--dry-run", action="store_true", help="preview only (redundant; dry-run is the default)")
     c.set_defaults(func=_cmd_clean)
     # reset (H-INV-6)
     # backup (H-INV-8)

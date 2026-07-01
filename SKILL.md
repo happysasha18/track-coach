@@ -90,8 +90,8 @@ to skip). Manage it with `scripts/library.py`:
 python3 "$SKILL_DIR/scripts/library.py" path           # where the library lives
 python3 "$SKILL_DIR/scripts/library.py" list [--track T]
 python3 "$SKILL_DIR/scripts/library.py" catalog --open  # (re)build + open the global Catalog page
-python3 "$SKILL_DIR/scripts/library.py" clean --dry-run [--older-than DAYS] \
-    [--keep-per-track N] [--track T] [--missing]        # add --yes to actually delete
+python3 "$SKILL_DIR/scripts/library.py" clean [--older-than DAYS] \
+    [--keep-per-track N] [--track T] [--missing]        # dry-run by default; add --apply to act
 ```
 The library archives the self-contained HTML only (never stems/audio). Every `build` also
 regenerates the **global Catalog** — a standalone `~/.track-coach/library/index.html`: a flat,
@@ -773,6 +773,14 @@ Forbidden in this section:
 ## Library management — cleanup verbs
 
 All cleanup verbs live in `scripts/library.py` and follow the same pattern: **dry-run by default**, `--apply` (or a stronger confirm) to act. Source `.als`/audio files are never touched.
+
+**Confirmation convention (H-INV-12) — one predictable pattern per risk tier:**
+- `backup` / `deposit` / `catalog` — additive; no confirmation needed, runs immediately.
+- `gc` / `remove` / `prune-versions` / `clean` — prune tier; **dry-run by default, `--apply` to act**.
+- `reset` — wipe working state; dry-run by default, `--yes-wipe-everything` to act.
+- `hard-reset` — catastrophic wipe; requires BOTH `--yes-wipe-everything` AND `--including-backups`.
+
+A bare invocation of any destructive verb is always a safe preview. Note: `clean` is a **legacy** verb — prefer `remove` (drop a track or one version) and `prune-versions` (keep newest N) for new workflows. `clean` still works and now follows the same `--apply` convention as the rest of the prune tier; its old `--yes` flag remains as a silent back-compat alias.
 
 Run any of these with `uv run --python 3.11 ... python scripts/library.py <verb> [flags]`.
 

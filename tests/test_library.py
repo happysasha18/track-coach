@@ -210,5 +210,105 @@ class LegacyStrInLibraryEntries(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class CleanCommandConvention(unittest.TestCase):
+    """Integration tests for the `clean` command H-INV-12 confirmation convention.
+
+    Dry-run is the default; --apply (or back-compat --yes) is required to act.
+    Bare `clean --all` must preview (not error). All asserted against real FS state.
+    """
+
+    def _make_lib(self, tmp, entries):
+        """Create a minimal library under tmp with the given entries + widget files."""
+        import types
+        lib_root = Path(tmp) / "library"
+        wdir = lib_root / "widgets"
+        wdir.mkdir(parents=True)
+        for e in entries:
+            (wdir / e["widget"]).write_text("<html>widget</html>")
+        library.save_index(lib_root, {"entries": entries})
+        return lib_root
+
+    def _args(self, **kwargs):
+        import types
+        defaults = dict(all=False, older_than=None, keep_per_track=None,
+                        track=None, missing=False, apply=False, yes=False, dry_run=False)
+        defaults.update(kwargs)
+        # argparse stores --older-than as older_than (underscored)
+        ns = types.SimpleNamespace(**defaults)
+        return ns
+
+    def test_dry_run_by_default_older_than(self):
+        """bare clean --older-than N (no act flag) previews only; index unchanged. H-INV-12."""
+        with tempfile.TemporaryDirectory() as d:
+            entries = [E("A", "old", days_old=40), E("A", "new", days_old=2)]
+            lib_root = self._make_lib(d, entries)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = self._args(older_than=30)
+                library._cmd_clean(args)
+                # index must still have both entries (dry-run changed nothing)
+                idx = json.loads((lib_root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 2, "dry-run must not remove index entries")
+                # both widget files must still exist
+                self.assertTrue((lib_root / "widgets" / entries[0]["widget"]).exists())
+                self.assertTrue((lib_root / "widgets" / entries[1]["widget"]).exists())
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_apply_flag_actually_removes(self):
+        """clean --older-than N --apply removes the old entry and its widget. H-INV-12."""
+        with tempfile.TemporaryDirectory() as d:
+            entries = [E("A", "old", days_old=40), E("A", "new", days_old=2)]
+            lib_root = self._make_lib(d, entries)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = self._args(older_than=30, apply=True)
+                library._cmd_clean(args)
+                idx = json.loads((lib_root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 1, "--apply must reduce index to 1 entry")
+                stamps = [e.get("stamp") for e in idx["entries"]]
+                self.assertIn("new", stamps, "the newer entry must survive")
+                self.assertNotIn("old", stamps, "the old entry must be removed")
+                # widget file for the removed entry must be gone
+                self.assertFalse((lib_root / "widgets" / entries[0]["widget"]).exists(),
+                                 "--apply must delete the widget file")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_yes_flag_back_compat_still_removes(self):
+        """clean --older-than N --yes (legacy alias) removes, same as --apply. H-INV-12."""
+        with tempfile.TemporaryDirectory() as d:
+            entries = [E("A", "old", days_old=40), E("A", "new", days_old=2)]
+            lib_root = self._make_lib(d, entries)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = self._args(older_than=30, yes=True)
+                library._cmd_clean(args)
+                idx = json.loads((lib_root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 1, "--yes alias must remove like --apply")
+                stamps = [e.get("stamp") for e in idx["entries"]]
+                self.assertIn("new", stamps)
+                self.assertNotIn("old", stamps)
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_bare_all_previews_not_errors(self):
+        """bare clean --all (no act flag) must preview without raising SystemExit. H-INV-12."""
+        with tempfile.TemporaryDirectory() as d:
+            entries = [E("A", "s1"), E("B", "s2")]
+            lib_root = self._make_lib(d, entries)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = self._args(all=True)
+                # must not raise SystemExit (the old code did sys.exit without --yes)
+                library._cmd_clean(args)
+                # dry-run: index still has both entries
+                idx = json.loads((lib_root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 2,
+                                 "bare --all must preview, not remove entries")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 if __name__ == "__main__":
     unittest.main()

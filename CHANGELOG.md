@@ -5,6 +5,11 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.9] — 2026-07-01
+
+### Changed
+- **`clean` now dry-run by default with `--apply` to act** — consistent with the rest of the prune tier (`gc`, `remove`, `prune-versions`). Bare `clean --all` previews instead of erroring. The old `--yes` flag remains as a silent back-compat alias so existing scripts keep working. `clean` is marked legacy in the docs; prefer `remove` or `prune-versions` for new workflows.
+
 ## [0.9.8] — 2026-07-01
 
 ### Added
