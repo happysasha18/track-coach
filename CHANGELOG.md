@@ -5,6 +5,11 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.10] — 2026-07-01
+
+### Added
+- **Aim picker + prioritised-step panel** (`#aimpanel`, §D.6.1 stage 1) — a new collapsible panel in the Detailed widget, directly after the reference-read panel. Pick a target direction from a dropdown (same directions as the reference read, nearest-first) and see a ranked list of steps toward it, ordered by the size of the gap. Each step names the facet it's based on and suggests closing the gap in plain language ("Density sits much higher than Venetian Snares — an option: ease it down toward them."). In-zone facets (within ±0.4 z of the target) are silently skipped — when all facets are already close, the panel says so honestly instead of inventing steps. Selection persists in `localStorage` per track (keyed by slug). Detailed-only and full-run-only (quick reads have no fingerprint so no panel).
+
 ## [0.9.9] — 2026-07-01
 
 ### Changed

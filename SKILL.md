@@ -645,6 +645,19 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    that stick out from their NEIGHBOURS (a resonance = boxy/harsh) or sit in a hole (dull/thin) via
    `dev_db`, rather than against a guessed genre target. A deviation ≥4 dB also emits a
    `tonal_resonance` recommendation with a concrete EQ move.
+   **Reference read + aim picker (Detailed-only, full run required, §D.10.1/§D.6.1):** three
+   panels sit together right after the tonal balance panel: ① `#refRead` — per-facet bar chart
+   vs the nearest offerable direction centroid (up to 3 tabs when multiple directions qualify;
+   bars show the gap signed + in plain words; ★/☆ marks where web-described traits are
+   measurement-confirmed). ② `#webPanel` — collapsed panel with the web description of the
+   focused direction (blurb, traits, sources). ③ `#aimpanel` — **aim picker** (v0.9.10): a
+   collapsed `<select>` listing the same offerable directions (nearest-first). Pick one and see
+   a ranked list of concrete steps toward it — each step names the facet where you diverge most
+   and suggests closing the gap in the observe-and-offer register ("Density sits much higher
+   than Venetian Snares — an option: ease it down toward them."). Facets within ±0.4 z are
+   silently skipped; if all are close, the panel says "Already close on what we can measure."
+   instead of inventing steps. Selection persists in `localStorage` per track. All three panels
+   are absent in quick mode (no fingerprint) and in Simple view.
    **The metric-card grid was REMOVED (v0.5.4):** trend cards duplicated the Track Story lanes
    (now carried as lane-edge verdicts); the snapshot facts moved into the vitals strip. `build_cards`
    is no longer called.

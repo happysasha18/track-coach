@@ -197,5 +197,105 @@ class ResolveViewLogic(unittest.TestCase):
         self._node('A(V.resolveView("",null)==="simple",\'no hash+no stored should→simple (calm default)\');')
 
 
+# ── D-INV-31: AimPickerPersistsBySlug — applyAim logic (§D.6.1) ──
+_AIM_BLOCK = re.compile(r"/\* AIM_LOGIC_START.*?AIM_LOGIC_END \*/", re.S)
+
+
+def _render_aim_html():
+    """Render any full-mode widget — the AIM_LOGIC block is always present in the template."""
+    tmp = Path(tempfile.mkdtemp(prefix="tc_aim_"))
+    core = {
+        "duration_s": 48.0, "time_bins": [round(i * 1.0, 3) for i in range(48)], "tempo": 120,
+        "energy": [0.5] * 48, "brightness": [0.5] * 48, "density": [0.4] * 48,
+        "wobble_rate": [1.0] * 48, "stereo_width": [0.4] * 48,
+        "energy_trend": 0.0, "brightness_trend": 0.0, "density_trend": 0.0,
+        "stereo_width_trend": 0.0,
+    }
+    out = tmp / "widget.html"
+    build_widget.build_html(core, {}, None, None, str(out), "Aim Logic Test", build_widget.STRINGS)
+    return out.read_text(encoding="utf-8")
+
+
+@unittest.skipUnless(NODE, "node not installed — aim state-machine tests need a JS engine")
+class AimPickerPersistsBySlug(unittest.TestCase):
+    """D-INV-31: execute the REAL extracted applyAim helper in node.
+
+    applyAim(sel, blks, slug, storage) is emitted between AIM_LOGIC_START/AIM_LOGIC_END markers
+    in the rendered widget. We pull the block out of the HTML, run it in node, and assert:
+      - load restores stored aim from tc_aim_<slug> key
+      - change persists the new value to tc_aim_<slug>
+      - two different slugs don't collide (each has its own key)
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        html = _render_aim_html()
+        m = _AIM_BLOCK.search(html)
+        assert m, "AIM_LOGIC_START/AIM_LOGIC_END markers not found in the rendered widget"
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tc_aimjs_"))
+        cls.mod = cls.tmp / "aim_logic.js"
+        cls.mod.write_text(m.group(0), encoding="utf-8")
+
+    def _node(self, body):
+        """Run `body` JS with the extracted helpers required as M; fail on non-zero exit."""
+        js = (f"const M=require({json.dumps(str(self.mod))});\n"
+              f"const A=(c,m)=>{{if(!c){{console.error('FAIL: '+m);process.exit(1);}}}};\n"
+              + body)
+        r = subprocess.run([NODE, "-e", js], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, f"node assertion failed:\n{r.stderr}{r.stdout}")
+
+    def test_applyaim_shows_stored_aim_on_load(self):
+        """On load, applyAim reads tc_aim_<slug> from storage and applies it."""
+        self._node(r"""
+        var storage={_d:{},getItem:function(k){return k in this._d?this._d[k]:null;},
+          setItem:function(k,v){this._d[k]=v;}};
+        var handler=null;
+        var sel={value:"",addEventListener:function(ev,fn){if(ev==="change")handler=fn;}};
+        var blks=[{dataset:{aim:""},style:{display:""}},{dataset:{aim:"0"},style:{display:"none"}}];
+        // Pre-store aim="0" for this slug
+        storage.setItem("tc_aim_my-track","0");
+        M.applyAim(sel,blks,"my-track",storage);
+        A(sel.value==="0","load must restore stored aim from tc_aim_my-track: got "+sel.value);
+        A(blks[1].style.display!=="none","the restored aim block (idx 0) must be visible");
+        A(blks[0].style.display==="none","the baseline block must be hidden when aim is set");
+        """)
+
+    def test_applyaim_persists_change_by_slug_key(self):
+        """On change, applyAim writes the new value to tc_aim_<slug>."""
+        self._node(r"""
+        var storage={_d:{},getItem:function(k){return k in this._d?this._d[k]:null;},
+          setItem:function(k,v){this._d[k]=v;}};
+        var handler=null;
+        var sel={value:"0",addEventListener:function(ev,fn){if(ev==="change")handler=fn;}};
+        var blks=[{dataset:{aim:""},style:{display:"none"}},{dataset:{aim:"0"},style:{display:""}}];
+        M.applyAim(sel,blks,"slug-a",storage);
+        // Simulate the user changing to no-aim
+        sel.value="";handler();
+        A(storage.getItem("tc_aim_slug-a")==="","change must persist '' to tc_aim_slug-a");
+        A(blks[0].style.display==="","no-aim baseline must be visible after change");
+        A(blks[1].style.display==="none","aim-0 block must be hidden after change to no-aim");
+        """)
+
+    def test_applyaim_slug_key_isolation(self):
+        """Two different slugs have independent localStorage keys — they don't collide."""
+        self._node(r"""
+        var storage={_d:{},getItem:function(k){return k in this._d?this._d[k]:null;},
+          setItem:function(k,v){this._d[k]=v;}};
+        var h1=null,h2=null;
+        var sel1={value:"",addEventListener:function(ev,fn){if(ev==="change")h1=fn;}};
+        var sel2={value:"",addEventListener:function(ev,fn){if(ev==="change")h2=fn;}};
+        var blks=[{dataset:{aim:""},style:{display:""}},{dataset:{aim:"0"},style:{display:"none"}}];
+        M.applyAim(sel1,blks,"track-a",storage);
+        M.applyAim(sel2,blks,"track-b",storage);
+        // Change track-a to aim 0
+        sel1.value="0";h1();
+        A(storage.getItem("tc_aim_track-a")==="0","track-a must store aim=0 under its own key");
+        A(storage.getItem("tc_aim_track-b")===null,"track-b key must be unaffected by track-a change");
+        // Change track-b to aim 0 independently
+        sel2.value="0";h2();
+        A(storage.getItem("tc_aim_track-b")==="0","track-b must store its own independent aim");
+        """)
+
+
 if __name__ == "__main__":
     unittest.main()

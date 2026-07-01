@@ -996,8 +996,10 @@ direction "one at a time"), extended to persist the choice as the aim — not a 
 control. It is **single-select**: you aim at one direction at a time and see its steps. This narrows §D.6's
 "mix all aimed directions at once" to the in-widget interaction — with one selected aim the §D.6 re-order key
 (strongest divergence across the aimed set, D-INV-17) simply has a single member; keeping several aims live at
-once (a multi-select that mixes) is deferred. ⟨DECIDE D-25⟩ whether the picker ever becomes multi-select to
-restore the mix-all model, or single-aim-at-a-time is the final interaction.
+once (a multi-select that mixes) is deferred. ⟨DECIDE D-33⟩ **RESOLVED 2026-07-01 (Alexander): single-aim-at-
+a-time is the final interaction** — the picker stays single-select; the mix-all model is not restored. (This
+question earlier shared the code D-25 with the unrelated Simple-chip decision; split out to D-33 to keep the
+two apart — D-25 remains only the Simple-chip question.)
 
 **The «toward X» panel is a separate, default-collapsed list of prioritized steps toward the selected aim.**
 Distinct from the in-place re-flavour of §D.6 (which re-orders and re-words the existing cards where they sit),
@@ -1036,6 +1038,14 @@ Choosing an aim never triggers analysis, never re-runs the pipeline, and is **no
 If the epoch later changes (library or a reference group gains/loses members), the widget is rebuilt and every
 embedded per-direction set recomputes together and re-stamps (D-INV-14) — the client never silently shows a
 stale-epoch set. `D-INV-32`
+
+**Build staging (delivery, not a spec relaxation).** D-INV-32 embeds, per direction, *both* the aim-panel
+steps (§D.6.1) *and* the §D.6 in-place re-flavoured card set. These ship in two stages: **stage 1** delivers
+the aim picker + the `#aimpanel` prioritized steps (§D.6.1) — the payoff — and its per-direction embedding +
+client swap; **stage 2** adds the §D.6 in-place re-flavour of the coaching cards to the same per-direction
+embedding + swap. Between the stages the picker still swaps the aim panel per direction, and the in-place
+cards stay baseline (untouched) rather than re-flavoured — an honest partial, marked here, never a silent
+divergence from D-INV-32. Stage 2 completes the invariant. `D-INV-32 (staged)`
 
 **Composition — the selection states, and no stranding.** The panel is defined for every aim the dropdown can
 hold: (a) **no aim** — collapsed and empty, coaching unchanged (D-INV-5); (b) **aim = a cloud direction** —
@@ -1136,6 +1146,9 @@ structural holes:
   to a measured axis (★ direct) or a sound indirect signal (☆). It's authored, not learned; recommend a
   versioned in-repo table maintained like the other frozen constants, reviewed when a new ☆ tie is claimed.
   `§D.10.2`
+- ⟨DECIDE D-33⟩ does the aim picker ever become **multi-select** (mix several aims at once, restoring §D.6's
+  mix-all model) — **RESOLVED 2026-07-01 (Alexander): NO, single-aim-at-a-time is final** (§D.6.1). Split from
+  the old overloaded D-25 code so it doesn't tangle with the still-open Simple-chip question (D-25). `§D.6.1`
 - ⟨DECIDE D-31⟩ a **second ★-style mark for "your track shares this confirmed trait"** (per-your-track, atop
   the v1 ★ that means "true of the direction") — build it, or leave ★ as direction-only? (deferred; v1 =
   direction-only). `§D.10.2`

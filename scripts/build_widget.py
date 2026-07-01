@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.9"   # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.10"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -69,6 +69,7 @@ _CAT_COLORS  = {"Mix": "#5b6472", "Balance": "#7a6cab", "Character": "#c08a3e"}
 _REF_LEVEL_COLOR = {"close": "#2e9e5b", "mid": "#d8932a"}
 _REF_MAX_Z       = 3.0         # z-offsets beyond this clip to full bar width
 _REF_MAX_PCT     = 44          # max half-bar width in %
+AIM_INZONE_Z     = 0.4         # aim panel: facets within ±this are "close enough" — not a step (D-INV-34)
 
 
 def _bar_color(offset_abs: float) -> str:
@@ -2102,6 +2103,9 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     # NEVER invent a name from tempo/duration — those live in the vitals strip + subtitle and
     # read as a broken title here (Sasha 2026-06-22: "это БПМ а не имя трека!!").
     title = title or "Untitled track"
+    # Derive a stable slug from the title for localStorage keying in the aim panel (§D.6.1).
+    # lowercased, non-alnum runs collapsed to a single dash, leading/trailing dashes stripped.
+    _title_slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-') or "track"
     # Run-mode badge + (quick-only) explainer, rendered SERVER-SIDE from `mode` so it's deterministic
     # in the HTML (testable, no JS needed): quick = amber "Quick read" + a line on what full adds;
     # full = green "Full analysis". (Sasha 2026-06-20: метка должна быть видна на странице.)
@@ -2123,7 +2127,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
                    if _q else '<div class="viewtoggle" id="viewToggle"></div>')
     # §D.10.3 — reference read: Detailed-only; skipped for quick (no fingerprint) and when run_dir absent.
-    ref_read_html = _ref_read_html(run_dir) if not _q else ""
+    # Pass slug so the aim panel can key localStorage per-track.
+    ref_read_html = _ref_read_html(run_dir, slug=_title_slug) if not _q else ""
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
             .replace("__BODYCLASS__", "quick" if _q else "")
             .replace("__MODEBADGE__", badge_html)
@@ -2471,8 +2476,119 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web
     )
 
 
+def _aim_panel_html(track_z, leans, directions, slug=""):
+    """§D.6.1 — aim picker + per-direction prioritised-step panel.
+
+    For each offerable direction (from leans), computes diverging facets (|offset| >= AIM_INZONE_Z)
+    sorted by |offset| desc (same key as _refread_bars_html, D-INV-34/D-INV-17). Each step names
+    its facet label as an evidence anchor (D-INV-10) and suggests closing the gap in the
+    OBSERVE-AND-OFFER register.
+
+    Returns a '<details id="aimpanel" ...>' block (collapsed), or '' when leans is empty.
+    The inline <script> uses DOMContentLoaded to call applyAim() (defined in the bottom template
+    script, AIM_LOGIC block) — this ordering ensures applyAim is always defined when it runs.
+    """
+    import fingerprints as FP
+
+    if not leans:
+        return ""
+
+    slug_attr = _esc(slug)
+
+    # Per-lean: compute diverging facets (same offset calc as _refread_bars_html, filtered by threshold)
+    lean_steps = []
+    for lean in leans:
+        centroid_z = directions[lean.direction]
+        offsets = []
+        for axis in FP.AXES:
+            tv = track_z.get(axis)
+            cv = centroid_z.get(axis)
+            if tv is None or cv is None:
+                continue
+            try:
+                if math.isnan(float(tv)) or math.isnan(float(cv)):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            off = float(tv) - float(cv)
+            if abs(off) >= AIM_INZONE_Z:
+                offsets.append((axis, off))
+        offsets.sort(key=lambda t: abs(t[1]), reverse=True)   # most-divergent first (D-INV-34/17)
+        lean_steps.append((lean, offsets))
+
+    # Picker select: blank "no aim" option + one option per lean (nearest-first, same order as refpanels)
+    options_html = '<option value="">no aim</option>'
+    for i, (lean, _) in enumerate(lean_steps):
+        options_html += f'<option value="{i}">{_esc(lean.direction)}</option>'
+
+    # Baseline block (data-aim=""): shown when no aim is selected — placeholder only, no step items
+    blocks_html = (
+        '<div class="aim-block" data-aim="" style="display:none">'
+        '<p class="aim-placeholder">Pick an aim above to see prioritised steps.</p>'
+        '</div>'
+    )
+
+    # Per-direction aim-block divs (all hidden by default; applyAim shows the selected one)
+    for i, (lean, offsets) in enumerate(lean_steps):
+        if not offsets:
+            # All facets within ±AIM_INZONE_Z — honest: we can't point to anything (D-INV-34)
+            inner = '<p class="aim-close">Already close on what we can measure.</p>'
+        else:
+            items = []
+            for axis, offset in offsets:
+                label = _AXIS_LABELS.get(axis, axis)
+                direction_name = lean.direction
+                magnitude = _words(offset)          # e.g. "a bit higher", "much lower"
+                # The step CLOSES the gap — suggest the OPPOSITE direction:
+                # offset > 0: track is above centroid → ease DOWN toward them
+                # offset < 0: track is below centroid → nudge UP toward them
+                action = "ease it down toward them" if offset > 0 else "nudge it up toward them"
+                items.append(
+                    f'<li><strong>{_esc(label)}</strong> sits {_esc(magnitude)} than'
+                    f' {_esc(direction_name)} — an option: {_esc(action)}.</li>'
+                )
+            inner = '<ol class="aim-steps">' + ''.join(items) + '</ol>'
+        blocks_html += (
+            f'<div class="aim-block" data-aim="{i}" style="display:none">'
+            f'{inner}</div>'
+        )
+
+    # Inline script: DOMContentLoaded ensures applyAim (defined in bottom script) is available.
+    # One-way aim→read sync: picking an aim also switches the matching refpanel tab (D-INV-28
+    # left untouched — ephemeral tab view is not persisted; only the aim choice persists).
+    inline_js = (
+        '<script>document.addEventListener("DOMContentLoaded",function(){'
+        'var ap=document.getElementById("aimpanel");if(!ap)return;'
+        f'var slug={json.dumps(slug)};'
+        'var sel=ap.querySelector("#aimpicker");'
+        'var blks=[].slice.call(ap.querySelectorAll(".aim-block"));'
+        'if(typeof applyAim==="function")applyAim(sel,blks,slug,localStorage);'
+        # one-way sync: aim change → focus the same refpanel tab (leaves existing reftab click untouched)
+        'sel.addEventListener("change",function(){'
+        'if(!sel.value)return;'
+        'var idx=sel.value;'
+        'var panels=document.querySelectorAll("#refRead .refpanel");'
+        'var tabs=document.querySelectorAll("#refRead .reftab");'
+        'panels.forEach(function(p){p.style.display=p.dataset.didx===idx?"":"none";});'
+        'tabs.forEach(function(b){b.classList.toggle("active",b.dataset.didx===idx);});'
+        '});'
+        '});</script>'
+    )
+
+    return (
+        f'<details class="tc-panel" id="aimpanel" data-slug="{slug_attr}">'
+        '<summary>To sound more like your aim</summary>'
+        '<div class="aim-body">'
+        f'<select id="aimpicker">{options_html}</select>'
+        + blocks_html
+        + '</div>'
+        + inline_js
+        + '</details>'
+    )
+
+
 def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4,
-                          web_notes=None):
+                          web_notes=None, slug=""):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
     Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
@@ -2606,10 +2722,18 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     web_panel = _web_panel_html(focused.direction, focused_conf, focused_centroid, confirm_z,
                                 web_data=focused_web)
 
-    return refread_div + ("\n" + web_panel if web_panel else "")
+    # §D.6.1 — aim picker panel: follows the web-info plaque (order: refRead → webPanel → aimpanel)
+    aim_panel = _aim_panel_html(track_z, leans, directions, slug)
+
+    result = refread_div
+    if web_panel:
+        result += "\n" + web_panel
+    if aim_panel:
+        result += "\n" + aim_panel
+    return result
 
 
-def _ref_read_html(run_dir):
+def _ref_read_html(run_dir, slug=""):
     """§D.10.3 — load fingerprint from disk + reference_directions.json + reference_web_notes.json,
     delegate to render_reference_read. Returns '' when any input is missing or I/O fails.
 
@@ -2664,7 +2788,8 @@ def _ref_read_html(run_dir):
     return render_reference_read(raw_fp, directions, norm,
                                  confirmation=confirmation,
                                  confirm_z=confirm_z,
-                                 web_notes=web_notes if web_notes else None)
+                                 web_notes=web_notes if web_notes else None,
+                                 slug=slug)
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -2798,6 +2923,19 @@ body.simple #webPanel{display:none!important}
 #webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
 #webPanel .tc-rn-sources a{font-size:11.5px;color:var(--muted);text-decoration:none}
 #webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration:underline}
+/* Aim picker panel (§D.6.1) — collapsed, Detailed-only, full-run only */
+body.simple #aimpanel{display:none!important}
+#aimpanel{margin:10px 0 0}
+#aimpanel .aim-body{padding:4px 0 4px}
+#aimpanel #aimpicker{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+ color:var(--ink);font:12.5px inherit;padding:5px 10px;margin:0 0 12px;cursor:pointer;
+ appearance:auto}
+#aimpanel .aim-steps{margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:7px;
+ list-style:decimal}
+#aimpanel .aim-steps li{font-size:12.5px;color:var(--ink);line-height:1.5}
+#aimpanel .aim-steps strong{color:var(--muted);font-weight:600}
+#aimpanel .aim-close,#aimpanel .aim-placeholder{font-size:12.5px;color:var(--muted);
+ font-style:italic;margin:0}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -3830,6 +3968,17 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  master.addEventListener("loadedmetadata",()=>{paint(0);lresize();});
  paint(0);lresize();
 })();
+// ── Aim picker: persist/restore selection per track slug (§D.6.1) ──
+/* AIM_LOGIC_START — aim picker persistence (§D.6.1/D-INV-31..34); node-executed by test_player_logic */
+function applyAim(sel,blks,slug,storage){
+ function _ga(){try{return storage.getItem("tc_aim_"+slug);}catch(e){return null;}}
+ function _sa(v){try{storage.setItem("tc_aim_"+slug,v);}catch(e){}}
+ function _show(v){blks.forEach(function(b){b.style.display=b.dataset.aim===v?"":"none";});}
+ var stored=_ga();if(stored!==null){sel.value=stored;}_show(sel.value);
+ sel.addEventListener("change",function(){_sa(sel.value);_show(sel.value);});
+}
+if(typeof module!=="undefined")module.exports={applyAim};
+/* AIM_LOGIC_END */
 </script></body></html>"""
 
 
