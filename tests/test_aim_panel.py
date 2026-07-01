@@ -443,5 +443,307 @@ class AlreadyCloseWhenNoDivergence(unittest.TestCase):
                       "all-in-zone block must use the aim-close element (no invented steps)")
 
 
+# ── Stage-2 helpers ──────────────────────────────────────────────────────────────────────────────
+
+def _make_recs_for_aim():
+    """Build a small synthetic recs list (8-tuples) for stage-2 tests.
+
+    Returns (recs, track_z, directions) where:
+      - recs[0]: cls="do", axis="brightness" — track brightness=3.0 vs centroid=0 → diverging (offset=3.0)
+      - recs[1]: cls="do", axis="density" — track density=0.1 vs centroid=0.0 → on-style
+        (|offset|=0.1 < AIM_INZONE_Z, but |track_z|=0.1 < AIM_INZONE_Z → NOT on-style either)
+      - recs[2]: cls="crit", axis="tempo" — track tempo=2.5 vs centroid=0 → diverging, different tier
+      - recs[3]: cls="concept", axis=None — no axis, passes through unchanged
+    direction "TestDir" has centroid at all-0.0.
+    """
+    recs = [
+        # (cls, when, head, body, fix, t, based, axis)
+        ("do", "whole track", "Brightness issue", "The brightness is too high.", "", None, "brightness measurement.", "brightness"),
+        ("do", "whole track", "Density in-zone", "Density is typical.", "", None, "density measurement.", "density"),
+        ("crit", "0:30", "Tempo concern", "The tempo drifts.", "Tighten the grid.", 30.0, "tempo measurement.", "tempo"),
+        ("concept", "whole track", "Creative choice", "A structural note.", "", None, "structure.", None),
+    ]
+    # track_z: brightness=3.0 (diverging from centroid 0.0), tempo=2.5 (diverging), density=0.1 (in-zone)
+    track_z = {ax: 0.0 for ax in FP.AXES}
+    track_z["brightness"] = 3.0
+    track_z["tempo"] = 2.5
+    track_z["density"] = 0.1
+    # centroid at all-0.0
+    directions = {"TestDir": {ax: 0.0 for ax in FP.AXES}}
+    return recs, track_z, directions
+
+
+def _aim_html_with_recs(slug="stage2-test"):
+    """Render reference read passing recs — the full stage-2 path."""
+    recs, track_z, directions = _make_recs_for_aim()
+    norm = _norm_identity()
+    return build_widget.render_reference_read(
+        track_z, directions, norm, slug=slug, recs=recs
+    )
+
+
+# ── AimCardsStoreEmbedded ─────────────────────────────────────────────────────────────────────
+
+class AimCardsStoreEmbedded(unittest.TestCase):
+    """D-INV-32 stage-2: #aimcardsStore is embedded inside #aimpanel with one .aimcards-block
+    per qualifying direction when recs are passed.  Without recs, the store is absent."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html_with_recs = _aim_html_with_recs()
+        # Control: same call without recs
+        track_z = {ax: 0.0 for ax in FP.AXES}
+        track_z["brightness"] = 3.0
+        directions = {"TestDir": {ax: 0.0 for ax in FP.AXES}}
+        cls.html_no_recs = build_widget.render_reference_read(
+            track_z, directions, _norm_identity(), slug="no-recs-ctrl"
+        )
+
+    def test_aimcards_store_present_with_recs(self):
+        """#aimcardsStore must appear in the HTML when recs are passed."""
+        self.assertIn('id="aimcardsStore"', self.html_with_recs,
+                      "#aimcardsStore must be in the HTML when recs are supplied")
+
+    def test_aimcards_store_absent_without_recs(self):
+        """#aimcardsStore must NOT appear when no recs are passed."""
+        self.assertNotIn('id="aimcardsStore"', self.html_no_recs,
+                         "#aimcardsStore must be absent when recs=None")
+
+    def test_one_aimcards_block_per_lean(self):
+        """Number of .aimcards-block divs must equal the number of qualifying leans."""
+        import re
+        # Use the same track/directions as in _aim_html_with_recs
+        recs, track_z, directions = _make_recs_for_aim()
+        import similarity_columns as SC
+        leans = SC.leans_toward_topk(track_z, directions)
+        blocks = re.findall(r'class="aimcards-block"', self.html_with_recs)
+        self.assertEqual(len(blocks), len(leans),
+                         f"expected {len(leans)} .aimcards-block(s), got {len(blocks)}")
+
+    def test_aimcards_store_inside_aimpanel(self):
+        """#aimcardsStore must appear inside #aimpanel (after #aimpanel opening tag)."""
+        aimpanel_pos = self.html_with_recs.find('id="aimpanel"')
+        store_pos = self.html_with_recs.find('id="aimcardsStore"')
+        self.assertGreater(aimpanel_pos, 0, "#aimpanel must be present")
+        self.assertGreater(store_pos, 0, "#aimcardsStore must be present")
+        self.assertGreater(store_pos, aimpanel_pos,
+                           "#aimcardsStore must appear inside #aimpanel (after the opening tag)")
+
+
+# ── AimCardsSetIdenticalToBaseline ───────────────────────────────────────────────────────────
+
+class AimCardsSetIdenticalToBaseline(unittest.TestCase):
+    """D-INV-15: the card SET (count) in each aimcards-block must equal the recs count.
+    Re-flavouring never adds or drops cards — only re-orders and annotates."""
+
+    @classmethod
+    def setUpClass(cls):
+        import re
+        cls.recs, cls.track_z, cls.directions = _make_recs_for_aim()
+        cls.html = _aim_html_with_recs()
+        # Extract all .aimcards-block divs
+        cls.blocks = re.findall(
+            r'<div class="aimcards-block"[^>]*>(.*?)</div>\s*(?=<div class="aimcards-block"|</div>)',
+            cls.html, re.DOTALL
+        )
+
+    def test_aimcards_block_card_count_equals_recs_count(self):
+        """Every .aimcards-block must contain exactly len(recs) .rec divs."""
+        import re
+        n_recs = len(self.recs)
+        # get block content more reliably from the stored html
+        import re
+        # Find all aimcards-block contents
+        block_htmls = re.findall(
+            r'class="aimcards-block"[^>]*>(.*?)</div>\s*(?=<div class="aimcards-block"|</div>|$)',
+            self.html, re.DOTALL
+        )
+        self.assertTrue(len(block_htmls) > 0, "must have at least one aimcards-block")
+        for i, block in enumerate(block_htmls):
+            card_count = len(re.findall(r'<div class="rec ', block))
+            self.assertEqual(card_count, n_recs,
+                             f"aimcards-block[{i}] has {card_count} cards, expected {n_recs}")
+
+    def test_based_on_text_preserved(self):
+        """Each card's based-on text must appear in the aimcards block (D-INV-15)."""
+        # The first rec's based-on is "brightness measurement."
+        self.assertIn("brightness measurement.", self.html,
+                      "based-on text must be preserved in re-flavoured cards")
+
+
+# ── AimCardsDivergingRisesInTier ──────────────────────────────────────────────────────────────
+
+class AimCardsDivergingRisesInTier(unittest.TestCase):
+    """D-INV-17: within the same urgency tier, diverging cards appear before non-diverging cards.
+
+    Fixture:
+      - recs[0]: cls="do", axis="brightness", offset=3.0 (diverging)  — should appear first within do
+      - recs[1]: cls="do", axis="density",   offset=0.1 (in-zone)    — should appear second within do
+    Both are tier "do"; the diverging one must come first.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import re
+        cls.html = _aim_html_with_recs()
+        # Extract the first aimcards-block (data-aim="0")
+        m = re.search(r'class="aimcards-block"\s+data-aim="0"[^>]*>(.*?)(?=<div class="aimcards-block"|</div>\s*</div>)',
+                      cls.html, re.DOTALL)
+        cls.block_html = m.group(1) if m else ""
+
+    def test_diverging_card_before_inzone_within_tier(self):
+        """The diverging 'do' card (brightness) must appear before the in-zone 'do' card (density)."""
+        brightness_pos = self.block_html.find("Brightness issue")
+        density_pos = self.block_html.find("Density in-zone")
+        self.assertGreater(brightness_pos, -1, "Brightness issue card must be present")
+        self.assertGreater(density_pos, -1, "Density in-zone card must be present")
+        self.assertLess(brightness_pos, density_pos,
+                        "diverging 'do' card (Brightness issue) must appear before in-zone 'do' card")
+
+    def test_crit_tier_still_before_do_tier(self):
+        """crit-tier cards must appear before do-tier cards (tier ordering preserved)."""
+        crit_pos = self.block_html.find("Tempo concern")
+        do_pos = self.block_html.find("Brightness issue")
+        self.assertGreater(crit_pos, -1, "crit card must be present")
+        self.assertGreater(do_pos, -1, "do card must be present")
+        self.assertLess(crit_pos, do_pos,
+                        "crit-tier card must appear before do-tier card (tier ordering).")
+
+
+# ── AimCardsDivergingGetsOptionNote ──────────────────────────────────────────────────────────
+
+class AimCardsDivergingGetsOptionNote(unittest.TestCase):
+    """D-INV-17 / closes D-21: a diverging card gets ONE option-note (.aim-option) mentioning
+    the direction; the note cap is 1 per card for single-select (D-21 closed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import re
+        cls.html = _aim_html_with_recs()
+        # find the Brightness issue card HTML (it's diverging)
+        m = re.search(r'(<div class="rec [^"]*"[^>]*>.*?Brightness issue.*?</div>)',
+                      cls.html, re.DOTALL)
+        cls.brightness_card = m.group(1) if m else ""
+        # find the Density in-zone card HTML (it's in-zone, not diverging)
+        m2 = re.search(r'(<div class="rec [^"]*"[^>]*>.*?Density in-zone.*?</div>)',
+                       cls.html, re.DOTALL)
+        cls.density_card = m2.group(1) if m2 else ""
+
+    def test_diverging_card_has_option_note(self):
+        """The diverging card (brightness, |offset|=3.0) must contain a .aim-option note."""
+        self.assertIn("aim-option", self.brightness_card,
+                      "diverging card must have a .aim-option element")
+
+    def test_option_note_mentions_direction(self):
+        """The option-note must mention the direction name."""
+        self.assertIn("TestDir", self.brightness_card,
+                      "option-note must mention the direction name")
+
+    def test_option_note_uses_observe_and_offer_register(self):
+        """The option-note must use the observe-and-offer register ('an option, if')."""
+        self.assertIn("an option, if", self.brightness_card,
+                      "option-note must use the observe-and-offer register")
+
+    def test_inzone_card_has_no_option_note(self):
+        """An in-zone card (density, |offset|=0.1) must NOT have a .aim-option note."""
+        self.assertNotIn("aim-option", self.density_card,
+                         "in-zone card must not have a .aim-option note")
+
+    def test_single_option_note_per_diverging_card(self):
+        """Single-select → cap=1 option-note per card (D-21 closed)."""
+        import re
+        count = len(re.findall(r'aim-option', self.brightness_card))
+        self.assertLessEqual(count, 1,
+                             "single-select: at most 1 option-note per diverging card (D-21)")
+
+
+# ── AimCardsOnStyleMark ───────────────────────────────────────────────────────────────────────
+
+class AimCardsOnStyleMark(unittest.TestCase):
+    """D-INV-17: a card whose axis is on-style (track aligns with direction on that axis, both
+    at a notable value) gets a .aim-onstyle mark."""
+
+    @classmethod
+    def setUpClass(cls):
+        # Build a fixture where the track and direction share a notably extreme density value.
+        # track density=2.5, direction centroid density=2.0 → offset=0.5 (just above threshold, diverging)
+        # Hmm, for on-style we need |offset| < AIM_INZONE_Z AND |track_z| >= AIM_INZONE_Z AND |centroid_z| >= AIM_INZONE_Z
+        # So: track_z[density]=2.0, centroid_z[density]=1.8 → offset=0.2 < 0.4; |track|=2.0 >= 0.4; |centroid|=1.8 >= 0.4
+        recs = [
+            ("do", "whole track", "Density on-style", "Density is quite high.", "", None, "density evidence.", "density"),
+        ]
+        track_z = {ax: 0.0 for ax in FP.AXES}
+        track_z["density"] = 2.0   # notable value
+        directions = {"OnStyleDir": {ax: 0.0 for ax in FP.AXES}}
+        directions["OnStyleDir"]["density"] = 1.8   # direction also dense → offset = 0.2, on-style
+        norm = _norm_identity()
+        import re
+        cls.html = build_widget.render_reference_read(
+            track_z, directions, norm, slug="onstyle-test", recs=recs
+        )
+        m = re.search(r'class="aimcards-block"[^>]*>(.*?)(?=</div>\s*</div>|$)',
+                      cls.html, re.DOTALL)
+        cls.block_html = m.group(1) if m else ""
+
+    def test_onstyle_card_has_onstyle_mark(self):
+        """A card with axis at a notable value aligned with the direction must have .aim-onstyle."""
+        self.assertIn("aim-onstyle", self.block_html,
+                      "on-style card must have a .aim-onstyle mark")
+
+    def test_onstyle_note_mentions_direction(self):
+        """The on-style note must mention the direction name."""
+        self.assertIn("OnStyleDir", self.block_html,
+                      "on-style note must mention the direction name")
+
+
+# ── NoAimRecs ─────────────────────────────────────────────────────────────────────────────────
+
+class NoAimRecs(unittest.TestCase):
+    """D-INV-32/5: when recs=None (the default), the HTML must have no #aimcardsStore —
+    the 'no aim' baseline shows #recs (JS-rendered) untouched."""
+
+    def test_no_aimcards_store_when_recs_none(self):
+        """Default call (recs=None) must produce no #aimcardsStore element."""
+        track_z = {ax: 0.0 for ax in FP.AXES}
+        track_z["brightness"] = 2.0
+        directions = {"ADir": {ax: 0.0 for ax in FP.AXES}}
+        html = build_widget.render_reference_read(
+            track_z, directions, _norm_identity(), slug="no-recs"
+        )
+        self.assertNotIn('id="aimcardsStore"', html,
+                         "recs=None → no #aimcardsStore in HTML (baseline is JS-rendered #recs)")
+
+    def test_aimcards_display_in_full_widget(self):
+        """The full widget HTML must contain #aimcardsDisplay (ready to receive re-flavoured cards)."""
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="tc_aim_disp_"))
+        out = tmp / "w.html"
+        run_dir = _make_run_dir(str(tmp))
+        build_widget.build_html(
+            _minimal_core(), {}, None, None, str(out), "DispTest",
+            build_widget.STRINGS, run_dir=run_dir
+        )
+        html = out.read_text(encoding="utf-8")
+        self.assertIn('id="aimcardsDisplay"', html,
+                      "full widget must contain #aimcardsDisplay element")
+
+    def test_aimcards_display_css_gate_in_simple(self):
+        """CSS must gate #aimcardsDisplay to Detailed-only (body.simple #aimcardsDisplay display:none)."""
+        import tempfile, re
+        tmp = Path(tempfile.mkdtemp(prefix="tc_aim_dispgate_"))
+        out = tmp / "w.html"
+        run_dir = _make_run_dir(str(tmp))
+        build_widget.build_html(
+            _minimal_core(), {}, None, None, str(out), "DispGate",
+            build_widget.STRINGS, run_dir=run_dir
+        )
+        html = out.read_text(encoding="utf-8")
+        self.assertRegex(
+            html,
+            r"body\.simple\s+#aimcardsDisplay\s*\{[^}]*display\s*:\s*none",
+            "must have body.simple #aimcardsDisplay { display:none } rule"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
