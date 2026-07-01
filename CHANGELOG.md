@@ -5,6 +5,12 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.11] — 2026-07-01
+
+### Fixed
+- **Library plaque hides dead rows** — older runs whose widget files no longer exist on disk were showing a dead "(file not found)" row in the in-widget catalog plaque. `cmd_catalog` now silently drops such entries before writing `catalog.json`. The current/self row is always kept (its widget may not exist yet at catalog-build time). Tracks with no surviving runs are dropped entirely, and the `(N)` count in the plaque summary reflects only the visible rows. Aligns to G-INV-11 / RC-INV-9 already enforced by `existing_runs()`.
+- **Library plaque row alignment** — the right-hand label ("you are here" / "open →") was vertically misaligned when the verdict text wrapped to multiple lines. Root cause: `.catrun { align-items: baseline }`. Changed to `align-items: center` so the label is always centred against the row regardless of verdict length.
+
 ## [0.9.10] — 2026-07-01
 
 ### Added

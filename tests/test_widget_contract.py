@@ -182,5 +182,25 @@ class ModeBadge(unittest.TestCase):
         self.assertRegex(h, r'<p class="modenote" id="modeNote">[^<]+</p>', "quick explainer line missing")
 
 
+class CatalogPlaqueCSSContract(unittest.TestCase):
+    """FIX 2 (0.9.11): the catalog plaque row (.catrun) must use align-items:center so the
+    right-hand label sits vertically centred even when the verdict wraps to multiple lines.
+    Asserted on the SHIPPED widget HTML — not the template string — per the contract-test convention.
+    """
+
+    def test_catrun_uses_align_items_center(self):
+        # The shipped CSS must declare align-items:center, NOT align-items:baseline, on .catrun.
+        self.assertRegex(HTML, r'\.catrun\{[^}]*align-items:center',
+                         ".catrun must use align-items:center (not baseline) so right label is centred")
+
+    def test_catrun_does_not_use_align_items_baseline(self):
+        import re as _re
+        # Confirm the old broken value is gone from .catrun (both single-line and cross-line forms).
+        catrun_block = _re.search(r'\.catrun\{[^}]+\}', HTML)
+        self.assertIsNotNone(catrun_block, ".catrun block must be present in shipped CSS")
+        self.assertNotIn("align-items:baseline", catrun_block.group(),
+                         "align-items:baseline must not appear in .catrun — it mis-aligns the right label")
+
+
 if __name__ == "__main__":
     unittest.main()

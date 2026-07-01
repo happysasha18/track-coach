@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.10"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.11"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -3078,7 +3078,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 /* CATALOG inner tracks */
 .catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
  letter-spacing:.7px;font-weight:700}
-.catrun{display:flex;align-items:baseline;gap:10px;padding:9px 12px;border:1px solid var(--line);
+.catrun{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
  border-radius:11px;margin:7px 0;background:var(--panel2)}
 .catrun.self{border-color:var(--wob);box-shadow:inset 0 0 0 1px rgba(167,139,250,.25)}
 .catrun .cv{font-weight:650;color:var(--ink);white-space:nowrap}

@@ -267,20 +267,27 @@ def cmd_catalog(args):
             continue   # tolerate a legacy/malformed entry (e.g. a stray slug string from an old run)
         rd = Path(e.get("run_dir", "")).resolve()
         widget = e.get("widget", "analysis_widget.html")
+        is_self = (rd == self_dir)
+        widget_exists = (rd / widget).exists()
+        # G-INV-11 / RC-INV-9: drop absent-dir rows from the plaque entirely.
+        # The self/current entry is always kept — its widget may not exist yet at catalog-build time.
+        if not widget_exists and not is_self:
+            continue
         try:
             rel = os.path.relpath(rd / widget, start=self_dir)
         except ValueError:
             rel = str(rd / widget)
-        is_self = (rd == self_dir)
         if is_self:
             self_track = e.get("track", "?")
         bytrack.setdefault(e.get("track", "?"), []).append({
             "version": e.get("version", ""), "date": e.get("analyzed_at"),
             "verdict": e.get("verdict", ""), "mode": e.get("mode", ""),
-            "rel": rel, "self": is_self, "exists": (rd / widget).exists(),
+            "rel": rel, "self": is_self, "exists": widget_exists,
         })
     tracks = []
     for t, rs in bytrack.items():
+        if not rs:
+            continue  # track had only absent non-self runs — drop it entirely
         rs.sort(key=lambda r: (r["date"] or ""), reverse=True)
         tracks.append({"track": t, "self": t == self_track, "runs": rs})
     tracks.sort(key=lambda x: (not x["self"], x["track"].lower()))

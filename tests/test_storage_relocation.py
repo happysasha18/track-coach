@@ -409,6 +409,137 @@ class DiskPresenceCheck(unittest.TestCase):
             self.assertEqual(result[0]["src_run_dir"], str(real_dir))
 
 
+class CmdCatalogHidesAbsentRows(unittest.TestCase):
+    """G-INV-11 / RC-INV-9 applied to the in-widget plaque (catalog.json built by cmd_catalog).
+
+    Absent non-self rows must be DROPPED entirely from catalog.json so the plaque
+    never renders a dead '(file not found)' entry.  The self/current row is always
+    kept even when its widget file does not exist yet at catalog-build time.
+    A track whose only runs are all absent is dropped from the catalog.
+    Counts (n_runs / n_tracks) reflect only the visible rows.
+    """
+
+    def _make_index(self, base: Path, entries: list) -> Path:
+        idx = base / "index.json"
+        idx.write_text(json.dumps({"runs": entries}))
+        return idx
+
+    def test_absent_non_self_entry_is_hidden(self):
+        """One present + one absent run for the same track: absent must not appear in catalog.json."""
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            self_run = base / "TrackA" / "v1__2026-07-01_1200"
+            self_run.mkdir(parents=True)
+            widget = self_run / "analysis_widget.html"
+            widget.write_text("<html>self</html>")
+
+            gone_run = base / "TrackA" / "v0__2026-06-30_1000"
+            # gone_run NOT created — widget file will not exist
+
+            self._make_index(base, [
+                {"track": "TrackA", "run_dir": str(self_run), "version": "v1",
+                 "analyzed_at": "2026-07-01", "verdict": "good", "mode": "full"},
+                {"track": "TrackA", "run_dir": str(gone_run), "version": "v0",
+                 "analyzed_at": "2026-06-30", "verdict": "old", "mode": "full"},
+            ])
+
+            import types
+            args = types.SimpleNamespace(self=str(self_run), base=str(base))
+            run_dir.cmd_catalog(args)
+
+            cat = json.loads((self_run / "catalog.json").read_text())
+            all_versions = [r["version"] for t in cat["tracks"] for r in t["runs"]]
+            self.assertIn("v1", all_versions, "self row must be present")
+            self.assertNotIn("v0", all_versions, "absent non-self row must be hidden")
+
+    def test_counts_reflect_only_visible_rows(self):
+        """n_runs and n_tracks count only surviving (non-absent, non-dropped) rows."""
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            # Track A: self run (present) + one absent run
+            self_run = base / "TrackA" / "v1__2026-07-01_1200"
+            self_run.mkdir(parents=True)
+            (self_run / "analysis_widget.html").write_text("<html/>")
+            gone_run = base / "TrackA" / "v0__2026-06-20_0800"
+            # Track B: one present run
+            b_run = base / "TrackB" / "v1__2026-07-01_1000"
+            b_run.mkdir(parents=True)
+            (b_run / "analysis_widget.html").write_text("<html/>")
+
+            self._make_index(base, [
+                {"track": "TrackA", "run_dir": str(self_run), "version": "v1",
+                 "analyzed_at": "2026-07-01", "mode": "full"},
+                {"track": "TrackA", "run_dir": str(gone_run), "version": "v0",
+                 "analyzed_at": "2026-06-20", "mode": "full"},
+                {"track": "TrackB", "run_dir": str(b_run), "version": "v1",
+                 "analyzed_at": "2026-07-01", "mode": "full"},
+            ])
+
+            import types
+            args = types.SimpleNamespace(self=str(self_run), base=str(base))
+            run_dir.cmd_catalog(args)
+
+            cat = json.loads((self_run / "catalog.json").read_text())
+            # 2 tracks survive (TrackA + TrackB); 2 visible runs (one per track)
+            self.assertEqual(cat["n_tracks"], 2)
+            self.assertEqual(cat["n_runs"], 2)
+
+    def test_track_with_only_absent_runs_is_dropped(self):
+        """A track whose every run dir is absent must be dropped from the catalog entirely."""
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            self_run = base / "TrackA" / "v1__2026-07-01_1200"
+            self_run.mkdir(parents=True)
+            (self_run / "analysis_widget.html").write_text("<html/>")
+
+            # TrackB exists only as stale index entries — no run dir on disk
+            ghost_run1 = base / "TrackB" / "v1__2026-06-01_1000"
+            ghost_run2 = base / "TrackB" / "v2__2026-06-15_1200"
+
+            self._make_index(base, [
+                {"track": "TrackA", "run_dir": str(self_run), "version": "v1",
+                 "analyzed_at": "2026-07-01", "mode": "full"},
+                {"track": "TrackB", "run_dir": str(ghost_run1), "version": "v1",
+                 "analyzed_at": "2026-06-01", "mode": "full"},
+                {"track": "TrackB", "run_dir": str(ghost_run2), "version": "v2",
+                 "analyzed_at": "2026-06-15", "mode": "full"},
+            ])
+
+            import types
+            args = types.SimpleNamespace(self=str(self_run), base=str(base))
+            run_dir.cmd_catalog(args)
+
+            cat = json.loads((self_run / "catalog.json").read_text())
+            track_names = [t["track"] for t in cat["tracks"]]
+            self.assertNotIn("TrackB", track_names, "all-absent track must be dropped")
+            self.assertEqual(cat["n_tracks"], 1)
+
+    def test_self_entry_kept_even_without_widget_file(self):
+        """The self row must always appear in catalog.json even when its widget file is missing.
+
+        This covers the build-time window: catalog.json is written BEFORE build_widget runs,
+        so analysis_widget.html may not exist yet for the current run.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            self_run = base / "TrackA" / "v1__2026-07-01_1200"
+            self_run.mkdir(parents=True)
+            # Deliberately do NOT create analysis_widget.html for the self run
+
+            self._make_index(base, [
+                {"track": "TrackA", "run_dir": str(self_run), "version": "v1",
+                 "analyzed_at": "2026-07-01", "mode": "full"},
+            ])
+
+            import types
+            args = types.SimpleNamespace(self=str(self_run), base=str(base))
+            run_dir.cmd_catalog(args)
+
+            cat = json.loads((self_run / "catalog.json").read_text())
+            all_versions = [r["version"] for t in cat["tracks"] for r in t["runs"]]
+            self.assertIn("v1", all_versions, "self row must survive even without a widget file")
+
+
 # ─── Item 7: migrate command (G-INV-16) ───────────────────────────────────────
 
 class MigrateCommand(unittest.TestCase):
