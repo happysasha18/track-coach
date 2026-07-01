@@ -424,7 +424,25 @@ REC_BASED = {
     "masking_clean":   "the bass checked against the melody and the kick across the track — no overlap found.",
     "breakdown":       "a dip in overall energy at {t} — a breakdown in the arc.",
     "late_entry":      "a part whose level rises only near the end, at {t}.",
-    "intention_result":"your “{param}” automation in the .als against the measured result — they part ways after {a_end}.",
+    “intention_result”:”your “{param}” automation in the .als against the measured result — they part ways after {a_end}.”,
+}
+
+# §D.6 stage-2: maps each rec key to the FP axis it primarily reflects (for divergence/on-style calc).
+# Keys absent from this dict produce no re-ordering / no option-note / no on-style mark.
+REC_AXIS = {
+    “energy_flat”:      “energy_build”,
+    “brightness”:       “brightness”,
+    “squashed”:         “dynamics”,
+    “truepeak_clip”:    “dynamics”,
+    “masking_stem”:     “density”,
+    “masking_real”:     “density”,
+    “breakdown”:        “energy_build”,
+    “bass_groupstem”:   “bass_share”,
+    “climax”:           “energy_build”,
+    “plateau”:          “energy_build”,
+    “long_section”:     “energy_build”,
+    “tonal_resonance”:  “brightness”,
+    “stem_evolves”:     “density”,
 }
 
 
@@ -834,7 +852,7 @@ _COMPOSITE_WORDS = {                      # stem-vs-whole-track relation → (he
 
 def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, budget=4, per_stem_cap=2):
     """Turn the selected per-stem candidates into worded advice cards — rec tuples
-    `(cls, when, head, body, fix, t, based_on)`. Two kinds compete in ONE budget: per-stem DIVERGENCE (a stem runs
+    `(cls, when, head, body, fix, t, based_on, axis)`. Two kinds compete in ONE budget: per-stem DIVERGENCE (a stem runs
     against the rest) and COMPOSITE (a stem moves against the whole track, needs `mix_core`). Detailed-only
     by default = no timecode `t` (Simple hides non-timecoded recs, INV-18). `levels` (from `stem_prominence`)
     ranks a near-silent part's cards below the louder parts. Names the PART via its character label, never
@@ -861,7 +879,7 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
                 continue
             phrase, why = worded
             based = f"the {p} read against the whole-track arc (a cross-signal move)."   # §B.13
-            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None, based))
+            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None, based, None))
             continue
         if "measures" in c:                   # merged opposite-direction card ("louder but sparser")
             adjs = []
@@ -886,7 +904,7 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
                     f"The {p} — {adj} than the rest of the track",
                     f"For much of the track this part runs {adj} than everything else, pulling against "
                     f"the mix. A deliberate contrast, or worth a second listen.",
-                    "", None, based))
+                    "", None, based, None))
     return out
 
 
@@ -1264,9 +1282,10 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
         cls = REC_CLASS.get(key, "do")
         fix = tpl.get("fix", "")
         based = REC_BASED.get(key, "").format(**kw)   # SPEC §B.13 — where this card came from (plain)
+        axis = REC_AXIS.get(key)                      # §D.6 stage-2: FP axis for divergence/on-style calc
         recs.append((cls, tpl["header"].format(**kw), tpl["title"].format(**kw),
                      tpl["body"].format(**kw), fix.format(**kw) if fix else "",
-                     round(_t, 2) if _t is not None else None, based))
+                     round(_t, 2) if _t is not None else None, based, axis))
 
     if len(bounds) >= 2:
         edges = bounds + [dur]
@@ -2031,7 +2050,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                            levels=stem_prominence(masking))
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
     _rank = {"crit": 0, "do": 1, "concept": 2}
-    recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t)
+    recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t, based, axis)
 
     player = None
     if audio_stems_rel:
@@ -2079,7 +2098,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "mcards": [{"label": z, "pct": p, "diff": d, "fw": fw, "tw": tw} for z, p, d, fw, tw in masking_cards],
         "flags": flag_times,
         "recs": [{"cls": c, "when": w, "h": h, "p": p, "fix": fx, "t": t, "based": b}
-                 for c, w, h, p, fx, t, b in recs],
+                 for c, w, h, p, fx, t, b, _ax in recs],
         "als": als_overlay,
         "stemmap": stemmap,
         "rhythm": rhythm,
@@ -2128,7 +2147,9 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                    if _q else '<div class="viewtoggle" id="viewToggle"></div>')
     # §D.10.3 — reference read: Detailed-only; skipped for quick (no fingerprint) and when run_dir absent.
     # Pass slug so the aim panel can key localStorage per-track.
-    ref_read_html = _ref_read_html(run_dir, slug=_title_slug) if not _q else ""
+    # §D.6 stage-2: pass the sorted recs list so _ref_read_html can embed per-direction re-flavoured
+    # card sets in #aimcardsStore (D-INV-32). Not passed for quick runs (full-run-only, D-INV-33).
+    ref_read_html = _ref_read_html(run_dir, slug=_title_slug, recs=recs) if not _q else ""
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
             .replace("__BODYCLASS__", "quick" if _q else "")
             .replace("__MODEBADGE__", badge_html)
@@ -2476,7 +2497,106 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web
     )
 
 
-def _aim_panel_html(track_z, leans, directions, slug=""):
+def _render_rec_card(rec, option_note=None, on_style_note=None):
+    """§D.6 stage-2 — render one rec 8-tuple to an HTML card div.
+
+    Mirrors the JS template card format (class, chip, h3, p, fix, based), with two extra
+    optional annotations:
+      option_note  — .aim-option paragraph for diverging cards (D-INV-17)
+      on_style_note — .aim-onstyle paragraph for on-style cards (D-INV-17)
+    D-INV-15: based-on text is always preserved unchanged.
+    """
+    cls, when, head, body, fix, t, based, _axis = rec
+    tb = t is not None
+    chip = (f'<span class="when tbound">⏱ {_esc(when)}</span>'
+            if tb else '<span class="when glob">whole track</span>')
+    fix_html = (f'<p class="fix"><span class="fixlab">→ Try</span> {_esc(fix)}</p>' if fix else "")
+    based_html = (f'<p class="based"><span class="basedlab">Based on</span> {_esc(based)}</p>'
+                  if based else "")
+    extra = ""
+    if option_note:
+        extra += f'<p class="aim-option">{_esc(option_note)}</p>'
+    if on_style_note:
+        extra += f'<p class="aim-onstyle">{_esc(on_style_note)}</p>'
+    t_attr = (f' data-t="{t}" style="cursor:pointer"' if tb else "")
+    cls_str = f'{_esc(cls)}{" tb" if tb else ""}'
+    return (f'<div class="rec {cls_str}"{t_attr}>'
+            f'{chip}<h3>{_esc(head)}</h3><p>{_esc(body)}</p>'
+            f'{fix_html}{based_html}{extra}</div>')
+
+
+def _reflavour_recs_html(recs, direction_name, centroid_z, track_z):
+    """§D.6 stage-2 — pre-render a re-flavoured card set for one direction.
+
+    Applies three levers (D-INV-17 / §D.6):
+      1. Re-order: within urgency tier (crit=0, do=1, concept=2), diverging cards come first
+         (secondary key — D-INV-17); tier ordering is never broken.
+      2. Re-frame as option: a card whose axis diverges from the centroid (|offset| >= AIM_INZONE_Z)
+         gains ONE option-note in the observe-and-offer register (cap=1/card — closes D-21).
+      3. Mark on-style: a card whose axis is notably extreme AND aligns with the direction
+         (|offset| < AIM_INZONE_Z AND |track_z[axis]| >= AIM_INZONE_Z AND |centroid_z[axis]| >= AIM_INZONE_Z)
+         gains an on-style note.
+
+    D-INV-15: every input rec appears in the output — SET is identical (never dropped).
+    D-INV-16: a reduced direction re-flavours only trivially (passes through; centroid_z is thin).
+
+    Returns a flat HTML string of '.rec' divs (no outer wrapper) for embedding in an
+    '.aimcards-block' container.
+    """
+    if not recs:
+        return ""
+
+    _tier = {"crit": 0, "do": 1, "concept": 2}
+
+    cards = []
+    for rec in recs:
+        cls, _when, _head, _body, _fix, _t, _based, axis = rec
+        tier = _tier.get(cls, 3)
+        diverging = False
+        on_style = False
+        option_note = None
+        on_style_note = None
+
+        if axis and centroid_z and track_z:
+            tv = track_z.get(axis)
+            cv = centroid_z.get(axis)
+            if tv is not None and cv is not None:
+                try:
+                    tv_f, cv_f = float(tv), float(cv)
+                    if not (math.isnan(tv_f) or math.isnan(cv_f)):
+                        offset = tv_f - cv_f
+                        if abs(offset) >= AIM_INZONE_Z:
+                            diverging = True
+                            # observe-and-offer: direction "keeps that lower/higher"
+                            direction_adj = "lower" if offset > 0 else "higher"
+                            option_note = (
+                                f"…and {direction_name} keeps that {direction_adj};"
+                                f" an option, if you want to lean that way."
+                            )
+                        elif abs(tv_f) >= AIM_INZONE_Z and abs(cv_f) >= AIM_INZONE_Z:
+                            on_style = True
+                            label = _AXIS_LABELS.get(axis, axis).lower()
+                            on_style_note = (
+                                f"though {direction_name} sits this {label} too"
+                                f" — maybe it’s the point."
+                            )
+                except (TypeError, ValueError):
+                    pass
+
+        # secondary sort key within tier: diverging=0 rises, non-diverging=1 sinks
+        div_key = 0 if diverging else 1
+        cards.append((tier, div_key, rec, option_note, on_style_note))
+
+    # sort by (tier, div_key): preserves tier order, sub-sorts diverging first (D-INV-17)
+    cards.sort(key=lambda x: (x[0], x[1]))
+
+    parts = []
+    for _tier_v, _div_key, rec, option_note, on_style_note in cards:
+        parts.append(_render_rec_card(rec, option_note=option_note, on_style_note=on_style_note))
+    return "".join(parts)
+
+
+def _aim_panel_html(track_z, leans, directions, slug="", recs=None):
     """§D.6.1 — aim picker + per-direction prioritised-step panel.
 
     For each offerable direction (from leans), computes diverging facets (|offset| >= AIM_INZONE_Z)
@@ -2553,6 +2673,26 @@ def _aim_panel_html(track_z, leans, directions, slug=""):
             f'{inner}</div>'
         )
 
+    # §D.6 stage-2: pre-render per-direction re-flavoured card sets (D-INV-32).
+    # Stored in a hidden #aimcardsStore div inside #aimpanel; applyAim._swapCards copies the
+    # selected block to #aimcardsDisplay (next to #recs in #recsPanel) when an aim is chosen.
+    # When recs=None the store is omitted — baseline #recs is shown as-is (D-INV-5/32).
+    aimcards_store_html = ""
+    if recs:
+        store_parts = []
+        for i, (lean, _offsets) in enumerate(lean_steps):
+            centroid_z = directions[lean.direction]
+            cards_html = _reflavour_recs_html(recs, lean.direction, centroid_z, track_z)
+            store_parts.append(
+                f'<div class="aimcards-block" data-aim="{i}" style="display:none">'
+                f'{cards_html}</div>'
+            )
+        aimcards_store_html = (
+            '<div id="aimcardsStore" style="display:none">'
+            + "".join(store_parts)
+            + '</div>'
+        )
+
     # Inline script: DOMContentLoaded ensures applyAim (defined in bottom script) is available.
     # One-way aim→read sync: picking an aim also switches the matching refpanel tab (D-INV-28
     # left untouched — ephemeral tab view is not persisted; only the aim choice persists).
@@ -2581,6 +2721,7 @@ def _aim_panel_html(track_z, leans, directions, slug=""):
         '<div class="aim-body">'
         f'<select id="aimpicker">{options_html}</select>'
         + blocks_html
+        + aimcards_store_html
         + '</div>'
         + inline_js
         + '</details>'
@@ -2588,7 +2729,7 @@ def _aim_panel_html(track_z, leans, directions, slug=""):
 
 
 def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4,
-                          web_notes=None, slug=""):
+                          web_notes=None, slug="", recs=None):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
     Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
@@ -2723,7 +2864,8 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
                                 web_data=focused_web)
 
     # §D.6.1 — aim picker panel: follows the web-info plaque (order: refRead → webPanel → aimpanel)
-    aim_panel = _aim_panel_html(track_z, leans, directions, slug)
+    # §D.6 stage-2: pass recs so the panel can embed per-direction re-flavoured card sets (D-INV-32)
+    aim_panel = _aim_panel_html(track_z, leans, directions, slug, recs=recs)
 
     result = refread_div
     if web_panel:
@@ -2733,9 +2875,13 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     return result
 
 
-def _ref_read_html(run_dir, slug=""):
+def _ref_read_html(run_dir, slug="", recs=None):
     """§D.10.3 — load fingerprint from disk + reference_directions.json + reference_web_notes.json,
     delegate to render_reference_read. Returns '' when any input is missing or I/O fails.
+
+    recs: optional list of 8-tuple recs from build_html — when supplied, embeds per-direction
+    re-flavoured card sets inside #aimcardsStore (§D.6 stage-2, D-INV-32). When None, the
+    aimcardsStore is absent and #recs (JS-rendered baseline) is shown unchanged (D-INV-5/32).
 
     Loads reference_web_notes.json as the one-source file (§D.10.2): it drives both the rich
     web panel and the bar ★/☆ marks (confirmation derived from its direct/indirect traits).
@@ -2789,7 +2935,8 @@ def _ref_read_html(run_dir, slug=""):
                                  confirmation=confirmation,
                                  confirm_z=confirm_z,
                                  web_notes=web_notes if web_notes else None,
-                                 slug=slug)
+                                 slug=slug,
+                                 recs=recs)
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -2936,6 +3083,17 @@ body.simple #aimpanel{display:none!important}
 #aimpanel .aim-steps strong{color:var(--muted);font-weight:600}
 #aimpanel .aim-close,#aimpanel .aim-placeholder{font-size:12.5px;color:var(--muted);
  font-style:italic;margin:0}
+/* §D.6 stage-2: .aim-option (observe-and-offer option-note on diverging cards) and .aim-onstyle
+   (on-style mark on matching-style cards). Both are extra paragraphs appended inside .rec divs
+   when the pre-rendered aimcards-block is shown via #aimcardsDisplay. */
+.rec p.aim-option{margin-top:9px;padding:6px 10px;background:rgba(255,209,102,.07);
+ border-radius:8px;font-size:12.5px;color:#d4c97a;border-left:2px solid rgba(255,209,102,.35)}
+.rec p.aim-onstyle{margin-top:9px;font-size:12px;color:var(--muted);font-style:italic}
+/* #aimcardsDisplay: sibling of #recs in #recsPanel — shown when an aim is selected, hidden otherwise.
+   Detailed-only (D-INV-33): body.simple and body.quick gates mirror the #recs gates above. */
+#aimcardsDisplay{display:none}
+body.simple #aimcardsDisplay{display:none!important}
+body.quick #aimcardsDisplay{display:none!important}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
@@ -3148,6 +3306,9 @@ __MODENOTE__
  <p class="hint" id="recsHint"></p>
  <div class="legend" id="recLegend" style="margin-bottom:14px"></div>
  <div class="recs" id="recs"></div>
+ <!-- §D.6 stage-2: shown in place of #recs when an aim is selected; hidden by default.
+      applyAim._swapCards copies the pre-rendered block from #aimcardsStore here (D-INV-32). -->
+ <div class="recs" id="aimcardsDisplay" style="display:none"></div>
 </details>
 
 <!-- 3. THE READ: the diagnosis in prose, the Producer's view. Rendered SERVER-SIDE (markdown→HTML
@@ -3974,8 +4135,34 @@ function applyAim(sel,blks,slug,storage){
  function _ga(){try{return storage.getItem("tc_aim_"+slug);}catch(e){return null;}}
  function _sa(v){try{storage.setItem("tc_aim_"+slug,v);}catch(e){}}
  function _show(v){blks.forEach(function(b){b.style.display=b.dataset.aim===v?"":"none";});}
- var stored=_ga();if(stored!==null){sel.value=stored;}_show(sel.value);
- sel.addEventListener("change",function(){_sa(sel.value);_show(sel.value);});
+ // §D.6 stage-2: swap #recs ↔ #aimcardsDisplay when aim selected/cleared (D-INV-32).
+ // No aim → show #recs (JS-rendered baseline, D-INV-5/32); aim selected → hide #recs,
+ // copy pre-rendered block from #aimcardsStore to #aimcardsDisplay and wire click-to-seek.
+ function _swapCards(v){
+  var recs=document.getElementById("recs");
+  var disp=document.getElementById("aimcardsDisplay");
+  var store=document.getElementById("aimcardsStore");
+  if(!disp)return;
+  if(!v||!store){
+   if(recs)recs.style.display="";
+   disp.style.display="none";disp.innerHTML="";return;}
+  var cblks=[].slice.call(store.querySelectorAll(".aimcards-block"));
+  var target=null;
+  for(var i=0;i<cblks.length;i++){if(cblks[i].dataset.aim===v){target=cblks[i];break;}}
+  if(!target){if(recs)recs.style.display="";disp.style.display="none";disp.innerHTML="";return;}
+  if(recs)recs.style.display="none";
+  disp.innerHTML=target.innerHTML;
+  disp.style.display="";
+  // wire click-to-seek for timecoded cards in the displayed block
+  [].slice.call(disp.querySelectorAll(".rec[data-t]")).forEach(function(el){
+   el.onclick=function(){
+    var t=+el.dataset.t;if(window.__seek)window.__seek(t);
+    var sp=document.getElementById("storyPanel");
+    if(sp){sp.scrollIntoView({behavior:"smooth",block:"start"});
+     sp.classList.remove("pulse");void sp.offsetWidth;sp.classList.add("pulse");
+     setTimeout(function(){sp.classList.remove("pulse");},1200);}};});}
+ var stored=_ga();if(stored!==null){sel.value=stored;}_show(sel.value);_swapCards(sel.value);
+ sel.addEventListener("change",function(){_sa(sel.value);_show(sel.value);_swapCards(sel.value);});
 }
 if(typeof module!=="undefined")module.exports={applyAim};
 /* AIM_LOGIC_END */
