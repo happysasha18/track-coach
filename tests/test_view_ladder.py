@@ -91,12 +91,12 @@ class CssGatingContract(unittest.TestCase):
         # INV-22 + INV-18: Simple hides ONLY the deep stem viz, the non-timecoded recs, the
         # reference read (§D.10.3 — Detailed-only), the web-info plaque (§D.10.2 — Detailed-only),
         # and the aim picker panel (§D.6.1 — Detailed-only, shipped 0.9.10).
-        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refRead", "webPanel", "aimpanel"},
+        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refRead", "webPanel", "aimpanel", "aimcardsDisplay"},
                          f"INV-22: Simple hide-set drifted: {sorted(HIDE_SIMPLE)}")
 
     def test_quick_hide_set_is_only_recs(self):
         # INV-22: quick CSS-hides only the non-timecoded recs; stem viz is withheld by DATA absence.
-        self.assertEqual(HIDE_QUICK, {"recs"},
+        self.assertEqual(HIDE_QUICK, {"recs", "aimcardsDisplay"},
                          f"INV-22: quick hide-set drifted: {sorted(HIDE_QUICK)}")
 
     def test_quick_body_class_set_server_side(self):

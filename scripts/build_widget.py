@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.11"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.12"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -424,25 +424,25 @@ REC_BASED = {
     "masking_clean":   "the bass checked against the melody and the kick across the track — no overlap found.",
     "breakdown":       "a dip in overall energy at {t} — a breakdown in the arc.",
     "late_entry":      "a part whose level rises only near the end, at {t}.",
-    “intention_result”:”your “{param}” automation in the .als against the measured result — they part ways after {a_end}.”,
+    "intention_result":"your “{param}” automation in the .als against the measured result — they part ways after {a_end}.",
 }
 
 # §D.6 stage-2: maps each rec key to the FP axis it primarily reflects (for divergence/on-style calc).
 # Keys absent from this dict produce no re-ordering / no option-note / no on-style mark.
 REC_AXIS = {
-    “energy_flat”:      “energy_build”,
-    “brightness”:       “brightness”,
-    “squashed”:         “dynamics”,
-    “truepeak_clip”:    “dynamics”,
-    “masking_stem”:     “density”,
-    “masking_real”:     “density”,
-    “breakdown”:        “energy_build”,
-    “bass_groupstem”:   “bass_share”,
-    “climax”:           “energy_build”,
-    “plateau”:          “energy_build”,
-    “long_section”:     “energy_build”,
-    “tonal_resonance”:  “brightness”,
-    “stem_evolves”:     “density”,
+    "energy_flat":      "energy_build",
+    "brightness":       "brightness",
+    "squashed":         "dynamics",
+    "truepeak_clip":    "dynamics",
+    "masking_stem":     "density",
+    "masking_real":     "density",
+    "breakdown":        "energy_build",
+    "bass_groupstem":   "bass_share",
+    "climax":           "energy_build",
+    "plateau":          "energy_build",
+    "long_section":     "energy_build",
+    "tonal_resonance":  "brightness",
+    "stem_evolves":     "density",
 }
 
 
@@ -2578,7 +2578,7 @@ def _reflavour_recs_html(recs, direction_name, centroid_z, track_z):
                             label = _AXIS_LABELS.get(axis, axis).lower()
                             on_style_note = (
                                 f"though {direction_name} sits this {label} too"
-                                f" — maybe it’s the point."
+                                f" — maybe it's the point."
                             )
                 except (TypeError, ValueError):
                     pass
@@ -4139,6 +4139,7 @@ function applyAim(sel,blks,slug,storage){
  // No aim → show #recs (JS-rendered baseline, D-INV-5/32); aim selected → hide #recs,
  // copy pre-rendered block from #aimcardsStore to #aimcardsDisplay and wire click-to-seek.
  function _swapCards(v){
+  if(typeof document==="undefined")return;
   var recs=document.getElementById("recs");
   var disp=document.getElementById("aimcardsDisplay");
   var store=document.getElementById("aimcardsStore");

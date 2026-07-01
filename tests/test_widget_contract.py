@@ -112,7 +112,7 @@ class SimpleViewGating(unittest.TestCase):
         # web-info plaque (#webPanel — §D.10.2 Detailed-only, shipped 0.9.1), and the aim picker
         # panel (#aimpanel — §D.6.1 Detailed-only, shipped 0.9.10).
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE))
-        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refRead", "webPanel", "aimpanel"},
+        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refRead", "webPanel", "aimpanel", "aimcardsDisplay"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
 
     def test_evidence_drawer_is_always_visible(self):

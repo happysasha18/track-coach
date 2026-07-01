@@ -620,14 +620,11 @@ class AimCardsDivergingGetsOptionNote(unittest.TestCase):
     def setUpClass(cls):
         import re
         cls.html = _aim_html_with_recs()
-        # find the Brightness issue card HTML (it's diverging)
-        m = re.search(r'(<div class="rec [^"]*"[^>]*>.*?Brightness issue.*?</div>)',
-                      cls.html, re.DOTALL)
-        cls.brightness_card = m.group(1) if m else ""
-        # find the Density in-zone card HTML (it's in-zone, not diverging)
-        m2 = re.search(r'(<div class="rec [^"]*"[^>]*>.*?Density in-zone.*?</div>)',
-                       cls.html, re.DOTALL)
-        cls.density_card = m2.group(1) if m2 else ""
+        # Extract individual rec cards — no nested divs inside .rec, so each .*?</div> is one card.
+        # re.findall with lazy .*? stops at the FIRST </div> after each opening tag.
+        all_cards = re.findall(r'<div class="rec [^"]*"[^>]*>.*?</div>', cls.html, re.DOTALL)
+        cls.brightness_card = next((c for c in all_cards if 'Brightness issue' in c), "")
+        cls.density_card = next((c for c in all_cards if 'Density in-zone' in c), "")
 
     def test_diverging_card_has_option_note(self):
         """The diverging card (brightness, |offset|=3.0) must contain a .aim-option note."""

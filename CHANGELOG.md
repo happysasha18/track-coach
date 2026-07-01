@@ -5,6 +5,11 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.12] — 2026-07-01
+
+### Added
+- **In-place card re-flavour when an aim is selected** (`#aimcardsDisplay`, §D.6 stage 2, D-INV-32) — when a direction is chosen in the aim picker, the recommendation cards are re-ordered and re-framed in place without a page reload. Diverging cards (axis z-distance from the direction centroid above threshold) rise to the top of their urgency tier and receive one optional note ("consider pushing toward TestDir here...") — implementing the §D.6 "observe and offer" register. Cards whose axis matches the direction's style (track and centroid both notably non-zero on that axis, small offset) get an on-style mark. In-zone cards (small offset) are shown unchanged. The baseline card set is preserved byte-for-byte when no aim is selected (D-INV-15). Detailed-only and full-run-only (D-INV-33). Closes D-21 (option-note cap = 1 per card for single-select).
+
 ## [0.9.11] — 2026-07-01
 
 ### Fixed
