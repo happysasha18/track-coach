@@ -742,5 +742,54 @@ class NoAimRecs(unittest.TestCase):
         )
 
 
+class AimCardsPreserveTrustedHTML(unittest.TestCase):
+    """REGRESSION: aim-mode cards double-escaped their body (<b> → &lt;b&gt;), so the JS-raw
+    HTML in rec bodies rendered as literal tags. The server-side card MUST mirror the JS #recs
+    template exactly — which inserts cls/when/head/body/fix/based RAW. (Missed before because the
+    stage-2 tests only counted cards, never checked their content.)"""
+
+    def test_reflavour_keeps_bold_tags_raw(self):
+        recs = [
+            # body + fix carry intentional <b> markup, exactly as the JS D.recs template inserts it
+            ("crit", "whole track", "Master over 0", "True peak hits <b>+0.2 dBTP</b>.",
+             "Leave <b>-1 dBTP</b> headroom.", None, "true-peak measurement.", "loudness"),
+        ]
+        centroid_z = {ax: 0.0 for ax in FP.AXES}
+        track_z = {ax: 0.0 for ax in FP.AXES}
+        html = build_widget._reflavour_recs_html(recs, "TestDir", centroid_z, track_z)
+        self.assertIn("<b>+0.2 dBTP</b>", html,
+                      "rec body <b> must stay a real tag (mirror the JS raw insert)")
+        self.assertIn("<b>-1 dBTP</b>", html, "rec fix <b> must stay a real tag")
+        self.assertNotIn("&lt;b&gt;", html,
+                         "card HTML must NOT be double-escaped — it reads as literal text in the browser")
+
+
+class AimCardsDisplayShownByConcreteValue(unittest.TestCase):
+    """REGRESSION: `#aimcardsDisplay{display:none}` is the CSS default, so the swap CANNOT show the
+    panel by clearing the inline style (disp.style.display="") — that reverts to the hidden default
+    and the aim recommendations render EMPTY. The show-path must set a concrete value ("block").
+    (Missed before because the node applyAim test runs without the stylesheet, so "" looked fine.)"""
+
+    def _build(self):
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="tc_aim_show_"))
+        out = tmp / "w.html"
+        run_dir = _make_run_dir(str(tmp))
+        build_widget.build_html(
+            _minimal_core(), {}, None, None, str(out), "ShowTest",
+            build_widget.STRINGS, run_dir=run_dir
+        )
+        return out.read_text(encoding="utf-8")
+
+    def test_hidden_default_and_concrete_show(self):
+        html = self._build()
+        # the hidden default exists (why "" cannot work)
+        self.assertRegex(html, r"#aimcardsDisplay\s*\{\s*display\s*:\s*none",
+                         "the display:none default must exist")
+        # the swap show-path sets a concrete non-empty display so it beats that default
+        self.assertIn('disp.style.display="block"', html,
+                      'swap must set disp.style.display="block", not "" (which the CSS default would hide)')
+
+
 if __name__ == "__main__":
     unittest.main()

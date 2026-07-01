@@ -5,6 +5,24 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.13] — 2026-07-01
+
+### Fixed
+- **Aim-mode recommendations rendered EMPTY** (regression from 0.9.12 stage-2). When an aim was
+  selected, the swap hid `#recs` and set `#aimcardsDisplay` visible with `style.display=""`.
+  But the CSS default is `#aimcardsDisplay{display:none}`, so clearing the inline style let the
+  hidden default win — the cards were in the DOM but never shown. The swap now sets an explicit
+  `display:"block"`. Verified in a real headless browser (computed display), not just the DOM.
+- **Aim-mode cards double-escaped their HTML** (regression from 0.9.12 stage-2). Rec bodies carry
+  intentional trusted markup (e.g. `<b>+0.2 dBTP</b>`); the JS `#recs` template inserts it raw,
+  but the server-side `_render_rec_card` ran it through `_esc()`, so `<b>` showed as literal
+  `<b>` text. The server card now mirrors the JS template exactly (no escaping of
+  cls/when/head/body/fix/based; only the server-generated aim notes are escaped).
+- Both gaps slipped through because the stage-2 tests only counted cards and the node `applyAim`
+  test runs without the stylesheet. Added two regression tests that assert the REAL artifact:
+  trusted `<b>` survives re-flavour, and the swap uses a concrete display that beats the hidden
+  default.
+
 ## [0.9.12] — 2026-07-01
 
 ### Added

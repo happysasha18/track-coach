@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.12"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.13"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2508,10 +2508,14 @@ def _render_rec_card(rec, option_note=None, on_style_note=None):
     """
     cls, when, head, body, fix, t, based, _axis = rec
     tb = t is not None
-    chip = (f'<span class="when tbound">⏱ {_esc(when)}</span>'
+    # when/head/body/fix/based/cls carry INTENTIONAL trusted HTML (e.g. <b>+0.2 dBTP</b>) — the
+    # JS #recs template inserts them raw (see the D.recs .map above). Mirror it EXACTLY: never
+    # _esc these, or the tags render as literal "<b>" text. Only the server-generated notes below
+    # (plain prose built from the direction name) are escaped.
+    chip = (f'<span class="when tbound">⏱ {when}</span>'
             if tb else '<span class="when glob">whole track</span>')
-    fix_html = (f'<p class="fix"><span class="fixlab">→ Try</span> {_esc(fix)}</p>' if fix else "")
-    based_html = (f'<p class="based"><span class="basedlab">Based on</span> {_esc(based)}</p>'
+    fix_html = (f'<p class="fix"><span class="fixlab">→ Try</span> {fix}</p>' if fix else "")
+    based_html = (f'<p class="based"><span class="basedlab">Based on</span> {based}</p>'
                   if based else "")
     extra = ""
     if option_note:
@@ -2519,9 +2523,9 @@ def _render_rec_card(rec, option_note=None, on_style_note=None):
     if on_style_note:
         extra += f'<p class="aim-onstyle">{_esc(on_style_note)}</p>'
     t_attr = (f' data-t="{t}" style="cursor:pointer"' if tb else "")
-    cls_str = f'{_esc(cls)}{" tb" if tb else ""}'
+    cls_str = f'{cls}{" tb" if tb else ""}'
     return (f'<div class="rec {cls_str}"{t_attr}>'
-            f'{chip}<h3>{_esc(head)}</h3><p>{_esc(body)}</p>'
+            f'{chip}<h3>{head}</h3><p>{body}</p>'
             f'{fix_html}{based_html}{extra}</div>')
 
 
@@ -4153,7 +4157,9 @@ function applyAim(sel,blks,slug,storage){
   if(!target){if(recs)recs.style.display="";disp.style.display="none";disp.innerHTML="";return;}
   if(recs)recs.style.display="none";
   disp.innerHTML=target.innerHTML;
-  disp.style.display="";
+  // MUST be an explicit value, not "" — CSS `#aimcardsDisplay{display:none}` is the default,
+  // so clearing the inline style would let the hidden default win (empty recs). D-INV-32.
+  disp.style.display="block";
   // wire click-to-seek for timecoded cards in the displayed block
   [].slice.call(disp.querySelectorAll(".rec[data-t]")).forEach(function(el){
    el.onclick=function(){
