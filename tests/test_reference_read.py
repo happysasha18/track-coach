@@ -253,21 +253,29 @@ class ReferenceReadSummaryLine(unittest.TestCase):
                              "raw axis key must not appear in summary (use readable label)")
 
 
-class ReferenceReadMostDivergentFirst(unittest.TestCase):
-    """Rows must be ordered most-divergent first."""
+class ReferenceReadMostSimilarFirst(unittest.TestCase):
+    """Rows are ordered most-SIMILAR first — the 'ёлочка': matched/green rows lead, divergence
+    grows downward (Alexander 2026-07-02, reverses the old most-divergent-first order)."""
 
-    def test_largest_offset_axis_is_first_row(self):
-        # Make 'brightness' the most divergent axis by setting a big offset
+    def test_divergence_grows_downward_most_divergent_is_last(self):
+        # Two divergent axes: brightness (biggest) and tempo (second); every other axis is matched
+        # (offset 0). Ascending order ⇒ matched axes lead, then tempo, then brightness LAST.
         raw = {ax: 0.0 for ax in FP.AXES}
-        raw["brightness"] = 0.0  # track at 0
-        centroid = _zfp(brightness=2.5, tempo=0.1)   # brightness is most divergent
-        dirs = {"Near": centroid, "FarDir": _zfp(tempo=9.0)}
+        centroid = _zfp(brightness=2.5, tempo=1.0)   # brightness far, tempo mid, rest matched
+        dirs = {"Near": centroid, "FarDir": _zfp(density=9.0)}
         html = build_widget.render_reference_read(raw, dirs, _norm_identity())
         import re
-        labels = re.findall(r'class="refread-label">([^<]+)<', html)
-        self.assertTrue(labels, "must have at least one label")
-        self.assertEqual(labels[0], "Brightness",
-                         f"most-divergent axis (Brightness) must be first; got {labels[0]}")
+        # scope to the FIRST (nearest) panel only — the html carries every direction's panel
+        # (split on the panel div, NOT bare data-didx which the tab buttons also carry)
+        first_panel = html.split('class="refpanel" data-didx="1"')[0]
+        labels = re.findall(r'class="refread-label">([^<]+)<', first_panel)
+        self.assertTrue(len(labels) >= 3, "need ≥3 axes to test the ёлочка ordering")
+        self.assertEqual(labels[-1], "Brightness",
+                         f"most-divergent axis (Brightness) must sit LAST; got {labels[-1]}")
+        self.assertEqual(labels[-2], "Tempo",
+                         f"second-most-divergent (Tempo) must sit just above it; got {labels[-2]}")
+        self.assertNotIn(labels[0], ("Brightness", "Tempo"),
+                         "a matched (green) axis must LEAD the ёлочка, not a divergent one")
 
 
 class ReferenceReadTabSelector(unittest.TestCase):

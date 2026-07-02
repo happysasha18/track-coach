@@ -1448,8 +1448,9 @@ plaque, which is the last and most external layer. `tags: read-order · D-INV-30
   axis), a small signed bar places the direction's centroid at zero and **your track as an offset** (more /
   less), z-normalised so axes are comparable. You read where you overlap and where you part — "denser, but
   darker and narrower than DeepChord" — dimension by dimension, never collapsed into one number. `D-INV-30`
-- **Ordered most-divergent first**, so "where you part from them" is at the top and the overlapping facets
-  sit below. `tags: most-divergent-first`
+- **Ordered most-similar first — the "ёлочка".** The facets where you already match the direction (small,
+  centred, green bars) lead at the top, and divergence grows downward, so the list reads as a tapering tree:
+  what overlaps first, where you part last. `tags: most-similar-first`
 - **The overall closeness is the same level/colour as the catalog** (D-INV-21/26) — one geometry shown twice;
   a short honest summary names the extremes ("closest on groove, density · furthest on brightness, stereo").
   No raw distance number on the surface (D-INV-25).

@@ -2264,14 +2264,15 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     if not offsets:
         return "", ""
 
-    # Most-divergent first (largest |offset| at top).
-    offsets.sort(key=lambda t: abs(t[1]), reverse=True)
+    # Most-SIMILAR first (smallest |offset| at top) — the "ёлочка": matched/green rows lead and
+    # divergence grows downward (Alexander 2026-07-02, reverses the old most-divergent-first order).
+    offsets.sort(key=lambda t: abs(t[1]))
 
-    # Summary: top 2–3 furthest + bottom 2–3 closest.
+    # Summary: closest = the leading (smallest-|offset|) rows; furthest = the trailing (largest).
     n = len(offsets)
     n_ext = min(3, max(1, (n + 2) // 4))   # 1 for tiny, 2 for mid, 3 for full fingerprints
-    furthest_labels = [_AXIS_LABELS.get(ax, ax) for ax, _ in offsets[:n_ext]]
-    closest_labels  = [_AXIS_LABELS.get(ax, ax) for ax, _ in reversed(offsets[-n_ext:])]
+    closest_labels  = [_AXIS_LABELS.get(ax, ax) for ax, _ in offsets[:n_ext]]
+    furthest_labels = [_AXIS_LABELS.get(ax, ax) for ax, _ in reversed(offsets[-n_ext:])]
     summary = (f"Closest on: {' · '.join(closest_labels)}"
                f" · Furthest on: {' · '.join(furthest_labels)}")
 
