@@ -363,6 +363,42 @@ class FmtDate(unittest.TestCase):
         self.assertEqual(catalog._fmt_date("whatever"), "whatever")
 
 
+class CatalogNoDevSlugOnSurface(unittest.TestCase):
+    """INV-43 (turnkey — no dev-internal label on the user surface). The catalog page must never
+    show a raw track/stamp folder-slug as VISIBLE text: the title link shows the human title, the
+    `.trk` raw-slug subtitle is gone, and a run dir that broke the `<track>/<stamp>` convention
+    (its stamp is a folder-slug like `Total_Reboot_Wobble_Drift_v0.6.2`) shows `—` in Date, not the
+    slug. `_fmt_date`'s pure passthrough (INV-13) is untouched — the guard is caller-side."""
+
+    def test_is_date_shaped(self):
+        self.assertTrue(catalog._is_date_shaped("2026-06-18_0748"))
+        self.assertTrue(catalog._is_date_shaped("2026-06-18"))
+        self.assertFalse(catalog._is_date_shaped("Total_Reboot_Wobble_Drift_v0.6.2"))
+        self.assertFalse(catalog._is_date_shaped(""))
+
+    def test_display_date_slug_stamp_falls_back(self):
+        # slug stamp, no analyzed_at → em dash, never the slug
+        self.assertEqual(catalog._display_date(
+            {"stamp": "Total_Reboot_Wobble_Drift_v0.6.2"}), "—")
+        # slug stamp but a real analyzed_at → that date
+        self.assertEqual(catalog._display_date(
+            {"stamp": "slug_x", "analyzed_at": "2026-06-25 10:01"}), "2026-06-25 10:01")
+        # date-shaped stamp still formats via _fmt_date
+        self.assertEqual(catalog._display_date({"stamp": "2026-06-18_0748"}),
+                         "2026-06-18 07:48")
+
+    def test_render_shows_title_not_raw_slug(self):
+        e = _e("Total_Reboot_-_Wobble_Drift", "h", "Total_Reboot_Wobble_Drift_v0.6.2", 1,
+               bpm=120, arc=[0.1, 1.0], title="Total Reboot — Wobble Drift")
+        html_out = catalog.render_catalog_html([e])
+        # strip attribute values (data-*, href, class…) → only tag-enclosed VISIBLE text remains
+        visible = re.sub(r'\w+="[^"]*"', "", html_out)
+        self.assertNotIn("Total_Reboot", visible,
+                         "raw folder-slug must not appear as visible catalog text")
+        self.assertIn("Total Reboot — Wobble Drift", html_out,
+                      "the clean human title must be the row label")
+
+
 class CatalogRowPlayer(unittest.TestCase):
     """INV-8, INV-9. Session 10: each row with a playable web mix gets a one-button preview player +
     a scrubber that rides the TIME-axis ribbon (not the frequency strip). Rows without a mix render

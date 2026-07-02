@@ -271,8 +271,13 @@ class TraceabilityChecks(unittest.TestCase):
     KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02: set[str] = {
         "D-INV-5", "D-INV-10", "D-INV-19"}
 
+    # An ACTIVE browser-level declaration: `Level = browser…` / `Level: browser…` or a bare
+    # `browser-render` / `browser-comp[uted]` token. Deliberately does NOT match a mere mention
+    # like "browser conversion lands …" on a row whose declared Level is string/node — otherwise a
+    # string-level row that names a future browser conversion would false-positive (caught by deed).
     _BROWSER_LEVEL_RE = re.compile(
-        r"level[^|]*browser|browser-render|browser-comp|browser-computed", re.IGNORECASE)
+        r"level\s*[=:]\s*\**\s*browser|browser-render|browser-comp|browser-computed",
+        re.IGNORECASE)
     _ROW_ID_RE = re.compile(r"^\s*\|\s*((?:D-)?INV-\d+)\s*\|")
 
     def test_browser_level_rows_cite_a_browser_test(self):

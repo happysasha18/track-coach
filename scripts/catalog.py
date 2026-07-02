@@ -63,6 +63,31 @@ def _fmt_date(stamp):
     return s
 
 
+def _is_date_shaped(stamp) -> bool:
+    """True when a stamp is a real `YYYY-MM-DD[_HHMM]` date, not a folder-slug carried
+    into the stamp slot (e.g. `Total_Reboot_Wobble_Drift_v0.6.2`)."""
+    return bool(re.match(r"^\d{4}-\d{2}-\d{2}(_\d{4})?$", str(stamp or "")))
+
+
+def _display_date(e) -> str:
+    """The Date CELL value — never a raw dev slug (turnkey: no dev-internal on the surface).
+
+    A date-shaped stamp formats via `_fmt_date`; otherwise the stamp is a folder-slug (a run
+    dir that didn't follow `<track>/<stamp>`), so we fall back to a real `analyzed_at` date if
+    present, else `—`. `_fmt_date`'s pure passthrough (INV-13) is untouched — this is a
+    caller-side display choice."""
+    stamp = e.get("stamp")
+    if _is_date_shaped(stamp):
+        return _fmt_date(stamp)
+    analyzed = str(e.get("analyzed_at") or "")
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})", analyzed)
+    if m:
+        return f"{m.group(1)} {m.group(2)}:{m.group(3)}"
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", analyzed):
+        return analyzed
+    return "—"
+
+
 def _fmt_num(x, suffix="", dp=0):
     if not isinstance(x, (int, float)):
         return "—"
@@ -334,10 +359,9 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
       data-bpm="{num(e.get('bpm'))}" data-key="{html.escape(str(e.get('key') or ''))}"
       data-len="{num(e.get('length_s'))}" data-lufs="{num(e.get('lufs'))}"
       data-energy="{num(e.get('energy_level'))}">
- <td class="c-track"><div class="tcell">{play_btn}<span class="tmeta">{title_cell}
-   <span class="trk">{html.escape(track)}</span></span></div></td>
+ <td class="c-track"><div class="tcell">{play_btn}<span class="tmeta">{title_cell}</span></div></td>
  <td class="c-ver">{html.escape(str(ver['label']))}{'' if ver['n_runs']<2 else f' <span class=runs>×{ver["n_runs"]}</span>'}{_stale_chip(e)}</td>
- <td class="c-date">{html.escape(_fmt_date(e.get('stamp')))}</td>
+ <td class="c-date">{html.escape(_display_date(e))}</td>
  <td class="c-sig">{signature_svg(e, uid, playable=bool(mix_uri))}</td>
  <td class="c-num">{_fmt_num(e.get('bpm'))}{_delta_html(ver.get('delta'),'bpm')}</td>
  <td class="c-key">{html.escape(str(e.get('key') or '—'))}</td>
