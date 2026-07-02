@@ -511,5 +511,118 @@ class CatalogPageResponsive(unittest.TestCase):
         self.assertFalse(self._col_shown(820, 3), "col 3 (date) must be hidden below 880px")
 
 
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class QuickModeRefReadAbsent(unittest.TestCase):
+    """D-INV-5 / D-INV-20: quick mode must produce NO #refRead block in the rendered DOM
+    even when a run_dir is supplied. The string test
+    (test_reference_read::ReferenceReadDetailedOnly::test_quick_mode_has_no_refread_block)
+    checks HTML source only — it cannot catch a JS loader injecting the block later.
+    This verifies the RENDERED DOM in headless Chrome."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_qm_"))
+        out = tmp / "widget.html"
+        build_widget.build_html(_rich_core(), {}, None, None, str(out), "Quick Mode Test",
+                                build_widget.STRINGS, mode="quick",
+                                run_dir=_make_ref_run_dir(str(tmp)),
+                                narrative_md="Quick run.")
+        cls.widget = str(out)
+
+    def test_refread_absent_in_quick_mode_rendered_dom(self):
+        """#refRead must not exist in the rendered DOM in quick mode (D-INV-5 / D-INV-20)."""
+        r = hc.probe(
+            self.widget,
+            "(function(){var e=document.getElementById('refRead');"
+            "return {present:!!e,visible:e?(getComputedStyle(e).display!=='none'"
+            "&&e.offsetHeight>0):false};})()",
+            width=1100, height=3200)
+        self.assertFalse(r["present"],
+                         "#refRead must be absent from the rendered DOM in quick mode "
+                         "(quick run ⊆ Simple view — no reference layer; D-INV-5 / D-INV-20)")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class RefReadEvidenceMarksRendered(unittest.TestCase):
+    """D-INV-10: ★/☆ evidence marks must RENDER visibly in the reference bars panel in Detailed
+    view; missing-axis rows must not produce phantom zero-height rows. The string tests
+    (test_reference_read::ReferenceReadRichLook, ::ReferenceReadOmitsMissingAxes) check
+    HTML source; they cannot verify that the browser actually displays these marks or that
+    CSS doesn't render hidden phantom rows for omitted axes."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.widget = _build_ref_widget()
+
+    def test_star_marks_visible_in_detailed(self):
+        """At least one data-confirmed row (★/☆ mark) must be VISIBLE in Detailed view (D-INV-10)."""
+        r = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var rows=document.querySelectorAll('#refRead [data-confirmed=\"1\"]');"
+            "var vis=0;"
+            "rows.forEach(function(e){"
+            "if(e.offsetHeight>0&&getComputedStyle(e).display!=='none')vis++;});"
+            "return {total:rows.length,visible:vis};})()",
+            width=1100, height=3600)
+        self.assertGreater(r["total"], 0,
+                           "fixture must produce at least one data-confirmed (★/☆) row — "
+                           "check _build_ref_widget or the bundled reference_web_notes.json")
+        self.assertGreater(r["visible"], 0,
+                           "at least one ★/☆ evidence mark must be VISIBLE in Detailed view "
+                           "(D-INV-10: each trait carries its real evidence)")
+
+    def test_all_rendered_rows_have_nonzero_height(self):
+        """Every rendered .refread-row must have non-zero height — no phantom hidden rows for
+        missing axes (D-INV-10: omitted axes must not appear, even invisibly)."""
+        r = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var rows=document.querySelectorAll('#refRead .refread-row');"
+            "var hidden=0,total=rows.length;"
+            "rows.forEach(function(e){"
+            "if(e.offsetHeight<=0||getComputedStyle(e).display==='none')hidden++;});"
+            "return {total:total,hidden:hidden};})()",
+            width=1100, height=3600)
+        self.assertGreater(r["total"], 0,
+                           "fixture must produce refread rows to test the omission gate")
+        self.assertEqual(r["hidden"], 0,
+                         f"every refread-row must have non-zero height — {r['hidden']} "
+                         "phantom/hidden row(s) detected (D-INV-10: missing axes omitted, never hidden)")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class RefReadBarsRendered(unittest.TestCase):
+    """D-INV-19: the per-facet signed bars (ёлочка decomposition) must physically RENDER
+    with non-zero pixel widths in a real browser. The string tests
+    (test_reference_read::ReferenceReadBars, ::ReferenceReadMostSimilarFirst) verify HTML
+    structure and sort order from source — they cannot confirm that CSS percentage widths
+    resolve to actual rendered pixels."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.widget = _build_ref_widget()
+
+    def test_refread_bars_render_with_nonzero_width(self):
+        """At least one .refread-bar element must have non-zero rendered pixel width (D-INV-19)."""
+        r = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var bars=Array.prototype.slice.call("
+            "document.querySelectorAll('#refRead .refread-bar'));"
+            "var any_nonzero=bars.some(function(e){"
+            "return e.getBoundingClientRect().width>0;});"
+            "return {count:bars.length,any_nonzero_width:any_nonzero};})()",
+            width=1100, height=3600)
+        self.assertGreater(r["count"], 0,
+                           "fixture must produce .refread-bar elements — check _build_ref_widget")
+        self.assertTrue(r["any_nonzero_width"],
+                        "at least one .refread-bar must render with non-zero pixel width "
+                        "(D-INV-19: full-dim fingerprint bars rendered, not just present in source HTML)")
+
+
 if __name__ == "__main__":
     unittest.main()

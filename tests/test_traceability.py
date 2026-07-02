@@ -268,8 +268,8 @@ class TraceabilityChecks(unittest.TestCase):
     # Browser-level rows still backed by STRING tests — tracked debt, to convert to
     # the headless harness (the reference-read render surfaces: header + facet bars).
     # A NEW browser-level row backed by a non-harness test is NOT allowlisted and fails.
-    KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02: set[str] = {
-        "D-INV-5", "D-INV-10", "D-INV-19"}
+    # 2026-07-02 (s6b): D-INV-5 / D-INV-10 / D-INV-19 converted — allowlist now empty.
+    KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02: set[str] = set()
 
     # An ACTIVE browser-level declaration: `Level = browser…` / `Level: browser…` or a bare
     # `browser-render` / `browser-comp[uted]` token. Deliberately does NOT match a mere mention
