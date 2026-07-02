@@ -1189,5 +1189,55 @@ class GcIgnoresBackups(unittest.TestCase):
                          "gc must return no orphans when projects/ is empty")
 
 
+class GcKeepsReferenceRun(unittest.TestCase):
+    """G-INV-19: gc_plan keeps a run dir whose run_meta.json has reference:true; never orphans it."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+        self.base = Path(self._tmp) / "output"
+        self.projects = self.base / "projects"
+        self.lib_root = self.base / "library"
+        self.lib_root.mkdir(parents=True)
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def test_reference_run_dir_not_orphaned(self):
+        """A run dir with run_meta.json reference:true is kept by gc, never orphaned. G-INV-19.
+
+        Setup: a competing run with 3 result files is also present. That run wins
+        keep_best by the completeness heuristic. The reference run (0 result files,
+        not in library) would normally be the orphan — G-INV-19 must prevent that.
+        """
+        slug_dir = self.projects / "some_artist"
+
+        # The reference run: marked reference:true, 0 result_*.json files
+        ref_run = slug_dir / "2026-01-01_1000"
+        ref_run.mkdir(parents=True)
+        (ref_run / "run_meta.json").write_text(
+            json.dumps({"reference": True, "track": "SomeArtist"}))
+
+        # A competing own run with 3 result files — wins keep_best heuristic
+        own_run = _make_run(slug_dir, "2026-01-02_1000", n_results=3)
+
+        # Library index is empty — neither run is library-referenced
+        library.save_index(self.lib_root, {"entries": []})
+
+        plan = library.gc_plan(self.projects, self.lib_root)
+
+        orphan_strs = {str(p.resolve()) for p in plan["orphan"]}
+        self.assertNotIn(str(ref_run.resolve()), orphan_strs,
+                         "reference run dir must NOT be classified as orphan (G-INV-19)")
+        # Must appear in some keep list
+        all_keep_strs = {str(p.resolve())
+                         for p in plan["keep_referenced"] + plan["keep_best"]}
+        self.assertIn(str(ref_run.resolve()), all_keep_strs,
+                      "reference run dir must appear in a keep list (G-INV-19)")
+        # The own run should be keep_best
+        best_strs = {str(p.resolve()) for p in plan["keep_best"]}
+        self.assertIn(str(own_run.resolve()), best_strs,
+                      "competing own run must still be keep_best (G-INV-19 must not break the normal path)")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,20 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newe
 ## [0.9.16] — 2026-07-02
 
 ### Fixed
+- **Reference tracks no longer land in your library.** Other people's tracks that you analyse to build a
+  "direction" (e.g. a DeepChord / SCSI-9 / Venetian Snares album) used to get deposited into your library
+  alongside your own work, so the catalog and the "N tracks have analysis data…" banner counted foreign
+  albums as if they were yours. A reference is now analysed with `analyze --reference [--artist NAME]` and is
+  kept out of the library entirely; a run marked reference is never deposited. Already-mixed-in references are
+  removed with the new `library.py dereference --album-path …` command (dry-run by default, backs up the
+  index before it changes anything, and never deletes the analysis on disk).
+
+### Added
+- **`analyze --reference [--artist NAME]`** — analyse a track as a reference (kept out of your library).
+- **`library.py dereference --album-path …`** — remove reference entries that were deposited before the
+  marker existed.
+
+### Fixed
 - **Near-silent stems no longer vanish — they show again as a flat line + a named note.** The
   6-stem separation always returns six parts; the empty ones (e.g. this track's *vocals* and *piano*,
   near total silence) had been quietly dropped from the stem view since 0.8.1, so you saw four lanes

@@ -395,7 +395,7 @@ state hides the reference column but leaves the DJ column visible; owning test l
 - **Process:** every demo I OPEN must be a real, COMPLETE `build` render (playbook + memory). Two partial
   hand-fed renders this session read as real bugs.
 
-## §G — Storage relocation (SPEC §G → G-INV-1…17)
+## §G — Storage relocation (SPEC §G → G-INV-1…20)
 
 Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.py`.
 
@@ -413,6 +413,9 @@ Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.p
 | G-INV-11 / RC-INV-9 — plaque counts | n_runs / n_tracks in catalog.json count only visible rows after absent rows are hidden | `test_storage_relocation::CmdCatalogHidesAbsentRows::test_counts_reflect_only_visible_rows` |
 | G-INV-11 / RC-INV-9 — all-absent track | A track whose every run dir is absent is dropped from catalog.json entirely | `test_storage_relocation::CmdCatalogHidesAbsentRows::test_track_with_only_absent_runs_is_dropped` |
 | G-INV-16 | `migrate` dry-run prints from→to plan and moves nothing; `--apply` moves + rewrites src_run_dir | `test_storage_relocation::MigrateCommand::test_dry_run_changes_nothing`, `::test_migrate_apply_moves_and_rewrites` |
+| G-INV-18 | A run whose `run_meta` has `reference: true` is refused by `deposit_from_run` (raises `DepositError` BEFORE any write) → never in `index.json`; one guard covers BOTH auto-deposit (`build`) and the CLI `deposit` (both route through `deposit_from_run`). | `test_library::ReferenceNotDeposited::test_reference_run_refused`, `::test_own_run_still_deposits` |
+| G-INV-16b | Banner counts library members only → once references aren't members, the count excludes them (an index of own-only members counts own-only). | `test_library::ReferenceNotDeposited::test_banner_count_excludes_references` |
+| G-INV-20 | One-off reference cleanup: **dry-run default** reports what it would drop and writes nothing; `--apply` first backs up `index.json`, then removes exactly the entries whose `src_run_dir` is under a known reference-album path — own tracks and the reference run dirs on disk are untouched. | `test_library::ReferenceCleanup::test_dry_run_writes_nothing`, `::test_apply_backs_up_and_drops_only_references`, `::test_own_entries_and_run_dirs_untouched` |
 
 ## §H — Commands, library management & cleanup (SPEC §H → H-INV-1..7, 2026-07-01 s31)
 
@@ -428,6 +431,7 @@ All owned by `tests/test_cleanup.py`.
 | H-INV-3 (dry-run) | `gc` without --apply lists orphans, removes nothing | `test_cleanup::GcCommand::test_dry_run_removes_nothing` |
 | G-INV-10 + H-INV-3 | `gc --apply` deletes orphan but keeps referenced run (library member) | `test_cleanup::GcCommand::test_apply_deletes_only_orphan` |
 | G-INV-15 + H-INV-3 | `gc --apply` keeps the best-undeposited run (most result files per slug) | `test_cleanup::GcCommand::test_apply_deletes_only_orphan` |
+| G-INV-19 + H-INV-3 | `gc` classify keeps a run dir whose `run_meta` marks it `reference: true` (never lists it orphan), the same as a library-referenced run — protects the fingerprints `gen_reference_directions.py` regenerates directions from. | `test_cleanup::GcKeepsReferenceRun::test_reference_run_dir_not_orphaned` |
 | H-INV-5 (classify) | `ableton_tail_scan` correctly classifies safe vs has-real-runs slug dirs | `test_cleanup::AbletonTailScan::test_dry_run_reports_safe_and_real_correctly` |
 | H-INV-5 (apply) | Removing safe slug dirs leaves has-real-runs slug dirs intact | `test_cleanup::AbletonTailScan::test_apply_removes_only_safe_leaves_real_runs` |
 | H-INV-5 (missing) | Missing tco dir reported in scan['missing'], no crash | `test_cleanup::AbletonTailScan::test_missing_tco_dir_reported_as_missing` |

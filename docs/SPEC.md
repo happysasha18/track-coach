@@ -794,6 +794,15 @@ Ableton project, so none of the project surfaces (arrangement, automation, locat
 carries an *artist* name and, optionally, web info about that artist. It lives in a separate reference
 catalog so other people's music never mixes into your library's signatures. `tags: audio-only · D-INV-3`
 
+**Reference marker.** The single explicit signal that a run is a reference — a `reference` flag (and the
+*artist* name) written into the run's `run_meta.json` at analysis time. You set it by analysing with the
+**`--reference` option** (optionally `--artist NAME`); that is the only thing that writes the flag, and it is
+a deliberate user act, never inferred. It is what tells the storage layer
+"this is someone else's music, keep it out of my library" (the ingest guard, §G G-INV-18). **Having no
+Ableton project is NOT the marker** — you also analyse your own audio-only tracks (an mp3 bounce with no
+`.als`), so `als: null` cannot distinguish a reference from your own work. Only the explicit `reference`
+flag does. A run without the flag is treated as your own track. `tags: audio-only · D-INV-3 · G-INV-18`
+
 **Reference direction (cloud).** A named set of reference tracks. A direction with **enough members** is a
 *cloud*: it has a centre and a spread, and your track can be read as in-zone or diverging from it. A
 direction with **too few** members is *reduced mode* — just track-vs-track, no spread, no "in-zone" talk.
@@ -1677,6 +1686,42 @@ place that says where things live, so the analyzer, the library, and the catalog
   index at deposit, and read back to open the original widget, play its preview audio, and compute similarity.
 - **Deposit** — copying a finished run's widget HTML into the library. It happens **automatically** at the end
   of every successful `build`, unless `--no-deposit` is passed; it is not a separate manual step. `G-INV-17`
+
+**Reference runs are never deposited into the library.** A run whose `run_meta.json` carries the reference
+marker (§D.3, an explicit `reference` flag) is kept out of the library index (`~/.track-coach/library/index.json`)
+entirely: auto-deposit at the end of a `build` is skipped for it, exactly as if `--no-deposit` had been passed,
+and an explicit `deposit` of a reference run is refused rather than silently written. This is the enforcement,
+at the deposit boundary, of the rule that other people's music never enters your catalog or signatures
+(D-INV-3, D-INV-7) — without this guard the reference albums you analyse to build directions leak in beside
+your own tracks. `G-INV-18`
+
+⟨DECIDE G-3⟩ Where do reference runs go *instead* — a separate reference catalog with its own index, or simply
+nowhere (kept out of the library, their fingerprints living only as precomputed direction centroids)? This pass
+takes the second: references stay out of the library; the separate reference-catalog surface (its own tab, §D)
+is a later pass. Revisit when that tab is built.
+
+**A reference run's dir is protected from cleanup even though it is not a library member.** Because a reference
+is never deposited (G-INV-18), it never joins gc's set of library-referenced run dirs — so a naive gc would see
+it as an orphan and prune it. That would delete the raw per-stem fingerprints that `gen_reference_directions.py`
+reads to rebuild the direction centroids, so the next time you re-run the albums the cloud silently shrinks or
+collapses. Therefore the reference marker makes a run dir **gc-exempt**, exactly as being library-referenced
+does: gc keeps it, never lists it as orphan. Your references are as safe as your library. `G-INV-19`
+
+**The migrate banner counts library members only.** A reference run is never a member (G-INV-18), so it is
+never counted — the "N tracks have analysis data in project folders" number always means *your* tracks whose
+data lives outside `$HOME`, never someone else's reference album. `G-INV-16b`
+
+### G.4 One-off cleanup of pre-marker references
+
+**References analysed before the marker existed must be removed from the library by a one-off migration.** The
+guard (G-INV-18) is going-forward only: reference albums deposited before the `reference` flag existed carry no
+marker in their `run_meta.json`, so nothing distinguishes them by flag. The one-off cleanup identifies them by
+their **source-album run-dir path** (an explicit set of the known reference albums, e.g. the DeepChord / SCSI-9 /
+Venetian Snares folders under `Downloads/`) — not by the marker — and drops exactly those entries from
+`library/index.json`. It is **backup-first** (the index is copied aside before any write) and all-or-clean-report
+like every destructive command (G-INV-8/G-INV-11): it reports what it would remove, and removes nothing until
+applied. The reference run dirs themselves stay on disk (G-INV-19 keeps them for centroid regen); only the
+library *entries* are removed. `G-INV-20`
 
 ### G.1 Output never lands in the user's project folder
 

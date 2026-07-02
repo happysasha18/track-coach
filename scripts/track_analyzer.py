@@ -194,6 +194,9 @@ def cmd_analyze(args):
                                    "tags_source": "heuristic"})
         except Exception as e:  # noqa: BLE001 — draft tags are a convenience, not a hard dep
             print(f"  · draft tags skipped: {e}", file=sys.stderr)
+        # G-INV-18: mark run as a reference so deposit_from_run refuses it later
+        if getattr(args, "reference", False):
+            _update_meta(out_dir, {"reference": True, "artist": getattr(args, "artist", None)})
 
     # STRUCTURE — repeats/form (full mix; no stems/als needed; cheap, always run)
     rn.step("fast", "self_similarity.py", audio, "--out", j("result_selfsim.json"))
@@ -582,6 +585,10 @@ def main():
     a.add_argument("--base", default=None, help="output base (default: ~/.track-coach/projects)")
     a.add_argument("--skip-transcribe", action="store_true")
     a.add_argument("--dry-run", action="store_true", help="print the plan; run nothing")
+    a.add_argument("--reference", action="store_true",
+                   help="analyse as a reference track (kept OUT of your library, G-INV-18)")
+    a.add_argument("--artist", default=None,
+                   help="artist name for the reference track (stored in run_meta.json)")
     a.set_defaults(func=cmd_analyze)
     # NOTE: render-only flags (--title/--verdict/--src-audio/--strings) live on `build`, not here —
     # analyze only measures; the widget (and the read it carries) is rendered by `build`.

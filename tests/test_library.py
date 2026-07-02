@@ -4,7 +4,7 @@
 `clean_plan` deletes files, so its policy is a PURE function tested exhaustively here (no FS).
 `deposit` is exercised against a temp library root via $TRACK_COACH_LIBRARY.
 """
-import json, os, sys, tempfile, unittest
+import json, os, sys, tempfile, types, unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -306,6 +306,145 @@ class CleanCommandConvention(unittest.TestCase):
                 idx = json.loads((lib_root / "index.json").read_text())
                 self.assertEqual(len(idx["entries"]), 2,
                                  "bare --all must preview, not remove entries")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
+class ReferenceNotDeposited(unittest.TestCase):
+    """G-INV-18: a run with reference:true in run_meta is refused by deposit_from_run."""
+
+    def test_reference_run_refused(self):
+        """deposit_from_run raises DepositError for a reference run; index unchanged. G-INV-18."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                meta = {"reference": True, "track": "SomeRef", "mode": "full"}
+                with self.assertRaises(library.DepositError):
+                    library.deposit_from_run(run, w, meta)
+                root = library.library_root()
+                self.assertFalse((root / "index.json").exists(),
+                                 "no index written on a reference deposit refusal (G-INV-18)")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_own_run_still_deposits(self):
+        """A run without reference:true deposits normally. G-INV-18."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                meta = {"track": "OwnTrack", "mode": "full"}
+                entry = library.deposit_from_run(run, w, meta)
+                self.assertEqual(entry["track"], "OwnTrack")
+                root = library.library_root()
+                idx = json.loads((root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 1)
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_banner_count_excludes_references(self):
+        """A reference run is refused, so library member count stays own-only. G-INV-18."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                # Deposit one own run
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                library.deposit_from_run(run, w, {"track": "OwnTrack", "mode": "full"})
+                # Attempt to deposit a reference run — must raise before writing
+                refrun = Path(d) / "refrun"; refrun.mkdir()
+                rw = refrun / "analysis_widget.html"; rw.write_text("<html>ref</html>")
+                with self.assertRaises(library.DepositError):
+                    library.deposit_from_run(refrun, rw,
+                                             {"reference": True, "track": "ArtistRef", "mode": "full"})
+                # Index must still have exactly 1 entry (the own track — banner input is own-only)
+                root = library.library_root()
+                idx = json.loads((root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 1,
+                                 "library member count must exclude references (banner input stays own-only)")
+                self.assertEqual(idx["entries"][0]["track"], "OwnTrack")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
+class ReferenceCleanup(unittest.TestCase):
+    """G-INV-20: dereference command drops reference entries by album-path substring."""
+
+    def _make_lib_with_refs(self, tmp):
+        """Create a library with 1 own entry + 2 reference entries under SomeAlbum path."""
+        lib_root = Path(tmp) / "lib"
+        wdir = lib_root / "widgets"
+        wdir.mkdir(parents=True)
+        (wdir / "own_track.html").write_text("<html>own</html>")
+        (wdir / "ref_1.html").write_text("<html>ref1</html>")
+        (wdir / "ref_2.html").write_text("<html>ref2</html>")
+        entries = [
+            {"track": "OwnTrack", "stamp": "s1", "widget": "own_track.html",
+             "src_run_dir": f"{tmp}/projects/OwnTrack/s1"},
+            {"track": "RefArtist1", "stamp": "r1", "widget": "ref_1.html",
+             "src_run_dir": f"{tmp}/SomeAlbum/track-coach-output/2026-01-01_1000"},
+            {"track": "RefArtist2", "stamp": "r2", "widget": "ref_2.html",
+             "src_run_dir": f"{tmp}/SomeAlbum/track-coach-output/2026-01-02_1000"},
+        ]
+        library.save_index(lib_root, {"entries": entries})
+        return lib_root
+
+    def test_dry_run_writes_nothing(self):
+        """dereference without --apply leaves index unchanged and creates no .bak. G-INV-20."""
+        with tempfile.TemporaryDirectory() as d:
+            lib_root = self._make_lib_with_refs(d)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                idx_before = (lib_root / "index.json").read_text()
+                args = types.SimpleNamespace(album_path=["SomeAlbum"], apply=False)
+                library._cmd_dereference(args)
+                self.assertEqual((lib_root / "index.json").read_text(), idx_before,
+                                 "dry-run must not modify index.json (G-INV-20)")
+                baks = list(lib_root.glob("index.json.bak-*"))
+                self.assertEqual(baks, [], "dry-run must not create .bak file (G-INV-20)")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_apply_backs_up_and_drops_only_references(self):
+        """dereference --apply creates a .bak and drops only reference entries. G-INV-20."""
+        with tempfile.TemporaryDirectory() as d:
+            lib_root = self._make_lib_with_refs(d)
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = types.SimpleNamespace(album_path=["SomeAlbum"], apply=True)
+                library._cmd_dereference(args)
+                baks = list(lib_root.glob("index.json.bak-*"))
+                self.assertEqual(len(baks), 1,
+                                 "exactly one .bak must be created on --apply (G-INV-20)")
+                idx = library.load_index(lib_root)
+                self.assertEqual(len(idx["entries"]), 1,
+                                 "only own entry must remain after dereference --apply (G-INV-20)")
+                self.assertEqual(idx["entries"][0]["track"], "OwnTrack")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_own_entries_and_run_dirs_untouched(self):
+        """dereference --apply keeps own entry; run dirs on disk are never deleted. G-INV-20."""
+        with tempfile.TemporaryDirectory() as d:
+            lib_root = self._make_lib_with_refs(d)
+            # Create a real run dir on disk (the reference album path)
+            run_dir = Path(d) / "SomeAlbum" / "track-coach-output" / "2026-01-01_1000"
+            run_dir.mkdir(parents=True)
+            (run_dir / "result_core.json").write_text("{}")
+            os.environ["TRACK_COACH_LIBRARY"] = str(lib_root)
+            try:
+                args = types.SimpleNamespace(album_path=["SomeAlbum"], apply=True)
+                library._cmd_dereference(args)
+                # own entry still in index
+                idx = library.load_index(lib_root)
+                own = [e for e in idx["entries"] if isinstance(e, dict) and e.get("track") == "OwnTrack"]
+                self.assertEqual(len(own), 1, "own entry must survive dereference (G-INV-20)")
+                # run dir on disk untouched
+                self.assertTrue(run_dir.exists(),
+                                "dereference must NOT delete run dirs on disk (G-INV-20)")
             finally:
                 del os.environ["TRACK_COACH_LIBRARY"]
 

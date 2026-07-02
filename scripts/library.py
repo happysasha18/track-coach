@@ -303,6 +303,10 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
 
 def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
     """Convenience wrapper used by track_analyzer: pull fields from run_meta + result_core.json."""
+    if meta.get("reference"):
+        raise DepositError(
+            "refusing to deposit: run is a reference (G-INV-18) — "
+            "references never enter the library")
     run_dir = Path(run_dir)
     core = {}
     cp = run_dir / "result_core.json"
@@ -566,7 +570,16 @@ def gc_plan(projects_dir: Path, lib_root: Path) -> dict:
             elif is_best:
                 result["keep_best"].append(run_dir)
             else:
-                result["orphan"].append(run_dir)
+                # G-INV-19: a run dir carrying run_meta.json{reference:true} is NEVER an orphan
+                try:
+                    rmp = run_dir / "run_meta.json"
+                    is_reference_run = rmp.exists() and json.loads(rmp.read_text()).get("reference")
+                except (OSError, ValueError):
+                    is_reference_run = False
+                if is_reference_run:
+                    result["keep_referenced"].append(run_dir)
+                else:
+                    result["orphan"].append(run_dir)
     return result
 
 
@@ -1221,6 +1234,57 @@ def _cmd_prune_versions(args):
     _regen_catalog()
 
 
+def _cmd_dereference(args):
+    """Drop library entries whose src_run_dir is under a reference-album path. Dry-run by default. G-INV-20.
+
+    Never deletes run dirs on disk. Only modifies the library index.
+    --apply: backs up index.json to index.json.bak-<UTC-timestamp> before writing.
+    """
+    root = library_root()
+    album_paths = args.album_path or []
+    if not album_paths:
+        sys.exit("dereference: at least one --album-path is required")
+
+    idx = load_index(root)
+    to_keep = []
+    to_drop = []
+    for e in idx["entries"]:
+        if not isinstance(e, dict):
+            to_keep.append(e)
+            continue
+        src = e.get("src_run_dir", "")
+        if any(ap in src for ap in album_paths):
+            to_drop.append(e)
+        else:
+            to_keep.append(e)
+
+    if not to_drop:
+        print("dereference: no matching entries found.")
+        return
+
+    verb = "would drop" if not args.apply else "dropping"
+    for e in to_drop:
+        print(f"  {verb}: {e.get('track', '?')} · {e.get('stamp', '?')} "
+              f"(src: {e.get('src_run_dir', '?')})")
+
+    if not args.apply:
+        print(f"(dry-run — {len(to_drop)} entr{'y' if len(to_drop) == 1 else 'ies'} "
+              f"would be dropped — pass --apply to act)")
+        return
+
+    # Back up index before modifying (G-INV-20: always back up on --apply)
+    idx_path = root / "index.json"
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    bak_path = root / f"index.json.bak-{ts}"
+    shutil.copy2(idx_path, bak_path)
+    print(f"  backed up index to {bak_path.name}")
+
+    idx["entries"] = to_keep
+    save_index(root, idx)
+    print(f"dereference: dropped {len(to_drop)} entr{'y' if len(to_drop) == 1 else 'ies'}; "
+          f"{len(to_keep)} left. Run dirs on disk are untouched (use `gc` to reclaim).")
+
+
 def _cmd_catalog(args):
     """Delegate to catalog.py (the view layer) so `library.py catalog` just works."""
     import catalog
@@ -1317,6 +1381,16 @@ def main():
                     help="versions to keep per track (omit to inspect; no silent default)")
     pv.add_argument("--apply", action="store_true", help="actually prune (default: dry-run)")
     pv.set_defaults(func=_cmd_prune_versions)
+    # dereference (G-INV-20)
+    dr = sub.add_parser("dereference",
+                        help="drop library entries whose src_run_dir is under a reference-album path "
+                             "(G-INV-20, dry-run by default — never deletes run dirs on disk)")
+    dr.add_argument("--album-path", dest="album_path", action="append", default=None,
+                    metavar="PATH",
+                    help="path substring to match against src_run_dir (repeatable)")
+    dr.add_argument("--apply", action="store_true",
+                    help="actually drop entries after backing up index.json (default: dry-run)")
+    dr.set_defaults(func=_cmd_dereference)
     args = p.parse_args()
     args.func(args)
 

@@ -85,13 +85,18 @@ provenance line. Write the rest of the read as usual; let the build own those tw
 
 **Global library (auto).** Every `build` also deposits the finished widget into the global
 library at `~/.track-coach/library/` (override with `$TRACK_COACH_LIBRARY`; pass `--no-deposit`
-to skip). Manage it with `scripts/library.py`:
+to skip). **Reference tracks are the exception:** analyse someone else's track with
+`analyze --reference [--artist NAME]` and it is kept OUT of your library — a reference run is never
+deposited (G-INV-18), so other people's music never mixes into your catalog or signatures. Manage the
+library with `scripts/library.py`:
 ```bash
 python3 "$SKILL_DIR/scripts/library.py" path           # where the library lives
 python3 "$SKILL_DIR/scripts/library.py" list [--track T]
 python3 "$SKILL_DIR/scripts/library.py" catalog --open  # (re)build + open the global Catalog page
 python3 "$SKILL_DIR/scripts/library.py" clean [--older-than DAYS] \
     [--keep-per-track N] [--track T] [--missing]        # dry-run by default; add --apply to act
+python3 "$SKILL_DIR/scripts/library.py" dereference --album-path PATH [--album-path PATH2] \
+    [--apply]                                           # drop refs deposited before --reference existed
 ```
 The library archives the self-contained HTML only (never stems/audio). Every `build` also
 regenerates the **global Catalog** — a standalone `~/.track-coach/library/index.html`: a flat,
