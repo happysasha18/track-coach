@@ -20,6 +20,24 @@ import sys, argparse, gzip, json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+# ── Time-signature enum decoder ───────────────────────────────────────────────
+def _decode_ts_enum(value: int) -> str:
+    """Decode Ableton Live's time-signature enum integer → 'num/den'.
+
+    Ableton stores arrangement metre changes as EnumEvent automation on the
+    MainTrack's TimeSignature parameter.  The encoding is:
+        value = log2(den) * 99 + (num - 1)
+    so den_idx = value // 99, num = (value % 99) + 1, den = 2**den_idx.
+
+    Verified against Fragile_Live12.1.1_minimal.als ground truth:
+        201 → 4/4,  309 → 13/8,  404 → 9/16.
+    """
+    den_idx = value // 99
+    num = (value % 99) + 1
+    den = 1 << den_idx   # 2**den_idx
+    return f"{num}/{den}"
+
+
 # MIDI pitch → note name
 NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
 def midi_to_note(n):
@@ -196,24 +214,86 @@ def parse_als(als_path: str, out_path: str):
     ts_den = get(live_set, "TimeSignature/TimeSignatures/RemoteableTimeSignature/Denominator") or "4"
 
     # ── Time-signature CHANGES across the arrangement ────────────────────────
-    # Every RemoteableTimeSignature carries Numerator/Denominator/Time(beats). Most
-    # projects are one constant 4/4 (Time=0); when the metre actually changes mid-track
-    # there are several distinct (time, sig) entries. Collapse to the transition points.
-    ts_seen = set()
-    for rts in root.iter("RemoteableTimeSignature"):
-        n_el, d_el, t_el = rts.find("Numerator"), rts.find("Denominator"), rts.find("Time")
-        if n_el is None or d_el is None:
-            continue
-        try:
-            beat = float(t_el.get("Value", 0)) if t_el is not None else 0.0
-        except Exception:
-            beat = 0.0
-        ts_seen.add((round(max(0.0, beat), 3), f"{n_el.get('Value','4')}/{d_el.get('Value','4')}"))
-    time_sig_changes, _last = [], None
-    for beat, sig in sorted(ts_seen):
-        if sig != _last:
-            time_sig_changes.append({"beat": round(beat, 2), "time_s": round(beat * beat_to_s, 2), "sig": sig})
-            _last = sig
+    # Ableton stores arrangement metre changes as EnumEvent automation on the
+    # MainTrack's TimeSignature parameter (PointeeId → AutomationTarget under
+    # TimeSignature).  Per-clip RemoteableTimeSignature only holds clip-local
+    # metre and does NOT carry arrangement-level changes — those live here.
+    # Encoding: _decode_ts_enum(value) above.  Fall back to RemoteableTimeSignature
+    # for older projects that have no MainTrack automation envelope.
+    time_sig_changes = []
+    _main_track = live_set.find(".//MainTrack")
+    _ts_envelope = None
+    if _main_track is not None:
+        _ts_at = _main_track.find(".//TimeSignature/AutomationTarget")
+        if _ts_at is not None:
+            _ts_auto_id = _ts_at.get("Id")
+            for _env in _main_track.findall(".//AutomationEnvelope"):
+                _pid_el = _env.find("EnvelopeTarget/PointeeId")
+                if _pid_el is not None and _pid_el.get("Value") == _ts_auto_id:
+                    _ts_envelope = _env
+                    break
+
+    if _ts_envelope is not None:
+        # Base (Manual) value → first entry at beat 0
+        _ts_manual_el = _main_track.find(".//TimeSignature/Manual")
+        _base_val = 201  # default 4/4
+        if _ts_manual_el is not None:
+            try:
+                _base_val = int(_ts_manual_el.get("Value", 201))
+            except (ValueError, TypeError):
+                pass
+
+        # Collect all non-negative-beat events; later event at same beat wins
+        _beat_to_val: dict = {}
+        for _ev in _ts_envelope.findall("Automation/Events/EnumEvent"):
+            try:
+                _b = float(_ev.get("Time", 0))
+                _v = int(_ev.get("Value", _base_val))
+            except (ValueError, TypeError):
+                continue
+            if _b < 0:
+                continue  # pre-roll default value; skip
+            _beat_to_val[round(_b, 3)] = _v
+
+        # Prepend beat-0 entry with Manual value if no event exists there
+        _all_beats = sorted(_beat_to_val)
+        if not _all_beats or _all_beats[0] > 0:
+            _beat_to_val[0.0] = _base_val
+            _all_beats = [0.0] + _all_beats
+
+        _last_sig = None
+        for _b in _all_beats:
+            _sig = _decode_ts_enum(_beat_to_val[_b])
+            if _sig != _last_sig:
+                time_sig_changes.append({
+                    "beat": round(_b, 2),
+                    "time_s": round(_b * beat_to_s, 2),
+                    "sig": _sig,
+                })
+                _last_sig = _sig
+    else:
+        # Fallback for older projects: read per-clip RemoteableTimeSignature markers.
+        # These only reflect the clip's local metre, not arrangement-wide changes.
+        _ts_seen: set = set()
+        for rts in root.iter("RemoteableTimeSignature"):
+            n_el, d_el, t_el = rts.find("Numerator"), rts.find("Denominator"), rts.find("Time")
+            if n_el is None or d_el is None:
+                continue
+            try:
+                _b = float(t_el.get("Value", 0)) if t_el is not None else 0.0
+            except Exception:
+                _b = 0.0
+            _ts_seen.add((round(max(0.0, _b), 3),
+                          f"{n_el.get('Value', '4')}/{d_el.get('Value', '4')}"))
+        _last = None
+        for _b, _sig in sorted(_ts_seen):
+            if _sig != _last:
+                time_sig_changes.append({
+                    "beat": round(_b, 2),
+                    "time_s": round(_b * beat_to_s, 2),
+                    "sig": _sig,
+                })
+                _last = _sig
 
     # ── Locators / Markers ───────────────────────────────────────────────────
     markers = []

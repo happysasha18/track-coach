@@ -106,16 +106,28 @@ class ReferenceReadHeader(unittest.TestCase):
         self.assertIn("Leans toward", html, "header must say 'Leans toward'")
         self.assertIn("Near", html, "header must name the nearest direction")
 
-    def test_header_colour_is_green_for_close(self):
+    def test_header_direction_name_uses_neutral_colour(self):
+        """'Leans toward <Name>' must use the neutral accent (var(--wob)), NOT the green/amber level hex.
+        Alexander 2026-07-02: level colour on the header confused when chip and bar colours already
+        carry the per-facet signal; the header just names which direction, order carries rank."""
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES},
             self._dirs_with_clear_lean(),
             _norm_identity()
         )
-        self.assertIn("#2e9e5b", html, "close lean must use green #2e9e5b")
+        import re
+        # The <strong> in the header must use var(--wob), not a level hex.
+        strong_match = re.search(r'<strong style="color:([^"]+)">', html)
+        self.assertIsNotNone(strong_match, "header <strong> must have a style colour")
+        colour = strong_match.group(1)
+        self.assertEqual(colour, "var(--wob)",
+                         "header direction name must use neutral var(--wob), not a level colour")
+        self.assertNotIn("#2e9e5b", html.split("refread-bars")[0],
+                         "green level hex must not appear in the header area")
 
-    def test_header_colour_is_amber_for_mid(self):
-        # Mid lean: nearest is moderately apart (sep ≈ 0.37)
+    def test_header_direction_name_not_amber_for_mid(self):
+        """'Leans toward <Name>' must not use amber (#d8932a) even when the nearest lean is MID.
+        Alexander 2026-07-02: header uses neutral var(--wob) regardless of closeness level."""
         dirs = {"Near": _zfp(tempo=0.5), "Mid": _zfp(tempo=4.0), "Far": _zfp(tempo=9.9)}
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES},
@@ -123,8 +135,13 @@ class ReferenceReadHeader(unittest.TestCase):
             _norm_identity()
         )
         lean = SC.leans_toward(_zfp(), dirs)
-        if lean and lean.level == SC.MID:
-            self.assertIn("#d8932a", html, "mid lean must use amber #d8932a")
+        if lean:
+            # The header <strong> must never carry the amber level hex, regardless of level.
+            import re
+            strong_match = re.search(r'<strong style="color:([^"]+)">', html)
+            if strong_match:
+                self.assertNotEqual(strong_match.group(1), "#d8932a",
+                                    "amber must not appear on the header direction name")
 
     def test_far_lean_shows_no_close_direction_yet(self):
         # Two equidistant directions → FAR
@@ -327,16 +344,28 @@ class ReferenceReadTabSelector(unittest.TestCase):
             self.assertIn('display:none', panels[1],
                           "second panel must be hidden until tab is clicked")
 
-    def test_nearest_tab_coloured_by_close_level(self):
-        """The nearest direction tab is coloured green (#2e9e5b) when level is CLOSE."""
+    def test_nearest_tab_not_level_coloured(self):
+        """Direction chips/tabs must NOT carry the green/amber/red level colour.
+        Similarity is not normalizable to a meaningful scale (Alexander 2026-07-02):
+        order (nearest-first) carries the rank; only the active chip is highlighted
+        via .reftab.active CSS — no per-chip level colour hex in the button markup."""
         dirs = {"Near": _zfp(tempo=0.1), "FarDir": _zfp(tempo=9.0)}
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
         )
+        # Level-colour hex codes must NOT appear on .reftab buttons.
+        # Extract button markup only (between <div class="reftabs"> and </div>).
         import re
-        lean = SC.leans_toward(_zfp(), dirs)
-        if lean and lean.level == SC.CLOSE:
-            self.assertIn("#2e9e5b", html, "CLOSE nearest tab must use green")
+        tabs_match = re.search(r'<div class="reftabs">(.*?)</div>', html, re.DOTALL)
+        if tabs_match:
+            tabs_html = tabs_match.group(1)
+            self.assertNotIn("#2e9e5b", tabs_html,
+                             "CLOSE green must NOT appear on tab chips")
+            self.assertNotIn("#d8932a", tabs_html,
+                             "MID amber must NOT appear on tab chips")
+        # Active chip must be distinguished via class, not inline colour.
+        self.assertIn('class="reftab active"', html,
+                      "first (active) tab must carry the .reftab.active class")
 
     def test_tab_js_present_for_multi_direction(self):
         """Client-side JS for tab switching must be present when ≥2 tabs exist."""

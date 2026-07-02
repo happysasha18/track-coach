@@ -59,6 +59,10 @@ The nouns the rest of the spec talks about. Each is a real measured thing with a
 - **scene** — a named, lettered section of the track (Intro / Build / Drop / Breakdown / …). The **name**
   is a musical claim about what the section does; the **letter** is a claim about what returns later.
 - **.als part** — one project track, group, or return, with its automation and clips.
+- **metre changes** — arrangement-level time-signature shifts read from the master time-signature
+  automation envelope (`EnumEvent`s on the `MainTrack`'s `TimeSignature` parameter), NOT from
+  `RemoteableTimeSignature` (which is per-clip only). Encoding: `log2(den) * 99 + (num − 1)`;
+  e.g. 201 = 4/4, 309 = 13/8, 404 = 9/16. `tags: parse_als/decode_ts_enum`
 
 ## B. The credibility layer — never say more than the numbers support
 
@@ -1203,8 +1207,7 @@ column tints by closeness against the **library's own distance distribution** (�
 amber are the default; red is a last-resort tint** in §F — used only when nothing closer qualifies, never
 hiding that the sibling is far. A reference **runner-up (+second direction) is now RESOLVED by listing, not
 tinting** (D-24 resolved 2026-06-26): the surface shows the **up to three nearest directions as a
-nearest-first selector** (§D.10.1, D-INV-27), so a second and third direction are their own ordered, colour +
-glyph-cued entries — not a self-contradictory second tint crammed into one cell. The old worry (a *tied*
+nearest-first selector** (§D.10.1, D-INV-27), so a second and third direction are their own clearly-ordered entries — not a self-contradictory second tint crammed into one cell. The old worry (a *tied*
 second under relative lean means the nearest does NOT stand apart) dissolves because a list HAS an order to
 carry the ranking, exactly as §F's own-library list does. So colour is never the *sole* channel:
 in **§F** (a list of up to three) the **nearest-first order** carries the ranking; in the **§D reference
@@ -1239,14 +1242,7 @@ composition is proven, but a 0.9 build neither renders nor tests them. `tags: sc
   reference list: a far *direction* is noise, whereas §F keeps its single-red last-resort because a far *own
   sibling* is still a real track you might mix. With no directions defined at all, "no direction yet" (D-INV-22).
   `tags: fewer-not-filler · supersedes-F-INV-1-for-§D · D-INV-27`
-- **Each shown direction is tinted by its OWN closeness, order carries the rank.** Each entry's colour + glyph
-  cue (D-INV-26) reflects **how close THAT direction is to the track**, by **one fixed formula at every list
-  position: the gap from this entry to the NEXT-shown entry** (the relative-lean basis, ⟨DECIDE D-28⟩,
-  z-normalised) — a big gap to the next reads as a strong lean, a small gap as a mild one. (Not "stand apart
-  from the whole field" — that's a different number; the gap-to-next is the one we use, so two builders paint
-  the same colours.) The nearest-first order carries which is closest. So the cue is defined for every entry
-  shown, not only the top one, and a list of two amber entries reads honestly as "two mild leans, neither
-  strong". `tags: D-INV-26 · per-entry-cue · gap-to-next · D-INV-27`
+- **Direction chips/tabs are neutral — nearest-first order carries the rank; only the active chip is highlighted.** Similarity is not normalizable to a meaningful 0–1 scale (Alexander 2026-07-02): a nearer chip could read amber while a farther one read green, which confused rather than informed. The ordering already carries all the closeness information needed: first tab = nearest direction, second = next nearest. Colour-coding the tabs by level added noise without meaning. The active tab is visually distinguished via its `.reftab.active` class (accent border, full opacity); inactive tabs are muted. The facet bars INSIDE each panel retain their green/amber/red colour (those are per-facet, meaningful divergence signals — untouched). `tags: D-INV-27`
 - **No numbers, no "#1/#2/#3".** Position in the list IS the ranking; the surface never prints a rank number,
   distance, or score (D-INV-25 unchanged).
 - **Ties resolve deterministically.** When two directions sit at the same distance, the order — and which is

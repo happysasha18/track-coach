@@ -127,14 +127,26 @@ Translate the example, don't paste it verbatim:
 Don't ask for permission to run Deep mode. Run everything by default.
 
 **If the user gives a folder (or you can see the project folder):** discover inputs
-yourself instead of asking.
+yourself, but **ASK before guessing when the choice is load-bearing** — a wrong input is
+worse than a question.
 - Audio render: pick the newest matching file —
   `ls -t <folder>/*.{wav,mp3,m4a,aiff,flac} 2>/dev/null | head -1` (prefer a bounced
   render over stems). If several look like versions, show the top few and confirm which.
-- Project: newest `.als` — `ls -t <folder>/*.als 2>/dev/null | head -1` (skip the
-  `Backup/` subfolder). If the audio is a render of a *section*, you'll still need the
-  render offset — ask which locator it starts from (see Step 2).
-Tell the user which files you picked before running, so a wrong guess is caught early.
+- **Project `.als` — NEVER just default to the newest when there are several.** A folder
+  often holds many arrangements (`_minimal`, `_rearrange`, `_melodic`, `v2`, …) that DIFFER
+  in content, length, AND time-signature/meter changes. `ls -t <folder>/*.als` (skip
+  `Backup/`), then **SHOW the list and ASK which one is THIS track** — don't assume the base
+  `.als` reflects the arrangement (Live keeps the default 4/4 in `RemoteableTimeSignature`
+  while the real meter changes live in the time-signature AUTOMATION; the wrong file reads as
+  a flat 4/4). *(Alexander 2026-07-02: "не тот алс, там их несколько — умей спросить на что смотреть.")*
+- **The audio may be many BLOCKS with silence between them** (multiple takes/sections on one
+  timeline, long gaps in the middle). Don't analyse one flat span blind: detect the non-silent
+  blocks first, and if there's more than one substantial block, **SHOW where they are and ASK
+  which block is the track** (or whether to treat the whole thing as one). Don't read silence
+  as content. *(Alexander 2026-07-02: "умей смотреть на какой блок если там много тишины в середине.")*
+- If the audio is a render of a *section*, you still need the render offset — ask which
+  locator it starts from (see Step 2).
+Tell the user which files/blocks you picked before running, so a wrong guess is caught early.
 
 ## Step 0b — Environment check + auto-setup
 

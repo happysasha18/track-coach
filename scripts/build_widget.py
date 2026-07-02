@@ -2555,7 +2555,6 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     # Build one content panel per qualifying direction
     panels_html = []
     for i, lean in enumerate(leans):
-        level_color = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
         centroid_z  = directions[lean.direction]
         conf_entries = (confirmation or {}).get(lean.direction, [])
         rows_html, summary = _refread_bars_html(track_z, centroid_z,
@@ -2567,7 +2566,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         panels_html.append(
             f'<div class="refpanel" data-didx="{i}"{hidden}>'
             f'<p class="refread-hdr">Leans toward'
-            f' <strong style="color:{level_color}">{_esc(lean.direction)}</strong></p>'
+            f' <strong style="color:var(--wob)">{_esc(lean.direction)}</strong></p>'
             f'<p class="refread-summary">{_esc(summary)}</p>'
             f'<div class="refread-bars">{rows_html}</div>'
             f'</div>'
@@ -2577,13 +2576,14 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         return ""   # all directions had no shared axes (degenerate)
 
     # Tab buttons: only rendered when ≥2 panels (1 qualifying direction → no tab bar)
+    # Chips are neutral — no level colour. Nearest-first order carries the rank.
+    # Only the active chip is distinguished (via .reftab.active CSS — accent border, full opacity).
     tabs_html = ""
     if len(panels_html) > 1:
         btns = ""
         for i, lean in enumerate(leans[:len(panels_html)]):
-            col = _REF_LEVEL_COLOR.get(lean.level, "#8b94a8")
             active = ' class="reftab active"' if i == 0 else ' class="reftab"'
-            btns += (f'<button{active} data-didx="{i}" style="color:{col}">'
+            btns += (f'<button{active} data-didx="{i}">'
                      f'{_esc(lean.direction)}</button>')
         tabs_html = f'<div class="reftabs">{btns}</div>'
 
