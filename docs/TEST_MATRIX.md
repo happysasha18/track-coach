@@ -495,3 +495,27 @@ Owned by `tests/test_parse_als.py`.
 | METRE-5 | Parsing Fragile_minimal.als yields `time_sig_changes` with 9/16, then 13/8, then 4/4 as ordered subsequence [disk-gated] | `test_parse_als::FragileMeterChanges::test_order_9_16_then_13_8_then_4_4` |
 | METRE-6 | `time_sig_changes` beats are ascending [disk-gated] | `test_parse_als::FragileMeterChanges::test_beats_ascending` |
 | METRE-7 | `time_sig_changes[*].time_s` ≈ beat × 60/bpm [disk-gated] | `test_parse_als::FragileMeterChanges::test_time_s_consistent_with_beat` |
+
+## §I — Visual design system (SPEC §I → DS-INV-1…14, 2026-07-02)
+
+Movement 1 (landed): the single token source + colour ladder/drift. Guarded at source-of-shipped-CSS
+level by `tests/test_design_tokens.py` (the CSS is emitted verbatim from `build_widget.TEMPLATE`).
+
+| code | rule (1-line) | owning test / status |
+|---|---|---|
+| DS-INV-2 | Catalog PALETTE shared roles are byte-equal to the widget `:root` (no re-drift; `line`/`ink` re-synced). | `test_design_tokens::test_catalog_palette_matches_widget_root` |
+| DS-INV-3a | `--ink-dim` is defined in the widget `:root` (and catalog copy). | `test_design_tokens::test_ink_dim_token_defined` |
+| DS-INV-3b | The 8 near-white + 2 drift raw hexes (#eef1f8/#cfd6e6/#cdd5e6/#c3cbdc/#aab3c7/#a0a8bc/#8b93a7 + #ffb13f→warn, #6fdfb8→good) are tokenised in the CSS rules (token defs excepted). | `test_design_tokens::test_ladder_and_drift_tokenised_in_css` |
+| DS-INV-7c | The guard is by LOCATION: stem-colour arrays + the canvas meter label keep their raw hex (data-viz untouched). | `test_design_tokens::test_stem_and_canvas_literals_untouched` |
+
+Deferred (next movement — surface named, not yet coded):
+| code | rule (1-line) | lands with |
+|---|---|---|
+| DS-INV-6 | rec-card left stripe renders a `bad`/red variant for a bad-severity card. | §1 cont. — rec-card CSS (`build_widget.py` `.rec` block) + a browser test |
+| DS-INV-5 (bg) | category backgrounds (#3a4060/#2e3a52/#3a3040/#3a2832) derive from `--panel2`/`--line`. | §1 cont. — `.refread-cat` CSS |
+| DS-INV-12 | every `border-radius` ∈ {10,14,18,20}; 6/8/9/11/12 snap. | §5 radii pass + browser test |
+| DS-INV-10 | motion tokens `--dur-fast/--dur-base/--ease` replace `.12s/.15s`. | §3 |
+| DS-INV-11 | one state ladder (rest/hover/focus/active/selected/disabled). | §4 |
+| DS-INV-13 | one segmented control from `.seg`/`.viewtoggle`/`.reftabs`; selected = `--wob` fill. | §6 + browser test (new selected look) |
+| DS-INV-8 | recs grid `auto-fill minmax`, cap 2; REPLACES s34 container-query; column-count tests updated. | §2 — update `test_headless_render` recs rows |
+| DS-INV-14 | typography fractional sizes fold into `--fs-1..4`; weights ⟨DECIDE DS-1⟩ held for Alexander. | §8 audit |

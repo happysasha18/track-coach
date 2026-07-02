@@ -39,8 +39,10 @@ _REF_FILE = _DATA_DIR / "reference_directions.json"
 _SIM_COL = {"close": "#2e9e5b", "mid": "#d8932a", "far": "#c2503d"}
 
 PALETTE = {  # slim copy of the build_widget dark theme so the catalog feels like the widgets
-    "bg": "#0c0e14", "panel": "#141822", "panel2": "#1b2030", "line": "#2a3142",
-    "ink": "#e8ecf6", "muted": "#8b94a8", "wob": "#a78bfa", "good": "#46d39a",
+    # SPEC §I.0 DS-INV-1/2: canon = the WIDGET values; these MUST stay byte-equal on shared roles
+    # (test_design_tokens.py guards it). `line`/`ink` drifted here historically and were re-synced.
+    "bg": "#0c0e14", "panel": "#141822", "panel2": "#1b2030", "line": "#262c3c",
+    "ink": "#e8ecf5", "ink_dim": "#aeb6c8", "muted": "#8b94a8", "wob": "#a78bfa", "good": "#46d39a",
     "bad": "#ff6b6b", "bright": "#ffd166",
 }
 

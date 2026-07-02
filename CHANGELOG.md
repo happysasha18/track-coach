@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.17] — 2026-07-02
+
+### Changed
+- **Design system, part 1 — one colour source, consistent text greys.** Started vivifying Alexander's
+  design-session decisions into the code. The catalog palette had quietly drifted from the widget on two
+  colours; it's now re-synced to one source. The tangle of near-identical off-white text colours is
+  collapsed to a clean 3-step ladder (`--ink` / `--ink-dim` / `--muted`), and a couple of stray hardcoded
+  colours (a reference star, a chip highlight) now use the proper good/warn tokens. Chart and per-stem
+  colours are deliberately left as-is. No visible layout change yet — the corners, spacing, controls and
+  typography follow in part 2.
+
+### Fixed
+- A wrong fallback colour on the card "based on" line (it named a slightly-off grey instead of the muted token).
+
 ## [0.9.16] — 2026-07-02
 
 ### Fixed

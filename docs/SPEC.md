@@ -2003,6 +2003,160 @@ user never has to remember to save. The management verbs (`backup`, `restore`, `
   removes `backups/` (H-INV-10); plain `reset` keeps the safety net (H-INV-6). Backups capture the curated tiers
   only (keep + references), scratch excluded unless `--full` (H-INV-8).
 
+## I. The visual design system — tokens & components (1.0, 2026-07-02, Alexander's design session)
+
+**Why this exists.** The widget CSS kept drifting: the same visual role lived as several raw hex
+values, radii were ad-hoc (6/8/9/11/12), three near-identical segmented controls were maintained
+separately, and the catalog palette had silently forked from the widget. Alexander ran a design
+session on claude.ai/design (project `track-coach`, `aae67990-…`) and produced a settled decision
+record — the implementable form is `docs/design/DESIGN_SESSION_2026-07-02.md` (v3). This section is
+the prover-ready spec of that system; the design doc is its human narrative, and the claude.ai/design
+project is its browsable component library. One role = one token = one name.
+
+### I.0 Single token source (root of the drift)
+- **Entity: the token set.** The canonical values are the WIDGET `:root` (`build_widget.py`), NOT
+  the catalog. The catalog (`catalog.py PALETTE`) had drifted on two roles — `ink` #e8ecf6 (widget
+  #e8ecf5) and `line` #2a3142 (widget #262c3c).
+- **DS-INV-1 (one source):** every UI role has ONE value, defined once, used by both the widget and
+  the catalog. Canon = the widget values. The catalog re-declares the SAME values (it is a separate
+  offline HTML file, so it carries its own copy, but the copy must be byte-equal on shared roles).
+- **DS-INV-2 (no fork):** a test asserts the catalog's shared roles equal the widget's (no re-drift).
+
+### I.1 Colour
+- **Neutrals** `--bg #0c0e14 · --panel #141822 · --panel2 #1b2030 · --line #262c3c · --ink #e8ecf5 ·
+  --muted #8b94a8` and the **brand accent** `--wob #a78bfa` — unchanged.
+- **State triple** `--good #46d39a · --warn #ffb454 · --bad #ff6b6b`.
+- **`--bright #ffd166`** — KEPT as its own UI token (role = "highlight/attention"; yellow ≠ amber).
+  Its UI uses are chart-attention marks (the ★ climax marker, meter-change lines, the reference
+  overlay dashes) + the run-mode "quick" badge. It is NOT merged into `--warn`.
+- **Text ladder (DS-INV-3):** the ~8 near-white raw hexes collapse to a 3-rung ladder by an EXPLICIT
+  per-hex map (no judgment at edit time): `--ink #e8ecf5` ← #eef1f8, #cfd6e6, #cdd5e6 (brightest) ·
+  `--ink-dim #aeb6c8` ← #c3cbdc, #aeb6c8, #aab3c7, #a0a8bc (mid) · `--muted #8b94a8` ← #8b93a7
+  (dimmest). 8 → 3. `--ink-dim` is a NEW token — add it to the widget `:root` AND the catalog copy.
+- **Reds (DS-INV-4):** UI-red → `--bad`; the magma/data reds stay in the gradient (below).
+- **Colour drift → tokens (DS-INV-5):** `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn` ·
+  the category backgrounds `#3a4060 / #2e3a52 / #3a3040 / #3a2832` derive from `--panel2`/`--line`.
+- **rec-card severity (DS-INV-6):** the left stripe encodes severity `good / warn / bad` (ADD the
+  `bad`/red variant). `--wob` is the neutral/brand accent, never an alarm level.
+- **Data-viz colours are OUTSIDE the UI palette and are LEFT UNTOUCHED — TWO sets:**
+  - **DS-INV-7a (colormap):** the arc/frequency colours are a magma/viridis perceptual gradient
+    (#4cc9f0 … #fcfdbf #8c2981 #3b0f70). NOT tokenised.
+  - **DS-INV-7b (categorical stems):** the stem colours are fixed categories —
+    `kick #ff5d73 · bass #a78bfa · drums #4cc9f0 · hats #5ad1c2 · chord #46d39a · lead #ffd166 ·
+    other #8b94a8`. Documented as a plaque group, left as raw literals.
+  - **DS-INV-7c (the dedup guard — critical; keyed by LOCATION, not hex value):** some stem literals
+    share a hex with a UI token (bass=--wob, chord=--good, other=--muted, lead=#ffd166, kick pink-red
+    near --bad) — they are byte-identical strings, so a value-based test cannot tell an allowed stem
+    literal from a forbidden UI raw hex. The guard therefore keys off WHERE the hex sits: the
+    whitelisted data-viz sites are the stem/family/drum colour arrays (`FAM`/`FCOL`/`DRCOL`/`COMP`),
+    canvas `ctx.fillStyle/strokeStyle`, colormap steps, and the favicon `<svg>`. The guard scans ONLY
+    CSS-rule / style-attribute / `:root` text and fails on a raw hex THERE that equals a token value.
+    The "exact-dupe → var(--token)" pass MUST NOT rewrite the data-viz literals — doing so would
+    falsely couple a data category to a UI role and could collide two stems (e.g. hats #5ad1c2 vs
+    drums #4cc9f0 must stay distinct; kick #ff5d73 must not become --bad).
+
+### I.2 Layout & grid (new tokens)
+- **Container widths:** `--w-prose 640px` (text/advice) · `--w-content 1120px` (main column) ·
+  `--w-full 100%` (ribbons/graphs).
+- **DS-INV-8 (grid by width, not breakpoints):** the card grid is
+  `grid-template-columns: repeat(auto-fill, minmax(<min>px, 1fr))` — columns emerge from
+  `floor((width+gap)/(minCard+gap))`, no media queries; `<min>` is chosen from the desired column
+  count at the target window. Fluid sizes use `clamp()`; a component in variable-width slots uses a
+  container query, not media. **This REPLACES the s34 `#recsPanel` container-query recs grid — the
+  existing `test_headless_render` recs column-count assertions are UPDATED to the new expected counts,
+  not held constant (this is a deliberate layout change, not a restyle). The recs cap stays 2 columns
+  (a rec card wants a readable line length; `<min>` picked so a ~1120px content column yields 2).**
+- **Spacing split (DS-INV-9):** two roles — `--gap 8/12/16` (within a group) and `--rhythm 28/44`
+  (between sections).
+
+### I.3 Motion (new tokens)
+- `--dur-fast 120ms` (hover, highlight, small colour change) · `--dur-base 180ms` (appear, state
+  change, expand) · `--ease ease-out` (no springs).
+- **DS-INV-10:** components use these tokens, not the scattered `.12s/.15s` literals.
+
+### I.4 State ladder (one, for buttons / segments / fields)
+- The interactive states form ONE ladder: `rest` (muted text / thin border) → `hover` (text→`--ink`,
+  or accent fills `--wob`; `--dur-fast`) → `focus` (ring `box-shadow: 0 0 0 3px` of `--wob` at ~.4α —
+  via `color-mix(in srgb, var(--wob) 40%, transparent)`, NOT a raw rgba, so the guard stays honest)
+  → `active` (`translateY(1px)`) → `selected` (fill `--wob`, text `var(--bg)`, bold) → `disabled`
+  (`opacity:.45; cursor:not-allowed`).
+- **DS-INV-11:** every interactive control (buttons, segmented control, the search field) draws from
+  this same ladder — no per-component bespoke hover/selected colours.
+
+### I.5 Radii (scale of 4)
+- **DS-INV-12:** every `border-radius` is one of `--radius 10 · --radius-lg 14 · --radius-xl 18 ·
+  --radius-pill 20`. The ad-hoc 6/8/9/11/12 snap in (12→14, 6/8/9/11→10 or the nearest rung). No
+  `--radius-xs`; the 4px bars are decoration, exempt.
+
+### I.6 Segmented control (one, not three)
+- **Entity: the segmented control.** `.seg`, `.viewtoggle`, `.reftabs` merge into ONE component.
+- **DS-INV-13:** container `border:1px solid --line; border-radius:--radius; overflow:hidden`;
+  buttons `padding:9px 14px`; `selected` = fill `--wob` + text `var(--bg)` + bold; `rest` = transparent
+  bg + text `--muted`; `hover` → `--ink`; transition `--dur-fast`. The three former controls render
+  from this one class. **Intended VISIBLE change:** the view-toggle's selected state moves from the
+  current subtle `panel2` fill to the bold `--wob` fill, and the reference tabs from a
+  `border-color`+opacity active to the same `--wob` fill — screenshot both in the before/after so the
+  shift is deliberate, and the browser tests assert the NEW selected look, not the old.
+
+### I.7 Per-component contracts (all 10)
+Each component draws ONLY from the tokens above (all §7 taste calls decided in the design doc v3):
+1. **buttons** — `.pbtn` accent, `.pmini/.backlink/.copen` ghost, `.cplay` round (stays 50%); state
+   ladder; radii → `--radius`.
+2. **chips** — `.pill` → `--radius-pill`; `.chip-level` close/mid/far = good/warn/bad; `.chip-char`
+   → `--radius`; `color-mix` tints kept; static (no hover).
+3. **collapsible-panel `.tc-panel`** — radius 18 → `--radius-xl`, nested 12 → `--radius-lg`; ▸/▾
+   marker = closed/open on `--wob`; nested background `rgba(0,0,0,.12)`. **Expansion animates via
+   `grid-template-rows: 0fr → 1fr` (CSS cannot transition `height:auto`), `--dur-base` — NOT a raw
+   `height` transition (that no-ops and the native jump persists).** Persistence rule: a panel
+   RESTORED open on reopen renders expanded with NO first-frame zero-height (the animate-from-0 must
+   only run on a user toggle, not on initial restore).
+4. **panel** — `.panel/.panel2` → `--radius-lg`; backgrounds `--panel/--panel2`; kicker `--wob`.
+5. **player-transport** — `.pbtn/.pmini` as buttons; `.ptime` tabular-nums `--muted`; `.seekbar`
+   track `--panel2` + fill `--wob`, thumb `--wob` + ring; `.pstem` mute.on `--bad` / solo.on `--good`.
+6. **rec-card** — left stripe severity good/warn/bad (DS-INV-6); `--radius-lg`; stripe 3px.
+7. **reference-bar** — `.reftabs` → the one segmented control; `.refread-cat` hardcoded backgrounds
+   derive from `--panel2/--line`; star #ffb13f → `--warn`, chip #6fdfb8 → `--good`, halfstar → `--muted`.
+8. **search** — `#q` focus (state ladder); `.seg` → the segmented control; `.count` `--muted`.
+9. **view-toggle** — `.viewtoggle` → the segmented control; `.viewhint` `--muted`.
+10. **vitals** — `.vitals` → `--radius-lg`; `.vval` warn/bad/good; `.vlabel`+`.srcmeta` `--muted`,
+    `.srcmeta b` → `--ink`; `::before` separators on `--line`.
+
+### I.8 Typography — audited, weights held for Alexander
+- The scale exists (`--fs-kicker 10.5 · --fs-1..6 = 12/13/14/15/20/28`) but components drift: weights
+  `620`/`650` (off 400/500/600/700), heading sizes `21`/`22` (off scale), fractional `13.5/12.5/11.5`.
+- **DS-INV-14 (mechanical snaps):** fractional sizes fold into `--fs-1..4`; the audit runs the same
+  grep-and-count as colour.
+- **⟨DECIDE DS-1⟩ (Alexander's call — the sole open taste item):** which weight goes where (snap 620/650
+  → 600 or 700?) and whether h1 21/22 snaps to `--fs-5 20` or gets a dedicated heading token. Audit +
+  safe snaps land now; the weight placement waits for him.
+
+### I.9 Machine-checked invariants (all at ≥ browser-rendered level per the test method)
+- No UI-CSS raw hex duplicates a token (DS-INV-7c guard, stem/colormap whitelisted).
+- Catalog shared roles == widget roles (DS-INV-2).
+- Every `border-radius` ∈ the 4-rung scale (DS-INV-12).
+- Exactly ONE segmented-control class, used by all three former controls (DS-INV-13).
+- The `--bright` UI uses render (climax ★, meter marks, ref overlay, quick badge) — unchanged pixels.
+- rec-card renders a `bad`/red stripe for a bad-severity card (DS-INV-6).
+
+### I.10 Composition across the axes
+- **× view (Simple/Detailed/quick):** the tokens are view-independent, but the components they style
+  are gated (e.g. `#stemlanes`/`#seqKey` Detailed-only, `#refRead` Detailed-only, the view-toggle
+  hidden on quick → `.viewhint`). The refactor must not change any view-VISIBILITY rule — the existing
+  view-ladder visibility browser tests pass UNCHANGED. (Distinct from the recs COLUMN-COUNT tests,
+  which DO change per DS-INV-8 — visibility is held, layout counts are updated.)
+- **× persistence/reopen:** the `.tc-panel` open/closed state and the remembered global view survive a
+  reopen; the animated-height change (I.7 #3) must not break the persisted-open render (a panel
+  restored open shows expanded, no first-frame collapse).
+- **× viewport:** the grid (DS-INV-8) yields column counts by width with no media-query cliff; the
+  segmented control and cards stay within `--w-content`.
+
+### I.11 Open decisions
+- **⟨DECIDE DS-1⟩** — §I.8 typography weight placement (above). The only open taste call.
+- **⟨DECIDE DS-2⟩** — catalog `_SIM_COL` (`#2e9e5b/#d8932a/#c2503d`) is a SEPARATE, darker
+  similarity-column palette, not the `--good/--warn/--bad` tokens. The design doc did not cover it.
+  Lean: LEAVE it (a deliberate muted table palette), do not force it onto the state tokens — but flag
+  to Alexander whether he wants the catalog table to use the same state colours as the widget.
+
 ## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
 `STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.16"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.17"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2702,7 +2702,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <title>Track Coach · __TITLE__</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230c0e14'/><rect x='6' y='14' width='4' height='12' rx='1.6' fill='%23a78bfa'/><rect x='13' y='7' width='4' height='19' rx='1.6' fill='%234cc9f0'/><rect x='20' y='11' width='4' height='15' rx='1.6' fill='%23ffd166'/></svg>">
 <style>
-:root{--bg:#0c0e14;--panel:#141822;--panel2:#1b2030;--ink:#e8ecf5;--muted:#8b94a8;
+:root{--bg:#0c0e14;--panel:#141822;--panel2:#1b2030;--ink:#e8ecf5;--ink-dim:#aeb6c8;--muted:#8b94a8;
  --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--bg) 60%);
@@ -2741,7 +2741,7 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
 /* verdict — the calm one-glance headline */
 .verdict{background:linear-gradient(180deg,rgba(167,139,250,.10),rgba(167,139,250,.03));
  border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:14px;
- padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:#eef1f8;max-width:840px}
+ padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:var(--ink);max-width:840px}
 .verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
 /* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, the EVIDENCE
@@ -2772,10 +2772,10 @@ body.simple #refRead{display:none!important}
  text-align:center;border-radius:4px;padding:1.5px 0;font-weight:600;letter-spacing:.02em}
 #refRead .refread-label{flex:0 0 155px;font-size:12.5px;color:var(--muted);text-align:right;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#refRead .refread-label .refread-star{font-size:11px;margin-left:3px;color:#ffb13f}
-#refRead .refread-label .refread-halfstar{color:#a0a8bc}
+#refRead .refread-label .refread-star{font-size:11px;margin-left:3px;color:var(--warn)}
+#refRead .refread-label .refread-halfstar{color:var(--ink-dim)}
 #refRead .refread-label .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
- color:#6fdfb8;padding:0 4px;border-radius:5px;margin-left:3px;cursor:help;
+ color:var(--good);padding:0 4px;border-radius:5px;margin-left:3px;cursor:help;
  font-weight:500;vertical-align:1px}
 #refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden}
 #refRead .refread-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:#3a3f52}
@@ -2785,7 +2785,7 @@ body.simple #refRead{display:none!important}
  display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
 #refRead .refread-legend b{color:var(--ink)}
 #refRead .refread-legend .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
- color:#6fdfb8;padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
+ color:var(--good);padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
 /* Web-info plaque (§D.10.2, "What the web says") — collapsed tc-panel, Detailed-only, after #refRead */
 body.simple #webPanel{display:none!important}
 #webPanel{margin:10px 0 0}
@@ -2864,15 +2864,15 @@ body.quick #recs .rec:not([data-t]){display:none!important}
    (white bold) and section heads (yellow) carry the hierarchy; generous spacing;
    section dividers; real bullet list. Full width (no reading cap — line length
    was never the problem; structure + colour hierarchy is). */
-.read #readBody{font-size:14.5px;line-height:1.8;color:#aab3c7}
+.read #readBody{font-size:14.5px;line-height:1.8;color:var(--ink-dim)}
 .read #readBody p{margin:0 0 16px}
 /* §B.12 "how it develops" — a quiet computed lead-line, set apart from the authored prose. */
 .read #readBody p.readdev{margin:0 0 20px;padding:10px 14px;background:rgba(124,107,255,.07);
- border-left:2px solid var(--accent,#7c6bff);border-radius:0 6px 6px 0;color:#c3cbdc;font-size:14px}
+ border-left:2px solid var(--accent,#7c6bff);border-radius:0 6px 6px 0;color:var(--ink-dim);font-size:14px}
 .read #readBody p.readdev .devlab{display:inline-block;margin-right:8px;font-size:10.5px;font-weight:700;
  letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#9b8cff)}
 .read #readBody strong{color:#fff;font-weight:650}
-.read #readBody em{color:#cdd5e6;font-style:italic}
+.read #readBody em{color:var(--ink);font-style:italic}
 .read #readBody h3{font-size:15.5px;color:var(--bright);margin:30px 0 12px;font-weight:700;
  letter-spacing:.01em;padding-top:16px;border-top:1px solid var(--line)}
 .read #readBody h3:first-child{margin-top:2px;padding-top:0;border-top:0}
@@ -2921,12 +2921,12 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .rec[data-t]:hover{border-color:var(--muted)}
 .rec.flash{border-color:var(--wob);box-shadow:0 0 0 2px rgba(167,139,250,.35);transition:box-shadow .2s}
 .rec[data-t]:hover .when.tbound{background:rgba(255,209,102,.2)}
-.rec p{margin:6px 0 0;font-size:12.8px;color:#cfd6e6}.rec p b{color:#fff}
+.rec p{margin:6px 0 0;font-size:12.8px;color:var(--ink)}.rec p b{color:#fff}
 .rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:8px;color:#dfe7d8}
 .rec p.fix b{color:#eafff2}
 .fixlab{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--good);margin-right:6px;text-transform:uppercase}
 /* §B.13 card evidence — a quiet "where this came from" line; transparency, never shouting. */
-.rec p.based{margin-top:8px;font-size:12px;line-height:1.5;color:var(--muted,#8b93a7)}
+.rec p.based{margin-top:8px;font-size:12px;line-height:1.5;color:var(--muted)}
 .basedlab{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#7c8398;margin-right:6px;text-transform:uppercase}
 /* INV-34 — card-click navigation: a brief pulse on the graph panel so the eye lands where the playhead
    jumped. CSS-only (the canvas draw is untouched). */
@@ -2983,7 +2983,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .catrun .cd{color:var(--muted);font-size:11.5px;white-space:nowrap}
 .catrun .cmode{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
  border:1px solid var(--line);border-radius:20px;padding:1px 7px}
-.catrun .cverd{color:#cfd6e6;font-size:12.5px;flex:1;min-width:120px}
+.catrun .cverd{color:var(--ink);font-size:12.5px;flex:1;min-width:120px}
 .catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;text-decoration:none;
  white-space:nowrap;border:1px solid var(--wob);border-radius:8px;padding:3px 10px;transition:background .12s}
 .catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:none}
@@ -3591,7 +3591,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   return `<div class="mcard"><div style="display:flex;justify-content:space-between;align-items:baseline">
     <div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${name}</div>
     <span class="tag ${vcls}" style="margin-top:0">${head}</span></div>
-    ${bars}<div class="z" style="margin-top:8px;color:#aeb6c8">${d.verdict_text}</div></div>`;}).join("");
+    ${bars}<div class="z" style="margin-top:8px;color:var(--ink-dim)">${d.verdict_text}</div></div>`;}).join("");
  document.getElementById("mapRows").innerHTML=rows;
  let notes="";
  if(M.export_suggestion)notes+=`<div class="rec do"><div class="when">PROJECT LOADED</div>
