@@ -315,6 +315,59 @@ class ViewLadderRendered(unittest.TestCase):
 
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class SimpleViewGatingBrowser(unittest.TestCase):
+    """Browser-level companion to test_widget_contract::SimpleViewGating and
+    test_view_ladder::CssGatingContract (INV-18 / INV-22).
+
+    Those tests assert the CSS hide-set by parsing `body.simple ... {display:none}`
+    from the HTML text — they cannot verify that the browser actually computes those
+    elements hidden.  A specificity conflict or a JS override at load time passes
+    the string test and still ships a broken Simple view.
+
+    These tests render full widgets in headless Chrome and read back REAL computed
+    visibility by toggling the `body.simple` class the toggle uses, via
+    `_vis_in_view`.  The hide-set is tested as a contract (all elements together)
+    rather than one element at a time, which is the direct browser proof for INV-18
+    and INV-22.  Two fixtures cover two disjoint halves of the hide-set:
+      - stems widget (`_build_rich_widget(with_stems=True)`) has `#stemlanes`/`#seqKey`
+      - ref widget (`_build_ref_widget()`) has `#refRead`/`#webPanel`
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stems_widget = _build_rich_widget(with_stems=True)
+        cls.ref_widget = _build_ref_widget()
+
+    def test_stem_viz_hidden_in_simple_visible_in_detailed(self):
+        """#stemlanes and #seqKey must be HIDDEN in Simple and VISIBLE in Detailed.
+        INV-18 / INV-22 browser proof for the stem-viz half of the Simple hide-set
+        (the recurring inversion the s34 overhaul targets — previously only checked
+        as a CSS text substring, not as real computed display)."""
+        sels = ["#stemlanes", "#seqKey"]
+        simple = _vis_in_view(self.stems_widget, "simple", sels)
+        detail = _vis_in_view(self.stems_widget, "detailed", sels)
+        for sel in sels:
+            self.assertIs(simple[sel], False,
+                          f"{sel} must be HIDDEN in Simple view (real computed visibility, INV-22)")
+            self.assertIs(detail[sel], True,
+                          f"{sel} must be VISIBLE in Detailed view (real computed visibility, INV-22)")
+
+    def test_ref_panels_hidden_in_simple_visible_in_detailed(self):
+        """#refRead and #webPanel must be HIDDEN in Simple and VISIBLE in Detailed.
+        INV-18 / INV-22 browser proof for the reference-panel half of the Simple
+        hide-set (§D.10.2 / §D.10.3 Detailed-only gates — previously only checked
+        as a CSS text substring, not as real computed display)."""
+        sels = ["#refRead", "#webPanel"]
+        simple = _vis_in_view(self.ref_widget, "simple", sels)
+        detail = _vis_in_view(self.ref_widget, "detailed", sels)
+        for sel in sels:
+            self.assertIs(simple[sel], False,
+                          f"{sel} must be HIDDEN in Simple view (real computed visibility, INV-18)")
+            self.assertIs(detail[sel], True,
+                          f"{sel} must be VISIBLE in Detailed view (real computed visibility, INV-18)")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class PreRenderSmoke(unittest.TestCase):
     """The standing ship gate (scripts/prerender_smoke.py) must pass on a real render:
     no JS console error, no escaped-tag leak, recs non-empty, every core surface visible
