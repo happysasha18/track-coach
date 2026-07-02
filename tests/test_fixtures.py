@@ -67,8 +67,8 @@ class GoldenRenderFromRealData(unittest.TestCase):
 
     def test_quick_has_hint_full_has_toggle(self):  # INV-3
         self.assertIn('<div class="viewhint" id="viewToggle">', self.q_html, "quick lost its hint")
-        self.assertNotIn('<div class="viewtoggle" id="viewToggle">', self.q_html, "quick grew a toggle")
-        self.assertIn('<div class="viewtoggle" id="viewToggle"></div>', self.f_html, "full lost its toggle")
+        self.assertNotIn('class="viewtoggle', self.q_html, "quick grew a toggle")
+        self.assertIn('<div class="viewtoggle seg" id="viewToggle"></div>', self.f_html, "full lost its toggle")
 
     def test_all_five_story_curves_present(self):
         for payload in (self.q, self.f):

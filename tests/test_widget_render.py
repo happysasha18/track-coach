@@ -349,7 +349,7 @@ class QuickHasNoToggleButAHint(unittest.TestCase):
     def test_quick_renders_a_hint_not_the_toggle(self):
         html, _ = _render(stems=(), mix=True, mode="quick")
         self.assertIn('<div class="viewhint" id="viewToggle">', html, "quick must show the view hint")
-        self.assertNotIn('<div class="viewtoggle" id="viewToggle">', html, "quick must NOT show the toggle")
+        self.assertNotIn('class="viewtoggle', html, "quick must NOT show the toggle")
         m = re.search(r'<div class="viewhint" id="viewToggle">([^<]+)</div>', html)
         self.assertTrue(m and m.group(1).strip(), "the quick hint text must be present")
 
@@ -374,7 +374,7 @@ class QuickHasNoToggleButAHint(unittest.TestCase):
 
     def test_full_still_renders_the_toggle_control(self):
         html, _ = _render(stems=("drums", "bass"), mode="full")
-        self.assertIn('<div class="viewtoggle" id="viewToggle"></div>', html, "full must keep the toggle")
+        self.assertIn('<div class="viewtoggle seg" id="viewToggle"></div>', html, "full must keep the toggle")
         self.assertNotIn('class="viewhint"', html, "full must NOT show the quick hint")
 
     def test_quick_draws_the_calm_four_lane_graph_like_the_others(self):

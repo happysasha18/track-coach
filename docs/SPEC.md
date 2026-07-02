@@ -2034,8 +2034,12 @@ project is its browsable component library. One role = one token = one name.
   `--ink-dim #aeb6c8` ← #c3cbdc, #aeb6c8, #aab3c7, #a0a8bc (mid) · `--muted #8b94a8` ← #8b93a7
   (dimmest). 8 → 3. `--ink-dim` is a NEW token — add it to the widget `:root` AND the catalog copy.
 - **Reds (DS-INV-4):** UI-red → `--bad`; the magma/data reds stay in the gradient (below).
-- **Colour drift → tokens (DS-INV-5):** `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn` ·
-  the category backgrounds `#3a4060 / #2e3a52 / #3a3040 / #3a2832` derive from `--panel2`/`--line`.
+- **Colour drift → tokens (DS-INV-5):** `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn`.
+  (⟨DECIDE DS-4⟩ RECONCILED s43: the category backgrounds are NOT the dim `#3a4060/#2e3a52/#3a3040/#3a2832`
+  this line originally assumed — those hexes do not exist in the code. The real category backgrounds are
+  saturated CATEGORY-IDENTITY colours `_CAT_COLORS` = Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`
+  (`build_widget.py:68`, applied inline). They are the same KIND of thing as the stem colours (DS-INV-7b) —
+  a categorical group, LEFT as literals; deriving them from `--panel2/--line` would destroy the colour-coding.)
 - **rec-card severity (DS-INV-6):** the left stripe encodes severity `good / warn / bad` (ADD the
   `bad`/red variant). `--wob` is the neutral/brand accent, never an alarm level.
 - **Data-viz colours are OUTSIDE the UI palette and are LEFT UNTOUCHED — TWO sets:**
@@ -2089,7 +2093,9 @@ project is its browsable component library. One role = one token = one name.
   `--radius-xs`; the 4px bars are decoration, exempt.
 
 ### I.6 Segmented control (one, not three)
-- **Entity: the segmented control.** `.seg`, `.viewtoggle`, `.reftabs` merge into ONE component.
+- **Entity: the segmented control.** `.viewtoggle` and `.reftabs` merge into ONE component `.seg`.
+  (RECONCILED s43: the original text named THREE — `.seg`/`.viewtoggle`/`.reftabs` — but `.seg` did not
+  exist in the code; there were only two controls. The shared class is now named `.seg`. Shipped 0.9.18.)
 - **DS-INV-13:** container `border:1px solid --line; border-radius:--radius; overflow:hidden`;
   buttons `padding:9px 14px`; `selected` = fill `--wob` + text `var(--bg)` + bold; `rest` = transparent
   bg + text `--muted`; `hover` → `--ink`; transition `--dur-fast`. The three former controls render
@@ -2113,9 +2119,12 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 4. **panel** — `.panel/.panel2` → `--radius-lg`; backgrounds `--panel/--panel2`; kicker `--wob`.
 5. **player-transport** — `.pbtn/.pmini` as buttons; `.ptime` tabular-nums `--muted`; `.seekbar`
    track `--panel2` + fill `--wob`, thumb `--wob` + ring; `.pstem` mute.on `--bad` / solo.on `--good`.
-6. **rec-card** — left stripe severity good/warn/bad (DS-INV-6); `--radius-lg`; stripe 3px.
-7. **reference-bar** — `.reftabs` → the one segmented control; `.refread-cat` hardcoded backgrounds
-   derive from `--panel2/--line`; star #ffb13f → `--warn`, chip #6fdfb8 → `--good`, halfstar → `--muted`.
+6. **rec-card** — left stripe severity (DS-INV-6); `--radius-lg`; stripe 3px. (RECONCILED s43: the red/bad
+   stripe already exists — `.rec.crit → --bad`; the three code levels are `crit → --bad`, `do → --good`,
+   `concept → --bright` yellow. ⟨DECIDE DS-3⟩: keep the third level `--bright` yellow, or move it to `--warn` amber?)
+7. **reference-bar** — `.reftabs` → the one segmented control (`.seg`, shipped 0.9.18); `.refread-cat`
+   backgrounds are the categorical `_CAT_COLORS` (⟨DECIDE DS-4⟩ — left as identity colours, NOT panel-derived);
+   star #ffb13f → `--warn`, chip #6fdfb8 → `--good`, halfstar → `--muted`.
 8. **search** — `#q` focus (state ladder); `.seg` → the segmented control; `.count` `--muted`.
 9. **view-toggle** — `.viewtoggle` → the segmented control; `.viewhint` `--muted`.
 10. **vitals** — `.vitals` → `--radius-lg`; `.vval` warn/bad/good; `.vlabel`+`.srcmeta` `--muted`,
@@ -2156,6 +2165,12 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
   similarity-column palette, not the `--good/--warn/--bad` tokens. The design doc did not cover it.
   Lean: LEAVE it (a deliberate muted table palette), do not force it onto the state tokens — but flag
   to Alexander whether he wants the catalog table to use the same state colours as the widget.
+- **⟨DECIDE DS-3⟩** (s43) — the rec-card THIRD severity level (`.rec.concept`) is currently `--bright`
+  (yellow), while the state triple is good/warn/bad. Keep it yellow (attention role, distinct from the
+  amber warn) or move it to `--warn` amber? Not changed overnight — Alexander's taste call.
+- **⟨DECIDE DS-4⟩** (s43, RECONCILED) — the category backgrounds (`_CAT_COLORS` Mix/Balance/Character) are
+  categorical identity colours, LEFT as literals (like stems). Confirm this is right, or does Alexander want
+  them re-derived from panels? Lean: LEAVE (they colour-code the categories).
 
 ## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
 All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse

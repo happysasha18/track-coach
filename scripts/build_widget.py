@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.17"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.18"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2147,7 +2147,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     # View toggle: full gets the (JS-wired) Simple/Detailed control; quick gets a hint in its place,
     # and the toggle JS bails on quick so the body never enters Simple → evidence + recs stay visible.
     view_toggle = (f'<div class="viewhint" id="viewToggle">{_esc(_ui.get("quick_view_hint", ""))}</div>'
-                   if _q else '<div class="viewtoggle" id="viewToggle"></div>')
+                   if _q else '<div class="viewtoggle seg" id="viewToggle"></div>')
     # §D.10.3 — reference read: Detailed-only; skipped for quick (no fingerprint) and when run_dir absent.
     ref_read_html = _ref_read_html(run_dir) if not _q else ""
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
@@ -2585,7 +2585,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
             active = ' class="reftab active"' if i == 0 else ' class="reftab"'
             btns += (f'<button{active} data-didx="{i}">'
                      f'{_esc(lean.direction)}</button>')
-        tabs_html = f'<div class="reftabs">{btns}</div>'
+        tabs_html = f'<div class="reftabs seg">{btns}</div>'
 
     # Inline tab-switching JS (ephemeral view state, D-INV-28 — never persists across reload)
     tab_js = ""
@@ -2703,7 +2703,9 @@ TEMPLATE = r"""<!DOCTYPE html>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230c0e14'/><rect x='6' y='14' width='4' height='12' rx='1.6' fill='%23a78bfa'/><rect x='13' y='7' width='4' height='19' rx='1.6' fill='%234cc9f0'/><rect x='20' y='11' width='4' height='15' rx='1.6' fill='%23ffd166'/></svg>">
 <style>
 :root{--bg:#0c0e14;--panel:#141822;--panel2:#1b2030;--ink:#e8ecf5;--ink-dim:#aeb6c8;--muted:#8b94a8;
- --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa}
+ --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa;
+ --radius:10px;--radius-lg:14px;--radius-xl:18px;--radius-pill:20px;
+ --dur-fast:120ms;--dur-base:180ms;--ease:ease-out}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--bg) 60%);
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
@@ -2729,13 +2731,18 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
 .srcmeta{color:var(--muted);font-size:12px;margin:2px 0 20px;display:flex;flex-wrap:wrap;gap:4px 16px}
 .srcmeta b{color:var(--ink);font-weight:600}
 .srcmeta:empty{display:none}
-/* segmented Simple⇄Detailed control */
-.viewtoggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);
- border-radius:11px;padding:3px;gap:2px;flex:0 0 auto}
-.viewtoggle button{appearance:none;border:0;background:transparent;color:var(--muted);
- font:600 12.5px/1 inherit;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .12s}
-.viewtoggle button.on{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
-.viewtoggle button:hover:not(.on){color:var(--ink)}
+/* ── segmented control (DS-INV-13): ONE component for the Simple⇄Detailed view-toggle
+   AND the reference-direction tabs (#refRead .reftabs). Selected = bold --wob fill
+   (was: the view-toggle's subtle panel2 fill / the reftabs' border-opacity). Both
+   containers wear `.seg`; their buttons are direct children; the selected marker is
+   `.on` (view-toggle) or `.active` (reftabs). */
+.seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);
+ border-radius:var(--radius);overflow:hidden;flex:0 0 auto}
+.seg>button{appearance:none;border:0;background:transparent;color:var(--muted);
+ font:600 12.5px/1 inherit;padding:9px 14px;cursor:pointer;white-space:nowrap;
+ transition:color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
+.seg>button:not(.on):not(.active):hover{color:var(--ink)}
+.seg>button.on,.seg>button.active{background:var(--wob);color:var(--bg);font-weight:700}
 /* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
 .viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
 /* verdict — the calm one-glance headline */
@@ -2755,12 +2762,9 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
 /* Reference read (§D.10.1/§D.10.3): up-to-3 tab selector + per-facet bars — Detailed-only */
 body.simple #refRead{display:none!important}
-#refRead .reftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-#refRead .reftab{background:var(--panel2);border:1px solid var(--line);border-radius:20px;
- padding:3px 13px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s}
-#refRead .reftab.active{border-color:currentColor;opacity:1}
-#refRead .reftab:not(.active){opacity:.55}
-#refRead .reftab:hover{opacity:.85}
+/* reference-direction tabs: the same `.seg` segmented bar (container styling comes from
+   `.seg`; the buttons from `.seg>button`); only spacing below is bespoke here. */
+#refRead .reftabs{margin-bottom:14px}
 #refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
 #refRead .refread-bars{display:flex;flex-direction:column;gap:7px}
@@ -2777,7 +2781,7 @@ body.simple #refRead{display:none!important}
 #refRead .refread-label .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
  color:var(--good);padding:0 4px;border-radius:5px;margin-left:3px;cursor:help;
  font-weight:500;vertical-align:1px}
-#refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden}
+#refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:var(--radius);overflow:hidden}
 #refRead .refread-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:#3a3f52}
 #refRead .refread-bar{position:absolute;top:1px;height:10px;border-radius:4px;min-width:2px}
 #refRead .refread-words{flex:0 0 110px;font-size:11.5px;color:var(--muted);padding-left:4px}
@@ -2901,7 +2905,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
  background:var(--panel2);border-radius:10px;padding:10px 14px;min-height:20px}
 .readout b{color:var(--ink);font-weight:600}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-.mcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.mcard{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-lg);padding:12px 14px}
 .mcard .z{font-size:12px;color:var(--muted)}.mcard .pct{font-size:20px;font-weight:650;margin-top:3px}
 /* Container-relative reflow (s34): the old `1fr 1fr` + `@media(max-width:760px)`
    collapsed to ONE column by VIEWPORT width — on Alexander's ~2/3-screen window
@@ -2911,7 +2915,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
    2 on a ~2/3 window, 3 when there's room. Wider vertical gap so the plates
    breathe. Regression-tested in a real browser: tests/test_headless_render.py. */
 .recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-.rec{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:12px;padding:14px 16px}
+.rec{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:var(--radius-lg);padding:14px 16px}
 .rec.crit{border-left-color:var(--bad)}.rec.do{border-left-color:var(--good)}.rec.concept{border-left-color:var(--bright)}
 .rec h3{margin:0 0 6px;font-size:13.5px;font-weight:640}
 .rec .when{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:20px;margin-bottom:7px;vertical-align:middle}
@@ -2922,7 +2926,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .rec.flash{border-color:var(--wob);box-shadow:0 0 0 2px rgba(167,139,250,.35);transition:box-shadow .2s}
 .rec[data-t]:hover .when.tbound{background:rgba(255,209,102,.2)}
 .rec p{margin:6px 0 0;font-size:12.8px;color:var(--ink)}.rec p b{color:#fff}
-.rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:8px;color:#dfe7d8}
+.rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:var(--radius);color:#dfe7d8}
 .rec p.fix b{color:#eafff2}
 .fixlab{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--good);margin-right:6px;text-transform:uppercase}
 /* §B.13 card evidence — a quiet "where this came from" line; transparency, never shouting. */
@@ -2931,7 +2935,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 /* INV-34 — card-click navigation: a brief pulse on the graph panel so the eye lands where the playhead
    jumped. CSS-only (the canvas draw is untouched). */
 @keyframes graphpulse{0%{box-shadow:0 0 0 0 rgba(124,107,255,0)}18%{box-shadow:0 0 0 3px rgba(124,107,255,.55)}100%{box-shadow:0 0 0 0 rgba(124,107,255,0)}}
-#storyPanel.pulse{animation:graphpulse 1.1s ease-out;border-radius:12px}
+#storyPanel.pulse{animation:graphpulse 1.1s ease-out;border-radius:var(--radius-lg)}
 .empty-note{color:var(--bad);font-size:12px;margin:0 0 12px;font-weight:600}
 .foot{color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center}
 .scale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:8px}
@@ -2940,29 +2944,29 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .ptop{display:flex;align-items:center;gap:14px;margin-bottom:12px}
 /* Play = accent-outline, not a loud solid block — matches how --wob is used elsewhere
    (thin accent lines on read/rec/cue), fills in on hover. Smaller than before. */
-.pbtn{background:var(--panel2);color:var(--wob);border:1px solid var(--wob);border-radius:9px;padding:7px 15px;font-weight:700;font-size:13px;cursor:pointer;transition:background .15s,color .15s}
-.pbtn:hover{background:var(--wob);color:#0c0e14}
+.pbtn{background:var(--panel2);color:var(--wob);border:1px solid var(--wob);border-radius:var(--radius);padding:7px 15px;font-weight:700;font-size:13px;cursor:pointer;transition:background var(--dur-base),color var(--dur-base)}
+.pbtn:hover{background:var(--wob);color:var(--bg)}
 .pbtn.pmini{padding:7px 10px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-size:13px}
 .pbtn.pmini:hover{background:var(--panel2);color:var(--ink)}
 .ptime{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 /* timeline callouts ("comments"): triangle cues over the scenes (canvas-drawn). The cards they
    point to live in the Recommendations panel under the graph — no separate list here any more. */
 .ctip{position:fixed;z-index:60;pointer-events:none;display:none;background:rgba(12,14,20,.96);
- border:1px solid var(--line);border-radius:9px;padding:7px 11px;font-size:12.5px;color:var(--ink);
+ border:1px solid var(--line);border-radius:var(--radius);padding:7px 11px;font-size:12.5px;color:var(--ink);
  line-height:1.55;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 .ctip b{font-weight:650}.ctip .tdim{color:var(--muted)}
 .pstems{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .pstem{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .pstem .nm{flex:1;font-size:12.5px;font-weight:600}
-.pstem button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;font-size:10.5px;padding:3px 7px;cursor:pointer;font-weight:600}
-.pstem button.on{color:#0c0e14}
+.pstem button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:var(--radius);font-size:10.5px;padding:3px 7px;cursor:pointer;font-weight:600}
+.pstem button.on{color:var(--bg)}
 .pstem button.mute.on{background:var(--bad);border-color:var(--bad)}
 .pstem button.solo.on{background:var(--good);border-color:var(--good)}
 .ltog{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .ltog .lbl{font-size:11px;color:var(--muted);margin-right:2px}
 .ltog button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);
- border-radius:8px;font-size:11px;padding:4px 10px;cursor:pointer;font-weight:600}
-.ltog button.on{background:var(--wob);border-color:var(--wob);color:#0c0e14}
+ border-radius:var(--radius);font-size:11px;padding:4px 10px;cursor:pointer;font-weight:600}
+.ltog button.on{background:var(--wob);border-color:var(--wob);color:var(--bg)}
 /* sequencer legend: explains height=loudness, colour=frequency, M/S, weak */
 .seqkey{display:flex;flex-wrap:wrap;align-items:center;gap:7px 16px;margin-top:10px;
  font-size:11px;color:var(--muted);line-height:1.5}
@@ -2970,14 +2974,14 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .seqkey .sw{display:inline-block;width:46px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
 .seqkey .chip{display:inline-flex;align-items:center}
 .seqkey .ms{display:inline-block;min-width:13px;height:13px;line-height:13px;text-align:center;
- border-radius:3px;font-size:8px;font-weight:700;color:#0c0e14;margin-right:4px}
+ border-radius:3px;font-size:8px;font-weight:700;color:var(--bg);margin-right:4px}
 /* Evidence drawer and Catalog: tc-panel chrome, collapsed by default, margin override */
 #evidence,#catalog{margin:24px 0 0}
 /* CATALOG inner tracks */
 .catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
  letter-spacing:.7px;font-weight:700}
 .catrun{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
- border-radius:11px;margin:7px 0;background:var(--panel2)}
+ border-radius:var(--radius);margin:7px 0;background:var(--panel2)}
 .catrun.self{border-color:var(--wob);box-shadow:inset 0 0 0 1px rgba(167,139,250,.25)}
 .catrun .cv{font-weight:650;color:var(--ink);white-space:nowrap}
 .catrun .cd{color:var(--muted);font-size:11.5px;white-space:nowrap}
@@ -2985,11 +2989,11 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
  border:1px solid var(--line);border-radius:20px;padding:1px 7px}
 .catrun .cverd{color:var(--ink);font-size:12.5px;flex:1;min-width:120px}
 .catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;text-decoration:none;
- white-space:nowrap;border:1px solid var(--wob);border-radius:8px;padding:3px 10px;transition:background .12s}
+ white-space:nowrap;border:1px solid var(--wob);border-radius:var(--radius);padding:3px 10px;transition:background var(--dur-fast)}
 .catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:none}
 .catrun .cnow{margin-left:auto;color:var(--wob);font-size:11px;font-weight:700;white-space:nowrap}
 .catrun .cmiss{margin-left:auto;color:var(--muted);font-size:11px}
-.cattrack{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:rgba(0,0,0,.12)}
+.cattrack{border:1px solid var(--line);border-radius:var(--radius-lg);margin:8px 0;background:rgba(0,0,0,.12)}
 .cattrack>summary{cursor:pointer;list-style:none;padding:11px 14px;font-weight:600;color:var(--ink)}
 .cattrack>summary::-webkit-details-marker{display:none}
 .cattrack>summary::before{content:"▸ ";color:var(--muted)}

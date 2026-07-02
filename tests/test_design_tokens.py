@@ -69,3 +69,66 @@ def test_stem_and_canvas_literals_untouched():
         assert hx in js, f"stem colour {hx} must stay a raw literal in the data-viz region"
     # the meter-change label is a canvas draw (data-viz), deliberately not tokenised
     assert 'ctx.fillStyle="#cfd6e6"' in js, "canvas meter label must keep its raw hex"
+
+
+# ── Movement 2 (SPEC §I.2–I.6) — radii, motion, dedup, one segmented control ──
+
+def _source():
+    """The shipped build_widget.py source text (asserts the real emitted markup)."""
+    return pathlib.Path(build_widget.__file__).read_text()
+
+
+def _root_block():
+    return re.search(r":root\{[^}]*\}", _css_region()).group(0)
+
+
+def _css_rules():
+    """CSS with the :root token definitions stripped — the component rules only."""
+    css = _css_region()
+    return css.replace(_root_block(), "")
+
+
+# DS-INV-12 — every single-value UI border-radius is on the 10/14/18/20 scale
+# (the ad-hoc 6/8/9/11/12 snap in). Compound notch shapes (`0 6px 6px 0`) and tiny
+# decorative swatch/bar radii (<=5px) are exempt per spec.
+def test_radii_snapped_to_scale():
+    vals = re.findall(r"border-radius:\s*(\d+)px\s*[;}]", _css_region())
+    on_scale = {10, 14, 18, 20}
+    decorative = {1, 2, 3, 4, 5}
+    off = sorted({int(v) for v in vals if int(v) not in on_scale | decorative})
+    assert not off, f"UI border-radius off the 10/14/18/20 scale (snap or tokenise): {off}px"
+
+
+# DS-INV-12 — the radius tokens exist in :root.
+def test_radius_tokens_defined():
+    root = _root_block()
+    for t in ("--radius:", "--radius-lg:", "--radius-xl:", "--radius-pill:"):
+        assert t in root, f"{t} must be defined in :root"
+
+
+# DS-INV-10 — motion tokens exist and the raw .12s/.15s literals leave the component rules.
+def test_motion_tokens_defined_and_used():
+    root = _root_block()
+    for t in ("--dur-fast:", "--dur-base:"):
+        assert t in root, f"{t} must be defined in :root"
+    rules = _css_rules()
+    leaked = [lit for lit in (".12s", ".15s") if lit in rules]
+    assert not leaked, f"component transitions still carry raw duration literals: {leaked}"
+
+
+# DS-INV-1/4 — the dark-on-accent text uses var(--bg), not raw #0c0e14, in the CSS rules.
+def test_bg_token_not_raw_in_css_rules():
+    assert "#0c0e14" not in _css_rules(), "CSS rules must use var(--bg), not raw #0c0e14"
+
+
+# DS-INV-13 — ONE segmented-control class, worn by BOTH former controls; selected = --wob fill.
+def test_one_segmented_control():
+    css = _css_region()
+    assert ".seg{" in css, "the unified segmented-control class .seg must exist"
+    src = _source()
+    assert 'class="viewtoggle seg"' in src, "the view-toggle must wear the shared .seg class"
+    assert 'class="reftabs seg"' in src, "the reference tabs must wear the shared .seg class"
+    # the selected state moves from the old subtle panel2 fill to the bold --wob fill
+    assert "button.on{background:var(--panel2)" not in css, \
+        "the old subtle selected look must be replaced by the --wob fill"
+    assert "background:var(--wob)" in css, "the segmented control's selected state fills --wob"

@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.18] — 2026-07-02
+
+### Changed
+- **Design system, part 2a — one segmented control, consistent corners & motion.** The Simple/Detailed
+  switch and the reference-direction tabs are now one and the same control: a clean segmented bar whose
+  selected option is filled in the brand purple with dark text (before, the selected side was a barely-there
+  darker shade). Every rounded corner across the widget now snaps to one small scale (10 / 14 / 18 / 20 px)
+  instead of a scatter of ad-hoc values, and hover/transition timings use two shared speeds. Chart, stem and
+  category colours are untouched.
+
 ## [0.9.17] — 2026-07-02
 
 ### Changed

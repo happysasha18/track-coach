@@ -312,14 +312,14 @@ class ReferenceReadTabSelector(unittest.TestCase):
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
         )
-        self.assertNotIn('class="reftabs"', html,
+        self.assertNotIn('class="reftabs', html,
                          "single direction must produce no tab bar")
         self.assertIn('class="refpanel"', html,
                       "single direction must still produce a refpanel content block")
 
     def test_two_directions_produce_tab_buttons(self):
         html = self._two_dir_html()
-        self.assertIn('class="reftabs"', html,
+        self.assertIn('class="reftabs seg"', html,
                       "two qualifying directions must produce a .reftabs tab bar")
         self.assertIn('class="reftab active"', html,
                       "first (nearest) tab must be active by default")
@@ -356,7 +356,7 @@ class ReferenceReadTabSelector(unittest.TestCase):
         # Level-colour hex codes must NOT appear on .reftab buttons.
         # Extract button markup only (between <div class="reftabs"> and </div>).
         import re
-        tabs_match = re.search(r'<div class="reftabs">(.*?)</div>', html, re.DOTALL)
+        tabs_match = re.search(r'<div class="reftabs seg">(.*?)</div>', html, re.DOTALL)
         if tabs_match:
             tabs_html = tabs_match.group(1)
             self.assertNotIn("#2e9e5b", tabs_html,
