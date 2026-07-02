@@ -175,7 +175,7 @@ class RenderSmoke(unittest.TestCase):
         self.assertIn("<svg class=\"arc\"", self.html)
         self.assertIn('polyline', self.html)
         self.assertIn(">dark<", self.html)
-        self.assertIn("draft", self.html)  # heuristic source marked
+        self.assertIn(">guess<", self.html)  # heuristic source marked (plain-language label)
 
     def test_empty_library_message(self):
         self.assertIn("Library is empty", catalog.render_catalog_html([]))
@@ -320,7 +320,7 @@ class StaleWidgetFlag(unittest.TestCase):
                src_run_dir="/r", src_widget="analysis_widget_v0.0.1.html")
         html = catalog.render_catalog_html([e])
         self.assertIn('class="stale"', html, "an out-of-date deposit must carry the stale chip element")
-        self.assertIn("older analysis", html, "chip text must say 'older analysis' (not just the bare word 'stale')")
+        self.assertIn("older version", html, "chip text must say 'older version' (plain, not the bare word 'stale')")
         self.assertIn("v0.0.1", html, "chip text must include the specific old version number")
         self.assertIn("re-analyse to refresh", html, "the tooltip must explain what to do")
 
@@ -336,7 +336,7 @@ class StaleWidgetFlag(unittest.TestCase):
                src_run_dir="/r", src_widget="analysis_widget.html", tc_version="0.0.1")
         html = catalog.render_catalog_html([e])
         self.assertIn('class="stale"', html, "a stored older version must be flagged even with no version in the name")
-        self.assertIn("older analysis", html, "chip text must say 'older analysis'")
+        self.assertIn("older version", html, "chip text must say 'older version'")
 
     def test_stored_tc_version_is_preferred_over_the_filename(self):
         # the deposit-time version is authoritative: a current-looking filename can't mask an older build

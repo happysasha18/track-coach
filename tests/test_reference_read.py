@@ -152,7 +152,7 @@ class ReferenceReadHeader(unittest.TestCase):
                 {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
             )
             self.assertNotIn("Leans toward", html, "far lean must not name a direction")
-            self.assertIn("No close direction", html, "far lean must show 'No close direction yet'")
+            self.assertIn("No similar tracks", html, "far lean must show 'No similar tracks'")
 
     def test_empty_directions_returns_empty_string(self):
         html = build_widget.render_reference_read(

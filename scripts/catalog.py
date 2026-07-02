@@ -256,7 +256,7 @@ def _lean_cell(leans, widget_href=None) -> str:
     that widget's #refRead section (D-INV-28: 'direction → open read focused').
     When None, falls back to '#refRead' (in-page no-op but never the dead bare '#')."""
     if not leans:
-        return '<td class="c-sim c-lean"><span class="sim-none">no close direction yet</span></td>'
+        return '<td class="c-sim c-lean"><span class="sim-none">no similar tracks</span></td>'
     chips = ""
     for lean in leans:
         col = _SIM_COL.get(lean.level, "#8b94a8")
@@ -288,7 +288,7 @@ def _tag_chips(mood, style, source):
     if not chips:
         return '<span class="noarc">—</span>'
     if source == "heuristic":  # mark drafts so an un-reviewed guess never reads as fact
-        chips += '<span class="tag draft" title="heuristic draft — not yet reviewed">draft</span>'
+        chips += '<span class="tag draft" title="auto-detected style — not yet reviewed">guess</span>'
     return chips
 
 
@@ -312,9 +312,9 @@ def _stale_chip(e):
     current or unknown (don't cry wolf)."""
     wv = _widget_version(e)
     if wv and wv != build_widget.TC_VERSION:
-        return (f'<span class="stale" title="opens a v{wv} widget; current is '
+        return (f'<span class="stale" title="analysed on v{wv}; current is '
                 f'v{build_widget.TC_VERSION} — re-analyse to refresh">'
-                f'older analysis · v{wv} → re-analyse</span>')
+                f'older version</span>')
     return ""
 
 
@@ -456,7 +456,8 @@ h1{{font-size:21px;margin:0 0 2px}}.brand{{color:var(--wob);font-weight:700;font
 #q::placeholder{{color:var(--muted)}}
 .seg{{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}}
 .seg button{{background:var(--panel);color:var(--muted);border:0;padding:9px 14px;font-size:12.5px;cursor:pointer}}
-.seg button.on{{background:var(--wob);color:#0c0e14;font-weight:700}}
+.seg button:hover:not(.on){{color:var(--ink)}}
+.seg button.on{{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}}
 .count{{color:var(--muted);font-size:12px;margin-left:auto}}
 table{{width:100%;border-collapse:collapse;font-size:13px}}
 thead th{{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;

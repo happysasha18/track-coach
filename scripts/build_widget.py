@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.20"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.21"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -164,7 +164,7 @@ STRINGS = {
         "play_title": "Stem player — hear what you see",
         "play_hint": "Play the separated stems together, in sync with every chart above. Mute/solo each part; click any timeline to jump there. The white line is the playhead.",
         "play_play": "▶ Play", "play_pause": "❚❚ Pause", "play_mute": "mute", "play_solo": "solo",
-        "play_note": "Each lane is one separated part (htdemucs_6s splits into drums · bass · other · vocals · guitar · piano). A lane can look empty when that instrument isn't really in the track — here piano is near-silent, so you effectively see fewer than six. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
+        "play_note": "Each lane is one separated part (the analyser splits the track into drums · bass · other · vocals · guitar · piano). A lane can look empty when that instrument isn't really in the track — here piano is near-silent, so you effectively see fewer than six. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
         "hover": "hover over the chart…",
         "scale_quiet": "quiet −90 dB",
         "scale_loud": "loud −6 dB",
@@ -309,8 +309,8 @@ STRINGS = {
             "title": "Separation found almost nothing in this stem",
             "body": "The separator found almost no material for “{stems}”. Often this isn't the track's fault: the model is "
                     "trained on live bands (drums / bass-guitar / vocals / other) and dumps synth bass into “{carrier}”. "
-                    "Worth re-running with a model that has more stems (htdemucs_6s adds guitar and piano).",
-            "fix": "Re-run separation with htdemucs_6s — or, if you have the project, export the group stem instead of trusting this one."},
+                    "Worth re-running with a model that has more stems (a 6-stem model adds guitar and piano).",
+            "fix": "Re-run separation with a 6-stem model — or, if you have the project, export the group stem instead of trusting this one."},
         "masking_real": {
             "header": "Frequencies · bass competes with mids",
             "title": "Around 250–600 Hz the bass is louder than the melody at times",
@@ -2548,7 +2548,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         return (
             '<details class="tc-panel" id="refRead" open>'
             '<summary>Reference direction</summary>'
-            '<p class="refread-hdr" style="color:#8b94a8">No close direction yet</p>'
+            '<p class="refread-hdr" style="color:var(--muted)">No similar tracks</p>'
             '</details>'
         )
 

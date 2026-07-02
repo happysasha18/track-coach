@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.21] — 2026-07-03
+
+### Changed
+- **Plain, domain-language labels across the widget AND the catalog.** Swept every user-facing string on
+  both pages (not just where a problem was spotted): the reference empty state now reads "no similar tracks"
+  (was "no close direction yet"); the catalog's stale marker is a short "older version" (was the long
+  "older analysis · vX → re-analyse", details in its tooltip); an auto-detected style tag reads "guess"
+  (was "draft"); and the model name "htdemucs_6s" no longer leaks into the player legend or a
+  recommendation (now "a 6-stem model").
+- **The catalog's All/Full/Quick switch matches the widget's calm segmented control** — subtle selected
+  state, same text weight, no loud fill or contrast flip. One switch look across the whole product.
+
 ## [0.9.20] — 2026-07-02
 
 ### Changed

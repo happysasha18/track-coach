@@ -63,12 +63,12 @@ class LeanCellRendering(unittest.TestCase):
     def test_far_lean_not_in_list_shows_no_close_message(self):
         # leans_toward_topk never passes FAR to the renderer; empty list → grey message.
         html = self._render([])
-        self.assertIn("no close direction yet", html, "empty list must show the grey message")
+        self.assertIn("no similar tracks", html, "empty list must show the grey message")
         self.assertNotIn("#c2503d", html, "red must NOT appear in the direction cell (owner rule 2026-06-29)")
 
     def test_none_lean_list_shows_no_close_message(self):
         html = self._render([])
-        self.assertIn("no close direction yet", html, "empty list must show the grey message")
+        self.assertIn("no similar tracks", html, "empty list must show the grey message")
 
     def test_direction_link_is_an_anchor(self):
         lean = S.Lean(direction="Venetian Snares", level=S.CLOSE, runner=None, n_shared=14)
