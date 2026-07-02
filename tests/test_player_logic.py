@@ -133,7 +133,7 @@ class PlayerStateMachine(unittest.TestCase):
         """)
 
 
-# ── INV-31: resolveView — global remembered view helper (SPEC §B.15)
+# ── INV-41: resolveView — global remembered view helper (SPEC §B.15)
 _VIEW_BLOCK = re.compile(r"/\* VIEW_LOGIC_START.*?VIEW_LOGIC_END \*/", re.S)
 
 
@@ -154,7 +154,7 @@ def _render_view_html():
 
 @unittest.skipUnless(NODE, "node not installed — view state-machine tests need a JS engine")
 class ResolveViewLogic(unittest.TestCase):
-    """INV-31: execute the REAL extracted resolveView helper in node.
+    """INV-41: execute the REAL extracted resolveView helper in node.
 
     The pure helper resolveView(hash, stored) is emitted between VIEW_LOGIC_START/VIEW_LOGIC_END
     markers in the rendered widget. We pull that block out of the HTML, run it in node, and assert
@@ -178,22 +178,22 @@ class ResolveViewLogic(unittest.TestCase):
         r = subprocess.run([NODE, "-e", js], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, f"node assertion failed:\n{r.stderr}{r.stdout}")
 
-    def test_hash_detailed_returns_detailed(self):  # INV-31 — URL hash overrides stored
+    def test_hash_detailed_returns_detailed(self):  # INV-41 — URL hash overrides stored
         self._node('A(V.resolveView("#detailed",null)==="detailed",\'#detailed should→detailed\');')
 
-    def test_hash_full_returns_detailed(self):       # INV-31 — #full is an alias for Detailed
+    def test_hash_full_returns_detailed(self):       # INV-41 — #full is an alias for Detailed
         self._node('A(V.resolveView("#full",null)==="detailed",\'#full should→detailed\');')
 
-    def test_hash_simple_returns_simple(self):       # INV-31 — #simple overrides stored
+    def test_hash_simple_returns_simple(self):       # INV-41 — #simple overrides stored
         self._node('A(V.resolveView("#simple","detailed")==="simple",\'#simple should→simple\');')
 
-    def test_stored_detailed_no_hash_returns_detailed(self):  # INV-31 — remembered preference
+    def test_stored_detailed_no_hash_returns_detailed(self):  # INV-41 — remembered preference
         self._node('A(V.resolveView("","detailed")==="detailed",\'stored detailed+no hash should→detailed\');')
 
-    def test_stored_simple_no_hash_returns_simple(self):      # INV-31 — remembered preference
+    def test_stored_simple_no_hash_returns_simple(self):      # INV-41 — remembered preference
         self._node('A(V.resolveView("","simple")==="simple",\'stored simple+no hash should→simple\');')
 
-    def test_no_hash_no_stored_returns_simple(self):          # INV-31 — calm-first-use default
+    def test_no_hash_no_stored_returns_simple(self):          # INV-41 — calm-first-use default
         self._node('A(V.resolveView("",null)==="simple",\'no hash+no stored should→simple (calm default)\');')
 
 

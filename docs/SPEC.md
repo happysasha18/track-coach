@@ -677,33 +677,33 @@ brand-new user still meets the calm screen first.*
   writes it; the next widget you open reads it. (Quick is a run MODE, not a selectable view — it is never
   stored as a view choice; a quick run shows its quick rung regardless of `tc_view`.) The `localStorage`
   reach across `file://` widgets is **verify-by-deed** (browser-dependent); if it doesn't share, an equivalent
-  global-scope mechanism stands in — the rule is "one remembered view", not the specific store. `INV-31`
+  global-scope mechanism stands in — the rule is "one remembered view", not the specific store. `INV-41`
 - **Write rule (only a toggle persists).** **Only an explicit view toggle writes `tc_view`**; resolving the
   open view from a URL hash or from the calm default **never writes the store**. So a shared `#detailed` deep
   link is genuinely one-shot — it opens Detailed for that visit but never flips your durable preference. `tags:
-  one-shot-hash · INV-31`
+  one-shot-hash · INV-41`
 - **Read-on-load, no live cross-tab sync.** A widget reads `tc_view` **once on open**; an already-open widget
   does **not** retro-change when another widget toggles. Uniformity is across the NEXT open, not live across two
   open tabs — two simultaneously-open widgets may briefly differ until reload, by design (simplest, no
-  cross-tab listener). `tags: read-on-load · INV-31`
+  cross-tab listener). `tags: read-on-load · INV-41`
 - **Degrade-safe.** If the store is unavailable or throws (private mode, a `file://` restriction), the selector
   **degrades to calm-default-per-open and never errors view initialisation** — the old always-calm behaviour is
   the safe floor; a store failure can never leave the widget with no view class / broken layout. `tags:
-  degrade-safe · INV-31`
+  degrade-safe · INV-41`
 - **On open (precedence).** A widget picks its initial view by: (1) a one-shot **URL hash override**
   (`#detailed`/`#simple`) if present — the entry-focus pattern, for a shared/deep link; else (2) the remembered
   `tc_view`; else (3) **calm (Simple)** on the first-ever open, before any choice exists. So a newcomer still
   meets the calm screen; a returning user lands where they left off. The hash is a one-shot entry, not a
   persisted channel; the remembered preference is the durable one. (Alexander 2026-06-29: remember last,
-  first-use calm.) `tags: view-state · entry-override · calm-first-use · INV-31`
+  first-use calm.) `tags: view-state · entry-override · calm-first-use · INV-41`
 - **It does NOT touch the ladder.** This changes only WHERE the initial view comes from, never WHAT is visible
   at each rung — `quick ⊆ Simple ⊆ Detailed` (INV-18/22) is untouched, and entering Simple still resets the
   per-stem mix (§B.14) so no soloed part strands. Remembering Detailed never makes a Simple-hidden surface
-  visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-31`
+  visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-41`
 - **Why it matters for the reference read.** The reference read + web plaque live in Detailed (depth, §D.10.3),
   and Simple hides `#refRead`. With the old always-calm open they were invisible unless you switched every
   time — the reason a producer couldn't find them. Remembering Detailed is what makes them reliably present.
-  `tags: INV-31 · D-INV-30`
+  `tags: INV-41 · D-INV-30`
 
 ## D. Reference & Compare — «хочу как Aphex Twin» (0.9)
 
@@ -980,82 +980,13 @@ Through all of it the card still stands on its real finding and cites the same "
 changes emphasis and words, never the truth. A track with no mapping is untouched. `tags: D-INV-15 · D-INV-2
 · ⟨DECIDE D-11⟩ recommend off unless mapped`
 
-### D.6.1 The aim picker & the «toward X» panel — set the aim in the widget, get prioritized steps
+### D.6.1 — REMOVED 0.9.15 (see JOURNAL 2026-07-02)
 
-**You set the aim in the widget, from a dropdown (this resolves where the mapping is stored + edited).** The
-mapping is still always yours — the tool never assigns it (D-INV-4) — and you set it by picking a direction
-from a dropdown in the track's own widget ("aim this track at ⟨direction⟩"), not by editing a file or
-re-running. The choice persists client-side in `localStorage`, keyed **per track**, using the same mechanism
-and the same `file://` share-caution as the `tc_view` preference (INV-31): two widgets opened from `file://`
-must never read each other's aim, so the key carries the track's id. Clearing the dropdown ("no aim") returns
-the track to plain coaching, byte-for-byte as unmapped (D-INV-5). The dropdown offers only directions the
-track can actually be placed against — a direction missing a shared fingerprint axis is shown as unavailable,
-never a half-target (D-INV-9) — and it appears only on a full run, since reference is full-run-only (D-INV-20).
-The picker is the **same one surface** as the §D.10.1 up-to-three-nearest selector (which already chooses a
-direction "one at a time"), extended to persist the choice as the aim — not a second, competing direction
-control. It is **single-select**: you aim at one direction at a time and see its steps. This narrows §D.6's
-"mix all aimed directions at once" to the in-widget interaction — with one selected aim the §D.6 re-order key
-(strongest divergence across the aimed set, D-INV-17) simply has a single member; keeping several aims live at
-once (a multi-select that mixes) is deferred. ⟨DECIDE D-33⟩ **RESOLVED 2026-07-01 (Alexander): single-aim-at-
-a-time is the final interaction** — the picker stays single-select; the mix-all model is not restored. (This
-question earlier shared the code D-25 with the unrelated Simple-chip decision; split out to D-33 to keep the
-two apart — D-25 remains only the Simple-chip question.)
+_What it was:_ the in-widget aim picker (`#aimpanel`) and «toward X» panel — a `<select>` dropdown letting you pick a reference direction and see a ranked list of steps toward it (ordered by per-facet divergence toward the aim), persisted per-track in `localStorage`.
 
-**The «toward X» panel is a separate, default-collapsed list of prioritized steps toward the selected aim.**
-Distinct from the in-place re-flavour of §D.6 (which re-orders and re-words the existing cards where they sit),
-this is its own collapsible panel that answers one question: "to sound more like ⟨aim⟩, what do I do first?" It
-lists the track's own findings as an **ordered** sequence — first ⟨Y⟩, then ⟨Z⟩ — ranked by how much each
-would close the gap to the selected aim. It is one named surface, the **aim panel** (`#aimpanel`), referred to
-by that one name everywhere. `D-INV-31`
+_Why removed (0.9.15):_ redundant while one offerable direction equals the measured lean; the persisted localStorage state also caused a visible regression on reopen (cards swapped for re-flavoured set, centroid `#refRead` hidden, widget looked broken). Decision: Alexander, s33.
 
-**Placement is fixed (Alexander, exact).** The aim panel sits right after the «leans toward» centroid line and
-**under** the panel that describes the parameters — the order around there is: centroid line → parameters
-panel → aim panel. It is a `<details>`, **default collapsed**, and is never merged into the read/centroid
-panel.
-
-**Every step is a real finding, re-ordered toward the aim — never invented.** The panel adds no advice that
-isn't already a measured finding in the coaching (D-INV-2): it is the same evidence, selected and ordered. A
-finding enters the list only where moving it would actually reduce the gap to the aim on a facet the track
-**diverges** on; a facet you're already in-zone on is dropped (you're there). The ordering key is per-facet
-divergence toward the selected aim, largest gap first — the same key as §D.6's re-order lever (D-INV-17), so
-the in-place order and the panel order can never disagree. When nothing measured moves toward the aim, the
-panel says so ("already close on what we can measure") rather than inventing filler. Each step still cites its
-real "based-on" evidence, like every other card (D-INV-10). `D-INV-34`
-
-**Switching the aim needs no re-run — the build embeds the WHOLE re-flavoured presentation for every offerable
-direction.** Because the aim is chosen in the browser after the widget is built, the aim is a **client-side
-display selection**, not baked-in content — so everything it changes must be precomputed. The build therefore
-embeds, **per offerable direction, both**: the §D.6 in-place re-flavour (the re-ordered, re-worded, on-style
-card set) *and* the §D.6.1 aim-panel steps. Selecting a direction in the dropdown swaps the entire
-re-flavoured view — cards and panel together — to that direction's precomputed set, instantly and offline.
-"No aim" shows the **baseline**: the un-re-flavoured cards exactly as an unmapped track (D-INV-5). This is the
-one place the earlier "the mapping is content, not view state" framing (§D.7) is refined for the in-widget
-picker: the *set of offerable directions* is content (baked at build from the current epoch), but *which one
-you're currently aiming at* is a per-track display selection persisted in `localStorage` — keyed on the
-track's **slug** (not the run stamp), so the aim survives re-analysis and every version of the track shares it.
-Choosing an aim never triggers analysis, never re-runs the pipeline, and is **not** a D-INV-12 recompute input
-(recompute is keyed on the reference-group members + normalisation epoch, never on your current dropdown pick).
-If the epoch later changes (library or a reference group gains/loses members), the widget is rebuilt and every
-embedded per-direction set recomputes together and re-stamps (D-INV-14) — the client never silently shows a
-stale-epoch set. `D-INV-32`
-
-**Build staging (delivery, not a spec relaxation).** D-INV-32 embeds, per direction, *both* the aim-panel
-steps (§D.6.1) *and* the §D.6 in-place re-flavoured card set. These ship in two stages: **stage 1** delivers
-the aim picker + the `#aimpanel` prioritized steps (§D.6.1) — the payoff — and its per-direction embedding +
-client swap; **stage 2** adds the §D.6 in-place re-flavour of the coaching cards to the same per-direction
-embedding + swap. Between the stages the picker still swaps the aim panel per direction, and the in-place
-cards stay baseline (untouched) rather than re-flavoured — an honest partial, marked here, never a silent
-divergence from D-INV-32. Stage 2 completes the invariant. `D-INV-32 (staged)`
-
-**Composition — the selection states, and no stranding.** The panel is defined for every aim the dropdown can
-hold: (a) **no aim** — collapsed and empty, coaching unchanged (D-INV-5); (b) **aim = a cloud direction** —
-the full ordered steps toward its centroid, in-zone facets omitted; (c) **aim = a reduced direction** — steps
-toward that single track, no in-zone / «своё» talk (reduced mode, D-INV-16), phrased track-vs-track; (d) **aim
-= an unplaceable direction** — not offered by the dropdown at all, so unreachable from the picker. The
-selected-aim state is **only live where the picker is visible**: a view without the picker, or a quick run,
-neither shows nor strands an aim — the same no-strand rule the switch and the player follow (D-INV-6). Full-run
-only (D-INV-20); the picker + panel live in Detailed alongside the plaque chip and the switch (§D.7), and
-nothing in Simple is absent from Detailed. `D-INV-33`
+_History lives in:_ JOURNAL 2026-07-02 (excision details) and CHANGELOG 0.9.15.
 
 ### D.7 How it fits the views, the switch, and the player
 
@@ -1097,9 +1028,10 @@ structural holes:
 
 - ⟨DECIDE D-1⟩ how many members make a cloud (below it = reduced).
 - ⟨DECIDE D-2⟩ **SETTLED 2026-07-01 (Alexander):** the aim is set **in the widget, from a dropdown**, and
-  persists per-track in `localStorage` (same mechanism + file:// share-caution as `tc_view`, INV-31). Clearing
+  persists per-track in `localStorage` (same mechanism + file:// share-caution as `tc_view`, INV-41). Clearing
   it returns the track to plain coaching. The dropdown drives the new **aim panel** of prioritized steps
   (§D.6.1, D-INV-31/32/33/34). Not a file the user hand-edits; not a re-run.
+  _(Feature REMOVED 0.9.15 → see §D.6.1 tombstone and JOURNAL 2026-07-02.)_
 - ⟨DECIDE D-5⟩ ~~does style ever need a number for the map~~ → **DROPPED 2026-06-26**: the map is gone;
   style stays a label.
 - ⟨DECIDE D-8⟩ what triggers the web fetch.
@@ -1126,7 +1058,7 @@ structural holes:
 - ⟨DECIDE D-22⟩ does the reference line show its descriptive «leans toward» for tracks you've written **no
   mapping** for, or stay off until mapped? (recommend: show the descriptive line for every full run; gate
   only re-flavouring on mapping, as D-11 already leans).
-- ⟨DECIDE D-24⟩ runner-up direction — **RESOLVED 2026-06-26 by listing, not tinting (§D.10.1, D-INV-27).** The
+- D-24 (resolved) runner-up direction — **RESOLVED 2026-06-26 by listing, not tinting (§D.10.1, D-INV-27).** The
   earlier worry (a *tied* second under relative lean means the nearest does NOT stand apart, so a second tint
   in one cell is self-contradictory) dissolves once the surface is an **up-to-three nearest-first selector**:
   a list HAS an order to carry the ranking, exactly as §F does, so a 2nd/3rd direction is its own ordered,
@@ -1134,11 +1066,11 @@ structural holes:
 - ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
   Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip;
   the up-to-three selector and the web-style plaque are Detailed-only by §D.10.1/§D.10.2).
-- ⟨DECIDE D-29⟩ aimed direction outside the three nearest — **RESOLVED 2026-06-29 (Alexander).** Pin **only the
+- D-29 (resolved) aimed direction outside the three nearest — **RESOLVED 2026-06-29 (Alexander).** Pin **only the
   single nearest of the aimed** ones, as an additive entry (it never displaces a nearer one), shown **even if it
   tints far** because a declared aim is intent, not filler; the other aimed directions live in the read panel.
   At most one pinned aimed entry. `§D.10.1`
-- ⟨DECIDE D-30⟩ a web facet the measurement **contradicts** (or can't measure) — **RESOLVED 2026-06-30
+- D-30 (resolved) a web facet the measurement **contradicts** (or can't measure) — **RESOLVED 2026-06-30
   (Alexander): SHOW it, labeled** "web says · our tracks don't show it", sorted into the bottom tier of the web
   panel, never silently dropped. The teaching contrast (web suggested, measurement didn't bear it out) is the
   value he wants. Stays observation about the reference centroid, not a grade of your track (D-INV-1). `§D.10.2`
@@ -1146,9 +1078,7 @@ structural holes:
   to a measured axis (★ direct) or a sound indirect signal (☆). It's authored, not learned; recommend a
   versioned in-repo table maintained like the other frozen constants, reviewed when a new ☆ tie is claimed.
   `§D.10.2`
-- ⟨DECIDE D-33⟩ does the aim picker ever become **multi-select** (mix several aims at once, restoring §D.6's
-  mix-all model) — **RESOLVED 2026-07-01 (Alexander): NO, single-aim-at-a-time is final** (§D.6.1). Split from
-  the old overloaded D-25 code so it doesn't tangle with the still-open Simple-chip question (D-25). `§D.6.1`
+- D-33, resolved 2026-07-01 then removed 0.9.15: the aim picker was kept single-select (multi-select = mix-all model was not restored); the feature was then excised entirely (see §D.6.1 tombstone). `§D.6.1`
 - ⟨DECIDE D-31⟩ a **second ★-style mark for "your track shares this confirmed trait"** (per-your-track, atop
   the v1 ★ that means "true of the direction") — build it, or leave ★ as direction-only? (deferred; v1 =
   direction-only). `§D.10.2`
@@ -1710,7 +1640,7 @@ auto-fixed, NOT imputed, NOT silently degraded. This is distinct from **missing-
 error: a quick run has no stems *by design* (RC-INV-7), so per-stem axes aren't "broken", they're simply not
 promised. So: *should-have-measured-but-didn't* = error, re-run; *mode-never-promised-it* = silent. Until a
 genuinely-incomplete run is re-run, its missing axes stay *missing* under the rules above (dropped from
-comparison, shown as "not measured"). ⟨DECIDE E-1⟩ **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
+comparison, shown as "not measured"). E-1 (resolved) **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
 (a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
 
 ### E.5 Decisions (settled 2026-06-25, Alexander)
@@ -2024,7 +1954,7 @@ user never has to remember to save. The management verbs (`backup`, `restore`, `
   the user names N).
 - ⟨DECIDE H-2⟩ does `remove` of a version also delete its run dir by default, or only the library entry (run dir
   left for gc)? Lean: only the library entry; gc reclaims the run dir later.
-- ⟨DECIDE H-3⟩ RESOLVED (Alexander, 2026-07-01) — the 'truly-full' wipe is a distinct `hard reset` that also
+- H-3 (resolved) RESOLVED (Alexander, 2026-07-01) — the 'truly-full' wipe is a distinct `hard reset` that also
   removes `backups/` (H-INV-10); plain `reset` keeps the safety net (H-INV-6). Backups capture the curated tiers
   only (keep + references), scratch excluded unless `--full` (H-INV-8).
 

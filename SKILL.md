@@ -348,7 +348,7 @@ else), `deep` (separate.py / Demucs), `bp` (transcribe.py). `uv` downloads the p
 on first run (~2 min) and caches them after, so later runs start instantly.
 
 ```bash
-SKILL_DIR="/var/folders/76/f5bl3yp57wsd1n_wc5z8yxmw0000gn/T/claude-hostloop-plugins/66078eafcb0b97d4/skills/track-coach"
+SKILL_DIR="~/.claude/skills/track-coach"
 ```
 
 ### Fast mode
@@ -595,16 +595,8 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    noise). Shown on wide blocks + in the hover.
    **Timeline callouts (v0.5.3; de-duped v0.5.13):** the located recs are placed on the timeline as
    **downward triangles above the scenes**, lettered A·B·C… and coloured by class (crit/do/concept).
-   Under the player sits `#storyCues` — a **COMPACT INDEX**, NOT a second copy of the recs: each item
-   is just **letter · when · one-line headline**. **Tap a triangle** → seek + flash its compact index
-   item (stays near the player, good for scrubbing). **Tap an index item** → seek + scroll to and flash
-   the matching **full** card in "Recommendations" (`flashRec`). **The paragraph + "→ Try" fix live in
-   exactly ONE place — the bottom Recommendations cards** (this fixed the v0.5.10 bug where the same
-   insight, e.g. "the end sounds like the start", appeared in full both under the player AND at the
-   bottom). The same letters tag the recs (rec cards carry `data-let`). `CUES` is built once from
-   `D.recs` (time-sorted) and shared by triangles, the index, and the badges.
    **One-card-one-text rule:** an insight's full prose belongs to its Recommendation card only;
-   everything else (timeline triangle, `#storyCues` index, lane verdicts) is a pointer/headline to it,
+   everything else (timeline triangle, lane verdicts) is a pointer/headline to it,
    never a re-statement. The "→ Try" action label is shown ONLY on the bottom rec cards — keep the
    fix-line format consistent (don't render a bare "→ fix" elsewhere).
    Below the sequencer sits the **transport** (v0.5.3 moved it UNDER the lanes): a compact
@@ -645,19 +637,7 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    that stick out from their NEIGHBOURS (a resonance = boxy/harsh) or sit in a hole (dull/thin) via
    `dev_db`, rather than against a guessed genre target. A deviation ≥4 dB also emits a
    `tonal_resonance` recommendation with a concrete EQ move.
-   **Reference read + aim picker (Detailed-only, full run required, §D.10.1/§D.6.1):** three
-   panels sit together right after the tonal balance panel: ① `#refRead` — per-facet bar chart
-   vs the nearest offerable direction centroid (up to 3 tabs when multiple directions qualify;
-   bars show the gap signed + in plain words; ★/☆ marks where web-described traits are
-   measurement-confirmed). ② `#webPanel` — collapsed panel with the web description of the
-   focused direction (blurb, traits, sources). ③ `#aimpanel` — **aim picker** (v0.9.10): a
-   collapsed `<select>` listing the same offerable directions (nearest-first). Pick one and see
-   a ranked list of concrete steps toward it — each step names the facet where you diverge most
-   and suggests closing the gap in the observe-and-offer register ("Density sits much higher
-   than Venetian Snares — an option: ease it down toward them."). Facets within ±0.4 z are
-   silently skipped; if all are close, the panel says "Already close on what we can measure."
-   instead of inventing steps. Selection persists in `localStorage` per track. All three panels
-   are absent in quick mode (no fingerprint) and in Simple view.
+   **Reference read (Detailed-only, full run required, §D.10.1):** two panels sit together right after the tonal balance panel: ① `#refRead` — per-facet bar chart vs the nearest offerable direction centroid (up to 3 tabs when multiple directions qualify; bars show the gap signed + in plain words; ★/☆ marks where web-described traits are measurement-confirmed). ② `#webPanel` — collapsed panel with the web description of the focused direction (blurb, traits, sources). Both panels are absent in quick mode (no fingerprint) and in Simple view.
    **The metric-card grid was REMOVED (v0.5.4):** trend cards duplicated the Track Story lanes
    (now carried as lane-edge verdicts); the snapshot facts moved into the vitals strip. `build_cards`
    is no longer called.
