@@ -25,6 +25,15 @@ Checks
    No single line in SPEC.md or TEST_MATRIX.md may carry BOTH a live ⟨DECIDE marker
    AND the word RESOLVED.  A resolved decision must drop the ⟨…⟩ marker.
 
+5. test_browser_level_rows_cite_a_browser_test   (the REVERSE-VERIFY gate)
+   Every ACTIVE (built, non-deferred) TEST_MATRIX row that declares its Level as
+   `browser` must cite an owning test that lives in a real headless-harness module
+   (BROWSER_HARNESS_MODULES).  A render claim ("the widget shows …", Level=browser)
+   backed only by a STRING test is the exact drift that let the omitted-stems
+   regression ship for a month (INV-42) — a string test cannot see what a browser
+   renders.  Known rows still on string tests are allowlisted + tracked for
+   conversion; any NEW browser-level row backed by a non-harness test fails.
+
 Pure stdlib unittest — no pytest, no librosa, no heavy deps.
 Run with:  python3 -m unittest tests.test_traceability
 """
@@ -244,6 +253,70 @@ class TraceabilityChecks(unittest.TestCase):
             self.fail(
                 f"Found {len(violations)} line(s) with both ⟨DECIDE and RESOLVED "
                 f"(resolve the decision, then drop the live marker):\n"
+                + "\n".join(violations)
+            )
+
+    # ------------------------------------------------------------------
+    # Check 5 — the REVERSE-VERIFY gate: browser-level rows need a browser test
+    # ------------------------------------------------------------------
+
+    # Test modules backed by the real headless browser harness (scripts/headless_check.py).
+    # A "Level = browser" matrix claim is only honoured by a test in this set;
+    # a string/node test asserting HTML source cannot verify what a browser renders.
+    BROWSER_HARNESS_MODULES: set[str] = {"test_headless_render"}
+
+    # Browser-level rows still backed by STRING tests — tracked debt, to convert to
+    # the headless harness (the reference-read render surfaces: header + facet bars).
+    # A NEW browser-level row backed by a non-harness test is NOT allowlisted and fails.
+    KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02: set[str] = {
+        "D-INV-5", "D-INV-10", "D-INV-19"}
+
+    _BROWSER_LEVEL_RE = re.compile(
+        r"level[^|]*browser|browser-render|browser-comp|browser-computed", re.IGNORECASE)
+    _ROW_ID_RE = re.compile(r"^\s*\|\s*((?:D-)?INV-\d+)\s*\|")
+
+    def test_browser_level_rows_cite_a_browser_test(self):
+        """Every browser-level matrix row that CITES a test must cite a harness test.
+
+        A row is checked when its first cell is an invariant id, its cell declares a
+        `browser` Level, AND it cites at least one `test_file::…` — i.e. it has a
+        BUILT test.  Pure not-yet-built rows (which name the surface they will land
+        with but carry no test) cite nothing, so they are naturally skipped; this is
+        deliberately test-presence-driven, not phrase-driven, so a MIXED row (a built
+        browser test + a deferred clause like "lands with …") is still checked on its
+        built citation rather than slipping through on the deferred phrase.
+
+        For a checked row every cited citation must resolve to a module in
+        BROWSER_HARNESS_MODULES; otherwise the render claim rests on a string test.
+        Rows in KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02 are known debt and skipped.
+        """
+        violations = []
+        for lineno, line in enumerate(_lines(MATRIX), 1):
+            idm = self._ROW_ID_RE.match(line)
+            if not idm:
+                continue
+            if not self._BROWSER_LEVEL_RE.search(line):
+                continue
+            cited = [m.group(1) for m in CITATION_RE.finditer(line)]
+            if not cited:
+                continue  # pure not-yet-built browser row — no test to check yet
+            inv_id = idm.group(1)
+            if inv_id in self.KNOWN_BROWSER_LEVEL_STRING_ROWS_2026_07_02:
+                continue
+            for citation in cited:
+                raw = citation.split("::")[0]
+                stem = raw[:-3] if raw.endswith(".py") else raw
+                if stem not in self.BROWSER_HARNESS_MODULES:
+                    violations.append(
+                        f"  line {lineno} ({inv_id}): browser-level claim backed by "
+                        f"`{citation}` — {stem} is not a headless-harness module "
+                        f"{sorted(self.BROWSER_HARNESS_MODULES)}"
+                    )
+
+        if violations:
+            self.fail(
+                f"{len(violations)} browser-level matrix row(s) not backed by a "
+                f"headless-harness test (a render claim needs a browser test):\n"
                 + "\n".join(violations)
             )
 
