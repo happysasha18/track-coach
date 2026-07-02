@@ -406,16 +406,16 @@ REC_CLASS = {
 # tag. Format fields are a subset of each rec's add(**kw). EVERY key that produces a `D.recs` card must have an
 # entry (the invariant: every card carries a non-empty based-on). Per-stem cards build theirs in per_stem_cards.
 REC_BASED = {
-    "long_section":    "the song structure (self-similarity) — one section runs {frac:.0f}% of the track unchanged.",
+    "long_section":    "the song structure — one section runs {frac:.0f}% of the track unchanged.",
     "energy_flat":     "the loudness curve over time — it barely trends across the track.",
     "brightness":      "the brightness curve rising while loudness and density stay roughly flat.",
     "endpoint":        "the ending and the opening measured against each other — their spectra are nearly identical.",
     "wobble":          "the modulation-rate curve holding a near-constant speed start to end.",
     "climax":          "where the energy peak lands — about {pos:.0f}% through the track.",
     "swing":           "the drum timing against the grid — about {sw:.0f} ms off the straight beat.",
-    "truepeak_clip":   "the master's true-peak meter — {tp:+.1f} dBTP (4× oversampled).",
+    "truepeak_clip":   "the master's true peak — {tp:+.1f} dB, just past the 0 dB ceiling.",
     "tonal_resonance": "the track's average spectrum — the {band} Hz band sits {dev:+.1f} dB off its neighbours.",
-    "squashed":        "the master's dynamic range — peak-to-RMS of only {dr:.0f} dB.",
+    "squashed":        "the master's dynamic range — only {dr:.0f} dB between the peaks and the average level.",
     "plateau":         "the song structure — no new section after {onset}; the last {tail_pct:.0f}% recombines.",
     "stem_evolves":    "per-part repetition — the {evolver} barely repeats while {loopers} loop.",
     "masking_stem":    "the separated parts' spectra overlapping — the {low_lbl} sits over the {mid_lbl} ~{pct:.0f}% of the track.",

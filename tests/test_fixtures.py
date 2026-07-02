@@ -87,6 +87,18 @@ class GoldenRenderFromRealData(unittest.TestCase):
                                     f"{label}: card {r['h']!r} based-on is a bare tag")
             self.assertIn('class="based"', html, f"{label}: based-on line did not render")
 
+    def test_based_on_avoids_technical_method_jargon(self):  # INV-31 / §B.13 — Alexander 2026-07-02
+        # Keep the RESULT + a simple unit (dB); drop technical METHOD jargon (oversampling,
+        # peak-to-RMS, self-similarity, dBTP) from the user-facing based-on copy — those describe
+        # HOW it was measured, not WHAT was found.
+        import build_widget
+        banned = ("oversampl", "peak-to-rms", "self-similarity", "dbtp")
+        for key, tmpl in build_widget.REC_BASED.items():
+            low = tmpl.lower()
+            for term in banned:
+                self.assertNotIn(term, low,
+                                 f"REC_BASED[{key!r}] leaks technical method jargon {term!r}: {tmpl!r}")
+
     def test_develop_mode_line_leads_the_read_when_the_track_develops(self):  # INV-32 (SPEC §B.12)
         # Shared Memories develops (density up + image tightens) → the read leads with the observation,
         # carrying DIRECTION (tightens, not widens).

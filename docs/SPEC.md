@@ -595,7 +595,10 @@ observation:
 Alexander: *"show which signals drove each card."* Every recommendation card carries a plain
 line saying what it is **based on**. The credibility trap (memory `track-coach-card-evidence`): a raw lone
 number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what, oranges?"* (Alexander). So the based-on line is
-in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`).
+in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`). It names the
+**result and a simple unit** (a dB figure, a percentage, a time) but **not the measurement METHOD** — the
+technical *how* (`4× oversampled`, `peak-to-RMS`, `self-similarity`) is a signal-processing detail, not the
+finding, so it stays out of the user-facing line (Alexander 2026-07-02). `tags: result-not-method`
 - **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
   advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
   project panel (export, model, leakage) are an evidence SURFACE, out of scope this increment.
