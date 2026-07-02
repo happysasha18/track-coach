@@ -57,12 +57,34 @@ var TC = {
     var r=e.getBoundingClientRect();
     return {x:Math.round(r.left), y:Math.round(r.top), w:Math.round(r.width), h:Math.round(r.height)};});},
   count: function(sel){return document.querySelectorAll(sel).length;},
-  // literal escaped-tag leak in visible markup (e.g. "&lt;b&gt;" shown as text).
+  // literal escaped-tag leak in VISIBLE markup — a tag that shipped as text instead of
+  // rendering. Script bodies are stripped first: they legitimately carry such sequences
+  // in their own source (regexes, this harness's injected probe), which are not visible.
   escLeak: function(sel){var e=document.querySelector(sel); if(!e) return null;
-    return (e.innerHTML.match(/&lt;\/?[a-z]/gi)||[]).length;},
+    var h=e.innerHTML.replace(/<script[\s\S]*?<\/script>/gi,'');
+    return (h.match(/&lt;\/?[a-z]/gi)||[]).length;},
   text: function(sel){var e=document.querySelector(sel); return e?e.textContent.trim():null;},
+  // vertical top of the first match (px, viewport-relative) — for read-order checks.
+  top: function(sel){var e=document.querySelector(sel); if(!e) return null;
+    return Math.round(e.getBoundingClientRect().top);},
+  // JS errors captured since page load (window.onerror + console.error). Empty = clean.
+  errors: function(){return (window.__tcErrors||[]).slice();},
 };
 """
+
+# Installed in <head> BEFORE the widget's own scripts run, so a console.error or an
+# uncaught exception during render is captured (a probe injected at </body> would miss
+# an error thrown earlier). Read back via TC.errors().
+JS_ERROR_COLLECTOR = (
+    "<script>window.__tcErrors=[];"
+    "window.addEventListener('error',function(e){"
+    "window.__tcErrors.push(String((e&&e.message)||(e&&e.error)||e));});"
+    "window.addEventListener('unhandledrejection',function(e){"
+    "window.__tcErrors.push('unhandledrejection: '+String((e&&e.reason)||e));});"
+    "var _ce=console.error;console.error=function(){"
+    "try{window.__tcErrors.push(Array.prototype.map.call(arguments,String).join(' '));}"
+    "catch(_){}_ce.apply(console,arguments);};</script>"
+)
 
 
 def _run_chrome(args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
@@ -90,6 +112,12 @@ def probe(html_path: str, js: str, width: int = 1200, height: int = 2400,
         "document.body.appendChild(n);"
         "}," + str(settle_ms) + ");});</script>"
     )
+    # Install the error collector as early as possible (before the widget's scripts).
+    if "<head>" in src:
+        src = src.replace("<head>", "<head>" + JS_ERROR_COLLECTOR, 1)
+    else:
+        src = JS_ERROR_COLLECTOR + src
+
     if "</body>" in src:
         src = src.replace("</body>", injected + "</body>", 1)
     else:

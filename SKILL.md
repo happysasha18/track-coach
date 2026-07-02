@@ -761,6 +761,7 @@ Forbidden in this section:
 - [ ] Demucs wait filled with substantive text (not silence)
 - [ ] All dependency versions pinned
 - [ ] No monetisation language
+- [ ] **Pre-render smoke passed on the REAL widget before showing Alexander** — `uv run --python 3.11 python scripts/prerender_smoke.py <widget.html>` (exit 0). Catches a broken render — JS console error, an escaped-tag leak, an empty recs panel, a missing core surface — that a string test cannot see, so a human never spots it first.
 
 
 ## Library management — cleanup verbs

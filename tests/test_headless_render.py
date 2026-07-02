@@ -82,6 +82,104 @@ _COLS_JS = ("(function(){document.body.classList.remove('simple');"
             "cards:document.querySelectorAll('#recs > .rec').length};})()")
 
 
+def _make_ref_run_dir(tmp_root):
+    """Minimal on-disk run dir (result_core + result_masking) so fingerprint_from_run_dir
+    returns a placeable fingerprint — the reference read/web panel then load their
+    directions + web notes from the bundled data/ files. Mirrors test_reference_read's
+    _make_run_dir (the fixture that already renders refRead for Venetian Snares)."""
+    import json
+    run_dir = Path(tmp_root) / "run"
+    run_dir.mkdir(exist_ok=True)
+    (run_dir / "result_core.json").write_text(json.dumps({
+        "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+        "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+    (run_dir / "result_masking.json").write_text(json.dumps({
+        "band_rms_db": {
+            "drums": {"sub": [-30]*8, "low": [-25]*8, "low_mid": [-28]*8,
+                      "mid": [-35]*8, "hi_mid": [-40]*8, "air": [-60]*8},
+            "bass":  {"sub": [-20]*8, "low": [-18]*8, "low_mid": [-30]*8,
+                      "mid": [-45]*8, "hi_mid": [-60]*8, "air": [-80]*8},
+            "other": {"sub": [-50]*8, "low": [-45]*8, "low_mid": [-30]*8,
+                      "mid": [-25]*8, "hi_mid": [-20]*8, "air": [-25]*8}},
+        "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+        "sustain": {"bass": 0.5, "other": 0.4},
+        "spectral_centroid": {"other": 800.0}, "total_windows": 8}))
+    return str(run_dir)
+
+
+def _build_ref_widget():
+    """A FULL widget that renders the §D reference read (needs a run_dir for the
+    fingerprint) AND the tonal-balance panel (needs core.tonal_balance) — the surfaces
+    whose Detailed-only gate + read-order were only ever asserted as CSS text."""
+    tmp = Path(tempfile.mkdtemp(prefix="tc_ref_"))
+    out = tmp / "widget.html"
+    core = _rich_core()
+    # The tonal panel self-hides below 3 bands and draws by rel_db (0 dB = loudest band).
+    core["tonal_balance"] = [
+        {"band": "60",  "rel_db": 0.0,  "dev_db": 0.0},
+        {"band": "120", "rel_db": -2.0, "dev_db": 1.0},
+        {"band": "250", "rel_db": -4.0, "dev_db": 6.0},
+        {"band": "500", "rel_db": -6.0, "dev_db": -2.0},
+        {"band": "2k",  "rel_db": -9.0, "dev_db": 0.0},
+        {"band": "8k",  "rel_db": -14.0, "dev_db": -5.0},
+    ]
+    build_widget.build_html(core, {}, None, None, str(out), "Reference Test",
+                            build_widget.STRINGS, mode="full",
+                            run_dir=_make_ref_run_dir(str(tmp)),
+                            narrative_md="The mix reads clear.\n\nBass is forward early.")
+    return str(out)
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class RefReadSurfacesRendered(unittest.TestCase):
+    """The reference read (#refRead), the web plaque (#webPanel) and the tonal-balance
+    panel (#tonalPanel) had their visibility + Detailed-only gate + read-order verified
+    ONLY as CSS text / DOM-string order (inventory Tier-2 holes 12/14/15/16). A browser
+    specificity conflict or load-time JS override would pass those and still ship a
+    Detailed panel leaking into Simple. These assert the RENDERED visibility + geometry."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.widget = _build_ref_widget()
+
+    def test_reference_surfaces_present_in_detailed(self):
+        # Guard the fixture itself: if the bundled directions/web-notes stop producing a
+        # reference read, the gate tests below would pass vacuously. Fail loudly instead.
+        v = _vis_in_view(self.widget, "detailed", ["#refRead", "#webPanel", "#tonalPanel"])
+        for sel in ("#refRead", "#webPanel", "#tonalPanel"):
+            self.assertIs(v[sel], True, f"{sel} must render+show in Detailed (fixture guard)")
+
+    def test_refread_detailed_only(self):
+        simple = _vis_in_view(self.widget, "simple", ["#refRead"])["#refRead"]
+        detail = _vis_in_view(self.widget, "detailed", ["#refRead"])["#refRead"]
+        self.assertIs(simple, False, "#refRead must be hidden in Simple (rendered, not CSS text)")
+        self.assertIs(detail, True, "#refRead must be visible in Detailed (rendered)")
+
+    def test_webpanel_detailed_only(self):
+        simple = _vis_in_view(self.widget, "simple", ["#webPanel"])["#webPanel"]
+        detail = _vis_in_view(self.widget, "detailed", ["#webPanel"])["#webPanel"]
+        self.assertIs(simple, False, "#webPanel must be hidden in Simple (rendered)")
+        self.assertIs(detail, True, "#webPanel must be visible in Detailed (rendered)")
+
+    def test_tonal_panel_visible_in_both_views(self):
+        # The tonal-balance panel is the always-on head of the read — NOT Detailed-only.
+        for view in ("simple", "detailed"):
+            v = _vis_in_view(self.widget, view, ["#tonalPanel"])["#tonalPanel"]
+            self.assertIs(v, True, f"#tonalPanel must stay visible in {view} (rendered)")
+
+    def test_read_order_tonal_above_refread_above_webpanel(self):
+        # §D.10.3 fixed read order — asserted by RENDERED vertical position, not DOM string
+        # order (which cannot see a CSS reorder / flex / grid moving a block visually).
+        r = hc.probe(
+            self.widget,
+            "(function(){document.body.classList.remove('simple');"
+            "return {tonal:TC.top('#tonalPanel'),ref:TC.top('#refRead'),web:TC.top('#webPanel')};})()",
+            width=1100, height=3600)
+        self.assertIsNotNone(r["tonal"]); self.assertIsNotNone(r["ref"]); self.assertIsNotNone(r["web"])
+        self.assertLess(r["tonal"], r["ref"], "tonal panel must sit above the reference read")
+        self.assertLess(r["ref"], r["web"], "reference read must sit above the web panel")
+
+
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class RecsGridReflow(unittest.TestCase):
     """The s29 panels + a sub-760px window used to stack every rec in one crooked
@@ -214,6 +312,19 @@ class ViewLadderRendered(unittest.TestCase):
         self.assertEqual(simple["shown"], 0, "Simple must hide non-timecoded recs (rendered)")
         self.assertEqual(detail["shown"], detail["total"],
                          "Detailed must show every non-timecoded rec (rendered)")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class PreRenderSmoke(unittest.TestCase):
+    """The standing ship gate (scripts/prerender_smoke.py) must pass on a real render:
+    no JS console error, no escaped-tag leak, recs non-empty, every core surface visible
+    in both views. This runs the exact function the ship-checklist CLI runs, so the gate
+    can never silently rot away from the checklist."""
+
+    def test_smoke_clean_on_a_full_widget(self):
+        import prerender_smoke  # noqa: E402  (scripts is already on sys.path)
+        fails = prerender_smoke.run_smoke(_build_rich_widget(with_stems=True))
+        self.assertEqual(fails, [], "pre-render smoke found render defects:\n" + "\n".join(fails))
 
 
 if __name__ == "__main__":
