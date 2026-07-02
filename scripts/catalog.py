@@ -314,7 +314,7 @@ def _stale_chip(e):
     if wv and wv != build_widget.TC_VERSION:
         return (f'<span class="stale" title="analysed on v{wv}; current is '
                 f'v{build_widget.TC_VERSION} — re-analyse to refresh">'
-                f'older version</span>')
+                f'older analysis · v{wv} → re-analyse</span>')
     return ""
 
 
@@ -382,7 +382,7 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
 _HEADERS = [
     ("track", "Track"), ("version", "Version"), ("date", "Date"), (None, "Signature"),
     ("bpm", "BPM"), ("key", "Key"), ("len", "Length"), ("lufs", "LUFS"),
-    (None, "Mood / style"), ("mode", "Mode"),
+    (None, "Mood / style"), ("mode", "Analysis"),
     (None, "Leans toward"), (None, "Similar in library"),
 ]
 _NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the header count
@@ -471,7 +471,7 @@ tbody tr:hover .ttl{{color:var(--wob)}}
 .tablewrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}  /* fallback: scroll, never squish */
 /* The td stays a normal table-cell (so every column shares one vertical-align baseline and rows can't
    skew); the play button + title live in an INNER flex container, never on the <td> itself. */
-.c-track{{max-width:250px}}
+.c-track{{max-width:210px}}
 .tcell{{display:flex;align-items:center;gap:8px}}
 .tmeta{{min-width:0;flex:1}}  /* min-width:0 lets the title ellipsis-truncate inside the flex row */
 .cplay{{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
@@ -495,7 +495,7 @@ a.ttl:hover{{color:var(--wob);text-decoration:underline}}
 svg.arc{{width:130px;height:30px;display:block}}.noarc{{color:var(--muted)}}
 svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .delta{{margin-left:5px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}}
-.c-tags{{min-width:158px}}  /* room for chips to sit 2-per-row, not one-per-line (keeps rows short) */
+.c-tags{{min-width:130px}}  /* room for chips to sit 2-per-row, not one-per-line (keeps rows short) */
 .tag{{display:inline-block;font-size:10px;padding:1px 7px;border-radius:20px;margin:1px 3px 1px 0;white-space:nowrap}}
 .tag.mood{{background:rgba(167,139,250,.16);color:#cdbcff}}
 .tag.style{{background:transparent;border:1px solid var(--line);color:var(--muted)}}
@@ -503,22 +503,22 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .mode{{font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}}
 .mode.full{{background:rgba(70,211,154,.14);color:var(--good)}}.mode.quick{{background:rgba(255,209,102,.14);color:var(--bright)}}
 /* Similarity columns (§D.10 / §F — added 2026-06-29) */
-.c-sim{{min-width:110px;font-size:11.5px;vertical-align:middle}}
+.c-sim{{min-width:96px;font-size:11.5px;vertical-align:middle}}
 .sim-none{{color:var(--muted);font-style:italic;font-size:11px}}
 .sim-dir{{display:block;font-weight:600;text-decoration:none;line-height:1.6}}
 .sim-dir:hover{{text-decoration:underline}}
 .sib-chip{{display:inline-block;background:var(--panel2);border:1px solid;border-radius:6px;
  padding:1px 7px;margin:0 3px 3px 0;font-size:10.5px;text-decoration:none;white-space:nowrap}}
 .sib-chip:hover{{opacity:.85}}
-/* Responsive columns: on a non-maximised window the 12-col table doesn't fit, and nowrap cells
-   would force an ugly horizontal-scroll clip (Sasha 2026-06-20: "если не на полный экран таблица
-   странно показывается"). Progressively drop the least-important columns — sim cols + mood/style +
-   mode → date — keeping the core spec (signature, BPM, key, length, LUFS). overflow-x:auto is the
-   last-resort fallback below the smallest breakpoint. */
-@media(max-width:1100px){{thead th:nth-child(9),tbody td:nth-child(9),
- thead th:nth-child(10),tbody td:nth-child(10),
- thead th:nth-child(11),tbody td:nth-child(11),
- thead th:nth-child(12),tbody td:nth-child(12){{display:none}}}}      /* mood/style + mode + sim cols */
+/* Responsive columns: the full 12-col table only fits on a wide/maximised window. Drop the LEAST
+   important columns FIRST and keep the reference columns (Leans toward / Similar) visible longest —
+   they were the ones clipping off-screen at 1400 (Fable pre-1.0 V1). Priority: mood/style + mode go
+   at ≤1440 (so the reference work stays on a normal full window); the reference cols themselves only
+   drop at ≤1100; overflow-x:auto is the last-resort fallback. */
+@media(max-width:1440px){{thead th:nth-child(9),tbody td:nth-child(9),
+ thead th:nth-child(10),tbody td:nth-child(10){{display:none}}}}       /* mood/style + mode — keep reference cols */
+@media(max-width:1100px){{thead th:nth-child(11),tbody td:nth-child(11),
+ thead th:nth-child(12),tbody td:nth-child(12){{display:none}}}}       /* last resort: the reference cols too */
 @media(max-width:880px){{thead th:nth-child(3),tbody td:nth-child(3){{display:none}};
  .wrap{{padding:18px 12px 48px}};tbody td,thead th{{padding:6px 8px}}}}                        /* date */
 .empty{{text-align:center;color:var(--muted);padding:40px}}
@@ -549,7 +549,7 @@ tr.hide{{display:none}}
  <div class="tablewrap"><table><thead><tr>{ths}</tr></thead><tbody id="rows">
 {rows_html}
  </tbody></table></div>
- <div class="foot">Track Coach library · generated offline · v{html.escape(build_widget.TC_VERSION)} · links are relative to <code>{html.escape(widgets_rel)}/</code></div>
+ <div class="foot">Track Coach library · generated offline · v{html.escape(build_widget.TC_VERSION)}</div>
 </div>
 <script>
 const tbody=document.getElementById("rows");

@@ -320,8 +320,8 @@ class StaleWidgetFlag(unittest.TestCase):
                src_run_dir="/r", src_widget="analysis_widget_v0.0.1.html")
         html = catalog.render_catalog_html([e])
         self.assertIn('class="stale"', html, "an out-of-date deposit must carry the stale chip element")
-        self.assertIn("older version", html, "chip text must say 'older version' (plain, not the bare word 'stale')")
-        self.assertIn("v0.0.1", html, "chip text must include the specific old version number")
+        self.assertIn("older analysis", html, "chip text must say 'older analysis' (Glossary wording, not the bare word 'stale')")
+        self.assertIn("v0.0.1", html, "chip text must include the specific old version number, visible not just hovered")
         self.assertIn("re-analyse to refresh", html, "the tooltip must explain what to do")
 
     def test_unparseable_widget_name_is_not_flagged(self):
@@ -336,7 +336,7 @@ class StaleWidgetFlag(unittest.TestCase):
                src_run_dir="/r", src_widget="analysis_widget.html", tc_version="0.0.1")
         html = catalog.render_catalog_html([e])
         self.assertIn('class="stale"', html, "a stored older version must be flagged even with no version in the name")
-        self.assertIn("older version", html, "chip text must say 'older version'")
+        self.assertIn("older analysis", html, "chip text must say 'older analysis'")
 
     def test_stored_tc_version_is_preferred_over_the_filename(self):
         # the deposit-time version is authoritative: a current-looking filename can't mask an older build

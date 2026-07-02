@@ -5,6 +5,22 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.22] — 2026-07-03
+
+### Fixed
+- **One producer name per stem across every surface; no leaked splitter/model/tool names.** The same
+  audio stem now shows the same label everywhere — arc bar, rhythm tiles, stem map panel, notes title,
+  masking cards, and the omitted-stems note. Raw Demucs family names ("other", "vocals", "guitar",
+  "piano"), model names ("htdemucs_6s", "htdemucs"), tool names ("Demucs", "basic-pitch"), and the
+  hardcoded per-track "piano is near-silent" claim are all removed from rendered text. Omitted
+  (near-silent) stems show "near-silent" in every surface. A new class-level browser test
+  (`NoRawStemNameOnAnySurface`) guards against regressions.
+- **Library page: clearer stale marker + reference columns no longer clip.** The stale chip now reads
+  "older analysis · v{version} → re-analyse" — the version is visible, not only on hover (the Glossary
+  wording). At a full 1400px window the two reference columns (Leans toward, Similar in library) stay
+  visible; the less-important mood/style + Analysis columns drop first (≤1440px). The "Mode" column header
+  is now "Analysis", and the footer's "links are relative to widgets/" dev-note is removed.
+
 ## [0.9.21] — 2026-07-03
 
 ### Changed

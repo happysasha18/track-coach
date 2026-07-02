@@ -359,6 +359,25 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). NOTE: 0.8.12 already put the
   real name in the SUB-line, so if it's ever promoted to PRIMARY, drop the sub-line duplicate (else
   "Guitar / Guitar").
+- **INV-STEMNAME-ALL (0.9.22, s45 — Fable pre-1.0 blocker #1; the §B.7 rule now binds EVERY surface, not just
+  the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
+  lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
+  (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
+  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` = the `stem_character`
+    label if the stem is significant, else `"near-silent"` (empty stem) / a neutral part word — **NEVER** the
+    raw Demucs family name. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every
+    JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem
+    ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title.
+  - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
+    6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
+    (`play_note`, `map_hint`, `note_hint`, `note_hint_other`) AND prose from `map_stems.py`
+    (`verdict_text`, `model_why`, `model_recommendation`).
+  - **The three deliberate-different-name surfaces (§B.7 above) still hold** — they differ in JOB (best-guess
+    rec vs role-headline vs track-sub-line), never by leaking a raw name; all three draw from the one resolver.
+  - **Guard (class-level, catches future regressions):** a rendered widget on the NO-`.als` path (the leaking
+    path) contains NONE of the raw tokens in user-facing text: `other`/`vocals`/`guitar`/`piano` as a standalone
+    part name, `Demucs`/`htdemucs`/`htdemucs_6s`/`basic-pitch`. Test `NoRawStemNameOnAnySurface`. One instance
+    reported ⇒ whole class owned (Alexander's "never patch pointwise").
 
 ### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Alexander's idea, s14)
 Alexander (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral

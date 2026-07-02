@@ -109,7 +109,7 @@ def verdict(best_fam, best_r, second_r, rel_db, best_track=None):
     # Conservative: broadband RMS under-reports narrowband/sub stems, so only the truly
     # negligible (<-28 dB ≈ 0.15% power) is called empty. A quiet-but-real bass is NOT lost.
     if rel_db < -28:
-        return "empty", None, ("This stem is near-silent — Demucs put almost nothing here "
+        return "empty", None, ("This stem is near-silent — the separator put almost nothing here "
                                f"({rel_db:+.0f} dB vs the loudest stem).")
     # 2) Strong, unambiguous match to one family.
     if best_r >= 0.40 and (best_r - second_r) >= 0.12:
@@ -128,13 +128,13 @@ def recommend_model(families_present):
     has = lambda f: f in families_present
     melodic = sum(1 for f in ("chord", "lead") if has(f))
     if melodic >= 1:
-        return ("htdemucs_6s",
-                "Project has melodic/harmonic parts (chords, leads). htdemucs_6s adds "
+        return ("a 6-stem model",
+                "The project has melodic/harmonic parts (chords, leads). A 6-stem model adds "
                 "guitar and piano stems, so more of that material lands in its own stem "
-                "instead of being dumped into 'other'.")
-    return ("htdemucs",
-            "Project is mostly drums + bass. The standard 4-stem htdemucs is enough; "
-            "the extra 6s stems would stay near-empty.")
+                "instead of being dumped into the everything-else stem.")
+    return ("the default model",
+            "The project is mostly drums + bass. The default 4-stem model is enough; "
+            "the extra stems from a 6-stem model would stay near-empty.")
 
 
 def main():
@@ -219,7 +219,7 @@ def main():
         "export_suggestion":
             "A project is loaded, so the most reliable stems aren't separated at all: in "
             "Ableton, solo each group (Grp Bass, Grp Kick, Grp Snr, …) and export it. Those "
-            "group bounces are perfect by construction — use them instead of Demucs guesses "
+            "group bounces are perfect by construction — use them instead of the automatic separation "
             "for any per-part EQ or sidechain decisions.",
     }
     write_json(out, args.out)

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.21"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.22"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -128,7 +128,7 @@ STRINGS = {
         "auto_hint": "Real automation envelopes from the project (filter, gain, pitch, sends…), aligned to the audio. Each curve is scaled to its own range. Compare with Energy / Brightness above: where a curve flattens but the sound keeps moving — or moves while the sound sits still — intention and result disagree.",
         "auto_none": "No moving automation found in the rendered window.",
         "map_title": "Stem ↔ project — does separation match reality?",
-        "map_hint": "Each Demucs stem checked against the real project tracks by timing (when its loudness rises vs. when each part plays). “Near-silent” = the stem really is empty. “Has signal · no clean match” means there IS audio here — it just overlaps other parts too much to pin to one track (not lost). Only trust a stem for EQ when it matches one part.",
+        "map_hint": "Each separated stem checked against the real project tracks by timing (when its loudness rises vs. when each part plays). “Near-silent” = the stem really is empty. “Has signal · no clean match” means there IS audio here — it just overlaps other parts too much to pin to one track (not lost). Only trust a stem for EQ when it matches one part.",
         "map_clear": "matches “{fam}”", "map_mixed": "blends parts", "map_weak": "no clear match",
         "map_nomatch": "has signal · no clean match", "map_empty": "near-silent",
         "cues_title": "Callouts on the timeline — tap a triangle above, or an item here",
@@ -141,9 +141,9 @@ STRINGS = {
         "rhy_bleed_title": "Likely bleed — don't read this as the stem's own",
         "rhy_bleed_line": "“{stem}” looks loudest in {band}, but “{source}” sits {gap} dB louder there and they rise & fall together — so that energy is most likely “{source}” bleeding into “{stem}”, not “{stem}” itself.",
         "note_title": "Transcribed notes — {label}",
-        "note_hint": "Pitches pulled straight from the audio of this stem (basic-pitch), not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
+        "note_hint": "Pitches read straight from the audio of this stem, not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
         "note_label_other": "the melodic layer (synths / keys / pads)",
-        "note_hint_other": " This is Demucs’s “other” stem — everything that isn’t drums, bass or vocals, so it’s where the track’s chords and lead lines live.",
+        "note_hint_other": " This is the splitter’s everything-else part — what isn’t drums, bass or vocals — so it’s where the track’s chords and lead lines live.",
         "drum_title": "Drum breakdown — kick / snare / hat",
         "drum_hint": "Every hit in the drums stem, classified by spectral shape (not separated into audio). Bar height = hits per window. Kicks {k} · snares {s} · hats {h}.",
         "stem_title": "Stem frequency map",
@@ -164,7 +164,7 @@ STRINGS = {
         "play_title": "Stem player — hear what you see",
         "play_hint": "Play the separated stems together, in sync with every chart above. Mute/solo each part; click any timeline to jump there. The white line is the playhead.",
         "play_play": "▶ Play", "play_pause": "❚❚ Pause", "play_mute": "mute", "play_solo": "solo",
-        "play_note": "Each lane is one separated part (the analyser splits the track into drums · bass · other · vocals · guitar · piano). A lane can look empty when that instrument isn't really in the track — here piano is near-silent, so you effectively see fewer than six. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
+        "play_note": "Each lane is one separated part (the analyser splits the track into its parts (drums, bass, and the melodic layers)). A lane can look empty when that instrument isn't really in the track — lanes with too little material to read are dropped — the legend names them. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
         "hover": "hover over the chart…",
         "scale_quiet": "quiet −90 dB",
         "scale_loud": "loud −6 dB",
@@ -867,7 +867,7 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
 
     def part(stem):
         lbl = ((character or {}).get(stem, {}) or {}).get("label")
-        return lbl or stem
+        return lbl or "a part"
 
     out = []
     for c in chosen:
@@ -1402,7 +1402,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
                       "mid": "600 Hz–2 kHz", "hi_mid": "2–6 kHz", "air": "6–16 kHz"}
 
         def _lbl(st):
-            return ((character or {}).get(st, {}) or {}).get("label") or st
+            return ((character or {}).get(st, {}) or {}).get("label") or "a part"
         real = [(z, s) for z, s in masking.get("masking_summary", {}).items()
                 if s["pct_masked"] > 0 and z.split("__")[-1] not in empties]
         if real and character:
@@ -1426,7 +1426,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
                     spot=spot, notch=notch, pct=s["pct_masked"],
                     worst_t=fmt_t(worst["time_s"]) if worst else "—")
         elif real:                                          # no characters → old generic line
-            lines = "; ".join(R["masking_line"].format(mid=z.split("__")[-1], pct=s["pct_masked"]) for z, s in real)
+            lines = "; ".join(R["masking_line"].format(mid="a part", pct=s["pct_masked"]) for z, s in real)
             add("masking_real", lines=lines)
         elif not empties:
             add("masking_clean")
@@ -2039,6 +2039,33 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
 
     _leak = leakage_caveats(masking, rhythm)   # CR-4; also feeds (g) stem_character (exclude bled bands)
     _character = stem_character(masking, rhythm, _leak, per_stem_notes)  # computed once; reused by recs (G16) + payload
+    # INV-STEMNAME-ALL (0.9.22): one display name per stem, resolved ONCE here, threaded into every surface.
+    # Significant stems get their character label; near-silent (omitted) → "near-silent"; missing → "a part".
+    _analysed_for_display = masking.get("stems_analysed", []) if masking else []
+    _omitted_for_display = set(
+        st for st in _analysed_for_display
+        if st not in significant_stems(masking)
+    ) if masking else set()
+    _display = {
+        st: ((_character.get(st, {}) or {}).get("label") or
+             ("near-silent" if st in _omitted_for_display else "a part"))
+        for st in _analysed_for_display
+    }
+    _fam_display = {
+        "other": "the rest", "kick": "kick", "bass": "bass", "drums": "drums",
+        "hats": "hats", "chord": "chords", "lead": "lead", "perc": "perc",
+    }
+    # Post-process arc structure bar lead labels: the no-.als path sets seg["lead"] to the raw stem name
+    # (line ~2007); apply the display map now that _display is built. The .als path uses real track names
+    # (not raw stem names), so they are safe — they won't appear as keys in _display.
+    if _display and ss_segs:
+        for _seg in ss_segs:
+            if _seg.get("lead") and _seg["lead"] in _display:
+                _seg["lead"] = _display[_seg["lead"]]
+    if _display and story and story.get("scenes"):
+        for _sc in story["scenes"]:
+            if _sc.get("lead") and _sc["lead"] in _display:
+                _sc["lead"] = _display[_sc["lead"]]
     _repetition = stem_repetition(per_stem_selfsim, masking)  # CR-6; reused by the (e) dev-vs-loop rec + payload
     recs = build_recommendations(core, detail, masking, S,
                                  als_overlay=als_overlay, stemmap=stemmap, rhythm=rhythm,
@@ -2110,6 +2137,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "rhythm": rhythm,
         "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
         "stem_character": _character,  # (g)/G13: deterministic character label per significant stem (computed above)
+        "stem_display": _display,    # INV-STEMNAME-ALL: one display name per stem (significant→label, near-silent→"near-silent", else→"a part")
+        "fam_display": _fam_display, # INV-STEMNAME-ALL: producer label per family key (used in mapPanel family bars)
         "stem_repetition": _repetition,  # CR-6: per-significant-stem repetition (computed once above, reused by the (e) rec)
         "notes": notes,
         "drums": drums,
@@ -3135,6 +3164,10 @@ __REFREAD__
 </div>
 <script>
 const D=__PAYLOAD__, T=D.t;
+// INV-STEMNAME-ALL (0.9.22): one display name per stem/family, resolved from the Python payload.
+// Every JS surface MUST go through disp()/fdisp() — never show a raw Demucs/model name.
+function disp(s){return (D.stem_display&&D.stem_display[s])||s||"a part";}
+function fdisp(s){return (D.fam_display&&D.fam_display[s])||s;}
 const fmtT=s=>(s<0?"0:00":Math.floor(s/60)+":"+String(Math.round(s%60)).padStart(2,"0"));
 // Timeline callouts ("comments"): the located recommendations, in time order, each
 // given a letter (a,b,c…). The same list drives the triangle cues over the scenes,
@@ -3264,7 +3297,7 @@ document.getElementById("recLegend").innerHTML=
  // NAMED as omitted, so the missing lanes read as a decision, not a bug. htdemucs_6s always emits
  // 6 stems; the empty ones (e.g. Lazy Sparks vocals/piano ≈ −90 dB) show here as a flat line + this note.
  const OM=(D.stem&&D.stem.omitted)||[];
- if(OM.length){const names=OM.map(n=>`<b>${n}</b>`).join(", ");
+ if(OM.length){const names=OM.map(n=>`<b>${disp(n)}</b>`).join(", ");
   el.insertAdjacentHTML("beforeend",
    `<span class="chip" id="omittedNote"><span class="sw" style="background:#a78bfa;opacity:.55"></span>`+
    `${names}&nbsp;— near-silent, omitted (too little material to read)</span>`);}
@@ -3597,12 +3630,12 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   const bars=d.family_matches.slice(0,3).map(m=>{
    const w=Math.max(0,Math.min(100,m.r*100));
    return `<div style="display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11px">
-     <span style="width:38px;color:var(--muted)">${m.family}</span>
+     <span style="width:38px;color:var(--muted)">${fdisp(m.family)}</span>
      <div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden">
        <div style="height:100%;width:${w}%;background:${FCOL[m.family]||"#888"}"></div></div>
      <span style="width:34px;text-align:right;color:var(--muted)">${m.r.toFixed(2)}</span></div>`;}).join("");
   return `<div class="mcard"><div style="display:flex;justify-content:space-between;align-items:baseline">
-    <div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${name}</div>
+    <div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${disp(name)}</div>
     <span class="tag ${vcls}" style="margin-top:0">${head}</span></div>
     ${bars}<div class="z" style="margin-top:8px;color:var(--ink-dim)">${d.verdict_text}</div></div>`;}).join("");
  document.getElementById("mapRows").innerHTML=rows;
@@ -3629,7 +3662,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   const col=FCOL[s]||"#8b94a8";
   const tight=d.offgrid_ms!=null?T.rhy_tight.replace("{ms}",d.offgrid_ms):"—";
   const sync=d.syncopation_pct!=null?T.rhy_sync.replace("{p}",d.syncopation_pct):"—";
-  return `<div class="mcard"><div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${s}</div>
+  return `<div class="mcard"><div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${disp(s)}</div>
    <div class="pct" style="color:${col};font-size:18px">${T.rhy_rate.replace("{r}",d.onset_rate)}</div>
    <div class="z">${tight} · ${sync}</div>${spark(d.onset_density,col)}</div>`;}).join("");
  const sep=R.separation||{};let html="";
@@ -3638,13 +3671,13 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  html+=`<div class="rec ${rcls}"><div class="when">${T.rhy_sep}</div>
    <h3>${rdb!=null?rdb+" dB residual":"—"}</h3><p>${sep.reconstruction_text||""}</p></div>`;
  const leaks=(sep.leakage||[]).filter(l=>l.r>=0.2);
- const lbody=leaks.length?leaks.map(l=>`${l.a} ↔ ${l.b}: <b>${l.r.toFixed(2)}</b>`).join(" · "):T.rhy_noleak;
+ const lbody=leaks.length?leaks.map(l=>`${disp(l.a)} ↔ ${disp(l.b)}: <b>${l.r.toFixed(2)}</b>`).join(" · "):T.rhy_noleak;
  html+=`<div class="rec ${leaks.length?"concept":"do"}" style="margin-top:12px"><div class="when">${T.rhy_leak}</div>
    <p style="margin-top:2px">${lbody}</p></div>`;
  // CR-4: bands that are most likely a louder, correlated neighbour bleeding in — caveat, don't attribute.
  const bleed=D.leakage_caveats||[];
  if(bleed.length){html+=`<div class="rec crit" style="margin-top:12px"><div class="when">${T.rhy_bleed_title}</div>`+
-   bleed.map(b=>`<p style="margin:4px 0 0">${T.rhy_bleed_line.replace(/{stem}/g,b.stem).replace(/{source}/g,b.source).replace("{band}",b.band_label).replace("{gap}",b.gap_db)}</p>`).join("")+`</div>`;}
+   bleed.map(b=>`<p style="margin:4px 0 0">${T.rhy_bleed_line.replace(/{stem}/g,disp(b.stem)).replace(/{source}/g,disp(b.source)).replace("{band}",b.band_label).replace("{gap}",b.gap_db)}</p>`).join("")+`</div>`;}
  document.getElementById("rhySep").innerHTML=html;
 })();
 
@@ -3658,7 +3691,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const lo=N.pitch_min,hi=N.pitch_max,span=Math.max(1,hi-lo);
  // "other" is the raw Demucs catch-all stem name — meaningless to a producer. Show a friendly
  // label + explain what it actually is (where the melody/chords live). See note_label_other.
- const nlabel=N.label==="other"?(T.note_label_other||N.label):N.label;
+ const nlabel=N.label==="other"?(T.note_label_other||N.label):disp(N.label);
  const nextra=N.label==="other"?(T.note_hint_other||""):"";
  document.getElementById("noteTitle").textContent=T.note_title.replace("{label}",nlabel);
  document.getElementById("noteHint").textContent=T.note_hint

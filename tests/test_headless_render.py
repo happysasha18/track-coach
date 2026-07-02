@@ -442,8 +442,11 @@ class OmittedStemsAcknowledged(unittest.TestCase):
         self.assertTrue(res.get("present"), "stem-panel legend (#seqKey) must exist on a full run")
         self.assertTrue(res.get("vis"), "the omitted-stems acknowledgment must be VISIBLE in Detailed")
         text = res.get("text", "")
-        self.assertIn("vocals", text, "the omitted stem 'vocals' must be named in the stem panel")
-        self.assertIn("piano", text, "the omitted stem 'piano' must be named in the stem panel")
+        # INV-STEMNAME-ALL (0.9.22): omitted stems show as "near-silent" via disp(), not raw names.
+        # The note must acknowledge the count of omitted stems; raw names must not appear.
+        # (NoRawStemNameOnAnySurface guards against "vocals"/"piano" leaking.)
+        self.assertGreaterEqual(text.count("near-silent"), 2,
+                                "each omitted stem must be acknowledged; got: " + repr(text[:120]))
         self.assertTrue("omit" in text or "near-silent" in text or "silent" in text,
                         "the acknowledgment must say WHY they are absent (omitted / near-silent)")
 
@@ -465,10 +468,12 @@ class OmittedStemsAcknowledged(unittest.TestCase):
 
 class CatalogPageResponsive(unittest.TestCase):
     """Browser-level gate on the catalog page (index.html): responsive column shedding is
-    REAL geometry a string test can't see. `@media(max-width:1100px)` hides cols 9–12
-    (mood/style, mode, similarity); `@media(max-width:880px)` also hides col 3 (date). This
-    is the same class of bug as the crooked recs grid — a computed `display:none` under a
-    viewport width, invisible to a string/DOM-stub test. INV-10 / responsive-table."""
+    REAL geometry a string test can't see. PRIORITY (Fable pre-1.0 V1): the two reference
+    columns (11 Leans toward, 12 Similar — the newest work) must stay visible longest, so the
+    less-important mood/style (9) + Analysis (10) drop first at `@media(max-width:1440px)`; the
+    reference columns themselves drop only at `@media(max-width:1100px)`; `@media(max-width:880px)`
+    also hides col 3 (date). Same bug class as the crooked recs grid — a computed `display:none`
+    under a viewport width, invisible to a string/DOM-stub test. INV-10 / responsive-table."""
 
     @classmethod
     def setUpClass(cls):
@@ -496,9 +501,20 @@ class CatalogPageResponsive(unittest.TestCase):
               "return th?getComputedStyle(th).display!=='none':null;})()")
         return hc.probe(self.widget, js, width=width, height=900)
 
-    def test_wide_shows_shed_columns(self):
-        self.assertTrue(self._col_shown(1400, 9), "col 9 (mood/style) must show at 1400px")
+    def test_1400_keeps_reference_cols_drops_moodstyle_and_mode(self):
+        # Fable pre-1.0 V1: at a full 1400px window the reference columns (11 Leans toward,
+        # 12 Similar) used to clip off-screen. New priority — drop mood/style (9) + Analysis (10)
+        # first at ≤1440 so the reference work stays visible on a normal full window.
+        self.assertFalse(self._col_shown(1400, 9), "col 9 (mood/style) drops first at ≤1440px")
+        self.assertFalse(self._col_shown(1400, 10), "col 10 (Analysis) drops first at ≤1440px")
+        self.assertTrue(self._col_shown(1400, 11), "col 11 (Leans toward) must stay visible at 1400px")
+        self.assertTrue(self._col_shown(1400, 12), "col 12 (Similar in library) must stay visible at 1400px")
         self.assertTrue(self._col_shown(1400, 3), "col 3 (date) must show at 1400px")
+
+    def test_wide_1500_shows_all_columns(self):
+        for nth in (9, 10, 11, 12):
+            self.assertTrue(self._col_shown(1500, nth),
+                            f"col {nth} shows on a wide (>1440px) window")
 
     def test_narrow_1000_sheds_cols_9_to_12(self):
         for nth in (9, 10, 11, 12):
@@ -622,6 +638,205 @@ class RefReadBarsRendered(unittest.TestCase):
         self.assertTrue(r["any_nonzero_width"],
                         "at least one .refread-bar must render with non-zero pixel width "
                         "(D-INV-19: full-dim fingerprint bars rendered, not just present in source HTML)")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class NoRawStemNameOnAnySurface(unittest.TestCase):
+    """INV-STEMNAME-ALL (0.9.22, s45): the same stem must show ONE producer name on every
+    surface, and no raw splitter/model/tool name may appear in rendered text.
+    Exercises all 8 leaking surfaces from data/stem_naming_inventory_s45.md:
+      Surface C — omitted stems note (vocals/piano → 'near-silent')
+      Surface E — rhythm panel tile headings ('other' → character label)
+      Surface F — leakage pairs and bleed caveats ('other'/'bass' raw names)
+      Surface G — mapPanel stem card titles and family bars ('other' family)
+      Surface D — notes panel title ('vocals' label → display name)
+      plus static STRINGS: note_hint 'basic-pitch', map_hint 'Demucs', note_hint_other 'Demucs'
+    The NO-.als path is used (the leaking path where the arc fallback emits raw names)."""
+
+    @classmethod
+    def setUpClass(cls):
+        if not _HAVE_CHROME:
+            raise unittest.SkipTest("headless Chrome not available")
+        tmp = Path(tempfile.mkdtemp(prefix="tc_rawstem_"))
+        N = 8
+        BIG = -20.0    # well above STEM_EMPTY_FLOOR_DB (-55 dB) → significant
+        SMALL = -80.0  # well below floor → near-silent / omitted
+        BANDS = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
+
+        # Masking: drums/bass/other significant; vocals/piano near-silent.
+        # bass dominates "sub" at -10 dB; "other" also sits in sub at -25 dB
+        # (gap = 15 dB ≥ 10 = LEAK_LOUDER_DB) → triggers a bleed caveat for "other".
+        masking = {
+            "stems_analysed": ["drums", "bass", "other", "vocals", "piano"],
+            "total_windows": N,
+            "time_bins": [float(i) for i in range(N)],
+            "duration_s": float(N),
+            "band_rms_db": {
+                "drums": {b: ([BIG] if b in ("low_mid", "mid") else [SMALL]) * N for b in BANDS},
+                "bass":  {b: ([-10.0] if b == "sub" else [SMALL]) * N for b in BANDS},
+                "other": {b: ([-25.0] if b == "sub" else [SMALL]) * N for b in BANDS},
+                "vocals": {b: [SMALL] * N for b in BANDS},
+                "piano":  {b: [SMALL] * N for b in BANDS},
+            },
+            "masking_summary": {},
+            "masking_flags": {},
+            "sustain": {"bass": 0.9, "other": 0.3},
+            "spectral_centroid": {"drums": 300.0, "bass": 120.0, "other": 800.0},
+            "spectral_flatness": {},
+            "spectrum": {},
+            "spectrum_freqs": None,
+        }
+
+        # Rhythm: leakage pair (bass ↔ other, r=0.65 ≥ 0.2) drives the bleed caveat.
+        rhythm = {
+            "rhythm": {
+                "drums": {"onset_rate": 4.0, "offgrid_ms": 5.0, "syncopation_pct": 10.0,
+                          "onset_density": [1.0] * N},
+                "bass":  {"onset_rate": 0.5, "offgrid_ms": 8.0, "syncopation_pct": 5.0,
+                          "onset_density": [1.0] * N},
+                "other": {"onset_rate": 0.5, "offgrid_ms": 15.0, "syncopation_pct": 20.0,
+                          "onset_density": [1.0] * N},
+            },
+            "separation": {
+                "reconstruction_error_db": -20.0,
+                "reconstruction_text": "The parts add back up cleanly.",
+                "leakage": [{"a": "bass", "b": "other", "r": 0.65}],
+            },
+        }
+
+        # Stemmap: has a family_matches entry with family "other" (should become "the rest")
+        # and a verdict_text that has been cleaned (already fixed in map_stems.py).
+        stemmap = {
+            "stems": {
+                "drums": {"verdict": "clear", "best_family": "drums",
+                          "verdict_text": "Tracks the drums family closely.",
+                          "family_matches": [{"family": "drums", "r": 0.85},
+                                             {"family": "other", "r": 0.1},
+                                             {"family": "kick",  "r": 0.05}]},
+                "bass":  {"verdict": "clear", "best_family": "bass",
+                          "verdict_text": "Tracks the bass family closely.",
+                          "family_matches": [{"family": "bass",  "r": 0.90},
+                                             {"family": "other", "r": 0.05},
+                                             {"family": "kick",  "r": 0.02}]},
+                "other": {"verdict": "mixed", "best_family": None,
+                          "verdict_text": "Has signal, but timing follows several parts.",
+                          "family_matches": [{"family": "other", "r": 0.30},
+                                             {"family": "chord", "r": 0.20},
+                                             {"family": "lead",  "r": 0.10}]},
+            },
+            "model_recommendation": "a 6-stem model",
+            "model_why": "The project has melodic/harmonic parts. A 6-stem model adds stems.",
+            "export_suggestion": None,
+        }
+
+        # Notes: label = "vocals" (raw stem name — must be routed through disp()).
+        notes = {
+            "label": "vocals",
+            "notes": [{"t": 0.0, "dur": 0.5, "pitch": 60, "amp": 0.8}],
+            "pitch_min": 60,
+            "pitch_max": 72,
+            "n_notes": 1,
+        }
+
+        out = tmp / "widget.html"
+        build_widget.build_html(
+            _rich_core(), {}, masking, None, str(out), "Raw Stem Test",
+            build_widget.STRINGS, mode="full",
+            stemmap=stemmap, rhythm=rhythm, notes=notes,
+        )
+        cls.widget = str(out)
+
+    def _full_text(self):
+        """Rendered innerText with all panels open and Detailed view."""
+        return hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "return document.body.innerText;})()",
+            width=1100, height=3400,
+        )
+
+    def test_no_raw_tool_names_in_any_text(self):
+        """Demucs, htdemucs, htdemucs_6s, basic-pitch must not appear anywhere in the
+        rendered widget text (static strings + map_stems.py prose)."""
+        import re
+        text = self._full_text()
+        self.assertNotRegex(text, r"(?i)\bDemucs\b",
+                            "Demucs tool name must not appear in rendered text")
+        self.assertNotRegex(text, r"(?i)\bhtdemucs\b",
+                            "htdemucs model name must not appear in rendered text")
+        self.assertNotIn("htdemucs_6s", text,
+                         "htdemucs_6s must not appear in rendered text")
+        self.assertNotIn("basic-pitch", text,
+                         "basic-pitch tool name must not appear in rendered text")
+
+    def test_no_raw_stem_in_omitted_note(self):
+        """Omitted stems (vocals, piano) must show 'near-silent', not their raw names."""
+        text = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var e=document.getElementById('omittedNote');"
+            "return e?e.textContent.toLowerCase():'';})()",
+            width=1100, height=3200,
+        )
+        self.assertNotIn("vocals", text,
+                         "raw 'vocals' must not appear in the omitted note")
+        self.assertNotIn("piano", text,
+                         "raw 'piano' must not appear in the omitted note")
+        self.assertIn("near-silent", text,
+                      "omitted stems must show 'near-silent' as their display name")
+
+    def test_no_raw_stem_as_rhythm_tile_heading(self):
+        """Rhythm panel tile headings must use display names, not raw 'other'."""
+        text = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var el=document.getElementById('rhyRows');"
+            "return el?el.textContent.toLowerCase():'';})()",
+            width=1100, height=3400,
+        )
+        # textContent concatenates child text without structural newlines.
+        # 'drums' and 'bass' are valid display names (trusted by identity).
+        # 'other' as a tile heading must be gone (mapped to character label).
+        self.assertNotIn("other", text,
+                         "'other' must not appear as a rhythm tile heading (use the character label)")
+
+    def test_no_raw_stem_in_leakage_pairs(self):
+        """Leakage pairs must show display names, not 'other ↔ bass'."""
+        text = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var el=document.getElementById('rhySep');"
+            "return el?el.textContent.toLowerCase():'';})()",
+            width=1100, height=3400,
+        )
+        # The leakage pair was 'bass ↔ other' — after fix it uses display names.
+        # 'other' should not appear in the '↔' context (it may appear in other prose,
+        # so we check the specific leaking phrase pattern).
+        self.assertNotIn("other ↔", text,
+                         "raw 'other ↔' must not appear in leakage pairs")
+        self.assertNotIn("↔ other", text,
+                         "raw '↔ other' must not appear in leakage pairs")
+
+    def test_no_raw_stem_in_notes_title(self):
+        """Notes panel title must not show raw 'vocals' — must use display name."""
+        text = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var e=document.getElementById('noteTitle');"
+            "return e?e.textContent.toLowerCase():'';})()",
+            width=1100, height=3400,
+        )
+        self.assertNotIn("vocals", text,
+                         "raw 'vocals' must not appear in the notes panel title")
 
 
 if __name__ == "__main__":
