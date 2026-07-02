@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.15] — 2026-07-02
+
+### Removed
+- **The "aim" picker is gone.** It swapped the recommendation cards for re-flavoured "…to sound
+  more like ⟨artist⟩" versions and, once a choice was remembered in the browser, kept hiding the
+  reference centroid and stamping every card with a "Venetian Snares keeps that…" note on reopen.
+  Removed entirely (the single offerable direction was redundant with the centroid already shown).
+  The recommendations and the reference read now render plainly, as before.
+
+### Changed
+- **Recommendation grid now adds columns as the window widens** — one column when narrow, two on a
+  two-thirds-screen window, three when there's plenty of room — reflowing by the panel's width, not
+  a fixed viewport breakpoint.
+
 ## [0.9.14] — 2026-07-02
 
 ### Fixed
