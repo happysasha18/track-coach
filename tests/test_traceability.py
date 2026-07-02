@@ -179,12 +179,12 @@ class TraceabilityChecks(unittest.TestCase):
     # Check 3 — every SPEC invariant has a matrix row
     # ------------------------------------------------------------------
 
-    # Pre-existing §D matrix-projection debt, frozen 2026-07-02. New gaps still fail.
-    # Close these + shrink this set — see NEXT_STEPS "complete §D matrix projection".
-    KNOWN_MATRIX_GAPS_2026_07_02 = {
-        "D-INV-4", "D-INV-5", "D-INV-6", "D-INV-7", "D-INV-8", "D-INV-9",
-        "D-INV-10", "D-INV-11", "D-INV-16", "D-INV-18", "D-INV-19", "D-INV-20",
-    }
+    # §D matrix-projection debt — CLOSED 2026-07-02 (s36): all 12 core §D invariants
+    # (D-INV-4…11/16/18/19/20) now have a real TEST_MATRIX row under
+    # "### §D core reference-layer invariants" (built rows cite a live test, deferred
+    # rows name the surface they land with). No baseline gaps remain; a NEW absent
+    # invariant still fails check-3.
+    KNOWN_MATRIX_GAPS_2026_07_02: set[str] = set()
 
     def test_every_spec_invariant_has_a_matrix_row(self):
         """Every (D-)?INV-\\d+ token in SPEC.md must appear somewhere in
@@ -221,7 +221,7 @@ class TraceabilityChecks(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_no_stale_decide_marker(self):
         """No line in SPEC.md or TEST_MATRIX.md may contain BOTH a live
-        ⟨DECIDE marker AND the word RESOLVED.
+        ⟨DECIDE marker AND the word 'resolved' (matched case-insensitively).
 
         A DECIDE that has been settled must have its ⟨…⟩ marker removed from
         the doc.  Finding both on the same line means the marker was left in
@@ -231,7 +231,9 @@ class TraceabilityChecks(unittest.TestCase):
         for path in (SPEC, MATRIX):
             fname = path.name
             for lineno, line in enumerate(_lines(path), 1):
-                if "⟨DECIDE" in line and "RESOLVED" in line:
+                # Case-insensitive on 'resolved' — a stale marker leaks the same
+                # way whether the note is RESOLVED or resolved (s36 hardening).
+                if "⟨DECIDE" in line and "resolved" in line.lower():
                     # Truncate very long lines to keep the failure readable
                     snippet = line.strip()
                     if len(snippet) > 160:

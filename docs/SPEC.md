@@ -1162,7 +1162,7 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   would be the missing-as-value trap (RC-INV-1) in colour form. `tags: D-INV-9 · RC-INV-5a · RC-INV-1 · E.3`
 - **The switch.** The reference line is a reference surface in both placements, so it is governed by the **one
   show/hide-references switch** (D-INV-6) shared by the catalog column and the plaque chip: hiding references
-  hides the column and the chip together, and the switch never strands the line where you can't see or restore it. The switch is **one global persisted flag** that both the catalog page and a track's widget read, so hiding references on either page hides both — one flag, never a per-page toggle (⟨DECIDE D-16⟩ resolved).
+  hides the column and the chip together, and the switch never strands the line where you can't see or restore it. The switch is **one global persisted flag** that both the catalog page and a track's widget read, so hiding references on either page hides both — one flag, never a per-page toggle (D-16 resolved).
   **The toggle CONTROL renders wherever a reference surface renders** — the catalog page, and **both** the
   Simple and Detailed widget (since Simple already shows reference prose, §D.7) — every instance reads and
   writes the one global flag. So content and its off-switch are never separated: a producer who works only in
@@ -1190,7 +1190,7 @@ from the track's other directions (⟨DECIDE D-28⟩ settled = relative, not abs
 column tints by closeness against the **library's own distance distribution** (⟨DECIDE D-27⟩). **Green and
 amber are the default; red is a last-resort tint** in §F — used only when nothing closer qualifies, never
 hiding that the sibling is far. A reference **runner-up (+second direction) is now RESOLVED by listing, not
-tinting** (⟨DECIDE D-24⟩ resolved 2026-06-26): the surface shows the **up to three nearest directions as a
+tinting** (D-24 resolved 2026-06-26): the surface shows the **up to three nearest directions as a
 nearest-first selector** (§D.10.1, D-INV-27), so a second and third direction are their own ordered, colour +
 glyph-cued entries — not a self-contradictory second tint crammed into one cell. The old worry (a *tied*
 second under relative lean means the nearest does NOT stand apart) dissolves because a list HAS an order to
@@ -1208,7 +1208,7 @@ into one cell was self-contradictory under relative lean — a tied second means
 apart, so "also close" contradicted itself. A **nearest-first list with a selector dissolves that**: a list
 HAS an order, and the order carries the ranking exactly as §F's own-library list does, so a second and third
 direction are no longer a confusing second tint in one cell but their own clearly-ordered, clearly-cued
-entries. The runner-up is resolved by listing, not by tinting (⟨DECIDE D-24⟩ resolved). `D-INV-27`
+entries. The runner-up is resolved by listing, not by tinting (D-24 resolved). `D-INV-27`
 
 **Scope split (what ships in 0.9 vs what waits on the mapping input ⟨D-2⟩).** The **descriptive** rows below —
 the up-to-three nearest *clouds* ranked by fingerprint distance, the per-entry colour/glyph cue, "no close
@@ -1271,8 +1271,8 @@ like the own-track column). `D-INV-28`
   the aimed is among the shown nearest**, the surface pins **only the single nearest of the aimed ones** as an
   extra entry — shown **even if it tints far/red**, because a declared aim is intent, not filler, and the
   nearest↔aimed gap ("aimed SCSI-9 · but far from it") is exactly the useful thing to see. The other aimed
-  directions live in the read panel, not the catalog cell. So at most one pinned aimed entry (⟨DECIDE D-29⟩
-  resolved). `tags: D-INV-4 · intent-not-filler · ⟨DECIDE D-29⟩`
+  directions live in the read panel, not the catalog cell. So at most one pinned aimed entry (D-29
+  resolved). `tags: D-INV-4 · intent-not-filler · D-29 resolved`
 
 **How it composes across the axes.**
 - **The catalog column (run mode).** A full-run row shows the up-to-three nearest directions **inline, as a
