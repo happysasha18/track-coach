@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.22"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.23"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2732,7 +2732,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230c0e14'/><rect x='6' y='14' width='4' height='12' rx='1.6' fill='%23a78bfa'/><rect x='13' y='7' width='4' height='19' rx='1.6' fill='%234cc9f0'/><rect x='20' y='11' width='4' height='15' rx='1.6' fill='%23ffd166'/></svg>">
 <style>
 :root{--bg:#0c0e14;--panel:#141822;--panel2:#1b2030;--ink:#e8ecf5;--ink-dim:#aeb6c8;--muted:#8b94a8;
- --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa;
+ --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa;--accent:var(--wob);
  --radius:10px;--radius-lg:14px;--radius-xl:18px;--radius-pill:20px;
  --dur-fast:120ms;--dur-base:180ms;--ease:ease-out}
 *{box-sizing:border-box}
@@ -2813,7 +2813,7 @@ body.simple #refRead{display:none!important}
  color:var(--good);padding:0 4px;border-radius:5px;margin-left:3px;cursor:help;
  font-weight:500;vertical-align:1px}
 #refRead .refread-barwrap{flex:1;position:relative;height:12px;background:var(--panel2);border-radius:var(--radius);overflow:hidden}
-#refRead .refread-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:#3a3f52}
+#refRead .refread-center{position:absolute;left:50%;top:0;width:2px;height:100%;background:var(--muted)}
 #refRead .refread-bar{position:absolute;top:1px;height:10px;border-radius:4px;min-width:2px}
 #refRead .refread-words{flex:0 0 110px;font-size:11.5px;color:var(--muted);padding-left:4px}
 #refRead .refread-legend{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;
@@ -2903,9 +2903,9 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 .read #readBody p{margin:0 0 16px}
 /* §B.12 "how it develops" — a quiet computed lead-line, set apart from the authored prose. */
 .read #readBody p.readdev{margin:0 0 20px;padding:10px 14px;background:rgba(124,107,255,.07);
- border-left:2px solid var(--accent,#7c6bff);border-radius:0 6px 6px 0;color:var(--ink-dim);font-size:14px}
+ border-left:2px solid var(--accent);border-radius:0 6px 6px 0;color:var(--ink-dim);font-size:14px}
 .read #readBody p.readdev .devlab{display:inline-block;margin-right:8px;font-size:10.5px;font-weight:700;
- letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#9b8cff)}
+ letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 .read #readBody strong{color:#fff;font-weight:650}
 .read #readBody em{color:var(--ink);font-style:italic}
 .read #readBody h3{font-size:15.5px;color:var(--bright);margin:30px 0 12px;font-weight:700;

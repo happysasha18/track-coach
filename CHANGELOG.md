@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.23] — 2026-07-03
+
+### Fixed
+- **Two colour-token bugs (Fable pre-1.0 blocker #3).** Defined the missing `--accent` token — it was
+  never declared in `:root`, so a hardcoded fallback purple always fired right next to the real `--wob`
+  accent (a phantom second accent). Now there is one accent colour. And the reference-bars' centre anchor
+  line — the "where the reference track sits" marker — was 1px in near-background grey and did not read; it
+  is now 2px `--muted` and visible.
+
 ## [0.9.22] — 2026-07-03
 
 ### Fixed
