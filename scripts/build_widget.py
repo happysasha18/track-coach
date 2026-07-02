@@ -143,7 +143,7 @@ STRINGS = {
         "note_title": "Transcribed notes — {label}",
         "note_hint": "Pitches read straight from the audio of this stem, not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
         "note_label_other": "the melodic layer (synths / keys / pads)",
-        "note_hint_other": " This is the splitter’s everything-else part — what isn’t drums, bass or vocals — so it’s where the track’s chords and lead lines live.",
+        "note_hint_other": " This is the splitter’s everything-else part — where the track’s chords and lead lines live.",
         "drum_title": "Drum breakdown — kick / snare / hat",
         "drum_hint": "Every hit in the drums stem, classified by spectral shape (not separated into audio). Bar height = hits per window. Kicks {k} · snares {s} · hats {h}.",
         "stem_title": "Stem frequency map",
