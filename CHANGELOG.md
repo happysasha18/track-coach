@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.20] — 2026-07-02
+
+### Changed
+- **Collapsed panels centre their title.** A closed section (e.g. "Evidence & detail", "Library") now sits
+  vertically balanced instead of top-heavy.
+
+### Fixed
+- **Re-renders keep the Library/catalog.** The bottom "Library — every track & version" panel (and its
+  back-link) is preserved on rebuild.
+
 ## [0.9.19] — 2026-07-02
 
 ### Changed

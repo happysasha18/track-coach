@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.19"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.20"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2899,6 +2899,10 @@ details.tc-panel>summary{cursor:pointer;list-style:none;user-select:none;
 details.tc-panel>summary::-webkit-details-marker{display:none}
 details.tc-panel>summary::before{content:"▸ ";color:var(--wob)}
 details.tc-panel[open]>summary::before{content:"▾ "}
+/* collapsed: symmetric padding so the title sits VERTICALLY CENTRED, not top-heavy
+   (Alexander 2026-07-02). Open keeps the larger bottom padding for the content below. */
+details.tc-panel:not([open]){padding-bottom:14px}
+details.tc-panel:not([open])>summary{padding-bottom:4px}
 .hint{color:var(--muted);font-size:12px;margin:0 0 16px}
 .legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px;font-size:12px}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
