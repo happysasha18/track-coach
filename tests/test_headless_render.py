@@ -327,5 +327,88 @@ class PreRenderSmoke(unittest.TestCase):
         self.assertEqual(fails, [], "pre-render smoke found render defects:\n" + "\n".join(fails))
 
 
+def _build_omitted_widget():
+    """A FULL widget whose separation returned SIX stems, two of which are near-silent
+    (vocals/piano ≈ −90 dB, below STEM_EMPTY_FLOOR_DB). The player still ships all six;
+    the per-stem viz keeps the 4 loud ones. SPEC CR-2 (docs/SPEC.md:75) requires the
+    widget to NAME the omitted two ("stems X, Y omitted — too little material to read")
+    — the regression this fixture guards is that they vanish with no acknowledgment."""
+    tmp = Path(tempfile.mkdtemp(prefix="tc_omit_"))
+    sdir = tmp / "stems_web"
+    sdir.mkdir()
+    for s in ("drums", "bass", "other", "guitar", "vocals", "piano"):
+        (sdir / f"{s}.m4a").write_bytes(b"\x00")
+    W = 8
+    def _band(v):
+        return {b: [float(v)] * W for b in build_widget.BAND_ORDER}
+    loud, silent = _band(-20.0), _band(-90.0)
+    masking = {
+        "stems_analysed": ["drums", "bass", "other", "guitar", "vocals", "piano"],
+        "band_rms_db": {"drums": loud, "bass": loud, "other": loud, "guitar": loud,
+                        "vocals": silent, "piano": silent},
+        "total_windows": W, "duration_s": 120.0,
+        "time_bins": [round(i * 120.0 / W, 3) for i in range(W)],
+        "masking_summary": {},
+    }
+    out = tmp / "widget.html"
+    build_widget.build_html(_rich_core(), {}, masking, None, str(out), "Omitted Test",
+                            build_widget.STRINGS, mode="full", audio_stems_rel="stems_web",
+                            narrative_md="The mix reads clear.\n\nBass is forward early.")
+    return str(out)
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class OmittedStemsAcknowledged(unittest.TestCase):
+    """SPEC CR-2 (docs/SPEC.md:75) + INV-42: when separation returns near-silent stems,
+    the stem panel must ACKNOWLEDGE them by name, not silently drop them. Regression
+    guard (Alexander 2026-07-02): they used to render; 0.8.1 stripped them from the draw
+    grid and no caption replaced them, so vocals/piano vanished and every string test
+    (and Fable) missed it — because the tests checked the disappearance, never the
+    acknowledgment. This reads the REAL rendered stem-panel text in headless Chrome."""
+
+    def test_payload_marks_the_near_silent_stems_omitted(self):
+        # Precondition (backend already correct): the data names the omitted stems.
+        widget = _build_omitted_widget()
+        got = hc.probe(widget,
+                       "(function(){return (D.stem&&D.stem.omitted)||[];})()",
+                       width=1100, height=3200)
+        self.assertEqual(sorted(got), ["piano", "vocals"],
+                         "backend must mark the near-silent stems omitted")
+
+    def test_stem_panel_names_the_omitted_stems_visibly(self):
+        # The regression itself: the RENDERED stem panel must name the omitted stems.
+        widget = _build_omitted_widget()
+        res = hc.probe(widget, "(function(){"
+                       "document.body.classList.remove('simple');"  # stem viz is Detailed-only
+                       "var e=document.getElementById('seqKey');"
+                       "if(!e)return{present:false};"
+                       "return{present:true,"
+                       "vis:getComputedStyle(e).display!=='none'&&e.offsetHeight>0,"
+                       "text:(e.textContent||'').toLowerCase()};})()",
+                       width=1100, height=3200)
+        self.assertTrue(res.get("present"), "stem-panel legend (#seqKey) must exist on a full run")
+        self.assertTrue(res.get("vis"), "the omitted-stems acknowledgment must be VISIBLE in Detailed")
+        text = res.get("text", "")
+        self.assertIn("vocals", text, "the omitted stem 'vocals' must be named in the stem panel")
+        self.assertIn("piano", text, "the omitted stem 'piano' must be named in the stem panel")
+        self.assertTrue("omit" in text or "near-silent" in text or "silent" in text,
+                        "the acknowledgment must say WHY they are absent (omitted / near-silent)")
+
+    def test_omitted_stems_sink_below_the_significant_ones(self):
+        # Layout (Alexander s37): an empty lane in the MIDDLE reads as a gap; the near-silent stems
+        # must be grouped at the BOTTOM, below every stem that carries real content.
+        widget = _build_omitted_widget()
+        res = hc.probe(widget, "(function(){"
+                       "var s=(D.player&&D.player.srcs||[]).map(function(x){return x.name;});"
+                       "var om=(D.stem&&D.stem.omitted)||[];"
+                       "return {order:s,omitted:om};})()",
+                       width=1100, height=3200)
+        order, omitted = res["order"], set(res["omitted"])
+        last_significant = max((i for i, n in enumerate(order) if n not in omitted), default=-1)
+        first_omitted = min((i for i, n in enumerate(order) if n in omitted), default=len(order))
+        self.assertGreater(first_omitted, last_significant,
+                           f"omitted stems must sit below every significant one; order={order}, omitted={sorted(omitted)}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,25 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.16] — 2026-07-02
+
+### Fixed
+- **Near-silent stems no longer vanish — they show again as a flat line + a named note.** The
+  6-stem separation always returns six parts; the empty ones (e.g. this track's *vocals* and *piano*,
+  near total silence) had been quietly dropped from the stem view since 0.8.1, so you saw four lanes
+  and no explanation of where the rest went. They now render as a faint flat line on their lane and
+  the stem key names them: *"vocals, piano — near-silent, omitted (too little material to read)."*
+  The near-silent lanes now also sit at the **bottom**, under the parts that carry real content, so an
+  empty lane reads as "these are the empty ones", not a gap in the middle.
+  This is what the spec always required (CR-2); the drawing had just stopped doing it.
+- **The stale "aim-demo" version label is gone from the catalog.** A track re-rendered after the aim
+  feature was removed no longer carries the internal demo tag as its version.
+
+### Added
+- **A browser test that fails if an omitted stem is ever silently dropped again** — it renders the
+  widget and reads the real stem panel, so this class of "the number disappeared and every string
+  test still passed" regression is caught at the level the eye sees it.
+
 ## [0.9.15] — 2026-07-02
 
 ### Removed

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.15"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.16"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2062,7 +2062,14 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         EXT_PREF = (".m4a", ".mp3", ".ogg", ".opus", ".wav", ".flac")
         disk = sorted({p.stem for p in adir.glob("*") if p.suffix.lower() in EXT_PREF})
         analysed = (masking.get("stems_analysed") if masking else None) or []
-        names = [n for n in analysed if n in disk] + [n for n in disk if n not in analysed]
+        in_disk = [n for n in analysed if n in disk]
+        # Lane / player order: real content on top, near-silent (omitted) stems sink to the BOTTOM
+        # (Alexander s37) — an empty lane in the middle reads as a gap; grouped at the end it reads as
+        # "these are the empty ones". Stable within each group; falls back to analysed order with no masking.
+        if masking:
+            sig = set(significant_stems(masking))
+            in_disk = [n for n in in_disk if n in sig] + [n for n in in_disk if n not in sig]
+        names = in_disk + [n for n in disk if n not in analysed]
         srcs = []
         for n in names:
             hit = next((f"{rel}/{n}{e}" for e in EXT_PREF if (adir / f"{n}{e}").exists()), None)
@@ -3239,6 +3246,14 @@ document.getElementById("recLegend").innerHTML=
    `<b style="color:rgb(255,78,80)">bass</b> / <b style="color:rgb(76,214,140)">mids</b> / <b style="color:rgb(80,168,255)">highs</b>, bottom→top. `+
    `Taller band = more energy there; several tall at once = they hit together.</span>`+
   `<span class="chip"><b>≈&nbsp;name</b>&nbsp;= which project track this stem sounds like (only when we're confident)</span>`;
+ // SPEC CR-2 (docs/SPEC.md §1): near-silent stems are dropped from the per-stem viz but must be
+ // NAMED as omitted, so the missing lanes read as a decision, not a bug. htdemucs_6s always emits
+ // 6 stems; the empty ones (e.g. Lazy Sparks vocals/piano ≈ −90 dB) show here as a flat line + this note.
+ const OM=(D.stem&&D.stem.omitted)||[];
+ if(OM.length){const names=OM.map(n=>`<b>${n}</b>`).join(", ");
+  el.insertAdjacentHTML("beforeend",
+   `<span class="chip" id="omittedNote"><span class="sw" style="background:#a78bfa;opacity:.55"></span>`+
+   `${names}&nbsp;— near-silent, omitted (too little material to read)</span>`);}
 })();
 // canvases inside the collapsed <details> have 0 width until it opens — re-run every
 // resize() handler on first open so the arrangement / notes charts draw at full width.
@@ -3818,6 +3833,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(mainLbl),19,L.y+L.h/2+3);lx.globalAlpha=1;
    if(L.drum){drawDrum(L,active);}
    else if(L.env){drawWave(L,active);}
+   else{ // near-silent / omitted stem (no envelope data, SPEC CR-2): a flat faint line on the baseline so
+    // the lane reads as PRESENT-but-empty, not missing — the "фиолетовая линия" restore (regression from 0.8.1).
+    const base=L.y+L.h-2;lx.globalAlpha=active?.55:.28;lx.strokeStyle=L.col||"#a78bfa";lx.lineWidth=1.5;
+    lx.beginPath();lx.moveTo(PADL,base);lx.lineTo(LW-PADR,base);lx.stroke();lx.globalAlpha=1;}
    // tiny sub-line: ONLY the real project track (map clear) — NEVER the raw Demucs name (Sasha s14:
    // "guitar · → other" was salad). Skip it when it would just repeat the big label (an empty stem
    // already reads "near-silent" — don't print it twice, Sasha s14 "не критичный" double-label).
