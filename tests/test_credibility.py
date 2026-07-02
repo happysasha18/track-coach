@@ -986,7 +986,8 @@ class G20_RepetitionSurfacing(unittest.TestCase):
         self.assertIn("bass", blob)        # the evolver
         self.assertIn("drums", blob)       # a looper
         self.assertIn("guitar", blob)      # a looper
-        self.assertIn("0.14", blob)        # the measured recurrence is shown
+        # C12: raw recurrence numbers are no longer shown in the card body (they were "(recurrence 0.14)")
+        self.assertNotIn("0.14", blob, "raw recurrence numbers must not appear in card body (C12 fix)")
 
     def test_no_card_when_everything_loops(self):
         rep = [{"stem": "bass", "recurrence": 0.52}, {"stem": "drums", "recurrence": 0.55},

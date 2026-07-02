@@ -148,13 +148,19 @@ class NoResidualPlaceholder(unittest.TestCase):
 
 
 class ModeLabel(unittest.TestCase):
-    """Quick runs were once mislabelled 'deep mode' — the header subtitle must follow D.mode."""
+    """Quick runs were once mislabelled 'deep mode' — the header subtitle must follow D.mode.
+    C3 (s45): 'deep mode' removed from the full-run subtitle (the FULL ANALYSIS chip already says it).
+    The full-mode subtitle is now intentionally empty; only the quick-mode subtitle must be non-empty."""
 
     def test_subtitle_branches_on_mode(self):
         self.assertRegex(HTML, r'D\.mode\s*===?\s*["\']quick["\']',
                          "header subtitle does not branch on D.mode (quick runs mislabelled)")
-        for s in ("subtitle", "subtitle_quick"):
-            self.assertTrue(build_widget.STRINGS["ui"].get(s), f"missing the {s} string")
+        # subtitle_quick must be non-empty (it's shown to users on quick runs).
+        # subtitle (full mode) is intentionally empty after C3 fix — the mode badge already says "Full analysis".
+        self.assertTrue(build_widget.STRINGS["ui"].get("subtitle_quick"),
+                        "missing the subtitle_quick string")
+        self.assertIn("subtitle", build_widget.STRINGS["ui"],
+                      "subtitle key must exist in STRINGS (even if empty for the full-mode case)")
 
 
 class ModeBadge(unittest.TestCase):

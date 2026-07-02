@@ -442,13 +442,16 @@ class OmittedStemsAcknowledged(unittest.TestCase):
         self.assertTrue(res.get("present"), "stem-panel legend (#seqKey) must exist on a full run")
         self.assertTrue(res.get("vis"), "the omitted-stems acknowledgment must be VISIBLE in Detailed")
         text = res.get("text", "")
-        # INV-STEMNAME-ALL (0.9.22): omitted stems show as "near-silent" via disp(), not raw names.
-        # The note must acknowledge the count of omitted stems; raw names must not appear.
-        # (NoRawStemNameOnAnySurface guards against "vocals"/"piano" leaking.)
-        self.assertGreaterEqual(text.count("near-silent"), 2,
-                                "each omitted stem must be acknowledged; got: " + repr(text[:120]))
-        self.assertTrue("omit" in text or "near-silent" in text or "silent" in text,
-                        "the acknowledgment must say WHY they are absent (omitted / near-silent)")
+        # Part 1, item 3 (s45): the omitted note now shows a COUNT sentence rather than each stem's
+        # display name ("near-silent, near-silent" was a meaningless listing). The note reads
+        # "N parts were too quiet to read and are left out". Check: count-sentence words are present
+        # and raw stem names are absent.
+        self.assertTrue("too quiet" in text or "left out" in text or "omit" in text,
+                        "the omitted-stems note must explain WHY they are absent; got: " + repr(text[:200]))
+        self.assertNotIn("vocals", text,
+                         "raw 'vocals' must not appear in the omitted-stems note")
+        self.assertNotIn("piano", text,
+                         "raw 'piano' must not appear in the omitted-stems note")
 
     def test_omitted_stems_sink_below_the_significant_ones(self):
         # Layout (Alexander s37): an empty lane in the MIDDLE reads as a gap; the near-silent stems
@@ -772,7 +775,7 @@ class NoRawStemNameOnAnySurface(unittest.TestCase):
                          "basic-pitch tool name must not appear in rendered text")
 
     def test_no_raw_stem_in_omitted_note(self):
-        """Omitted stems (vocals, piano) must show 'near-silent', not their raw names."""
+        """Omitted stems (vocals, piano) must not show raw names; note shows a count sentence."""
         text = hc.probe(
             self.widget,
             "(function(){"
@@ -785,8 +788,10 @@ class NoRawStemNameOnAnySurface(unittest.TestCase):
                          "raw 'vocals' must not appear in the omitted note")
         self.assertNotIn("piano", text,
                          "raw 'piano' must not appear in the omitted note")
-        self.assertIn("near-silent", text,
-                      "omitted stems must show 'near-silent' as their display name")
+        # Part 1, item 3 (s45): the note now shows a count sentence, not per-stem "near-silent" labels.
+        # "2 parts were too quiet to read and are left out" — check for the count-sentence words.
+        self.assertTrue("too quiet" in text or "left out" in text,
+                        "omitted note must say the parts were too quiet / left out; got: " + repr(text))
 
     def test_no_raw_stem_as_rhythm_tile_heading(self):
         """Rhythm panel tile headings must use display names, not raw 'other'."""

@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.23"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.24"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -111,7 +111,7 @@ STEM_COLOUR_FLOOR_DB = -60.0
 # To localise, dump this with --dump-strings, translate the values, pass --strings.
 STRINGS = {
     "ui": {
-        "subtitle": "deep mode",
+        "subtitle": "",
         "subtitle_quick": "quick read",
         "mode_badge_full": "Full analysis",
         "mode_badge_quick": "Quick read",
@@ -159,12 +159,12 @@ STRINGS = {
         "recs_title": "Recommendations",
         "recs_hint": "The few things that stood out, most important first. Red = worth fixing · green = working / do it · yellow = a creative choice. A ⏱ tag means it's tied to a moment in the track — click it to jump there; the rest apply to the whole mix.",
         "legend_crit": "worth fixing",
-        "legend_do": "working / actionable",
+        "legend_do": "working — do it",
         "legend_concept": "creative choice",
         "play_title": "Stem player — hear what you see",
         "play_hint": "Play the separated stems together, in sync with every chart above. Mute/solo each part; click any timeline to jump there. The white line is the playhead.",
         "play_play": "▶ Play", "play_pause": "❚❚ Pause", "play_mute": "mute", "play_solo": "solo",
-        "play_note": "Each lane is one separated part (the analyser splits the track into its parts (drums, bass, and the melodic layers)). A lane can look empty when that instrument isn't really in the track — lanes with too little material to read are dropped — the legend names them. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
+        "play_note": "Each lane is one separated part (the analyser splits the track into its parts (drums, bass, and the melodic layers)). A lane can look empty when that instrument isn't really in the track — parts with too little material to read are left out. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
         "hover": "hover over the chart…",
         "scale_quiet": "quiet −90 dB",
         "scale_loud": "loud −6 dB",
@@ -322,7 +322,7 @@ STRINGS = {
             "header": "Frequencies · the {low_lbl} buries the {mid_lbl}",
             "title": "The {low_lbl} is louder than the {mid_lbl} {spot} ~{pct:.0f}% of the track",
             "body": "Worst around {worst_t}. Where it bothers you, carve a small dip in the {low_lbl} {notch}, "
-                    "or move them apart in time. Where the {mid_lbl} is simply silent there, that's not a clash.",
+                    "or move them apart in time. Where the {mid_lbl} {mid_v} simply silent there, that's not a clash.",
             "fix": "Notch the {low_lbl} {notch}, or duck it under the {mid_lbl} so they stop fighting."},
         "masking_clean": {
             "header": "Low end · clean",
@@ -333,8 +333,8 @@ STRINGS = {
         "stem_evolves": {
             "header": "Development · what carries it vs what loops",
             "title": "The {evolver} keeps changing while {loopers} mostly loop",
-            "body": "Across the track the {evolver} barely repeats (recurrence {evo_r}) — it's carrying the "
-                    "development — while {loopers} loop more ({loop_r}). That's often exactly what you want.",
+            "body": "Across the track the {evolver} barely repeats — it's carrying the development — "
+                    "while {loopers} loop more. That's often exactly what you want.",
             "fix": "If it ever feels static, the development is resting on one part ({evolver}) — vary a looping "
                    "one too ({loopers}): a filter sweep, a pattern change, or drop/add a layer."},
         "plateau": {
@@ -377,8 +377,8 @@ STRINGS = {
         "sep_incomplete": {
             "header": "Separation · stems don't add up",
             "title": "The stems don't reconstruct the full mix",
-            "body": "Summing every stem leaves a <b>{db} dB</b> residual against the original — a lot of the track isn't captured "
-                    "by any single stem. Read the per-stem panels as approximate here, not exact. If you have the project, export "
+            "body": "A lot of the track isn't captured by any single separated part — the parts don't add back up to the original. "
+                    "Read the per-stem panels as approximate here, not exact. If you have the project, export "
                     "group stems from Ableton instead — those are complete by construction.",
             "fix": "Export group stems from Ableton for exact analysis — treat the separated stems as approximate."},
         "bass_groupstem": {
@@ -1403,6 +1403,10 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
 
         def _lbl(st):
             return ((character or {}).get(st, {}) or {}).get("label") or "a part"
+
+        def _verb(lbl):
+            """Verb form for '{lbl} {_verb(lbl)} silent' — plural labels (drums, hats) take 'are'."""
+            return "are" if lbl in ("drums", "hats") else "is"
         real = [(z, s) for z, s in masking.get("masking_summary", {}).items()
                 if s["pct_masked"] > 0 and z.split("__")[-1] not in empties]
         if real and character:
@@ -1422,7 +1426,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
                 spot  = "around <b>{}</b> (in {})".format(hz, band_lbl) if hz else "around <b>{}</b>".format(band_lbl)
                 notch = "around <b>{}</b>".format(hz or band_lbl)
                 add("masking_stem", _t=(worst["time_s"] if worst else None),
-                    low_lbl=_lbl(low_stem), mid_lbl=_lbl(mid),
+                    low_lbl=_lbl(low_stem), mid_lbl=_lbl(mid), mid_v=_verb(_lbl(mid)),
                     spot=spot, notch=notch, pct=s["pct_masked"],
                     worst_t=fmt_t(worst["time_s"]) if worst else "—")
         elif real:                                          # no characters → old generic line
@@ -3166,8 +3170,8 @@ __REFREAD__
 const D=__PAYLOAD__, T=D.t;
 // INV-STEMNAME-ALL (0.9.22): one display name per stem/family, resolved from the Python payload.
 // Every JS surface MUST go through disp()/fdisp() — never show a raw Demucs/model name.
-function disp(s){return (D.stem_display&&D.stem_display[s])||s||"a part";}
-function fdisp(s){return (D.fam_display&&D.fam_display[s])||s;}
+function disp(s){return (D.stem_display&&D.stem_display[s])||"a part";}
+function fdisp(s){return (D.fam_display&&D.fam_display[s])||"a part";}
 const fmtT=s=>(s<0?"0:00":Math.floor(s/60)+":"+String(Math.round(s%60)).padStart(2,"0"));
 // Timeline callouts ("comments"): the located recommendations, in time order, each
 // given a letter (a,b,c…). The same list drives the triangle cues over the scenes,
@@ -3192,7 +3196,8 @@ document.getElementById("title").textContent=document.title.replace(/^Track Coac
  if(D.backHref){b.href=D.backHref;b.hidden=false;}
  else if(history.length>1){b.hidden=false;
   b.addEventListener("click",e=>{e.preventDefault();history.back();});}})();
-document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM · ${D.mode==="quick"?(T.subtitle_quick||"quick read"):T.subtitle}`;
+(function(){const sfx=D.mode==="quick"?(T.subtitle_quick||"quick read"):(T.subtitle||"");
+document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM`+(sfx?` · ${sfx}`:"");})();
 // (The run-mode badge + quick explainer are rendered server-side into the markup — see build_html.)
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
@@ -3200,7 +3205,10 @@ const META=D.meta||{};
  if(META.audio)bits.push(`${T.src_audio||"Audio"}: <b>${META.audio}</b>`);
  if(META.als)bits.push(`${T.src_project||"Project"}: <b>${META.als}</b>`);
  if(META.track_version)bits.push(`<b>${META.track_version}</b>`);
- if(META.analyzed_at)bits.push(`${T.src_analyzed||"Analyzed"}: <b>${META.analyzed_at}</b>`);
+ if(META.analyzed_at){const adate=(META.analyzed_at||"").split(" ")[0];
+  const bdate=META.built_at||"";const diffDate=bdate&&bdate!==adate;
+  bits.push(`${T.src_analyzed||"Analyzed"}: <b>${META.analyzed_at}</b>`+
+   (diffDate?`<span style="opacity:.6"> · report built: ${bdate}</span>`:""));}
  el.innerHTML=bits.join('<span style="opacity:.4">·</span>');})();
 // ── Verdict: the calm one-glance headline (Simple view leads with this)
 (function(){const el=document.getElementById("verdict");if(!el)return;const v=(D.verdict||"").trim();
@@ -3293,14 +3301,14 @@ document.getElementById("recLegend").innerHTML=
    `<b style="color:rgb(255,78,80)">bass</b> / <b style="color:rgb(76,214,140)">mids</b> / <b style="color:rgb(80,168,255)">highs</b>, bottom→top. `+
    `Taller band = more energy there; several tall at once = they hit together.</span>`+
   `<span class="chip"><b>≈&nbsp;name</b>&nbsp;= which project track this stem sounds like (only when we're confident)</span>`;
- // SPEC CR-2 (docs/SPEC.md §1): near-silent stems are dropped from the per-stem viz but must be
- // NAMED as omitted, so the missing lanes read as a decision, not a bug. htdemucs_6s always emits
- // 6 stems; the empty ones (e.g. Lazy Sparks vocals/piano ≈ −90 dB) show here as a flat line + this note.
+ // SPEC CR-2 (docs/SPEC.md §1): near-silent stems are dropped from the per-stem viz. Show a count
+ // sentence so the missing lanes read as a decision, not a bug. Names are omitted to avoid listing
+ // "near-silent, near-silent" (a status word is not a name).
  const OM=(D.stem&&D.stem.omitted)||[];
- if(OM.length){const names=OM.map(n=>`<b>${disp(n)}</b>`).join(", ");
+ if(OM.length){const cnt=OM.length;
   el.insertAdjacentHTML("beforeend",
    `<span class="chip" id="omittedNote"><span class="sw" style="background:#a78bfa;opacity:.55"></span>`+
-   `${names}&nbsp;— near-silent, omitted (too little material to read)</span>`);}
+   `${cnt} part${cnt>1?"s":""} were too quiet to read and are left out</span>`);}
 })();
 // canvases inside the collapsed <details> have 0 width until it opens — re-run every
 // resize() handler on first open so the arrangement / notes charts draw at full width.
@@ -3315,7 +3323,7 @@ document.getElementById("recLegend").innerHTML=
  const push=(label,val,cls,tip)=>{if(val==null||val==="")return;items.push({label,val,cls:cls||"",tip:tip||""});};
  const fmtDur=s=>{s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
  push("Tempo",(V.tempo_bpm!=null?V.tempo_bpm+" <small>BPM</small>":null),"","Detected from the audio. May differ ±1–2 from the project tempo.");
- push("Key",V.key+(V.key_conf!=null?` <small>conf ${V.key_conf}</small>`:""),"","Estimated key/scale (Krumhansl-Schmuckler on chroma). A confidence near 0 means ambiguous/atonal.");
+ push("Key",V.key+(V.key_conf!=null&&V.key_conf<0.5?" <small>best guess</small>":""),"",`Estimated key/scale (Krumhansl-Schmuckler on chroma). Confidence: ${V.key_conf!=null?V.key_conf:"—"}. A confidence near 0 means ambiguous/atonal.`);
  push("Length",(V.duration_s!=null?fmtDur(V.duration_s):null),"","Track length.");
  const tsc=(V.time_sig_changes||[]).length;
  push("Metre",(V.time_sig?V.time_sig+(tsc>1?` <small>+${tsc-1} change${tsc>2?"s":""}</small>`:""):null),
@@ -3658,7 +3666,8 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   return `<svg width="${w}" height="${h}" style="display:block;margin-top:6px">
    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`;};
  const FCOL={drums:"#4cc9f0",bass:"#a78bfa",other:"#ffd166",vocals:"#ff9ec7",guitar:"#5ad1c2",piano:"#46d39a"};
- document.getElementById("rhyRows").innerHTML=Object.entries(R.rhythm).map(([s,d])=>{
+ const OM_RHY=new Set((D.stem&&D.stem.omitted)||[]);
+ document.getElementById("rhyRows").innerHTML=Object.entries(R.rhythm).filter(([s])=>!OM_RHY.has(s)).map(([s,d])=>{
   const col=FCOL[s]||"#8b94a8";
   const tight=d.offgrid_ms!=null?T.rhy_tight.replace("{ms}",d.offgrid_ms):"—";
   const sync=d.syncopation_pct!=null?T.rhy_sync.replace("{p}",d.syncopation_pct):"—";
@@ -3668,10 +3677,23 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const sep=R.separation||{};let html="";
  const rdb=sep.reconstruction_error_db;
  const rcls=rdb==null?"warn":rdb<-25?"do":rdb<-12?"concept":"crit";
+ // C5: human-readable headline in h3; raw dB in title tooltip for producers who want it.
+ const sepHead=rdb==null?"—":rdb<-25?"The split is clean — the parts add back up to the original mix"
+   :rdb<-12?"The split is mostly complete — most of the sound is accounted for"
+   :"The stems don't add back up to the mix";
  html+=`<div class="rec ${rcls}"><div class="when">${T.rhy_sep}</div>
-   <h3>${rdb!=null?rdb+" dB residual":"—"}</h3><p>${sep.reconstruction_text||""}</p></div>`;
+   <h3>${sepHead}</h3></div>`;
  const leaks=(sep.leakage||[]).filter(l=>l.r>=0.2);
- const lbody=leaks.length?leaks.map(l=>`${disp(l.a)} ↔ ${disp(l.b)}: <b>${l.r.toFixed(2)}</b>`).join(" · "):T.rhy_noleak;
+ // C6: words-first for leakage pairs; raw numbers in a title tooltip.
+ let lbody;
+ if(!leaks.length){lbody=T.rhy_noleak;}
+ else{const tip=leaks.map(l=>`${disp(l.a)} ↔ ${disp(l.b)}: ${l.r.toFixed(2)}`).join(", ");
+  const top=leaks[0];const rest=leaks.slice(1);
+  const allClean=rest.every(l=>l.r<0.4);
+  let txt=`${disp(top.a)} and ${disp(top.b)} bleed into each other noticeably`;
+  if(rest.length&&allClean)txt+="; the rest stay clean";
+  else if(rest.length)txt+="; "+rest.map(l=>`${disp(l.a)} and ${disp(l.b)} overlap slightly`).join(", ");
+  lbody=`<span title="${tip.replace(/"/g,'&quot;')}">${txt}</span>`;}
  html+=`<div class="rec ${leaks.length?"concept":"do"}" style="margin-top:12px"><div class="when">${T.rhy_leak}</div>
    <p style="margin-top:2px">${lbody}</p></div>`;
  // CR-4: bands that are most likely a louder, correlated neighbour bleeding in — caveat, don't attribute.
@@ -3689,9 +3711,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const N=D.notes,P=document.getElementById("notePanel");
  if(!N||!N.notes||!N.notes.length){P.style.display="none";return;}
  const lo=N.pitch_min,hi=N.pitch_max,span=Math.max(1,hi-lo);
- // "other" is the raw Demucs catch-all stem name — meaningless to a producer. Show a friendly
- // label + explain what it actually is (where the melody/chords live). See note_label_other.
- const nlabel=N.label==="other"?(T.note_label_other||N.label):disp(N.label);
+ // Route all stem labels through disp() (the resolved character name). For the "other" stem
+ // (Demucs catch-all), disp() returns the character label (e.g. "lead"); add the extra hint
+ // so the reader knows this is where the melody/chords live. See note_label_other / note_hint_other.
+ const nlabel=disp(N.label);
  const nextra=N.label==="other"?(T.note_hint_other||""):"";
  document.getElementById("noteTitle").textContent=T.note_title.replace("{label}",nlabel);
  document.getElementById("noteHint").textContent=T.note_hint
@@ -3821,7 +3844,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // the drums lane is special: kick/snare/hat hit-density (Part D), not one curve
  const DR=(D.drums&&D.drums.density&&D.drums.bins)?D.drums:null;
  const DRCOL={kick:"#ff5d73",snare:"#ffd166",hat:"#5ad1c2"},DRK=["kick","snare","hat"];
- const lanes=auds.map(s=>{const br=bridge(s.name),isdrum=(s.name==="drums"&&!!DR);
+ // Filter omitted (near-silent) stems from the lane grid — they have no real content to show
+ // and their M/S buttons would be meaningless. The audio elements still exist in `auds` (silent).
+ const OM_LN=new Set((D.stem&&D.stem.omitted)||[]);
+ const lanes=auds.filter(s=>!OM_LN.has(s.name)).map(s=>{const br=bridge(s.name),isdrum=(s.name==="drums"&&!!DR);
   return{s:s,name:s.name,br:br,col:br.col||"#a78bfa",drum:isdrum,
          env:isdrum?null:volEnv(s.name),fc:isdrum?null:freqColors(s.name),bands:isdrum?null:bandFracs(s.name)};});
  const lcv=document.getElementById("stemlanes"),lx=lcv.getContext("2d");
@@ -4033,11 +4059,21 @@ def main():
                 pass
     narrative_md = Path(args.narrative).read_text(encoding="utf-8") if args.narrative else None
     from datetime import datetime
+    _now = datetime.now()
+    # C19: derive analysis date from the run-dir name (format YYYY-MM-DD_HHMM) when --analyzed-at
+    # is not passed explicitly. This ensures the widget shows when the analysis actually ran, not
+    # when the report was built (which can be days later on a re-render).
+    _run_dir_name = Path(args.out).parent.name
+    _run_date = None
+    _rdm = re.match(r"^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})$", _run_dir_name)
+    if _rdm:
+        _run_date = f"{_rdm.group(1)} {_rdm.group(2)}:{_rdm.group(3)}"
     meta = {
         "audio": args.src_audio,
         "als": args.src_als,
         "track_version": args.track_version,
-        "analyzed_at": args.analyzed_at or datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "analyzed_at": args.analyzed_at or _run_date or _now.strftime("%Y-%m-%d %H:%M"),
+        "built_at": _now.strftime("%Y-%m-%d"),
     }
     catalog = json.loads(Path(args.catalog).read_text()) if args.catalog and Path(args.catalog).exists() else None
     # Derive run_dir from --core so the reference-read block can load the fingerprint (§D.10.3).

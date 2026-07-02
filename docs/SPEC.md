@@ -346,7 +346,8 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
 - Verified by deed (Lazy_Sparks 0.8.11–0.8.15): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
   vocals/piano→"near-silent"; guitar sub-line→"Guitar".
 - **INV (label set).** The displayed lane label is EXACTLY one of:
-  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `mid`, `high`, `near-silent`.
+  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `mid`, `high`, `near-silent`, `not measured`.
+  `near-silent` = measured and found empty; `not measured` = significance unknown / character unmeasurable (the third stem state from §A/RC-INV-11 — distinct, never collapsed into "near-silent").
   **Never** `tonal`, never a `≈` prefix, never a raw Demucs family name. **Internal buckets that DON'T appear
   verbatim:** `tonal` (G13 fallback) is displayed as the base role `mid`; `air` (G12/G14 high-sustained) is
   displayed as `high`; `noise` is inert (the flatness gate never fires — §B.4/G13 — so it is never emitted,
@@ -363,11 +364,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
   lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
   (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
-  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` = the `stem_character`
-    label if the stem is significant, else `"near-silent"` (empty stem) / a neutral part word — **NEVER** the
-    raw Demucs family name. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every
-    JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem
-    ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title.
+  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) `"near-silent"` when the stem is **measured and found empty** (asserts measured silence, not unknown); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from "near-silent", per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
   - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
     6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
     (`play_note`, `map_hint`, `note_hint`, `note_hint_other`) AND prose from `map_stems.py`
@@ -378,6 +375,23 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
     path) contains NONE of the raw tokens in user-facing text: `other`/`vocals`/`guitar`/`piano` as a standalone
     part name, `Demucs`/`htdemucs`/`htdemucs_6s`/`basic-pitch`. Test `NoRawStemNameOnAnySurface`. One instance
     reported ⇒ whole class owned (Alexander's "never patch pointwise").
+  - **Partition of stem-name surfaces (F1/F5 — explicit two-column split, s45 pre-1.0 gate).** Two named sets,
+    never conflated:
+    - **Byte-identical set** — all via the `disp()` resolver, same word for the same stem on BOTH the `.als`
+      and no-`.als` path: **arc bar, player lane, rhythm tiles, stem↔project card title, masking cards, notes title.**
+      Property: "Every surface in the byte-identical set renders a stem via `disp()` and shows the same word for
+      the same stem on BOTH the `.als` and no-`.als` path." `INV-STEMNAME-PARTITION`
+    - **Deliberate-different set** — differ by JOB (not by leaking a raw name): the `late_entry` rec (best
+      single guess: character → clear track-name → "a new element"); the lane sub-line (real project track name
+      when the stemmap verdict is `clear`); AND the **arc-bar scene-lead WHEN a `.als` IS PRESENT** — it shows
+      the real project ARRANGEMENT track name (e.g. "Lead Synth"), which is domain-correct and a different job
+      from the stem's character role. ⟨pending Alexander's confirm — he may want the arc lead to match the
+      lane's character role (fold into byte-identical set) rather than show the arrangement name⟩
+  - **Back-compat (F4 — widgets deposited before 0.9.22).** When `stem_display` is absent from a payload (any
+    widget deposited before 0.9.22), no surface shows the raw stem key — the `disp()` fallback is `"a part"`,
+    never the raw key — and every deposited widget is **re-rendered to the current version before a release**
+    (the CLAUDE.md re-render-all rule applied as a ship precondition, so the catalog never opens a stale leaking
+    widget). `INV-STEMNAME-BACKCOMPAT`
 
 ### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Alexander's idea, s14)
 Alexander (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
@@ -840,7 +854,10 @@ survive); it is never auto-deleted. ⟨DECIDE D-1⟩ how many placeable members 
 
 **The fingerprint (the numeric side).** The «leans toward» line and the in-zone/diverge verdict need
 coordinates, so each track's signals are boiled down to a **full-dimensional** vector of numbers (the
-development trends, the tonal palette, density, meter rate, repetition). This is geometry: it grounds the
+development trends, the tonal palette, density, meter rate, repetition). **The fingerprint has N = 14
+producer-facing axes (`fingerprints.py` AXES).** Invariant: a fully-measured pair shares all 14 axes, and
+14 ≥ MIN_SHARED_AXES (10), so two complete runs are always comparable (confirmed by deed — the shipped 3-track
+catalog produces working comparisons). `D-INV-20b` This is geometry: it grounds the
 **geometric** in-zone/diverge verdict (D-INV-19) and the nearest-direction «leans toward» (§D.10) — but it
 never writes the **worded** mood/style read (that's §D.2's holistic synthesis, anchored to signals). The
 numbers are
@@ -986,6 +1003,13 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   from its cloud. Its written read still renders from whatever signals DID compute. `D-INV-9`
 
 ### D.6 How the coaching changes — re-flavouring (the payoff)
+
+> **DEFERRED FROM 1.0 — the only input surface for aspiration mapping (the aim picker, ⟨DECIDE D-2⟩) was
+> excised in 0.9.15, so re-flavouring, the aim glyph, and pinned-aimed entries have no way to be created.
+> The descriptive 'leans toward' column ships WITHOUT aspiration mapping or re-flavouring.
+> ⟨pending Alexander's confirm to cut for 1.0 vs rebuild the mapping input⟩**
+> Design text below is preserved for when the input surface is re-specified; the D-INV-4/D-INV-13/D-INV-18
+> invariants and §D.10.1 aim rows are also deferred on the same basis (see §D.10.1 scope split).
 
 When your track is mapped to a direction, the *existing* cards and read are re-flavoured toward it. A track
 can aim at **several directions at once** (the mapping is many-to-many, D-INV-4), and re-flavouring **mixes
@@ -1250,6 +1274,11 @@ direction yet", and the inline links — ship in **0.9**: they need no aspiratio
 fingerprints. The **aim-dependent** rows — the aim glyph, the pinned-aimed-direction entry, and re-flavouring
 (§D.6) — are **inert until the mapping input surface (⟨DECIDE D-2⟩) exists**; they are authored here so the
 composition is proven, but a 0.9 build neither renders nor tests them. `tags: scope-0.9-descriptive · ⟨DECIDE D-2⟩`
+
+> **DEFERRED FROM 1.0 (F2, s45):** the aim picker (⟨DECIDE D-2⟩) was excised in 0.9.15 (see §D.6.1
+> tombstone), so the aim glyph, the pinned-aimed-direction entry, and all re-flavouring have no input surface
+> and cannot be created. They remain authored here so the composition is proven; they do NOT ship in 1.0
+> unless the mapping input is re-specified. ⟨pending Alexander's confirm to cut for 1.0 vs rebuild the input⟩
 
 **What the list holds and how it's cued.**
 - **Up to the three nearest reference clouds that are a REAL lean** — ranked nearest-first, in the **same

@@ -5,6 +5,26 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.24] — 2026-07-03
+
+### Fixed
+- **Near-silent stems no longer read as anonymous "near-silent" everywhere (blocker #1 tail).** Insignificant
+  (near-silent) stems are excluded from the interactive per-stem surfaces (player lanes, rhythm tiles) — so no
+  empty ghost lanes with mute/solo and no two tiles both titled "near-silent". The omitted-stems note now shows
+  a count ("2 parts were too quiet to read and are left out") instead of repeating the status as a name. The
+  notes-panel heading uses the stem's character name, consistent with every other surface.
+- **Plain-language copy pass on the first screen and the evidence panel.** Removed "deep mode" and the raw
+  confidence number from the header; "separation confidence · −21 dB residual · unaccounted for" → a plain
+  sentence; leakage correlations and recurrence numbers → words; grammar fix for plural part names; one
+  "working — do it" label; the header shows the analysis date, not the render time.
+- **Back-compat:** an old deposited widget without the stem-name map never shows a raw stem key (fallback "a part").
+
+### Changed
+- SPEC clarified (product-prover pre-1.0 gate): stem-name surface partition (byte-identical vs deliberate-different,
+  incl. the `.als` arc-bar), a "not measured" stem-display state, the fingerprint's 14-axis count, and re-flavouring
+  marked deferred from 1.0. See docs/SPEC.md §B.7 / §D. (The "not measured" display branch is specced; its code
+  path is a known follow-up — partial/quick runs currently fall to "near-silent"/"a part".)
+
 ## [0.9.23] — 2026-07-03
 
 ### Fixed

@@ -133,11 +133,11 @@ def main():
     if recon_db is None:
         recon_text = "No mix available to check completeness."
     elif recon_db < -25:
-        recon_text = f"Stems sum back to the mix almost perfectly ({recon_db} dB residual) — the split is complete, nothing is missing."
+        recon_text = "The separated parts add back up to the original almost perfectly — nothing meaningful is missing."
     elif recon_db < -12:
-        recon_text = f"Stems mostly reconstruct the mix ({recon_db} dB residual) — minor material is unaccounted for."
+        recon_text = "The separated parts mostly add back up to the original — only a little material isn't captured."
     else:
-        recon_text = f"Stems do NOT add back up to the mix ({recon_db} dB residual) — a lot of the track isn't captured by any stem. Read them with caution."
+        recon_text = "The separated parts don't fully add back up to the original — a fair amount isn't captured by any part, so read them with some caution."
 
     out = {
         "duration_s": round(dur, 1), "tempo": round(tempo, 1) if tempo else None,
