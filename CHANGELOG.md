@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.14] — 2026-07-02
+
+### Fixed
+- **Recommendation cards no longer collapse into one crooked column.** On a two-thirds-screen window
+  (or with browser zoom) the recs grid stacked every card in a single column. It now reflows by the
+  panel's own width — two tidy columns when there's room, one only when genuinely narrow — with more
+  vertical space between cards and panels.
+
+### Added
+- **Real-browser tests.** The widget's layout, view visibility (Simple/Detailed) and text escaping are
+  now checked in an actual headless browser, not just against the HTML text — so a broken render is
+  caught before it reaches your eyes. First 10 such tests landed (grid columns, the stem-lane
+  Simple/Detailed gate, card escaping, non-empty recommendations).
+
 ## [0.9.13] — 2026-07-01
 
 ### Fixed

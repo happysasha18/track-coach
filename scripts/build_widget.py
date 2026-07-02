@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.13"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.14"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -3157,7 +3157,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 .tag.bad{background:rgba(255,107,107,.14);color:var(--bad)}
 /* ── tc-panel: ONE canonical collapsible panel — the single look for every section ────── */
 details.tc-panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;
- padding:14px 20px 18px;margin-bottom:22px}
+ padding:14px 20px 18px;margin-bottom:30px}
 details.tc-panel>summary{cursor:pointer;list-style:none;user-select:none;
  color:var(--ink);font-size:15px;font-weight:620;padding:4px 0 10px}
 details.tc-panel>summary::-webkit-details-marker{display:none}
@@ -3173,8 +3173,17 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .mcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .mcard .z{font-size:12px;color:var(--muted)}.mcard .pct{font-size:20px;font-weight:650;margin-top:3px}
-.recs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:760px){.recs{grid-template-columns:1fr}}
+/* Container-based reflow (s34): the old `1fr 1fr` + `@media(max-width:760px)`
+   collapsed to ONE column by VIEWPORT width — with cards wrapped in the s29
+   `<details class="tc-panel">` panels plus Alexander's ~2/3-screen window (or a
+   browser zoom) the viewport fell under 760px and every rec stacked in one
+   crooked column. Fix: a CONTAINER query on #recsPanel, so the column count
+   follows the PANEL's own width (immune to window size / zoom), capped at two to
+   match the tidy 2-column layout he remembers. Wider vertical gap so the plates
+   breathe. Regression-tested in a real browser: tests/test_headless_render.py. */
+#recsPanel{container-type:inline-size}
+.recs{display:grid;grid-template-columns:1fr;gap:18px}
+@container (min-width:520px){.recs{grid-template-columns:1fr 1fr}}
 .rec{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:12px;padding:14px 16px}
 .rec.crit{border-left-color:var(--bad)}.rec.do{border-left-color:var(--good)}.rec.concept{border-left-color:var(--bright)}
 .rec h3{margin:0 0 6px;font-size:13.5px;font-weight:640}
