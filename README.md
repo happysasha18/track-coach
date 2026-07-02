@@ -2,7 +2,7 @@
 
 **A local, fully-offline compositional coach for music producers — a [Claude Code](https://claude.com/claude-code) skill.**
 
-Drop the folder into `~/.claude/skills/track-coach/`, run `./setup.sh` once, then just talk to Claude about your track. Point it at an audio file (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one self-contained offline HTML widget**.
+Drop the folder into `~/.claude/skills/track-coach/`, run `bash setup.sh` (safe to re-run), then just talk to Claude about your track. Point it at an audio file (and optionally your Ableton project), and it runs the complete analysis pipeline, then builds **one self-contained offline HTML widget**.
 
 The widget is not a dashboard of numbers. It's a mirror: the synced player, the arrangement from your project, the graphs, and the cards all live on one page, all pointing at the same moments in the track — so you can hear what you're looking at.
 
@@ -20,11 +20,11 @@ The coach does two things, and keeps them distinct.
 
 Three layers, always kept separate:
 
-1. **Measured** — exact numbers from `librosa` and Demucs, nothing inferred
+1. **Measured** — exact numbers, measured — nothing inferred
 2. **What it means** — a concrete reading: not *"energy is low"* but *"bass dominates 250–500 Hz in the first two minutes; the mids are present but buried"*
 3. **Your call** — the creative decision stays yours; the coach names the pattern and shows its evidence
 
-The same track gives the same answer every time — it reports what it measured, not a re-improvised opinion.
+The same track gives the same answer every time — it reports what it measured, not a re-improvised opinion. The same instinct runs through this whole skill family: facts over plausible fiction, the decision always yours.
 
 ---
 
@@ -33,11 +33,11 @@ The same track gives the same answer every time — it reports what it measured,
 **From the audio:**
 
 - Energy, brightness, density, modulation and stereo-width arcs over time; section structure (self-similarity / recurrence)
-- Demucs stem separation — up to 6 stems (htdemucs or htdemucs_6s); per-stem character labels derived from measurement (`kick`, `bass`, `lead`, `chord`, `pad`…), not raw Demucs names
+- Stem separation — up to 6 stems; per-stem character labels derived from measurement (`kick`, `bass`, `lead`, `chord`, `pad`…), never the separator's raw names
 - Frequency masking between stems (e.g. *"bass masks mid in 250–500 Hz during bars 8–24"*)
 - Per-stem rhythm: onset density, timing, syncopation, separation confidence
 - Drum-hit breakdown: kick / snare / hat density in the drums stem
-- Note transcription (basic-pitch): pitch content per stem, polyphony, mono vs chord character
+- Note transcription: pitch content per stem, polyphony, mono vs chord character
 - Vitals: tempo, key/scale, length, LUFS, true-peak dBTP, dynamic range, stereo width, phase correlation
 
 **From the Ableton `.als` (when provided):**
@@ -64,9 +64,9 @@ One self-contained HTML file. Everything is offline; data is embedded. The playe
 
 **Intention vs. result.** Automation envelopes from the `.als` — filter, gain, pitch, sends — each scaled to its own range, plotted against the measured brightness arc. Where a curve flattens but the sound keeps moving, you can see where they drifted apart.
 
-**Stem ↔ project map.** Each Demucs stem is correlated against the real project tracks by envelope similarity. Confident matches are shown; ambiguous or near-silent stems are labelled honestly.
+**Stem ↔ project map.** Each separated stem is matched against the real project tracks by envelope similarity. Confident matches are shown; ambiguous or near-silent stems are labelled honestly.
 
-**Reference read.** Per-facet bars comparing the track to each reference direction, with selectable direction tabs. Followed by a "What the web says about [artist]" panel: genre/era, a prose blurb, and the full trait list sorted by evidence strength. Both the widget panel and the standalone reference side page render from the same source, so they can't drift.
+**Reference read** (shown in the Detailed view of a full run). Per-facet bars comparing the track to each reference direction, with selectable direction tabs. Followed by a "What the web says about [artist]" panel: genre/era, a prose blurb, and the full trait list sorted by evidence strength. Both the widget panel and the standalone reference side page render from the same source, so they can't drift.
 
 **Recommendations.** A short ranked list — most important first — with the evidence behind each card and a concrete move. Timecoded cards seek the player to their moment on click.
 
@@ -83,7 +83,7 @@ Three views on a monotonic ladder — each adds to the one before; nothing visib
 | View | What you see |
 |---|---|
 | **Quick read** | Verdict, vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. A note says what a full run adds. |
-| **Simple** (default, full analysis) | Everything in Quick, plus the full per-stem player. The Evidence drawer is available but collapsed. |
+| **Simple** (default, full analysis) | Everything in Quick, plus the synced player (full stem audio, one transport). The Evidence drawer is available but collapsed. |
 | **Detailed** | Adds the per-stem visualisation lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
 
 The view preference is remembered in `localStorage` — open any track and it lands in whichever view you used last. A first-time open defaults to Simple (calm). A `#detailed` link is a one-shot entry that doesn't change the stored preference.
@@ -94,7 +94,7 @@ The Simple/Detailed toggle is pure client-side JS — it never recomputes or hit
 
 ## Commands
 
-**`/tc`** — full deep analysis. Runs Demucs stem separation, all analysis steps, and builds the widget with the per-stem player and full evidence. Takes a few minutes (Demucs runs on Apple MPS on Apple Silicon — fast).
+**`/tc`** — full deep analysis. Runs stem separation, all analysis steps, and builds the widget with the per-stem player and full evidence. Takes a few minutes (stem separation runs on Apple MPS on Apple Silicon — fast).
 
 **`/tc-quick`** — fast calm read, no stems. Runs core + detail analysis only, encodes a single-track mix player, and builds the widget in seconds. Can be upgraded to a full run later without re-running what's already there.
 
@@ -135,7 +135,7 @@ Drop the folder into `~/.claude/skills/track-coach/` and talk to Claude:
 > *"analyse this project"*  
 > *"compare these two versions"*
 
-Claude finds the latest render and `.als` from a project folder automatically, runs the pipeline, and opens the widget. While Demucs runs it narrates what it's looking for.
+Claude finds the latest render and `.als` from a project folder automatically, runs the pipeline, and opens the widget. While stem separation runs it narrates what it's looking for.
 
 The pipeline runs as three steps: **measure** (deterministic scripts, same input → same output) → **interpret** (the skill writes the producer's read) → **render** (builds the widget once, deposits it to the global library).
 
