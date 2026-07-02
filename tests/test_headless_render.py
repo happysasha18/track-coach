@@ -410,5 +410,53 @@ class OmittedStemsAcknowledged(unittest.TestCase):
                            f"omitted stems must sit below every significant one; order={order}, omitted={sorted(omitted)}")
 
 
+class CatalogPageResponsive(unittest.TestCase):
+    """Browser-level gate on the catalog page (index.html): responsive column shedding is
+    REAL geometry a string test can't see. `@media(max-width:1100px)` hides cols 9–12
+    (mood/style, mode, similarity); `@media(max-width:880px)` also hides col 3 (date). This
+    is the same class of bug as the crooked recs grid — a computed `display:none` under a
+    viewport width, invisible to a string/DOM-stub test. INV-10 / responsive-table."""
+
+    @classmethod
+    def setUpClass(cls):
+        if not _HAVE_CHROME:
+            raise unittest.SkipTest("headless Chrome not available")
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import catalog  # noqa: E402
+        entries = [
+            {"track": "Alpha", "audio_sha": "h1", "stamp": "2026-01-01_0900",
+             "audio_mtime": 1000, "widget": "a.html", "mode": "full", "bpm": 120,
+             "key": "A minor", "lufs": -9.0, "dr": 10.0, "length_s": 300,
+             "mood_tags": ["dark"], "style_tags": ["techno"], "arc": [0.1, 0.5, 1.0]},
+            {"track": "Beta", "audio_sha": "h2", "stamp": "2026-02-01_0900",
+             "audio_mtime": 2000, "widget": "b.html", "mode": "full", "bpm": 128,
+             "key": "C major", "lufs": -8.0, "dr": 8.0, "length_s": 320,
+             "mood_tags": ["bright"], "style_tags": ["house"], "arc": [0.2, 0.6, 0.9]},
+        ]
+        tmp = Path(tempfile.mkdtemp(prefix="tc_cat_"))
+        out = tmp / "index.html"
+        out.write_text(catalog.render_catalog_html(entries))
+        cls.widget = str(out)
+
+    def _col_shown(self, width, nth):
+        js = ("(function(){var th=document.querySelector('thead th:nth-child(" + str(nth) + ")');"
+              "return th?getComputedStyle(th).display!=='none':null;})()")
+        return hc.probe(self.widget, js, width=width, height=900)
+
+    def test_wide_shows_shed_columns(self):
+        self.assertTrue(self._col_shown(1400, 9), "col 9 (mood/style) must show at 1400px")
+        self.assertTrue(self._col_shown(1400, 3), "col 3 (date) must show at 1400px")
+
+    def test_narrow_1000_sheds_cols_9_to_12(self):
+        for nth in (9, 10, 11, 12):
+            self.assertFalse(self._col_shown(1000, nth),
+                             f"col {nth} must be hidden below 1100px; got shown")
+        self.assertTrue(self._col_shown(1000, 3),
+                        "col 3 (date) still shows at 1000px (above the 880 breakpoint)")
+
+    def test_very_narrow_820_also_sheds_date(self):
+        self.assertFalse(self._col_shown(820, 3), "col 3 (date) must be hidden below 880px")
+
+
 if __name__ == "__main__":
     unittest.main()
