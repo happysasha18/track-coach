@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.18"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.19"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2742,7 +2742,9 @@ h1{font-size:22px;margin:0 0 2px;font-weight:650}
  font:600 12.5px/1 inherit;padding:9px 14px;cursor:pointer;white-space:nowrap;
  transition:color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
 .seg>button:not(.on):not(.active):hover{color:var(--ink)}
-.seg>button.on,.seg>button.active{background:var(--wob);color:var(--bg);font-weight:700}
+/* selected = calm: the old subtle panel2 lift, SAME weight, no contrast inversion
+   (Alexander 2026-07-02: the bold --wob fill read too loud and the invert/bold jarred). */
+.seg>button.on,.seg>button.active{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
 /* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
 .viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
 /* verdict — the calm one-glance headline */
@@ -2914,7 +2916,10 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
    (i.e. the #recsPanel it sits in), never the raw window: 1 column when narrow,
    2 on a ~2/3 window, 3 when there's room. Wider vertical gap so the plates
    breathe. Regression-tested in a real browser: tests/test_headless_render.py. */
-.recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+/* recs grid: reflow by the panel's OWN width, capped at 2 columns (Alexander: never 3 —
+   a rec card wants a readable line length). max(300px, half-minus-gap) forces at most two
+   columns and drops to one when cramped; no media/container query. */
+.recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(300px,(100% - 18px)/2),1fr));gap:18px}
 .rec{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:var(--radius-lg);padding:14px 16px}
 .rec.crit{border-left-color:var(--bad)}.rec.do{border-left-color:var(--good)}.rec.concept{border-left-color:var(--bright)}
 .rec h3{margin:0 0 6px;font-size:13.5px;font-weight:640}

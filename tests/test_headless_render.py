@@ -205,13 +205,13 @@ class RecsGridReflow(unittest.TestCase):
             f"recs grid must show 2 columns at a 720px window; saw {r['cols']} "
             "(the crooked single-column regression Alexander saw)")
 
-    def test_more_columns_when_theres_room(self):
-        # Alexander: "when there's plenty of room give 3 or more." auto-fit adds a
-        # column as the panel widens (capped only by the wrap max-width).
+    def test_capped_at_two_columns_when_wide(self):
+        # Alexander 2026-07-02: at a wide window the recs must stay at 2 columns, never 3 —
+        # a rec card wants a readable line length. The grid caps at two (was ">=3" before).
         r = hc.probe(self.widget, _COLS_JS, width=1100, height=2800)
-        self.assertGreaterEqual(
-            r["cols"], 3,
-            f"recs grid must add a 3rd column on a wide window; saw {r['cols']}")
+        self.assertEqual(
+            r["cols"], 2,
+            f"recs grid must stay capped at 2 columns on a wide window; saw {r['cols']}")
 
     def test_single_column_when_cramped(self):
         r = hc.probe(self.widget, _COLS_JS, width=460, height=4000)

@@ -5,15 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
-## [0.9.18] — 2026-07-02
+## [0.9.19] — 2026-07-02
 
 ### Changed
-- **Design system, part 2a — one segmented control, consistent corners & motion.** The Simple/Detailed
-  switch and the reference-direction tabs are now one and the same control: a clean segmented bar whose
-  selected option is filled in the brand purple with dark text (before, the selected side was a barely-there
-  darker shade). Every rounded corner across the widget now snaps to one small scale (10 / 14 / 18 / 20 px)
-  instead of a scatter of ad-hoc values, and hover/transition timings use two shared speeds. Chart, stem and
-  category colours are untouched.
+- **Design system, part 2a — one segmented control, consistent corners & motion, 2-column recs.** The
+  Simple/Detailed switch and the reference-direction tabs are now one and the same control, keeping their
+  calm look (the selected side is a subtle lift in the same text weight — no loud fill, no contrast flip).
+  Every rounded corner across the widget snaps to one small scale (10 / 14 / 18 / 20 px) instead of a scatter
+  of ad-hoc values, and hover/transition timings use two shared speeds. The recommendation cards now cap at
+  **2 columns** on wide windows (never three — a card wants a readable line length) and reflow to one when
+  cramped. Chart, stem and category colours are untouched.
 
 ## [0.9.17] — 2026-07-02
 

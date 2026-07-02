@@ -2097,12 +2097,13 @@ project is its browsable component library. One role = one token = one name.
   (RECONCILED s43: the original text named THREE — `.seg`/`.viewtoggle`/`.reftabs` — but `.seg` did not
   exist in the code; there were only two controls. The shared class is now named `.seg`. Shipped 0.9.18.)
 - **DS-INV-13:** container `border:1px solid --line; border-radius:--radius; overflow:hidden`;
-  buttons `padding:9px 14px`; `selected` = fill `--wob` + text `var(--bg)` + bold; `rest` = transparent
-  bg + text `--muted`; `hover` → `--ink`; transition `--dur-fast`. The three former controls render
-  from this one class. **Intended VISIBLE change:** the view-toggle's selected state moves from the
-  current subtle `panel2` fill to the bold `--wob` fill, and the reference tabs from a
-  `border-color`+opacity active to the same `--wob` fill — screenshot both in the before/after so the
-  shift is deliberate, and the browser tests assert the NEW selected look, not the old.
+  buttons `padding:9px 14px`; `rest` = transparent bg + text `--muted`; `hover` → `--ink`;
+  transition `--dur-fast`. Both former controls render from this ONE class.
+  **`selected` = CALM (Alexander 2026-07-02, REVERSED after seeing it rendered):** the old subtle
+  `--panel2` lift + `--ink` text, SAME weight — NOT a `--wob` fill, NO contrast inversion, NO sudden bold.
+  Rationale: the loud `--wob` fill (the earlier design-session value) clashed with the calm-by-default
+  aesthetic; the invert + bold jarred. The win kept from the merge is structural (one class for both
+  controls); the look stays the old calm one. Browser test asserts the calm selected look.
 
 ### I.7 Per-component contracts (all 10)
 Each component draws ONLY from the tokens above (all §7 taste calls decided in the design doc v3):

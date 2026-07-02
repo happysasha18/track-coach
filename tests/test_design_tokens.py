@@ -128,7 +128,8 @@ def test_one_segmented_control():
     src = _source()
     assert 'class="viewtoggle seg"' in src, "the view-toggle must wear the shared .seg class"
     assert 'class="reftabs seg"' in src, "the reference tabs must wear the shared .seg class"
-    # the selected state moves from the old subtle panel2 fill to the bold --wob fill
-    assert "button.on{background:var(--panel2)" not in css, \
-        "the old subtle selected look must be replaced by the --wob fill"
-    assert "background:var(--wob)" in css, "the segmented control's selected state fills --wob"
+    # selected = CALM (Alexander 2026-07-02): the old panel2 lift, SAME weight, NO inverted contrast.
+    seg_sel = re.search(r"\.seg>button\.on[^}]*\}", css).group(0)
+    assert "var(--panel2)" in seg_sel, "the selected state uses the calm panel2 fill"
+    assert "var(--bg)" not in seg_sel, "the selected state must not invert to dark text on a bright fill"
+    assert "font-weight:700" not in seg_sel, "the selected tab must not suddenly go bold"
