@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.29"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.30"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -4059,6 +4059,14 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  master.addEventListener("loadedmetadata",()=>{paint(0);lresize();});
  paint(0);lresize();
 })();
+// A0 / INV-GATE (Fable audit 2026-07-03): each evidence sub-panel self-hides (display:none) when it
+// has no data; the OUTER #evidence container did not, so a QUICK (mix-only) run — which structurally
+// has no stems and no .als, hence NO arrangement/automation/map/rhythm/notes — showed an #evidence
+// collapsible that opened to nothing. A quick run can never carry evidence, so hide the container in
+// quick; a full run always carries evidence, so #evidence stays (its always-visible contract holds).
+(function(){var ev=document.getElementById("evidence");if(!ev)return;
+ var badge=document.getElementById("modeBadge");
+ if(badge&&badge.classList.contains("quick")){ev.style.display="none";}})();
 </script></body></html>"""
 
 

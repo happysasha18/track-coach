@@ -5,6 +5,19 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.30] — 2026-07-03
+
+### Fixed
+- **On a quick (mix-only) read, the "Evidence & detail" section no longer opens to an empty box.** A quick read
+  has no Ableton project, stem-map, rhythm or notes, so all of that section's sub-panels were empty — but the
+  outer section still showed and expanded to nothing, which read as broken. It's now hidden whenever it has
+  nothing to show. (Found in an independent audit.)
+
+### Internal
+- **The completeness check now runs across every kind of read — quick, Simple and Detailed — not just the full
+  one**, and flags any collapsible section that opens to nothing. This is the class of silent problem behind
+  the empty-section bug above, now caught mechanically for every view.
+
 ## [0.9.29] — 2026-07-03
 
 ### Fixed

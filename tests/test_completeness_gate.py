@@ -404,6 +404,37 @@ def _build_muted_stem_widget(tmp: Path) -> str:
     return str(out)
 
 
+def _build_quick_widget(tmp: Path) -> str:
+    """Build a SYNTHETIC QUICK widget: mix-only — NO stems, NO .als, NO stemmap/rhythm/notes.
+    A quick run has no evidence data, so every #evidence sub-panel self-hides — the config that
+    exposed the empty-#evidence-opens-to-nothing bug (Fable audit 2026-07-03). The always-panels
+    (arc, tonal, read, recs, catalog) stay populated so the empty-collapsible scan flags ONLY the
+    genuinely empty container, not a false positive."""
+    lib_index = tmp / "library_index_quick.html"
+    lib_index.write_text("<html><body>Library</body></html>")
+    out = tmp / "widget_quick.html"
+    from datetime import datetime
+    build_widget.build_html(
+        _core(), {}, {}, None, str(out),
+        "Quick Gate Track",
+        build_widget.STRINGS,
+        narrative_md=(
+            "## What I hear\n\nA mix-only quick read: clean kick, a steady build into the drop.\n\n"
+            "## What needs attention\n\nThe high end accumulates past bar 32."
+        ),
+        catalog=_catalog(str(out)),
+        back_href=lib_index.as_uri(),
+        meta={
+            "audio": "quick_test.wav",
+            "als": None,   # quick = no Ableton project
+            "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "built_at":    datetime.now().strftime("%Y-%m-%d"),
+        },
+        mode="quick",
+    )
+    return str(out)
+
+
 # ── Shared probe helpers ──────────────────────────────────────────────────────
 
 def _probe(widget: str, js: str, width: int = 1200, height: int = 3200) -> object:
@@ -416,6 +447,61 @@ def _open_details(body_class: str = "detailed") -> str:
         f"(function(){{document.body.className='{body_class}';"
         "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
     )
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class NoEmptyVisibleCollapsibleAcrossConfigs(unittest.TestCase):
+    """A0 / INV-GATE axis extension (Fable audit 2026-07-03). NO visible, open ``<details>`` may
+    render with ONLY its summary — an empty expandable reads as broken. Checked across the
+    render-config axis {quick, full-Simple, full-Detailed}: the standard completeness gate builds
+    only ``mode="full"`` fixtures, so the LIVE empty-#evidence-in-quick bug (its 5 sub-panels all
+    self-hide, but the outer #evidence container stayed visible) passed the suite green. A visible
+    collapsible must have body content beyond its summary, or not be visible at all."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = Path(tempfile.mkdtemp(prefix="tc_axisgate_"))
+        cls.quick = _build_quick_widget(cls._tmp)
+        cls.full = _build_full_widget(cls._tmp)
+
+    def _empty_open_details(self, widget: str, body_class: str) -> list:
+        """ids of every VISIBLE, open ``<details id>`` that has NO visible child besides its summary.
+
+        Height alone lies — a tc-panel's padding keeps a content-less container ~34px tall (Fable's
+        "71px" #evidence). The real test is structural: does the opened panel show any content element
+        at all? A panel whose only children are the summary + display:none sub-panels is empty-open."""
+        js = (
+            "(function(){document.body.className='%s';"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var ev=document.getElementById('evidence');"
+            "if(ev){ev.dispatchEvent(new Event('toggle'));}"      # force the on-open sub-panel draws
+            "var bad=[];"
+            "document.querySelectorAll('details[id]').forEach(function(d){"
+            "  if(d.offsetParent===null) return;"                 # the <details> itself is hidden → fine
+            "  var kids=Array.prototype.filter.call(d.children,function(c){"
+            "    if(c.tagName==='SUMMARY') return false;"
+            "    var st=getComputedStyle(c);"
+            "    if(st.display==='none'||st.visibility==='hidden') return false;"
+            "    var r=c.getBoundingClientRect();"
+            "    return r.width>1 && r.height>1;"                 # a real, visible content element
+            "  });"
+            "  if(kids.length===0){bad.push(d.id);}"             # nothing but the summary shows → empty open
+            "});return bad;})()" % body_class
+        )
+        res = _probe(widget, js)
+        return res if isinstance(res, list) else []
+
+    def test_quick_has_no_empty_open_collapsible(self):
+        bad = self._empty_open_details(self.quick, "")
+        self.assertEqual(bad, [], f"EMPTY OPEN COLLAPSIBLE in the QUICK widget: {bad}")
+
+    def test_full_simple_has_no_empty_open_collapsible(self):
+        bad = self._empty_open_details(self.full, "simple")
+        self.assertEqual(bad, [], f"EMPTY OPEN COLLAPSIBLE in the full-SIMPLE widget: {bad}")
+
+    def test_full_detailed_has_no_empty_open_collapsible(self):
+        bad = self._empty_open_details(self.full, "detailed")
+        self.assertEqual(bad, [], f"EMPTY OPEN COLLAPSIBLE in the full-DETAILED widget: {bad}")
 
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
