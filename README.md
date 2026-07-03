@@ -82,7 +82,7 @@ Three views on a monotonic ladder — each adds to the one before; nothing visib
 
 | View | What you see |
 |---|---|
-| **Quick read** | Verdict, vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. A note says what a full run adds. |
+| **Quick read** | Vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. A note says what a full run adds. |
 | **Simple** (default, full analysis) | Everything in Quick, plus the synced player (full stem audio, one transport). The Evidence drawer is available but collapsed. |
 | **Detailed** | Adds the per-stem visualisation lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
 

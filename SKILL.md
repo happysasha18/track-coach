@@ -60,7 +60,7 @@ python3 "$SKILL_DIR/scripts/track_analyzer.py" analyze "<AUDIO>" \
 # 3) RENDER (cheap, one pass): build the widget WITH the read + the cross-version catalog.
 #    Set the catalog's mood/style tags here too — override the heuristic draft with your real read.
 python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
-    --title "<Track name + version>" --verdict "<1–2 sentence calm headline>" \
+    --title "<Track name + version>" --verdict "<1–2 sentence verdict for the version catalog>" \
     --mood-tags "dark,driving" --style-tags "melodic techno"   # genre is YOUR call; '' clears
 ```
 
@@ -258,7 +258,7 @@ like a lot. So there are two depths AND a calm default view:
   The widget is clearly badged "Quick read" with a note on what a full run adds; every stem-dependent
   panel (and the per-section instrument labels) auto-omits.
 
-Independently of mode, the widget opens in a **calm "Simple" view** (verdict + vitals +
+Independently of mode, the widget opens in a **calm "Simple" view** (vitals +
 power curve + repeats + top-3 recs); a **Detailed** toggle reveals the rest. That toggle
 is pure client-side JS — it never recomputes or calls anything, so it's free to flip.
 
@@ -527,7 +527,7 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" fast "$SKILL_DIR/scripts/build_widget.py" \
     --title   "<track name + version, e.g. My Track v0.6.2>" \
     --src-audio "<audio filename, e.g. My_Track_[v0.6.2].mp3>" \
     --track-version "<the track's own version, e.g. v0.6.2>" \
-    --verdict "<your 1–2 sentence headline for the calm Simple view>" \
+    --verdict "<your 1–2 sentence verdict for the version catalog>" \
     $([ -n "$ALS" ] && echo "--src-als $(basename "$ALS")") \
     $([ -f "$OUT_DIR/result_masking.json" ]      && echo "--masking $OUT_DIR/result_masking.json") \
     $([ -f "$OUT_DIR/result_als.json" ]          && echo "--als $OUT_DIR/result_als.json") \
@@ -559,16 +559,18 @@ passed as `--verdict` when that version was built — so always give a good `--v
 `--narrative` picks it up — then the widget opens with your words on top. Optional flags
 also: `--presence-threshold 0.3` (playing cutoff).
 
-**`--verdict`** is the calm one-glance headline shown at the very top of the Simple view:
-the single most important takeaway in 1–2 plain sentences (what KIND of track + the one
-thing that matters). Distil it from your Step 5 read. If you omit it, the widget falls
-back to the first sentences of `narrative.md` — so always give a narrative at minimum.
+**`--verdict`** is the one-line verdict recorded for the **version catalog** — the single
+most important takeaway in 1–2 plain sentences (what KIND of track + the one thing that
+matters). It shows per version on the catalog page and in the widget's cross-version list
+(it is no longer rendered as a top panel — that "In short" headline was removed 2026-07-03).
+Distil it from your Step 5 read. If you omit it, it falls back to the first sentences of
+`narrative.md` — so always give a narrative at minimum.
 
 The widget storytelling is a FUNNEL (v0.5.4, user-driven): **quick measured facts →
 SEE it → understand it → act**. Top → bottom (each panel appears only if its data is present):
 
 **Simple⇄Detailed view (v0.5.11, friend-feedback):** the widget opens in a calm **Simple**
-view so a non-power-user isn't overwhelmed — header **verdict** (1–2 sentences, `--verdict`),
+view so a non-power-user isn't overwhelmed —
 vitals, power curve + repeats + locators, the 3 power-driver lanes (energy/brightness/density),
 and the top-3 recs. A segmented **toggle** (top-right, `#viewToggle`) flips to **Detailed**,
 which adds the stem player/sequencer, the modulation/stereo lanes, the full prose read, all
