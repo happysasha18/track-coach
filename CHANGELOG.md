@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.28] — 2026-07-03
+
+### Changed
+- **The library now shows one row per track — its newest version.** Before, a track you'd analysed twice
+  showed up as two rows (with an amber "older analysis" badge on the older one), which read like a mistake.
+  Now each track is a single, scannable row on its newest version; every older version still lives in that
+  track's own page (the version plaque at the bottom), so nothing is lost — the history just moved off the
+  library index and onto the track. The row's numbers, signature, and similar-in-library all read from the
+  newest version.
+
 ## [0.9.27] — 2026-07-03
 
 ### Changed

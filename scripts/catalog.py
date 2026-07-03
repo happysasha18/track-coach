@@ -3,9 +3,9 @@
 
 `library.py` is the store (deposit/list/clean + the pure metric/version helpers); this module is the
 front-end: it reads `index.json` and renders ONE self-contained, offline `index.html` — the home base
-for a producer's whole body of work. Flat, sortable, searchable table; each row is a VERSION (a
-distinct audio bounce, runs collapsed by content hash), with a coloured mini-arc, the spec numbers,
-mood/style tags, and cross-version deltas. The catalog is a LOCAL index (INV-17): both the title link
+for a producer's whole body of work. Flat, sortable, searchable table; each row is a TRACK, shown at its
+NEWEST version (D-INV-35 — older versions live only in that track's per-widget version plaque, INV-11),
+with a coloured mini-arc, the spec numbers, mood/style tags, and the delta vs the prior version. The catalog is a LOCAL index (INV-17): both the title link
 (`_open_href`) and the play button (`_mix_uri_for`) resolve to an absolute `file://` in the ORIGINAL
 run dir, where the widget's stems/mix live — the deposited library copy is stem-less. NOT a publishable
 / GitHub Pages artifact; revisit (KI-4 option b) only if the library is ever published.
@@ -400,8 +400,7 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
     ``migrate`` to consolidate analysis data out of Ableton project folders (G-INV-16 support).
     """
     groups = library.group_versions(entries)
-    n_tracks = len(groups)
-    n_versions = sum(len(v) for v in groups.values())
+    n_tracks = len(groups)  # D-INV-35: one row per track, so the count of rows == the count of tracks
 
     # Pre-build lookup maps from ALL entries (pure: _open_href is pure).
     # Used to resolve sibling display labels and widget links.
@@ -416,11 +415,13 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
     body_rows = []
     uid = 0
     for track in sorted(groups, key=str.lower):
-        for ver in groups[track]:
-            body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
-                                  mix_uri=ver["rep"].get("mix_uri"),
-                                  title_map=_title_map, href_map=_href_map))
-            uid += 1
+        ver = groups[track][0]  # D-INV-35: one row per track — its NEWEST version (group_versions
+        #                          orders newest-first). Older versions live only in the per-track
+        #                          plaque (INV-11), never as a second catalog row.
+        body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
+                              mix_uri=ver["rep"].get("mix_uri"),
+                              title_map=_title_map, href_map=_href_map))
+        uid += 1
     rows_html = "\n".join(body_rows) or (
         f'<tr><td colspan="{_NCOLS}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
     ths = "".join(
@@ -536,7 +537,7 @@ tr.hide{{display:none}}
 <div class="wrap">
  <div class="brand">Track Coach</div>
  <h1>Library</h1>
- <p class="sub">{n_versions} version{'s' if n_versions!=1 else ''} across {n_tracks} track{'s' if n_tracks!=1 else ''} · click a header to sort, search to filter.</p>
+ <p class="sub">{n_tracks} track{'s' if n_tracks!=1 else ''} · newest version shown · click a header to sort, search to filter.</p>
 {migrate_html} <div class="controls">
   <input id="q" type="search" placeholder="Search tracks…" autocomplete="off">
   <div class="seg" id="modeseg">
@@ -652,10 +653,12 @@ def _load_sim_data(entries: list) -> tuple[dict, dict]:
         directions[k] = {ax: _fix_none(vv) for ax, vv in v.items()}
 
     z_library = {}
-    for e in entries:
-        key = e.get("track")
-        src = e.get("src_run_dir")
-        if not key or not src:
+    # D-INV-35: the catalog shows each track's NEWEST version, so the lean/sibling fingerprint must
+    # come from that newest version's run — never an arbitrary older entry (which "last one wins"
+    # over raw entries would pick). newest_reps gives one rep entry per track (newest version).
+    for key, rep in library.newest_reps(entries).items():
+        src = rep.get("src_run_dir")
+        if not src:
             continue
         fp = FP.fingerprint_from_run_dir(src)
         if fp and norm:

@@ -100,11 +100,13 @@ python3 "$SKILL_DIR/scripts/library.py" dereference --album-path PATH [--album-p
 ```
 The library archives the self-contained HTML only (never stems/audio). Every `build` also
 regenerates the **global Catalog** — a standalone `~/.track-coach/library/index.html`: a flat,
-sortable, searchable table of every track→version (versions grouped by audio sha256; per-row
-**signature** = spectral ribbon over a 9-band tonal strip, fully visible by tap + mood/style tags +
-BPM/key/length/LUFS + cross-version deltas; "open →" into each widget). Show it to
+sortable, searchable table with **one row per track — its newest version** (versions grouped by audio
+sha256; D-INV-35); per-row **signature** = spectral ribbon over a 9-band tonal strip, fully visible by tap +
+mood/style tags + BPM/key/length/LUFS + the delta vs the prior version; "open →" into each widget. Older
+versions are NOT separate catalog rows — they live in the per-widget **Library** panel below. Show it to
 Sasha with `library.py catalog --open` (opens a new window). This is separate from the in-widget
-**Library** panel (the per-widget cross-version catalog rendered at the bottom of each widget).
+**Library** panel (the per-widget cross-version catalog rendered at the bottom of each widget, which lists
+every version).
 
 ---
 

@@ -235,6 +235,13 @@ def group_versions(entries: list) -> dict:
     return out
 
 
+def newest_reps(entries) -> dict:
+    """Dict slug -> the rep entry of the track's NEWEST version (D-INV-35). The catalog shows one
+    row per track (its newest version), so every cell — including the lean/sibling fingerprint — is
+    read from this entry, never blended across older versions. PURE (builds on group_versions)."""
+    return {track: vers[0]["rep"] for track, vers in group_versions(entries).items()}
+
+
 # ── index io ───────────────────────────────────────────────────────────────────────────
 def load_index(root: Path) -> dict:
     p = root / "index.json"

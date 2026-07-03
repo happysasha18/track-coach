@@ -1216,12 +1216,13 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   one thing** — the chip is a glance handle, the read is the words; both cite the same leans-toward fact. The
   ladder stays monotonic: Detailed adds the chip without removing the Simple-level prose. `tags: view-ladder ·
   D-INV-20 · ⟨DECIDE D-25⟩`
-- **The run mode (the catalog column).** The catalog is its own page (a row per version), governed by run
-  MODE, not the per-track view ladder. A **full-run** version shows its leans-toward; a **quick-only**
-  version's cell reads "full analysis only" — the canonical missing-by-mode case (D-INV-20, RC-INV-7): quick
-  never promised reference, so the empty cell is silent, never an error and never blank-implying-"no
-  direction". A catalog row collapses a version's runs, so the column reads the version's **most-complete
-  run** (E.4); "full analysis only" shows only when that version has **no** full run at all.
+- **The run mode (the catalog column).** The catalog is its own page (**a row per track — its newest
+  version**, D-INV-35), governed by run MODE, not the per-track view ladder. A **full-run** version shows its
+  leans-toward; a **quick-only** version's cell reads "full analysis only" — the canonical missing-by-mode
+  case (D-INV-20, RC-INV-7): quick never promised reference, so the empty cell is silent, never an error and
+  never blank-implying-"no direction". A catalog row reads the **newest version's most-complete run** (E.4);
+  "full analysis only" shows only when that newest version has **no** full run at all — the cell is read from
+  the newest version, never blended across older versions (older versions live only in the track's plaque, D-INV-35).
   **The column appears whenever at least ONE version has a computed reference RESULT** — a lean, a "no close
   direction yet", or a "can't compare" (Alexander 2026-06-25: don't hide it if there's data for even one
   track); it is **absent only when no version has any reference computation at all** (an all-quick library, or
@@ -1252,6 +1253,21 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   when the library grows or a direction gains/loses members, the line recomputes and re-stamps with every
   other placement (D-INV-12/14/18) — the catalog never shows a "leans toward" the current geometry no longer
   supports. `D-INV-24`
+- **Catalog granularity — one row per track, its newest version.** The catalog lists **one row per track**,
+  and that row is the track's **newest version** (by audio mtime / stamp — `library.group_versions` orders
+  newest-first, so position 0 is newest). Older versions of the same track do **not** get their own catalog
+  rows; they remain listed in that track's **per-track plaque** (the widget plaque already enumerates every
+  version). This closes the earlier per-version double-row + amber "older analysis" confusion (Alexander
+  2026-07-03): a two-version track is ONE scannable row in the library, and its history lives on its own page.
+  **Decision (design A, Alexander 2026-07-03): the row is the newest version STRICTLY** — every catalog cell
+  (signature, BPM/LUFS, reference lean, similar-in-library) is read from the newest version's most-complete
+  run, never blended across versions; the version **delta** (BPM/LUFS change vs the immediately prior version)
+  still renders so the row shows movement. This is consistent with E.4: "most-complete run" is scoped to the
+  runs *within* a version, so newest-only loses no measurement that principle protects. The **Version** column
+  shows the newest version's label; the `×N runs` chip counts runs within that newest version; the "older
+  analysis" (stale tool-version) chip (INV-12) is orthogonal and unchanged. The page **subtitle counts tracks**
+  (the rows shown), so the stated count matches what is on screen — never a version total larger than the
+  visible rows. `D-INV-35`
 
 **Never happens (safety), specific to this surface.** The reference line never shows a number — no raw
 distance, score, rank, percentage, or "match %"; it names a direction and a coarse cue. "leans toward" is

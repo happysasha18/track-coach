@@ -20,9 +20,9 @@ Every chart is wired to the audio: click a moment on any curve and the track pla
 
 ### Keep every version
 
-Every run is kept under its own version and date. The library lists everything you've analysed — one row each, with its spectral signature, vitals, and mood / style tags, sortable and searchable — and each track holds its full history, so today's bounce opens right next to last month's and you can see what moved.
+Every run is kept under its own version and date. The library lists everything you've analysed — one row per track, on its newest version, with its spectral signature, vitals, and mood / style tags, sortable and searchable — and each track holds its full history on its own page, so today's bounce opens right next to last month's and you can see what moved.
 
-![The library: every track and version in one sortable table](docs/catalog.png)
+![The library: one row per track in a sortable table](docs/catalog.png)
 
 ### Place it among your music
 
@@ -121,7 +121,7 @@ Reference directions are measured fingerprints too: web-described style traits a
 
 Each run is a self-contained HTML file, versioned and timestamped, kept under `~/.track-coach/projects/<track-slug>/` — outside your Ableton project folders, so a folder tidy-up leaves it alone. The player reads its co-located `stems_web/` folder; everything else is embedded in the page.
 
-Every finished widget deposits to the global library at `~/.track-coach/library/`. Its catalog page gives a sortable, searchable row per track and version — signature, vitals, tags, and a one-button preview player. Open it with `scripts/library.py catalog --open`.
+Every finished widget deposits to the global library at `~/.track-coach/library/`. Its catalog page gives a sortable, searchable row per track (its newest version; older versions live on each track's own page) — signature, vitals, tags, and a one-button preview player. Open it with `scripts/library.py catalog --open`.
 
 ---
 

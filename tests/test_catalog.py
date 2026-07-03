@@ -192,6 +192,59 @@ class RenderSmoke(unittest.TestCase):
         self.assertIn('stroke="url(#r0)"', page)  # the row's ribbon (uid 0); exact bar count is unit-tested
 
 
+class NewestOnlyPerTrack(unittest.TestCase):
+    """D-INV-32: the catalog shows ONE row per track — its NEWEST version. Older versions get no
+    catalog row (they live only in the per-track plaque, INV-11). Every rendered cell reads the
+    newest version; the subtitle counts TRACKS (rows shown), never a larger version total."""
+
+    def _two_versions(self):
+        # Same track slug, two different bounces (distinct sha) → two VERSIONS; v2 is newest by mtime.
+        return [
+            _e("Shared", "h1", "2026-01-01_0900", 1000, bpm=120, lufs=-12,
+               length_s=300, key="A minor", title="Shared", arc=[0.1, 0.5]),
+            _e("Shared", "h2", "2026-06-01_0900", 2000, bpm=124, lufs=-9,
+               length_s=310, key="A minor", title="Shared", arc=[0.2, 0.7]),
+        ]
+
+    def test_two_versions_render_one_row(self):
+        page = catalog.render_catalog_html(self._two_versions())
+        self.assertEqual(page.count('<tr data-track='), 1)  # ONE row, not two
+
+    def test_the_row_is_the_newest_version(self):
+        page = catalog.render_catalog_html(self._two_versions())
+        self.assertIn('data-version="v2"', page)       # newest version's label
+        self.assertNotIn('data-version="v1"', page)    # the older version has NO catalog row
+        self.assertIn('data-bpm="124"', page)          # newest metrics, not the older 120
+        self.assertNotIn('data-bpm="120"', page)
+
+    def test_subtitle_counts_tracks_not_versions(self):
+        page = catalog.render_catalog_html(self._two_versions())
+        self.assertIn("1 track", page)                 # one track = one row
+        self.assertNotIn("2 versions", page)           # never claim more rows than are shown
+
+    def test_single_version_track_unchanged(self):
+        page = catalog.render_catalog_html(
+            [_e("Solo", "h1", "2026-01-01_0900", 1000, bpm=100, title="Solo", arc=[0.3, 0.4])])
+        self.assertEqual(page.count('<tr data-track='), 1)
+        self.assertIn("1 track", page)
+
+    def test_two_distinct_tracks_still_two_rows(self):
+        page = catalog.render_catalog_html([
+            _e("A", "h1", "2026-01-01_0900", 1000, title="A"),
+            _e("B", "h2", "2026-01-02_0900", 2000, title="B")])
+        self.assertEqual(page.count('<tr data-track='), 2)
+        self.assertIn("2 tracks", page)
+
+    def test_sibling_fingerprint_is_newest(self):
+        # library.newest_reps picks the NEWEST version's rep entry per track, so the lean/sibling
+        # cell (read from that entry's run dir) reflects the newest version, never an older one.
+        entries = [
+            _e("T", "h1", "2026-01-01_0900", 1000, src_run_dir="/old/run"),
+            _e("T", "h2", "2026-06-01_0900", 2000, src_run_dir="/new/run")]
+        reps = library.newest_reps(entries)
+        self.assertEqual(reps["T"]["src_run_dir"], "/new/run")  # newest version's run dir
+
+
 class LinkPointsAtOriginal(unittest.TestCase):
     """Where a row links to: the ORIGINAL widget in its run dir — its stems sit next to it, so the
     player plays. The deposited library copy is stem-less, so opening THAT leaves a dead player
