@@ -166,9 +166,12 @@ def _stored_identity(root: Path) -> "str | None":
         return None
     try:
         meta = json.loads((newest / "run_meta.json").read_text())
-        return (meta.get("source_identity") or
-                meta.get("als_path") or
-                meta.get("audio_path"))
+        # G-INV-2c: identity is als-AGNOSTIC → prefer the stored AUDIO path so an old run whose
+        # source_identity was an als path still matches a later run keyed on audio. Fall back to
+        # source_identity/als only for very old runs that never wrote audio_path.
+        return (meta.get("audio_path") or
+                meta.get("source_identity") or
+                meta.get("als_path"))
     except (ValueError, OSError):
         return None
 
@@ -177,10 +180,11 @@ def _resolve_slug(base: Path, audio: Path, als_path: "Path | None") -> tuple:
     """Return (slug, warn_msg_or_None) for this run, disambiguating same-name collisions.
 
     G-INV-2b: two different tracks that slug the same get ``<slug>-2`` (then -3, …) and a
-    warning; same source (same audio/als path) reuses the existing slug.  Source identity is
-    the als full path when provided, else the audio full path.
+    warning; same source reuses the existing slug.  G-INV-2c: source identity is als-AGNOSTIC —
+    the audio full path — so adding an ``.als`` to a previously audio-only track REUSES the slug
+    (groups as a new version) instead of forking a second track.  ``als_path`` is unused here.
     """
-    identity = str(als_path) if als_path else str(audio)
+    identity = str(audio)
     base_slug = slugify(audio.name)
     candidate = base_slug
     n = 2
@@ -222,8 +226,9 @@ def cmd_init(args):
         n += 1
     run_dir.mkdir(parents=True)
 
-    # G-INV-2b: source_identity = als path if provided, else audio full path
-    source_identity = str(als) if als else str(audio)
+    # G-INV-2c: source_identity is als-AGNOSTIC (audio full path), so adding an .als later reuses
+    # the slug instead of forking a second track. The .als is still recorded in als_path below.
+    source_identity = str(audio)
     meta = {
         "track": slug,
         "track_version": version,

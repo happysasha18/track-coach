@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.26] — 2026-07-03
+
+### Fixed
+- **Adding an Ableton project to a track you'd already analysed no longer splits it into two.** Before, a track
+  first analysed from audio alone, then re-analysed with its `.als` added, showed up in the catalog as a
+  *second, separate* track. Now the `.als` simply becomes a new version of the same track — one track, one
+  history. (Track identity is the audio file, not the `.als`.)
+
 ## [0.9.25] — 2026-07-03
 
 ### Fixed

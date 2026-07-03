@@ -136,6 +136,54 @@ class CollisionDisambiguation(unittest.TestCase):
             # because cmd_init calls .expanduser().resolve() which may add /private on macOS
             self.assertEqual(meta["source_identity"], str(audio.resolve()))
 
+    def test_adding_als_reuses_slug(self):
+        """G-INV-2c: same audio re-run WITH an .als added must reuse the slug, never fork to slug-2.
+
+        Regression for the s47 '-2 catalog fork' bug: identity keyed on the als path forked a
+        previously audio-only track the moment an .als was supplied. Identity is als-agnostic.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td) / "projects"
+            audio = _touch(Path(td) / "proj" / "My_Track.wav")
+            als = _touch(Path(td) / "proj" / "My_Track.als")
+            import io, contextlib
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_dir.cmd_init(_fake_args(audio=str(audio), base=str(base)))            # audio-only
+                run_dir.cmd_init(_fake_args(audio=str(audio), base=str(base), als=str(als)))  # + als
+            slug = run_dir.slugify(audio.name)
+            slug2_dir = base / f"{slug}-2"
+            self.assertFalse(slug2_dir.exists(),
+                             f"Adding an .als forked the track to {slug2_dir} (G-INV-2c violated)")
+            # Both runs live under the ONE slug dir → same track, two versions
+            slug_dir = base / slug
+            run_dirs = [p for p in slug_dir.iterdir() if p.is_dir() and p.name != "latest"]
+            self.assertGreaterEqual(len(run_dirs), 2,
+                                    "Second (als) run did not group under the same track")
+
+    def test_als_added_matches_old_als_identity_run(self):
+        """G-INV-2c back-compat: an OLD run that stored source_identity = the als path must still
+        match a later run by its stored audio_path, not fork."""
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td) / "projects"
+            audio = _touch(Path(td) / "proj" / "My_Track.wav")
+            als = _touch(Path(td) / "proj" / "My_Track.als")
+            slug = run_dir.slugify(audio.name)
+            # Hand-build a legacy run dir whose source_identity is the ALS path (pre-fix format)
+            legacy = base / slug / "2026-07-01_1000"
+            legacy.mkdir(parents=True)
+            legacy_meta = {
+                "track": slug, "audio": audio.name, "audio_path": str(audio.resolve()),
+                "als": als.name, "als_path": str(als.resolve()),
+                "source_identity": str(als.resolve()),  # the OLD, als-keyed identity
+            }
+            (legacy / "run_meta.json").write_text(json.dumps(legacy_meta))
+            import io, contextlib
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_dir.cmd_init(_fake_args(audio=str(audio), base=str(base)))  # new run, audio-only
+            slug2_dir = base / f"{slug}-2"
+            self.assertFalse(slug2_dir.exists(),
+                             f"Legacy als-identity run wrongly forked to {slug2_dir}")
+
 
 # ─── Item 3: Seed on first post-move run (G-INV-12) ──────────────────────────
 

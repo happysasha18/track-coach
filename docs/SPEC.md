@@ -1810,10 +1810,19 @@ versions (which the version-history / sibling-narrative features rely on). `G-IN
 **Collision: two genuinely different tracks that slug to the same name get disambiguated, never co-mingled.**
 Because the runs base is now shared across every project (it used to be per-Ableton-folder), two unrelated
 tracks that reduce to the same slug (e.g. both named `Untitled.wav`) would otherwise land in one slug dir with
-one mixed history. On a new run whose slug already exists, the tool compares the incoming source identity (the
-`.als` path if present, else the audio's full path) against the one stored for that slug; if they differ it
-uses `<slug>-2` (then `-3`, …) and warns the user, rather than mixing two tracks' histories. The source identity
-is stored in `run_meta.json`/the index for this check. `G-INV-2b`
+one mixed history. On a new run whose slug already exists, the tool compares the incoming source identity
+against the one stored for that slug; if they differ it uses `<slug>-2` (then `-3`, …) and warns the user,
+rather than mixing two tracks' histories. The source identity is stored in `run_meta.json`/the index for this
+check. `G-INV-2b`
+
+**Source identity is als-AGNOSTIC — it is the audio's full path, never the `.als` path.** Adding an `.als` to a
+previously audio-only track (same audio) must group as a **new version under the same track**, not fork a
+second one. Keying identity on the `.als` path broke exactly this (the s47 `-2` catalog-fork bug): a track first
+analysed audio-only, then re-analysed with `--als`, forked into `<slug>-2` because the two identities differed.
+Identity is therefore the audio full path on both sides of the compare; an old run whose stored `source_identity`
+was an als path still matches by its stored `audio_path`. (Audio *path*, not audio *bytes/sha*: successive
+versions of one track differ in bytes by design, so a content hash would wrongly fork every new version.)
+`G-INV-2c`
 
 **The path shape `base / slug / version__stamp` is preserved; only the base moves.** Code that walks up from a
 run dir to its base or `index.json` (`parent.parent`) keeps working unchanged — only the *base* moves from the
