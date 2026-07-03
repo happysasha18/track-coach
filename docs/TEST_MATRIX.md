@@ -521,7 +521,7 @@ Deferred (next movement — surface named, not yet coded):
 | code | rule (1-line) | lands with |
 |---|---|---|
 | DS-INV-6 | rec-card left stripe renders a `bad`/red variant for a bad-severity card. | §1 cont. — rec-card CSS (`build_widget.py` `.rec` block) + a browser test |
-| DS-INV-5 (bg) | category backgrounds (#3a4060/#2e3a52/#3a3040/#3a2832) derive from `--panel2`/`--line`. | §1 cont. — `.refread-cat` CSS |
+| DS-INV-5 | colour-drift hexes map to tokens: `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn` (matches SPEC §I DS-INV-5). Category IDENTITY backgrounds are NOT derived — they are `_CAT_COLORS` literals (Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`, `build_widget.py:68`), left as a categorical group like the stem colours (⟨DECIDE DS-4⟩ RECONCILED s43; the old `#3a40…` "derive from --panel2/--line" assumption was WRONG — those hexes don't exist). | §I design-tokens — `test_design_tokens` (shared-role token byte-equality) |
 | DS-INV-12 | every `border-radius` ∈ {10,14,18,20}; 6/8/9/11/12 snap. | §5 radii pass + browser test |
 | DS-INV-10 | motion tokens `--dur-fast/--dur-base/--ease` replace `.12s/.15s`. | §3 |
 | DS-INV-11 | one state ladder (rest/hover/focus/active/selected/disabled). | §4 |
