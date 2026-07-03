@@ -85,7 +85,10 @@ finding. "Don't cry wolf, and don't paint silence."
   excluded them from the lanes/tiles erased which stem they were; Alexander wants them SEEN, identified).
   Evidence: Lazy_Sparks vocals −92 dB (peak −61), piano −88 dB (peak −42). ⟨DECIDE⟩ floor value →
   **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)** — reused the existing empty-caveat floor, no
-  dedicated peak floor.
+  dedicated peak floor. **INV-45 (APPROVED — Alexander 2026-07-03): a near-silent stem's lane starts MUTED
+  on first load** (`build_widget.py:3868`, `if(startMuted)a.muted=true`). This avoids surprise silence
+  when the producer hits play (a muted lane carries no real content). The mute is cosmetic-initial only:
+  the M/S buttons still work, and the lane is visible and identified as usual (CR-2 visibility unaffected).
 
 - **CR-3 — per-stem visuals are gated on ABSOLUTE level, not per-stem normalization.** A silent stem
   must render as empty, never full-colour. Evidence: vocals sits at −92 dB yet its loudest band

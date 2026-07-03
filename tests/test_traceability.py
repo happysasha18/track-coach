@@ -263,7 +263,7 @@ class TraceabilityChecks(unittest.TestCase):
     # Test modules backed by the real headless browser harness (scripts/headless_check.py).
     # A "Level = browser" matrix claim is only honoured by a test in this set;
     # a string/node test asserting HTML source cannot verify what a browser renders.
-    BROWSER_HARNESS_MODULES: set[str] = {"test_headless_render"}
+    BROWSER_HARNESS_MODULES: set[str] = {"test_headless_render", "test_completeness_gate"}
 
     # Browser-level rows still backed by STRING tests — tracked debt, to convert to
     # the headless harness (the reference-read render surfaces: header + facet bars).

@@ -3318,7 +3318,7 @@ const META=D.meta||{};
 // ── Verdict: the calm one-glance headline (Simple view leads with this)
 (function(){const el=document.getElementById("verdict");if(!el)return;const v=(D.verdict||"").trim();
  if(!v){el.style.display="none";return;}
- el.innerHTML=`<span class="vlead">${T.verdict_lead||"In short"}</span>${v.replace(/&/g,"&amp;").replace(/</g,"&lt;")}`;})();
+ el.style.display="";el.innerHTML=`<span class="vlead">${T.verdict_lead||"In short"}</span>${v.replace(/&/g,"&amp;").replace(/</g,"&lt;")}`;})();
 // ── Simple⇄Detailed toggle. PURE presentation: flips a body class that hides/shows
 // already-embedded panels and re-filters the story lanes. No network, no recompute.
 (function(){const tg=document.getElementById("viewToggle");if(!tg)return;
@@ -3360,6 +3360,8 @@ const META=D.meta||{};
 // build_widget.py) and already present in the markup — no client-side markdown parsing here.
 document.getElementById("arrTitle").textContent=T.arr_title;
 document.getElementById("arrReadout").textContent=T.hover;
+document.getElementById("autoReadout").textContent=T.hover;
+document.getElementById("noteReadout").textContent=T.hover;
 document.getElementById("recsTitle").textContent=T.recs_title;
 document.getElementById("recsHint").textContent=T.recs_hint;
 document.getElementById("recLegend").innerHTML=
@@ -3785,7 +3787,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const rcls=rdb==null?"warn":rdb<-25?"do":rdb<-12?"concept":"crit";
  // C5: human-readable headline in h3; raw dB in title tooltip for producers who want it.
  const sepHead=rdb==null?"—":rdb<-25?"The split is clean — the parts add back up to the original mix"
-   :rdb<-12?"The split is mostly complete — most of the sound is accounted for"
+   :rdb<-12?"The stems don't sum back cleanly — some signal may bleed between parts"
    :"The stems don't add back up to the mix";
  html+=`<div class="rec ${rcls}"><div class="when">${T.rhy_sep}</div>
    <h3>${sepHead}</h3></div>`;
