@@ -115,6 +115,8 @@ def _core() -> dict:
             "true_peak_db": -0.5,
             "dynamic_range_db": 9,
             "stereo_width": 0.55,
+            "phase_corr": 0.42,   # L/R correlation → the 9th vitals slot "Phase" (real widgets carry it;
+                                  # the gate must scan it too — Fable audit 2026-07-03, INV-47 hygiene)
         },
         "tonal_balance": [
             {"band": "60",   "rel_db": 0.0,   "dev_db": 0.0},
@@ -503,6 +505,18 @@ class NoEmptyVisibleCollapsibleAcrossConfigs(unittest.TestCase):
         bad = self._empty_open_details(self.full, "detailed")
         self.assertEqual(bad, [], f"EMPTY OPEN COLLAPSIBLE in the full-DETAILED widget: {bad}")
 
+    def test_quick_panels_all_registered(self):
+        """INV-46 composed across the MODE axis: every panel rendered in the QUICK config is in
+        USER_SURFACES. The self-closing DOM-scan otherwise ran on the full widget only, so a
+        quick-only panel could ship unregistered + un-gated (Fable audit 2026-07-03)."""
+        ids = _probe(self.quick,
+            "(function(){var p=document.querySelectorAll('details.tc-panel[id]');"
+            "return Array.prototype.map.call(p,function(e){return e.id;});})()")
+        ids = ids if isinstance(ids, list) else []
+        unregistered = [i for i in ids if i not in USER_SURFACES]
+        self.assertEqual(unregistered, [],
+                         f"unregistered panel(s) rendered in the QUICK widget: {unregistered}")
+
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class WholeArtifactCompletenessGate(unittest.TestCase):
@@ -543,8 +557,9 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
     # ── 2. Vitals row ────────────────────────────────────────────────────────
 
     def test_2_vitals_all_slots_populated(self):
-        """Vitals row: BPM, Key, Length, Loudness, True peak, Dynamics, Stereo must
-        all render with non-empty, non-placeholder text. Metre appears when .als is loaded."""
+        """Vitals row: Tempo, Key, Length, Loudness, True peak, Dynamics, Stereo, Phase must
+        all render with non-empty, non-placeholder text. Metre appears when .als is loaded.
+        (Phase = L/R correlation, the 9th slot — real widgets carry phase_corr; gated here too.)"""
         r = _probe(self.full,
             "(function(){"
             "var vits={};"
@@ -552,7 +567,7 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
             "var lbl=e.querySelector('.vlabel');var val=e.querySelector('.vval');"
             "if(lbl&&val)vits[lbl.textContent.trim()]=val.textContent.trim();});"
             "return vits;})()")
-        required = {"Tempo", "Key", "Length", "Loudness", "True peak", "Dynamics", "Stereo", "Metre"}
+        required = {"Tempo", "Key", "Length", "Loudness", "True peak", "Dynamics", "Stereo", "Phase", "Metre"}
         for slot in required:
             self.assertIn(slot, r,
                           f"EMPTY SURFACE: vitals slot '{slot}' absent from full widget; got: {list(r.keys())}")

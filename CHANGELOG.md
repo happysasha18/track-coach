@@ -5,6 +5,14 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.31] — 2026-07-03
+
+### Internal
+- **The completeness check now covers the "Phase" reading (L/R correlation) and the quick-read layout too.**
+  Two small gaps an independent audit found: the top spec-sheet's Phase slot wasn't in the automatic
+  no-empty-surface net, and the panel-registry check ran only on the full render. Both are now covered — no
+  behaviour change, just tighter self-checking.
+
 ## [0.9.30] — 2026-07-03
 
 ### Fixed
