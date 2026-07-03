@@ -450,13 +450,28 @@ class ReferenceReadDetailedOnly(unittest.TestCase):
                          "quick mode must produce no refRead block (quick ⊆ Simple ⊆ Detailed)")
 
 
+def _newest_run_dir(slug: str) -> str:
+    """The newest dated run dir (`YYYY-MM-DD_HHMM`) for a project slug under $HOME, or a
+    non-existent path when the project isn't on this machine. DYNAMIC so the real-data test
+    never goes stale on a re-analysis (Fable audit 2026-07-03: a hardcoded stamp silently
+    disabled this test — the run had been re-analysed to a newer stamp)."""
+    import re as _re
+    base = Path.home() / ".track-coach" / "projects" / slug
+    if base.exists():
+        dated = sorted(d for d in base.iterdir()
+                       if _re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{4}", d.name))
+        if dated:
+            return str(dated[-1])
+    return str(base / "__absent__")  # skipUnless(exists) will skip cleanly
+
+
 class LazySparksNearestDirection(unittest.TestCase):
     """Lazy Sparks must lean toward Venetian Snares — matches what the catalog column shows.
     Skipped when the run dir is not present (CI-safe)."""
 
     # Relocated under $HOME by the §G migration (was in the Lazy_Sparks Ableton folder).
-    LAZY_RUN_DIR = str(Path.home() / ".track-coach" / "projects" /
-                       "Total_Reboot_Lazy_Sparks_edit2026" / "2026-06-20_2100")
+    # Resolved DYNAMICALLY to the newest run so a re-analysis can't silently disable this test.
+    LAZY_RUN_DIR = _newest_run_dir("Total_Reboot_Lazy_Sparks_edit2026")
 
     @unittest.skipUnless(Path(LAZY_RUN_DIR).exists(),
                          "Lazy Sparks run dir not on this machine")

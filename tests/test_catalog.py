@@ -245,6 +245,34 @@ class NewestOnlyPerTrack(unittest.TestCase):
         self.assertEqual(reps["T"]["src_run_dir"], "/new/run")  # newest version's run dir
 
 
+class LeanCellEmptyCopy(unittest.TestCase):
+    """D-INV-22: the 'leans toward' (reference) column empty state is MODE-AWARE and uses the
+    reference column's own domain phrases — a quick-only row reads 'full analysis only'
+    (D-INV-20/22), a full row with no close direction reads 'no close direction yet' (SPEC §D) —
+    and NEVER the siblings column's phrase 'no similar tracks' (Fable audit, 2026-07-03: the
+    shipped `_lean_cell` wrongly emitted 'no similar tracks' for every empty lean, incl. quick)."""
+
+    def test_quick_row_reads_full_analysis_only(self):
+        page = catalog.render_catalog_html(
+            [_e("Q", "h1", "2026-01-01_0900", 1000, mode="quick", title="Q", bpm=120)])
+        self.assertIn("full analysis only", page)          # D-INV-22 quick-cell copy
+        self.assertNotIn("no similar tracks", page)         # never the siblings-column phrase
+
+    def test_full_row_no_lean_reads_no_close_direction(self):
+        page = catalog.render_catalog_html(
+            [_e("F", "h1", "2026-01-01_0900", 1000, mode="full", title="F", bpm=120)])
+        self.assertIn("no close direction yet", page)       # full run, no direction stands apart
+        self.assertNotIn("no similar tracks", page)
+
+    def test_no_similar_tracks_phrase_never_in_lean_column(self):
+        # the phrase belongs to the §F "Similar in library" column's own empty state ("—"),
+        # never the reference/leans column — a whole-catalog guard against the collision.
+        for m in ("quick", "full"):
+            page = catalog.render_catalog_html(
+                [_e("T", "h1", "2026-01-01_0900", 1000, mode=m, title="T")])
+            self.assertNotIn("no similar tracks", page)
+
+
 class LinkPointsAtOriginal(unittest.TestCase):
     """Where a row links to: the ORIGINAL widget in its run dir — its stems sit next to it, so the
     player plays. The deposited library copy is stem-less, so opening THAT leaves a dead player

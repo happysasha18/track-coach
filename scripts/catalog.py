@@ -244,19 +244,24 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
-def _lean_cell(leans, widget_href=None) -> str:
-    """Render the 'leans toward' TD for a row (§D.10.1).
+def _lean_cell(leans, widget_href=None, mode=None) -> str:
+    """Render the 'leans toward' (reference) TD for a row (§D.10.1).
 
     Accepts a list of up to 3 Lean objects (nearest-first, CLOSE/MID only — FAR never
     reaches here, leans_toward_topk already excluded them). Each direction is a coloured
-    clickable link stacked vertically. Empty list → grey 'no close direction yet'.
-    No red for the reference column — owner decision 2026-06-29.
+    clickable link stacked vertically. No red for the reference column — owner decision 2026-06-29.
+
+    Empty state is MODE-AWARE (D-INV-22) and uses THIS column's own phrases, never the siblings
+    column's 'no similar tracks' (Fable audit 2026-07-03):
+      • quick-only row → 'full analysis only' — quick never promised a reference (D-INV-20/22);
+      • full row, no close direction → 'no close direction yet' (SPEC §D, the reference miss).
 
     widget_href: the row's own widget URL (from _open_href). Direction links navigate to
     that widget's #refRead section (D-INV-28: 'direction → open read focused').
     When None, falls back to '#refRead' (in-page no-op but never the dead bare '#')."""
     if not leans:
-        return '<td class="c-sim c-lean"><span class="sim-none">no similar tracks</span></td>'
+        msg = "full analysis only" if mode == "quick" else "no close direction yet"
+        return f'<td class="c-sim c-lean"><span class="sim-none">{msg}</span></td>'
     chips = ""
     for lean in leans:
         col = _SIM_COL.get(lean.level, "#8b94a8")
@@ -371,7 +376,7 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
- {_lean_cell(e.get('_leans') or [], widget_href=href)}
+ {_lean_cell(e.get('_leans') or [], widget_href=href, mode=e.get('mode'))}
  {_siblings_cell(e.get('_siblings') or [], title_map or {{}}, href_map or {{}})}
 </tr>"""
 

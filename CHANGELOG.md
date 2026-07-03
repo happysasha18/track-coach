@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.29] — 2026-07-03
+
+### Fixed
+- **The library's "Leans toward" column no longer shows the wrong words on a quick-analysed track.** A
+  quick-read row was showing *"no similar tracks"* in the reference column — a phrase that belongs to the
+  neighbouring "Similar in library" column, and wrong for a quick read anyway. It now reads **"full analysis
+  only"** on a quick row (a quick read doesn't compute references), and **"no close direction yet"** on a full
+  row that simply has no close reference — each column speaks in its own words. (Found in an independent audit.)
+- **A real-data check that had silently switched itself off is running again.** The Lazy Sparks reference test
+  was pinned to an old analysis folder that no longer exists (the track had been re-analysed), so it quietly
+  skipped. It now finds the newest analysis on its own, so a re-analysis can never disable it again.
+
 ## [0.9.28] — 2026-07-03
 
 ### Changed
