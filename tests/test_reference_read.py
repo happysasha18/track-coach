@@ -202,6 +202,16 @@ class ReferenceReadBars(unittest.TestCase):
         self.assertIn('class="refread-bar"', self.html,
                       "each bar must have a .refread-bar offset element")
 
+    def test_header_uses_domain_language_not_direction_jargon(self):
+        """The #refRead header speaks in producer terms, never the internal 'direction'
+        centroid jargon (domain-language rule, Alexander 2026-07-03; reword s47). Both the
+        populated and empty summaries share ONE name (one surface = one name)."""
+        self.assertIn("You vs your closest match", self.html,
+                      "the #refRead summary must use the domain header")
+        for jargon in ("vs the direction", "Reference direction"):
+            self.assertNotIn(jargon, self.html,
+                             f"internal jargon '{jargon}' leaked into the user-facing panel")
+
     def test_no_raw_numbers_on_surface(self):
         # D-INV-25: no raw distance/score/percentage text. Bar widths are CSS %; direction is in
         # the label. The offset numbers must only appear as CSS style values, not as text content.

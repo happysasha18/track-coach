@@ -2670,7 +2670,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     if not leans:
         return (
             '<details class="tc-panel" id="refRead" open>'
-            '<summary>Reference direction</summary>'
+            '<summary>You vs your closest match</summary>'
             '<p class="refread-hdr" style="color:var(--muted)">No similar tracks</p>'
             '</details>'
         )
@@ -2750,7 +2750,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
 
     refread_div = (
         '<details class="tc-panel" id="refRead" open>'
-        '<summary>How you sit vs the direction</summary>'
+        '<summary>You vs your closest match</summary>'
         + tabs_html
         + ''.join(panels_html)
         + tab_js
@@ -2905,7 +2905,7 @@ body.simple #refRead{display:none!important}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
 #refRead .refread-bars{display:flex;flex-direction:column;gap:7px}
 /* Axis orientation label above the bars — "lower · them · higher". Mirrors the bar geometry:
-   left of center = lower than the direction, right = higher. One row, muted text. */
+   left of center = lower than your closest match, right = higher. One row, muted text. */
 #refRead .refread-axis{display:flex;justify-content:space-between;padding:0 0 4px;
  font-size:10px;color:var(--muted);margin-left:calc(64px + 155px + 16px);margin-right:calc(110px + 8px)}
 /* Row = [cat-chip][label + ★][bar][words]. class stays plain "refread-row" — data-confirmed for tinting */
