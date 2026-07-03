@@ -138,7 +138,7 @@ class LadderIsMonotonic(unittest.TestCase):
         GRID = {  # element:            Q  F-S  F-D
             "modeBadge":               (1, 1, 1),
             "viewToggle/hint":         (1, 1, 1),
-            "vitals/verdict":          (1, 1, 1),
+            "vitals":                  (1, 1, 1),
             "story":                   (1, 1, 1),
             "structureBar":            (1, 1, 1),
             "playerTransport":         (1, 1, 1),

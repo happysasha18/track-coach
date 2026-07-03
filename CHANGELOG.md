@@ -5,6 +5,13 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.27] — 2026-07-03
+
+### Changed
+- **Removed the "In short" summary box at the top of a track.** It repeated what the cards and the read
+  already say and added weight to the calm opening screen, so it's gone. The one-line verdict still shows in
+  the version catalog (the plaque at the bottom that links between versions) — that's untouched.
+
 ## [0.9.26] — 2026-07-03
 
 ### Fixed

@@ -9,7 +9,7 @@ POPULATED in a full-widget render.
 
 This gate renders a SYNTHETIC FULL widget (labelled as such) exercising every panel —
 core, masking, als, stemmap, rhythm, notes, narrative, catalog, back_href, stems_web —
-and asserts 21+ surface-level completeness criteria in headless Chrome.
+and asserts 20+ surface-level completeness criteria in headless Chrome.
 
 FIXTURE: SYNTHETIC — built in this test, not from a real run dir.
 Reason: the most complete real run dir (Wobble Drift, 2026-07-03) has large real .m4a
@@ -812,29 +812,10 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
         self.assertTrue(re.search(r"\d{4}-\d{2}-\d{2}", srcmeta),
                         f"EMPTY SURFACE: no date in #srcmeta; got: {repr(srcmeta)}")
 
-    # ── 11. Verdict "In short" headline ──────────────────────────────────────
-
-    def test_11_verdict_nonempty(self):
-        """#verdict must be visible with non-empty content when a narrative is loaded.
-        The verdict is derived from the first paragraph of the narrative (no --verdict flag
-        in synthetic fixture) via _verdict_text(). It must be non-empty and not just the
-        "In short" label."""
-        r = _probe(self.full,
-            "(function(){"
-            "var e=document.getElementById('verdict');"
-            "if(!e)return {present:false};"
-            "var vis=getComputedStyle(e).display!=='none';"
-            "var text=(e.innerText||e.textContent||'').trim();"
-            "return {present:true,visible:vis,text:text,len:text.length};})()")
-        self.assertTrue(r.get("present"),
-                        "EMPTY SURFACE: #verdict element not found in full widget")
-        self.assertTrue(r.get("visible"),
-                        "EMPTY SURFACE: #verdict is hidden (display:none) in full widget — "
-                        "verdict text was not derived from the narrative")
-        text = r.get("text", "")
-        self.assertGreater(len(text), 10,
-                           f"EMPTY SURFACE: #verdict is too short ({len(text)} chars); "
-                           f"narrative may not be wired; got: {repr(text)}")
+    # ── 11. (removed 2026-07-03, s49) — the #verdict "In short" headline panel was
+    #        removed at Alexander's call (repeated the cards, weight on the calm-first
+    #        screen). The verdict TEXT still lives in the catalog/library listing, which
+    #        is gated elsewhere. No widget panel to assert here anymore. ──────────────
 
     # ── 12. Subtitle + source meta ────────────────────────────────────────────
 

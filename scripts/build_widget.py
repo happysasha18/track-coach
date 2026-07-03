@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.26"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.27"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -177,7 +177,6 @@ STRINGS = {
         "view_full": "Detailed",
         "view_aria": "Detail level",
         "back_to_library": "← Library",
-        "verdict_lead": "In short",
         "src_audio": "Audio",
         "src_project": "Project",
         "src_analyzed": "Analyzed",
@@ -2881,12 +2880,7 @@ h1{font-size:20px;margin:0 0 2px;font-weight:700}
 .seg>button.on,.seg>button.active{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
 /* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
 .viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
-/* verdict — the calm one-glance headline */
-.verdict{background:linear-gradient(180deg,rgba(167,139,250,.10),rgba(167,139,250,.03));
- border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:14px;
- padding:16px 20px;margin-bottom:22px;font-size:15.5px;line-height:1.55;color:var(--ink);max-width:840px}
-.verdict .vlead{display:block;color:var(--wob);font-size:10.5px;font-weight:700;
- text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+/* (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call) */
 /* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, the EVIDENCE
    drawer, and the timecoded recs all stay visible in BOTH views (hiding them just read as "things
    vanished"). The Evidence drawer is ALWAYS shown now (Sasha 2026-06-20, INV-18) — it used to be
@@ -3166,9 +3160,8 @@ __MODENOTE__
      Single authoritative numbers about the finished mix (no time axis). -->
 <div class="vitals" id="vitals"></div>
 
-<!-- VERDICT — the calm headline. First thing in the Simple view: what this track is
-     and the single most important takeaway, in one or two sentences. -->
-<div class="verdict" id="verdict" style="display:none"></div>
+<!-- (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call.
+     The verdict text still feeds the catalog self-row below; only the top panel is gone.) -->
 
 <!-- 1. VISUAL FIRST: Track Story + player/sequencer is the centrepiece & the proof. -->
 <details class="tc-panel" id="storyPanel" open>
@@ -3315,10 +3308,8 @@ const META=D.meta||{};
   bits.push(`${T.src_analyzed||"Analyzed"}: <b>${META.analyzed_at}</b>`+
    (diffDate?`<span style="opacity:.6"> · report built: ${bdate}</span>`:""));}
  el.innerHTML=bits.join('<span style="opacity:.4">·</span>');})();
-// ── Verdict: the calm one-glance headline (Simple view leads with this)
-(function(){const el=document.getElementById("verdict");if(!el)return;const v=(D.verdict||"").trim();
- if(!v){el.style.display="none";return;}
- el.style.display="";el.innerHTML=`<span class="vlead">${T.verdict_lead||"In short"}</span>${v.replace(/&/g,"&amp;").replace(/</g,"&lt;")}`;})();
+// (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call;
+//  D.verdict still feeds the catalog self-row render below.)
 // ── Simple⇄Detailed toggle. PURE presentation: flips a body class that hides/shows
 // already-embedded panels and re-filters the story lanes. No network, no recompute.
 (function(){const tg=document.getElementById("viewToggle");if(!tg)return;
