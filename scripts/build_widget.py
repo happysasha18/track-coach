@@ -2757,7 +2757,7 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
  color:var(--muted);text-decoration:none;font-size:12px;font-weight:600}
 .backlink:hover{color:var(--ink);border-color:var(--wob)}
 .backlink[hidden]{display:none}
-h1{font-size:22px;margin:0 0 2px;font-weight:650}
+h1{font-size:20px;margin:0 0 2px;font-weight:700}
 .sub{color:var(--muted);font-size:13px;margin-bottom:4px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 /* srcmeta — what file was analysed & when. Lives just under the title (and in footer). */
@@ -2882,7 +2882,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 .vitals .vit{display:flex;flex-direction:column;gap:2px;padding:9px 18px;position:relative;flex:1 0 auto}
 .vitals .vit+.vit::before{content:"";position:absolute;left:0;top:18%;height:64%;width:1px;background:var(--line)}
 .vitals .vlabel{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px}
-.vitals .vval{font-size:16px;font-weight:650;color:var(--ink);white-space:nowrap}
+.vitals .vval{font-size:16px;font-weight:600;color:var(--ink);white-space:nowrap}
 .vitals .vval small{font-size:11px;color:var(--muted);font-weight:500;margin-left:3px}
 .vitals .vval.warn{color:var(--warn)}.vitals .vval.bad{color:var(--bad)}.vitals .vval.good{color:var(--good)}
 .vitals .vit[title]{cursor:help}
@@ -2891,7 +2891,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 @media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
 .card .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
-.card .v{font-size:16px;font-weight:650;margin-top:6px}
+.card .v{font-size:16px;font-weight:600;margin-top:6px}
 .card .v.good{color:var(--good)}.card .v.warn{color:var(--warn)}.card .v.bad{color:var(--bad)}
 .card .cs{font-size:11px;color:var(--muted);margin-top:4px}
 .card .ic{color:var(--muted);font-size:10px;opacity:.7}
@@ -2910,7 +2910,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
  border-left:2px solid var(--accent);border-radius:0 6px 6px 0;color:var(--ink-dim);font-size:14px}
 .read #readBody p.readdev .devlab{display:inline-block;margin-right:8px;font-size:10.5px;font-weight:700;
  letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
-.read #readBody strong{color:#fff;font-weight:650}
+.read #readBody strong{color:#fff;font-weight:600}
 .read #readBody em{color:var(--ink);font-style:italic}
 .read #readBody h3{font-size:15.5px;color:var(--bright);margin:30px 0 12px;font-weight:700;
  letter-spacing:.01em;padding-top:16px;border-top:1px solid var(--line)}
@@ -2928,7 +2928,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 details.tc-panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;
  padding:14px 20px 18px;margin-bottom:30px}
 details.tc-panel>summary{cursor:pointer;list-style:none;user-select:none;
- color:var(--ink);font-size:15px;font-weight:620;padding:4px 0 10px}
+ color:var(--ink);font-size:15px;font-weight:600;padding:4px 0 10px}
 details.tc-panel>summary::-webkit-details-marker{display:none}
 details.tc-panel>summary::before{content:"▸ ";color:var(--wob)}
 details.tc-panel[open]>summary::before{content:"▾ "}
@@ -2945,7 +2945,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .readout b{color:var(--ink);font-weight:600}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .mcard{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-lg);padding:12px 14px}
-.mcard .z{font-size:12px;color:var(--muted)}.mcard .pct{font-size:20px;font-weight:650;margin-top:3px}
+.mcard .z{font-size:12px;color:var(--muted)}.mcard .pct{font-size:20px;font-weight:600;margin-top:3px}
 /* Container-relative reflow (s34): the old `1fr 1fr` + `@media(max-width:760px)`
    collapsed to ONE column by VIEWPORT width — on Alexander's ~2/3-screen window
    (or a browser zoom) the viewport fell under 760px and every rec stacked in one
@@ -2959,7 +2959,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(300px,(100% - 18px)/2),1fr));gap:18px}
 .rec{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--wob);border-radius:var(--radius-lg);padding:14px 16px}
 .rec.crit{border-left-color:var(--bad)}.rec.do{border-left-color:var(--good)}.rec.concept{border-left-color:var(--bright)}
-.rec h3{margin:0 0 6px;font-size:13.5px;font-weight:640}
+.rec h3{margin:0 0 6px;font-size:13px;font-weight:600}
 .rec .when{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:20px;margin-bottom:7px;vertical-align:middle}
 .rec .when.tbound{color:var(--bright);background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.3)}
 .rec .when.glob{color:var(--muted);background:transparent;border:1px solid var(--line)}
@@ -2967,7 +2967,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .rec[data-t]:hover{border-color:var(--muted)}
 .rec.flash{border-color:var(--wob);box-shadow:0 0 0 2px rgba(167,139,250,.35);transition:box-shadow .2s}
 .rec[data-t]:hover .when.tbound{background:rgba(255,209,102,.2)}
-.rec p{margin:6px 0 0;font-size:12.8px;color:var(--ink)}.rec p b{color:#fff}
+.rec p{margin:6px 0 0;font-size:13px;color:var(--ink)}.rec p b{color:#fff}
 .rec p.fix{margin-top:9px;padding:7px 10px;background:rgba(70,211,154,.09);border-radius:var(--radius);color:#dfe7d8}
 .rec p.fix b{color:#eafff2}
 .fixlab{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--good);margin-right:6px;text-transform:uppercase}
@@ -2996,7 +2996,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .ctip{position:fixed;z-index:60;pointer-events:none;display:none;background:rgba(12,14,20,.96);
  border:1px solid var(--line);border-radius:var(--radius);padding:7px 11px;font-size:12.5px;color:var(--ink);
  line-height:1.55;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
-.ctip b{font-weight:650}.ctip .tdim{color:var(--muted)}
+.ctip b{font-weight:600}.ctip .tdim{color:var(--muted)}
 .pstems{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .pstem{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .pstem .nm{flex:1;font-size:12.5px;font-weight:600}
@@ -3025,7 +3025,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .catrun{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
  border-radius:var(--radius);margin:7px 0;background:var(--panel2)}
 .catrun.self{border-color:var(--wob);box-shadow:inset 0 0 0 1px rgba(167,139,250,.25)}
-.catrun .cv{font-weight:650;color:var(--ink);white-space:nowrap}
+.catrun .cv{font-weight:600;color:var(--ink);white-space:nowrap}
 .catrun .cd{color:var(--muted);font-size:11.5px;white-space:nowrap}
 .catrun .cmode{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
  border:1px solid var(--line);border-radius:20px;padding:1px 7px}
@@ -3672,7 +3672,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   const tight=d.offgrid_ms!=null?T.rhy_tight.replace("{ms}",d.offgrid_ms):"—";
   const sync=d.syncopation_pct!=null?T.rhy_sync.replace("{p}",d.syncopation_pct):"—";
   return `<div class="mcard"><div class="z" style="font-size:13px;color:var(--ink);font-weight:600">${disp(s)}</div>
-   <div class="pct" style="color:${col};font-size:18px">${T.rhy_rate.replace("{r}",d.onset_rate)}</div>
+   <div class="pct" style="color:${col};font-size:20px">${T.rhy_rate.replace("{r}",d.onset_rate)}</div>
    <div class="z">${tight} · ${sync}</div>${spark(d.onset_density,col)}</div>`;}).join("");
  const sep=R.separation||{};let html="";
  const rdb=sep.reconstruction_error_db;
