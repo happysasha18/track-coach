@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.24"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.25"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -164,7 +164,7 @@ STRINGS = {
         "play_title": "Stem player — hear what you see",
         "play_hint": "Play the separated stems together, in sync with every chart above. Mute/solo each part; click any timeline to jump there. The white line is the playhead.",
         "play_play": "▶ Play", "play_pause": "❚❚ Pause", "play_mute": "mute", "play_solo": "solo",
-        "play_note": "Each lane is one separated part (the analyser splits the track into its parts (drums, bass, and the melodic layers)). A lane can look empty when that instrument isn't really in the track — parts with too little material to read are left out. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
+        "play_note": "Each lane is one separated part — drums, bass, and the melodic layers. A lane can look empty when that instrument isn't really in the track — parts with too little material to read are shown muted at the bottom. Lanes are drawn fine-grained (~0.25 s), so you see detail inside every bar, not one block per 4 seconds. Press play; click any lane to jump there. Legend below.",
         "hover": "hover over the chart…",
         "scale_quiet": "quiet −90 dB",
         "scale_loud": "loud −6 dB",
@@ -918,6 +918,91 @@ def significant_stems(masking):
         return []
     return [st for st in masking.get("stems_analysed", [])
             if (loud_level(stem_broadband_db(masking, st)) or -120) >= STEM_EMPTY_FLOOR_DB]
+
+
+# ── Near-silent stem identification (INV-STEMNAME-NEARSILENT-ID, s46) ──────────────────────────────
+# A near-silent stem carries an IDENTIFIED label — the mapped .als track name when the stemmap has a
+# clear match, else a 5-way frequency-band word derived from the stem's own spectral centroid (or its
+# loudest band when centroid is absent). Always suffixed " (near-silent)". Never bare "near-silent",
+# never the raw Demucs family word. Two near-silent stems in the same widget must have distinct labels.
+
+# 5-way band thresholds for near-silent labels — finer than the 3-way LOW/MID/HIGH in stem_character
+# so two empty stems in different sub-ranges can still have distinct words (e.g. low-mid vs mid).
+_NS_BAND_THRESHOLDS = [
+    (200.0,   "low"),
+    (600.0,   "low-mid"),
+    (2000.0,  "mid"),
+    (5000.0,  "mid-high"),
+    (float("inf"), "high"),
+]
+
+_NS_BAND_KEY_MAP = {
+    "sub": "low", "low": "low", "low_mid": "low-mid",
+    "mid": "mid", "hi_mid": "mid-high", "air": "high",
+}
+
+
+def _ns_band_from_centroid(hz):
+    """Map a spectral centroid (Hz) → 5-way band word for a near-silent label."""
+    for threshold, word in _NS_BAND_THRESHOLDS:
+        if hz < threshold:
+            return word
+    return "high"
+
+
+def _ns_band_from_band_rms(masking, st):
+    """Dominant band word from band_rms_db medians when centroid is absent. Deterministic tiebreak:
+    first BAND_ORDER element wins when all bands are equal (both-silent case)."""
+    bb = (masking.get("band_rms_db") or {}).get(st, {})
+    best_band, best_val = None, -9999.0
+    for b in BAND_ORDER:
+        vals = bb.get(b) or []
+        if vals:
+            m = median(vals)
+            if m > best_val:
+                best_val = m
+                best_band = b
+    return _NS_BAND_KEY_MAP.get(best_band, "mid") if best_band else "mid"
+
+
+def _ns_raw_label(st, masking, stemmap):
+    """Raw base word for a near-silent stem — either the mapped .als track name (stemmap clear match)
+    or a frequency-band word (centroid → 5-way split → fallback to band_rms_db). No qualifier yet."""
+    if stemmap:
+        sm = ((stemmap or {}).get("stems", {}) or {}).get(st, {}) or {}
+        if sm.get("verdict") == "clear":
+            matches = sm.get("track_matches") or []
+            if matches and (matches[0] or {}).get("track"):
+                return matches[0]["track"]
+    cen = (masking.get("spectral_centroid") or {}).get(st)
+    if cen is not None:
+        return _ns_band_from_centroid(float(cen))
+    return _ns_band_from_band_rms(masking, st)
+
+
+def _nearsilent_display_map(omitted_stems, masking, stemmap):
+    """Build {stem: identified_label + ' (near-silent)'} for all near-silent stems, ensuring
+    INV-STEMNAME-NEARSILENT-ID: every label is identified (not bare 'near-silent') AND distinct.
+    Disambiguation: if two stems get the same base word, suffix ' 1', ' 2', … (sorted alphabetically
+    on the stems for determinism). A trailing-number suffix is the SPEC-permitted 'trailing distinguisher'."""
+    raw = {}
+    for st in sorted(omitted_stems):  # sorted for determinism
+        raw[st] = _ns_raw_label(st, masking, stemmap)
+
+    # Group by raw word — find collisions
+    by_word = {}
+    for st, word in raw.items():
+        by_word.setdefault(word, []).append(st)
+
+    result = {}
+    for word, stems in by_word.items():
+        if len(stems) == 1:
+            result[stems[0]] = word + " (near-silent)"
+        else:
+            for idx, st in enumerate(stems, 1):
+                result[st] = f"{word} {idx} (near-silent)"
+
+    return result
 
 
 LEAK_CORR_MIN = 0.2     # min loudness-correlation to call two stems "bleeding" into each other
@@ -2044,19 +2129,24 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     _leak = leakage_caveats(masking, rhythm)   # CR-4; also feeds (g) stem_character (exclude bled bands)
     _character = stem_character(masking, rhythm, _leak, per_stem_notes)  # computed once; reused by recs (G16) + payload
     # INV-STEMNAME-ALL (0.9.22): one display name per stem, resolved ONCE here, threaded into every surface.
-    # Significant stems get their character label; near-silent (omitted) → "near-silent"; missing → "a part".
+    # Significant stems get their character label; near-silent (omitted) → IDENTIFIED label (INV-STEMNAME-NEARSILENT-ID,
+    # s46): mapped .als track name OR frequency-band word + " (near-silent)". Never bare "near-silent".
+    # Never raw Demucs family word. Distinct labels enforced. Missing stems → "a part".
     _analysed_for_display = masking.get("stems_analysed", []) if masking else []
     _omitted_for_display = set(
         st for st in _analysed_for_display
         if st not in significant_stems(masking)
     ) if masking else set()
+    # Compute identified near-silent labels once, with distinctness guarantee.
+    _nearsilent_labels = (_nearsilent_display_map(_omitted_for_display, masking, stemmap)
+                          if _omitted_for_display else {})
     _display = {
         st: ((_character.get(st, {}) or {}).get("label") or
-             ("near-silent" if st in _omitted_for_display else "a part"))
+             (_nearsilent_labels.get(st) or "a part"))
         for st in _analysed_for_display
     }
     _fam_display = {
-        "other": "the rest", "kick": "kick", "bass": "bass", "drums": "drums",
+        "other": "everything else", "kick": "kick", "bass": "bass", "drums": "drums",
         "hats": "hats", "chord": "chords", "lead": "lead", "perc": "perc",
     }
     # Post-process arc structure bar lead labels: the no-.als path sets seg["lead"] to the raw stem name
@@ -2141,7 +2231,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "rhythm": rhythm,
         "leakage_caveats": _leak,                             # CR-4: bands that are likely a louder neighbour's bleed
         "stem_character": _character,  # (g)/G13: deterministic character label per significant stem (computed above)
-        "stem_display": _display,    # INV-STEMNAME-ALL: one display name per stem (significant→label, near-silent→"near-silent", else→"a part")
+        "stem_display": _display,    # INV-STEMNAME-ALL: one display name per stem (significant→label, near-silent→identified label + "(near-silent)", else→"a part")
         "fam_display": _fam_display, # INV-STEMNAME-ALL: producer label per family key (used in mapPanel family bars)
         "stem_repetition": _repetition,  # CR-6: per-significant-stem repetition (computed once above, reused by the (e) rec)
         "notes": notes,
@@ -2596,11 +2686,22 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         if not rows_html:
             continue                                        # no shared measured axes — skip this direction
         hidden = ' style="display:none"' if i > 0 else ""
+        # Axis orientation label: "lower · them · higher" sits above the bars so the reader knows
+        # which side of the center line means "I'm lower than the direction" vs "higher". Matches the
+        # visual: bars grow right (above the direction) or left (below). One label, above all rows.
+        axis_lbl = (
+            '<div class="refread-axis">'
+            '<span>lower</span>'
+            '<span>· them ·</span>'
+            '<span>higher</span>'
+            '</div>'
+        )
         panels_html.append(
             f'<div class="refpanel" data-didx="{i}"{hidden}>'
             f'<p class="refread-hdr">Leans toward'
             f' <strong style="color:var(--wob)">{_esc(lean.direction)}</strong></p>'
             f'<p class="refread-summary">{_esc(summary)}</p>'
+            f'{axis_lbl}'
             f'<div class="refread-bars">{rows_html}</div>'
             f'</div>'
         )
@@ -2803,6 +2904,10 @@ body.simple #refRead{display:none!important}
 #refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
 #refRead .refread-bars{display:flex;flex-direction:column;gap:7px}
+/* Axis orientation label above the bars — "lower · them · higher". Mirrors the bar geometry:
+   left of center = lower than the direction, right = higher. One row, muted text. */
+#refRead .refread-axis{display:flex;justify-content:space-between;padding:0 0 4px;
+ font-size:10px;color:var(--muted);margin-left:calc(64px + 155px + 16px);margin-right:calc(110px + 8px)}
 /* Row = [cat-chip][label + ★][bar][words]. class stays plain "refread-row" — data-confirmed for tinting */
 #refRead .refread-row{display:flex;align-items:center;gap:8px;border-radius:4px;padding:1px 2px}
 #refRead .refread-row[data-confirmed]{background:rgba(255,177,63,.05)}
@@ -3301,14 +3406,15 @@ document.getElementById("recLegend").innerHTML=
    `<b style="color:rgb(255,78,80)">bass</b> / <b style="color:rgb(76,214,140)">mids</b> / <b style="color:rgb(80,168,255)">highs</b>, bottom→top. `+
    `Taller band = more energy there; several tall at once = they hit together.</span>`+
   `<span class="chip"><b>≈&nbsp;name</b>&nbsp;= which project track this stem sounds like (only when we're confident)</span>`;
- // SPEC CR-2 (docs/SPEC.md §1): near-silent stems are dropped from the per-stem viz. Show a count
- // sentence so the missing lanes read as a decision, not a bug. Names are omitted to avoid listing
- // "near-silent, near-silent" (a status word is not a name).
+ // SPEC CR-2 (docs/SPEC.md §1) + INV-STEMNAME-NEARSILENT-ID (s46): near-silent stems are dropped from
+ // the per-stem VIZ (rhythm, notes, masking cards) but appear as muted lanes. The legend note names
+ // them by their identified label so "vocals, piano → near-silent 1, near-silent 2" is never shown.
  const OM=(D.stem&&D.stem.omitted)||[];
- if(OM.length){const cnt=OM.length;
+ if(OM.length){
+  const names=OM.map(s=>disp(s)).join(", ");
   el.insertAdjacentHTML("beforeend",
    `<span class="chip" id="omittedNote"><span class="sw" style="background:#a78bfa;opacity:.55"></span>`+
-   `${cnt} part${cnt>1?"s":""} were too quiet to read and are left out</span>`);}
+   `stems ${names} omitted — too little material to read</span>`);}
 })();
 // canvases inside the collapsed <details> have 0 width until it opens — re-run every
 // resize() handler on first open so the arrangement / notes charts draw at full width.
@@ -3755,8 +3861,14 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  if(!PL||!PL.srcs||!PL.srcs.length){if(P)P.style.display="none";return;}
  const isMix=PL.kind==="mix";   // quick run: ONE mix source, transport only — no per-stem lane grid
  const wrap=document.getElementById("playAudios");
+ // Near-silent stems start MUTED (CR-2: they carry no real content — the listener should not be
+ // surprised by silence on play, and they should be able to unmute/solo them deliberately).
+ const _nsOmit=new Set((D.stem&&D.stem.omitted)||[]);
  const auds=PL.srcs.map(s=>{const a=new Audio();a.src=s.src;a.preload="auto";wrap.appendChild(a);
-  return {name:s.name,a:a,mute:false,solo:false};});
+  const startMuted=_nsOmit.has(s.name);if(startMuted)a.muted=true;
+  return {name:s.name,a:a,mute:startMuted,solo:false};});
+ // Expose state for test_nearsilent_stems_appear_as_muted_lanes (INV-44)
+ window.__ns_state=auds.map(s=>({name:s.name,mute:s.mute}));
  /* PLAYER_LOGIC_START — pure DOM-free player state machine (SPEC §B.14); node-executed by test_player_logic */
  const pgains=stems=>{const anySolo=stems.some(s=>s.solo);return stems.map(s=>anySolo?!s.solo:s.mute);};   // → muted[] per stem
  const toggleStem=(stems,i,kind)=>{const s=stems.map(x=>({mute:x.mute,solo:x.solo}));  // one mode at a time, across the whole player
@@ -3791,7 +3903,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
                chord:"#46d39a",lead:"#ffd166",other:"#8b94a8"};
  const SM=D.stem,MAP=D.stemmap&&D.stemmap.stems;
  function bridge(name){const sm=MAP&&MAP[name];if(!sm)return{txt:"",col:null};
-  if(sm.verdict==="empty")return{txt:"near-silent",col:null};   // Demucs put little here
+  // Empty verdict: the main label already carries the identified "(near-silent)" word via disp() —
+  // returning "near-silent" here would duplicate it in the sub-line (Sasha s14 double-label bug class).
+  if(sm.verdict==="empty")return{txt:"",col:null};
   // Sasha s14: the tiny sub-line shows the REAL PROJECT TRACK when the map is confident (e.g. "Guitar"),
   // never the raw Demucs name/family ("guitar · → other" was a salad of two Demucs words). Only when the
   // verdict is genuinely `clear` — otherwise nothing, no guessing.
@@ -3844,10 +3958,13 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // the drums lane is special: kick/snare/hat hit-density (Part D), not one curve
  const DR=(D.drums&&D.drums.density&&D.drums.bins)?D.drums:null;
  const DRCOL={kick:"#ff5d73",snare:"#ffd166",hat:"#5ad1c2"},DRK=["kick","snare","hat"];
- // Filter omitted (near-silent) stems from the lane grid — they have no real content to show
- // and their M/S buttons would be meaningless. The audio elements still exist in `auds` (silent).
+ // INV-STEMNAME-NEARSILENT-ID (s46) + CR-2: near-silent stems ARE shown as muted, labelled rows at
+ // the bottom of the lane grid (they were there in 0.8.1, hidden in s45 — regression now fixed).
+ // Their M/S buttons work; they start MUTED so the listener isn't surprised by silence on play.
+ // They carry no real content (env/bands are null → flat faint line), honest per CR-2.
+ // Their main label uses disp() (D.stem_display) — the identified label e.g. "mid (near-silent)".
  const OM_LN=new Set((D.stem&&D.stem.omitted)||[]);
- const lanes=auds.filter(s=>!OM_LN.has(s.name)).map(s=>{const br=bridge(s.name),isdrum=(s.name==="drums"&&!!DR);
+ const lanes=auds.map(s=>{const br=bridge(s.name),isdrum=(s.name==="drums"&&!!DR);
   return{s:s,name:s.name,br:br,col:br.col||"#a78bfa",drum:isdrum,
          env:isdrum?null:volEnv(s.name),fc:isdrum?null:freqColors(s.name),bands:isdrum?null:bandFracs(s.name)};});
  const lcv=document.getElementById("stemlanes"),lx=lcv.getContext("2d");
@@ -3895,13 +4012,13 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lanes.forEach(L=>{const active=anySolo?L.s.solo:!L.s.mute;
    lx.fillStyle="rgba(255,255,255,.02)";lx.fillRect(PADL,L.y,LW-PADL-PADR,L.h);
    box(3,L.y+3,L.s.mute,"#ff6b6b","M");box(3,L.y+L.h-15,L.s.solo,"#46d39a","S");
-   // (g) lane label: ONE plain label per stem (Sasha s14, docs/SPEC.md §B.7). The measured CHARACTER
-   // ("bass", "lead", "mid") is the prominent name — NOT the raw Demucs label (wrong for electronic
-   // music, [[track-coach-stem-labels]]) and NOT a "≈ uncertain" marker (dropped: if we're not sure we
-   // just show the base role). The raw stem name still shows tiny below (with the project match when
-   // clear) so you always know which file/stem it is (G8). No character ⇒ near-silent, never the raw name.
-   const CH=D.stem_character&&D.stem_character[L.name];
-   const mainLbl=CH?CH.label:"near-silent";
+   // (g) lane label: ONE plain label per stem (Sasha s14, docs/SPEC.md §B.7). Always through disp()
+   // (D.stem_display) — the ONE resolved name. For a significant stem this is the character label
+   // ("bass", "lead", "mid"); for a near-silent stem it is the identified label ("mid (near-silent)")
+   // — NEVER the bare "near-silent" (that erased which stem it was, the s45 regression, Alexander).
+   // NEVER the raw Demucs family word. The raw stem name still shows tiny below when the stemmap is
+   // clear (G8 — so you know which file it is). Sub-line is suppressed when it would repeat the main label.
+   const mainLbl=disp(L.name);
    lx.globalAlpha=active?1:.45;lx.fillStyle=active?getCss("--ink"):getCss("--muted");
    lx.font="600 9.5px sans-serif";lx.textAlign="left";if(!L.drum)lx.fillText(trunc(mainLbl),19,L.y+L.h/2+3);lx.globalAlpha=1;
    if(L.drum){drawDrum(L,active);}
@@ -3911,8 +4028,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
     const base=L.y+L.h-2;lx.globalAlpha=active?.55:.28;lx.strokeStyle=L.col||"#a78bfa";lx.lineWidth=1.5;
     lx.beginPath();lx.moveTo(PADL,base);lx.lineTo(LW-PADR,base);lx.stroke();lx.globalAlpha=1;}
    // tiny sub-line: ONLY the real project track (map clear) — NEVER the raw Demucs name (Sasha s14:
-   // "guitar · → other" was salad). Skip it when it would just repeat the big label (an empty stem
-   // already reads "near-silent" — don't print it twice, Sasha s14 "не критичный" double-label).
+   // "guitar · → other" was salad). Skip when it would repeat the main label to avoid a double-label.
    if(!L.drum&&L.br.txt&&L.br.txt!==mainLbl){lx.globalAlpha=active?.7:.35;
     lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(L.br.txt,PADL+4,L.y+9);lx.globalAlpha=1;}});
   drawLocators(lx,lxOf,LPT,LH-LPB,null);

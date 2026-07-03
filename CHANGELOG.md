@@ -5,6 +5,22 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.25] — 2026-07-03
+
+### Fixed
+- **Quiet stems are visible again — and now say which part they are.** A near-silent part is shown as a muted,
+  labelled row in the player (not hidden), and named in the omitted note — by its real project-track name when
+  the arrangement is loaded, otherwise by its frequency range (e.g. "mid (near-silent)", "low-mid
+  (near-silent)"). Two quiet parts can never collapse into an anonymous "near-silent, near-silent" again, and
+  the raw splitter word is never shown. (Reverses the 0.9.24 tail, which had hidden them entirely.)
+
+### Changed
+- **Wording:** the synth/keys family reads "everything else" everywhere (was "the rest" in one panel); the
+  player intro no longer nests parentheses; the similar-tracks bars carry "lower · them · higher" so the
+  left–right meaning is obvious.
+- **Typography:** folded to the two real weights (600 / 700); the track title sits on the shared scale (20px,
+  matching the catalog); a few off-scale sizes rounded.
+
 ## [0.9.24] — 2026-07-03
 
 ### Fixed

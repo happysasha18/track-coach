@@ -76,10 +76,14 @@ finding. "Don't cry wolf, and don't paint silence."
 
 **What that forces (each first found by deed on a real track — Lazy_Sparks):**
 
-- **CR-2 — empty stems are omitted, not parsed.** A stem whose broadband level is below the floor is
-  dropped from analysis: no notes / rhythm / masking / per-stem viz are computed for it (saves compute),
-  and the widget shows "stems X, Y omitted — too little material to read." Evidence: Lazy_Sparks vocals
-  −92 dB (peak −61), piano −88 dB (peak −42) — silent, yet currently shown. ⟨DECIDE⟩ floor value →
+- **CR-2 — empty stems are not PARSED, but stay VISIBLE and IDENTIFIED.** A stem below the floor is dropped
+  from *analysis* — no notes / rhythm / masking / per-stem viz (nothing honest to read in silence), and it is
+  never placed in the rhythm tiles (no pulse in silence). But it is NOT erased: it stays as a **muted, labelled
+  row in the player lanes** and is **named in the omitted note** (`"stems Bass Sub, low-mid omitted — too
+  little material to read"`), each via its identifying near-silent label (`INV-STEMNAME-NEARSILENT-ID`), never a
+  bare count and never an anonymous "near-silent, near-silent" (that was the s45 regression — the fix that
+  excluded them from the lanes/tiles erased which stem they were; Alexander wants them SEEN, identified).
+  Evidence: Lazy_Sparks vocals −92 dB (peak −61), piano −88 dB (peak −42). ⟨DECIDE⟩ floor value →
   **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)** — reused the existing empty-caveat floor, no
   dedicated peak floor.
 
@@ -364,7 +368,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
   lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
   (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
-  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) `"near-silent"` when the stem is **measured and found empty** (asserts measured silence, not unknown); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from "near-silent", per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
+  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression, Alexander), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (Alexander's standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (s46, Alexander): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
   - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
     6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
     (`play_note`, `map_hint`, `note_hint`, `note_hint_other`) AND prose from `map_stems.py`
@@ -752,8 +756,18 @@ already sits relative to it and where it goes its own way, and let that gently r
 already get — "more in the style of X". Not a copy: a direction. This section is written to be read by a
 human first; the short `tags` at the ends of rule lines are handles for the test matrix and the prover.
 
-> This is a 0.9 DESIGN, proven by `product-prover` but not yet built. Everything marked ⟨DECIDE⟩ is an open
-> call. Edit history lives in `JOURNAL.md`, not here.
+> ⛔ **DEFERRED / FUTURE — not in 1.0 (Alexander, 2026-07-03).** The whole "aim / reaches-toward / «leans
+> toward»" mechanism is CUT: the aim-setting UI was excised in 0.9.15 (a persisted aim auto-swapped and read
+> as broken) and Alexander confirmed it stays out. What ships in 1.0 is ONLY plain **similarity to nearest
+> tracks** in your own library — no aim, no re-flavouring, no map (the 2D map was killed: distance in ~50-D
+> fakes similarity). The one surviving seed for LATER is a stand-alone **"compare these two specific tracks,
+> say where they diverge"** pass — a concrete reference track, no cloud, no aim; it must go through the full
+> cycle (spec → prove → matrix → test → audit) before any code, and is not scheduled. **Reference-album
+> normalisation, when that future feature is built: normalise over YOUR library only** — importing someone
+> else's album must never shift which of your own tracks read as nearest (Alexander, 2026-07-03).
+>
+> Below is the retained 0.9 DESIGN (proven by `product-prover`, never built) kept for that future pass; it is
+> NOT a 1.0 promise. Everything marked ⟨DECIDE⟩ is an open call. Edit history lives in `JOURNAL.md`.
 
 ### D.0 What this is for
 

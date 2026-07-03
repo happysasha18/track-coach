@@ -385,7 +385,12 @@ def _build_omitted_widget():
     (vocals/piano ≈ −90 dB, below STEM_EMPTY_FLOOR_DB). The player still ships all six;
     the per-stem viz keeps the 4 loud ones. SPEC CR-2 (docs/SPEC.md:75) requires the
     widget to NAME the omitted two ("stems X, Y omitted — too little material to read")
-    — the regression this fixture guards is that they vanish with no acknowledgment."""
+    — the regression this fixture guards is that they vanish with no acknowledgment.
+    Spectral centroids are distinct for the two silent stems so they get different band words
+    (INV-STEMNAME-NEARSILENT-ID): piano=600 Hz → 'mid (near-silent)', vocals=1200 Hz → 'mid (near-silent)'
+    ... wait: both centroid ≥600 and < 2000 → both 'mid'. But they're sorted: piano < vocals, so
+    piano → 'mid 1 (near-silent)', vocals → 'mid 2 (near-silent)'.  Deliberately uses one with
+    centroid <600 Hz and one ≥600 Hz: piano=400 Hz → 'low-mid', vocals=1200 Hz → 'mid' (distinct)."""
     tmp = Path(tempfile.mkdtemp(prefix="tc_omit_"))
     sdir = tmp / "stems_web"
     sdir.mkdir()
@@ -399,6 +404,9 @@ def _build_omitted_widget():
         "stems_analysed": ["drums", "bass", "other", "guitar", "vocals", "piano"],
         "band_rms_db": {"drums": loud, "bass": loud, "other": loud, "guitar": loud,
                         "vocals": silent, "piano": silent},
+        # Distinct centroids for the silent stems: piano=400 Hz → "low-mid", vocals=1200 Hz → "mid"
+        "spectral_centroid": {"drums": 250.0, "bass": 120.0, "other": 800.0,
+                              "guitar": 1000.0, "piano": 400.0, "vocals": 1200.0},
         "total_windows": W, "duration_s": 120.0,
         "time_bins": [round(i * 120.0 / W, 3) for i in range(W)],
         "masking_summary": {},
@@ -775,7 +783,7 @@ class NoRawStemNameOnAnySurface(unittest.TestCase):
                          "basic-pitch tool name must not appear in rendered text")
 
     def test_no_raw_stem_in_omitted_note(self):
-        """Omitted stems (vocals, piano) must not show raw names; note shows a count sentence."""
+        """Omitted stems (vocals, piano) must not show raw names; note names them identified."""
         text = hc.probe(
             self.widget,
             "(function(){"
@@ -788,10 +796,13 @@ class NoRawStemNameOnAnySurface(unittest.TestCase):
                          "raw 'vocals' must not appear in the omitted note")
         self.assertNotIn("piano", text,
                          "raw 'piano' must not appear in the omitted note")
-        # Part 1, item 3 (s45): the note now shows a count sentence, not per-stem "near-silent" labels.
-        # "2 parts were too quiet to read and are left out" — check for the count-sentence words.
-        self.assertTrue("too quiet" in text or "left out" in text,
-                        "omitted note must say the parts were too quiet / left out; got: " + repr(text))
+        # s46: the note now names stems by identified label (INV-STEMNAME-NEARSILENT-ID):
+        # "stems low 1 (near-silent), low 2 (near-silent) omitted — too little material to read"
+        # Check that: (a) "(near-silent)" appears (identified labels), (b) reason is given.
+        self.assertIn("(near-silent)", text,
+                      "omitted note must show identified near-silent labels; got: " + repr(text))
+        self.assertTrue("omitted" in text or "too little" in text or "material" in text,
+                        "omitted note must explain WHY they are absent; got: " + repr(text))
 
     def test_no_raw_stem_as_rhythm_tile_heading(self):
         """Rhythm panel tile headings must use display names, not raw 'other'."""
@@ -842,6 +853,163 @@ class NoRawStemNameOnAnySurface(unittest.TestCase):
         )
         self.assertNotIn("vocals", text,
                          "raw 'vocals' must not appear in the notes panel title")
+
+    def test_everything_else_not_the_rest_in_fam_display(self):
+        """fam_display['other'] must read 'everything else', not 'the rest' in the stem↔project panel."""
+        # INV-44 wording: the family bars in #mapPanel must use producer language.
+        # (Other uses of "the rest" — recs_hint, tonal resonance card — are fine prose.)
+        text = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var mp=document.getElementById('mapPanel');"
+            "return mp?mp.innerText:'';})()",
+            width=1100, height=3400,
+        )
+        self.assertNotIn("the rest", text,
+                         "'the rest' (dev label) must not appear in #mapPanel; got: " + repr(text[:300]))
+        self.assertIn("everything else", text,
+                      "'everything else' must appear in #mapPanel for the fam_display 'other' family; got: " + repr(text[:300]))
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class NearSilentStemIdentified(unittest.TestCase):
+    """INV-STEMNAME-NEARSILENT-ID (s46): near-silent stems carry an IDENTIFIED label
+    (frequency-band word + '(near-silent)'), never the bare word 'near-silent'.
+    CR-2 visibility: they appear as MUTED, LABELLED rows in the player lanes.
+    No rhythm-tile entry for near-silent stems.
+    These tests render a full widget with two near-silent stems."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.widget = _build_omitted_widget()
+
+    def test_stem_display_has_identified_nearsilent_labels(self):
+        """stem_display for omitted stems must carry '(near-silent)' qualifier, not bare 'near-silent'."""
+        res = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var disp=D.stem_display||{};"
+            "var om=(D.stem&&D.stem.omitted)||[];"
+            "return om.map(function(s){return {stem:s,label:disp[s]||null};});})()",
+            width=1100, height=3200,
+        )
+        self.assertTrue(len(res) >= 2,
+                        "fixture must have at least 2 omitted stems; got: " + repr(res))
+        for entry in res:
+            lbl = (entry.get("label") or "").lower()
+            self.assertIn("(near-silent)", lbl,
+                          f"stem '{entry['stem']}' label must contain '(near-silent)'; got: {repr(lbl)}")
+            self.assertNotEqual(lbl, "near-silent",
+                                f"bare 'near-silent' must not be the label for '{entry['stem']}'")
+
+    def test_nearsilent_labels_are_distinct(self):
+        """No two near-silent stems in the same widget may have the same display label."""
+        res = hc.probe(
+            self.widget,
+            "(function(){"
+            "var disp=D.stem_display||{};"
+            "var om=(D.stem&&D.stem.omitted)||[];"
+            "return om.map(function(s){return disp[s]||'';});})()",
+            width=1100, height=3200,
+        )
+        self.assertEqual(len(res), len(set(res)),
+                         "near-silent labels must be distinct; got: " + repr(res))
+
+    def test_nearsilent_stems_appear_as_muted_lanes(self):
+        """Near-silent stems must be VISIBLE (not filtered out) in the player lane grid, rendered muted.
+
+        Checks canvas height: with 6 stems (4 significant + 2 near-silent, laneH=30px, gap=5px)
+        the #stemlanes canvas is taller than with 4 significant stems only. Minimum with 6 stems
+        and LPT=4, LPB=18: 4 + 6*35 - 5 + 18 = 227 px. With 4 only: 4 + 4*35 - 5 + 18 = 157 px.
+        Also checks via window.__ns_state that near-silent stems start muted (exposed by the code)."""
+        res = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var om=(D.stem&&D.stem.omitted)||[];"
+            "var lcv=document.getElementById('stemlanes');"
+            "var lh=lcv?lcv.offsetHeight:0;"
+            # window.__ns_state exposed by build_widget.py after the fix: {name, mute} per stem
+            "var ns=window.__ns_state||null;"
+            "return {canvas_h:lh,omitted:om,ns_state:ns};})()",
+            width=1100, height=3200,
+        )
+        self.assertGreater(res.get("canvas_h", 0), 200,
+                           "#stemlanes canvas must be tall enough for 6 lanes (≥200 px with near-silent visible); "
+                           f"got {res.get('canvas_h')} — near-silent stems may still be filtered out")
+        ns_state = res.get("ns_state")
+        if ns_state:  # exposed by the fixed code; absent in old code (test passes canvas check instead)
+            om = set(res.get("omitted", []))
+            for entry in ns_state:
+                if entry["name"] in om:
+                    self.assertTrue(entry.get("mute"),
+                                    f"near-silent stem '{entry['name']}' must start muted; ns_state={ns_state}")
+
+    def test_nearsilent_stems_not_in_rhythm_tiles(self):
+        """Near-silent stems must NOT appear in rhythm tiles (no pulse in silence)."""
+        res = hc.probe(
+            self.widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var om=(D.stem&&D.stem.omitted)||[];"
+            "var rhy=document.querySelectorAll('.rhy-tile .z');"
+            "var rhyNames=Array.prototype.map.call(rhy,function(e){return e.textContent.toLowerCase();});"
+            "var disp=D.stem_display||{};"
+            "var omDisp=om.map(function(s){return (disp[s]||'').toLowerCase()});"
+            "return {rhy_names:rhyNames,omitted_labels:omDisp};})()",
+            width=1100, height=3400,
+        )
+        rhy_names = set(res.get("rhy_names", []))
+        for lbl in res.get("omitted_labels", []):
+            if lbl:
+                self.assertNotIn(lbl, rhy_names,
+                                 f"near-silent stem label '{lbl}' must not appear in rhythm tiles")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class WordingInvariants(unittest.TestCase):
+    """INV-44 wording: play_note no nested parens; reference bars carry 'lower · them · higher'."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stem_widget = _build_rich_widget(with_stems=True)  # needs audio for the player to render
+        cls.ref_widget = _build_ref_widget()
+
+    def test_play_note_no_nested_parens(self):
+        """play_note intro must not have nested parentheses: '))'  signals a closing double-close."""
+        text = hc.probe(
+            self.stem_widget,
+            "(function(){"
+            "var e=document.getElementById('playNote');"
+            "return e?e.textContent:'';})()",
+            width=1100, height=2400,
+        )
+        self.assertTrue(len(text) > 10,
+                        "play_note must render with a stem widget (fixture check); got: " + repr(text))
+        self.assertNotIn("))", text,
+                         "play_note must not have nested parentheses — '))'  found; got: " + repr(text[:300]))
+
+    def test_reference_bars_have_axis_labels(self):
+        """Reference bars must carry a '.refread-axis' element with 'lower' and 'higher'."""
+        res = hc.probe(
+            self.ref_widget,
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var el=document.querySelector('.refread-axis');"
+            "return el?el.textContent:null;})()",
+            width=1100, height=3600,
+        )
+        self.assertIsNotNone(res,
+                             "reference bars must have a .refread-axis element (axis orientation label)")
+        self.assertIn("lower", (res or "").lower(),
+                      "refread-axis must contain 'lower'; got: " + repr(res))
+        self.assertIn("higher", (res or "").lower(),
+                      "refread-axis must contain 'higher'; got: " + repr(res))
 
 
 if __name__ == "__main__":
