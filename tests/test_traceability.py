@@ -61,6 +61,13 @@ TESTS_DIR = ROOT / "tests"
 # would satisfy the lookbehind and block the match for those forms).
 INV_TOKEN_RE = re.compile(r"(?<![-A-Za-z])(?:D-)?INV-\d+")
 
+# The EXTENDED namespaces the first regex deliberately excludes. Widening the
+# matrix-coverage guardrail to these (s50e, Fable audit) means a NEW §G storage,
+# §H command, §I design-token, §F own-library, or §E completeness invariant added
+# to SPEC.md without any matrix mention is caught RED — previously they were
+# entirely unchecked. Existing gaps are baselined (allowlist) not fabricated.
+EXT_INV_TOKEN_RE = re.compile(r"\b(?:G-INV|H-INV|DS-INV|F-INV|RC-INV)-\d+")
+
 # Matches owning-test citations that name a real test file.
 # Only backtick-quoted content that STARTS with `test_` is captured;
 # abbreviated `…::ClassName` forms are silently ignored.
@@ -224,6 +231,51 @@ class TraceabilityChecks(unittest.TestCase):
                 f"TEST_MATRIX.md (not in known-gap baseline):\n"
                 + "\n".join(f"  {inv_id}" for inv_id in new_gaps)
             )
+
+    # Baseline of EXISTING §G/§H/§I invariants that have no matrix mention yet
+    # (Fable audit 2026-07-03 / s50e). These are ACKNOWLEDGED debt, not fabricated
+    # coverage — each should earn a real matrix row citing its owning test as §G
+    # (storage/relocation), §H (command surface) and §I (design tokens) get their
+    # matrix projection filled in. The widened guardrail below catches any NEW gap
+    # in these namespaces; removing an id from this set (by adding its row) is the
+    # way to pay the debt down.
+    KNOWN_EXT_MATRIX_GAPS_2026_07_03: set[str] = {
+        "DS-INV-4", "DS-INV-9",
+        "G-INV-4", "G-INV-5", "G-INV-6", "G-INV-9", "G-INV-13", "G-INV-17",
+        "H-INV-7", "H-INV-11", "H-INV-12",
+    }
+
+    def test_every_extended_namespace_invariant_has_a_matrix_row(self):
+        """Widened matrix-coverage guardrail (s50e): every G-INV / H-INV / DS-INV /
+        F-INV / RC-INV token in SPEC.md must appear somewhere in TEST_MATRIX.md.
+
+        These namespaces were previously unchecked (INV_TOKEN_RE excludes them), so a
+        §G/§H/§I/§F/§E invariant could ship with zero matrix projection and nothing
+        caught it. Existing gaps are baselined in KNOWN_EXT_MATRIX_GAPS_2026_07_03;
+        any NEW gap fails. Pay the debt down by adding a real row (with a test
+        citation) and deleting the id from the baseline.
+        """
+        spec_text = _read(SPEC)
+        matrix_text = _read(MATRIX)
+
+        spec_ids = sorted(set(EXT_INV_TOKEN_RE.findall(spec_text)))
+        missing = [i for i in spec_ids if i not in matrix_text]
+        new_gaps = [i for i in missing
+                    if i not in self.KNOWN_EXT_MATRIX_GAPS_2026_07_03]
+
+        # If a baselined gap got a matrix row, the baseline is stale — make the
+        # author prune it so the debt list stays honest.
+        stale_baseline = sorted(self.KNOWN_EXT_MATRIX_GAPS_2026_07_03
+                                - set(missing))
+
+        self.assertEqual(new_gaps, [],
+            "SPEC.md references extended-namespace invariant ID(s) absent from "
+            "TEST_MATRIX.md (not in the known-gap baseline):\n"
+            + "\n".join(f"  {i}" for i in new_gaps))
+        self.assertEqual(stale_baseline, [],
+            "These ids are in KNOWN_EXT_MATRIX_GAPS_2026_07_03 but NOW appear in the "
+            "matrix — remove them from the baseline (debt paid):\n"
+            + "\n".join(f"  {i}" for i in stale_baseline))
 
     # ------------------------------------------------------------------
     # Check 4 — no stale ⟨DECIDE marker
