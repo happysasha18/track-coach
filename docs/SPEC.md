@@ -632,7 +632,7 @@ observation:
   authored, and `SKILL.md` carries the writing rule so every read includes it.
 - **Standalone (2026-06-23, by deed on Wobble — a Demucs run with NO authored narrative):** the line renders
   even when there's no authored read, so a developing track without a written read still gets this one real
-  observation. The read panel hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
+  observation. The producer's read hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
   (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
 
 ### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Alexander)
@@ -747,7 +747,7 @@ brand-new user still meets the calm screen first.*
   at each rung — `quick ⊆ Simple ⊆ Detailed` (INV-18/22) is untouched, and entering Simple still resets the
   per-stem mix (§B.14) so no soloed part strands. Remembering Detailed never makes a Simple-hidden surface
   visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-41`
-- **Why it matters for the reference read.** The reference read + web plaque live in Detailed (depth, §D.10.3),
+- **Why it matters for the reference read.** The reference read + web panel live in Detailed (depth, §D.10.3),
   and Simple hides `#refRead`. With the old always-calm open they were invisible unless you switched every
   time — the reason a producer couldn't find them. Remembering Detailed is what makes them reliably present.
   `tags: INV-41 · D-INV-30`
@@ -807,9 +807,9 @@ Every term used below, defined once.
   computation (§D.10). It is read in full dimensions — there is **no** lossy projection of it.
 - **the «leans toward» line** — the compact surface (a catalog column + a Detailed plaque chip) naming the
   reference direction this track's fingerprint sits nearest to; in Detailed it expands to an **up-to-three
-  nearest-first selector** (§D.10.1) and a per-direction **web-style plaque** (§D.10.2). See §D.10. (There is
+  nearest-first selector** (§D.10.1) and a per-direction **web panel** (§D.10.2). See §D.10. (There is
   **no** 2-D/3-D constellation map — dropped 2026-06-26: we show the nearest centroid, not a flattened picture.)
-- **the read panel** — click your track and read, in words, how it sits against a direction.
+- **the producer's read** — click your track and read, in words, how it sits against a direction.
 - **in-zone / diverge** — on a facet, your track reads as the same family as the direction (in-zone) or not
   (diverge). Descriptive, never pass/fail. **It is a per-facet test in FULL-dimensional fingerprint space**
   (your track within the cloud's per-facet spread = in-zone). It is read directly in full-dimensional
@@ -912,10 +912,10 @@ D-9⟩ which source + caching (we're offline-first). `tags: web-is-a-lead · D-I
 **Aspiration mapping.** Your authored link from your track(s) to direction(s). The tool never assigns it.
 Where it's stored and how you edit it is open. ⟨DECIDE D-2⟩. `tags: D-INV-4`
 
-**The two surfaces — the «leans toward» line and the read panel.** The «leans toward» line (§D.10) is the
+**The two surfaces — the «leans toward» line and the producer's read.** The «leans toward» line (§D.10) is the
 glanceable handle: a catalog column + a Detailed plaque chip naming the nearest reference direction with a
-colour closeness cue. The read panel opens when you click your track: "leans toward Venetian Snares", the
-in-zone/diverge read, "своё", each backed by its evidence. The read panel is a *read* (observation), it
+colour closeness cue. The producer's read opens when you click your track: "leans toward Venetian Snares", the
+in-zone/diverge read, "своё", each backed by its evidence. The producer's read is a *read* (observation), it
 never becomes an action card. Both draw from the SAME full-dimensional fingerprint, so they can never
 disagree about which direction is nearest (D-INV-11). ⟨DECIDE D-13⟩ the switch's default.
 
@@ -1141,10 +1141,10 @@ structural holes:
   cued entry rather than a crammed second tint. No co-leaders tied-pair tint needed.
 - ⟨DECIDE D-25⟩ does the **Simple** view also show the compact plaque chip, or does the chip stay
   Detailed-only while Simple keeps "leans toward X" as prose in the read? (recommend: Detailed-only chip;
-  the up-to-three selector and the web-style plaque are Detailed-only by §D.10.1/§D.10.2).
+  the up-to-three selector and the web panel are Detailed-only by §D.10.1/§D.10.2).
 - D-29 (resolved) aimed direction outside the three nearest — **RESOLVED 2026-06-29 (Alexander).** Pin **only the
   single nearest of the aimed** ones, as an additive entry (it never displaces a nearer one), shown **even if it
-  tints far** because a declared aim is intent, not filler; the other aimed directions live in the read panel.
+  tints far** because a declared aim is intent, not filler; the other aimed directions live in the producer's read.
   At most one pinned aimed entry. `§D.10.1`
 - D-30 (resolved) a web facet the measurement **contradicts** (or can't measure) — **RESOLVED 2026-06-30
   (Alexander): SHOW it, labeled** "web says · our tracks don't show it", sorted into the bottom tier of the web
@@ -1173,9 +1173,9 @@ structural holes:
 ### D.10 The reference line — the «leans toward» surface (catalog column + Detailed plaque) — 0.9
 
 One compact surface that answers, at a glance, *which direction is this track closest to?* — without opening
-the full read panel. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
+the full producer's read. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
 **chip on the Detailed plaque** of a track's widget. Both draw the identical fact from the identical
-computation; they are not two features, and not a second name for the read panel. It is one of the **two catalog
+computation; they are not two features, and not a second name for the producer's read. It is one of the **two catalog
 similarity columns** — the *reference* one (this section); the *own-library* one is §F. `tags:
 one-surface-two-placements`
 
@@ -1203,7 +1203,7 @@ one-surface-two-placements`
 
 **Same geometry, named once.** The "nearest" here is the **same full-dimensional fingerprint distance** that
 grounds the in-zone/diverge read (D-INV-12/19), at the current normalisation epoch — never a 2-D marker
-distance (there is no map). So the catalog column, the plaque chip, and the read panel can never disagree
+distance (there is no map). So the catalog column, the plaque chip, and the producer's read can never disagree
 about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
 
 **How it composes across the axes.**
@@ -1212,7 +1212,7 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   Detailed. **Quick shows nothing** — reference is full-run-only (D-INV-20): a quick run has no fingerprint, so
   there is no nearest to name. **Detailed shows the chip.** Whether **Simple** also shows it is ⟨DECIDE D-25⟩:
   Simple already carries "leans toward X" as *prose inside the read* (§D.7), which is a different surface (the
-  read panel — authored words) from this glanceable chip. The chip and the read's prose are **not two names for
+  producer's read — authored words) from this glanceable chip. The chip and the read's prose are **not two names for
   one thing** — the chip is a glance handle, the read is the words; both cite the same leans-toward fact. The
   ladder stays monotonic: Detailed adds the chip without removing the Simple-level prose. `tags: view-ladder ·
   D-INV-20 · ⟨DECIDE D-25⟩`
@@ -1342,8 +1342,8 @@ like the own-track column). `D-INV-28`
   direction link opening the read pre-focused on it) is 0.9.x** — in 0.9 the links render (`href` placeholder)
   and carry the colour/order; the cross-page focus hand-off is specified below (URL entry-focus) and wired next.
   `tags: clickable-navigation · inline-stack · F-INV-4`
-- **In the per-track read panel.** Here the up-to-three list is a set of **direction tabs**: the read defaults
-  to the **nearest**, and switching a tab re-targets the read's in-zone/diverge words and the web-style plaque
+- **In the per-track producer's read.** Here the up-to-three list is a set of **direction tabs**: the read defaults
+  to the **nearest**, and switching a tab re-targets the read's in-zone/diverge words and the web panel
   (§D.10.2) to that direction. The tab is **ephemeral view state** (it changes no analysis, and does not
   persist across a reload — like the view ladder itself). **The catalog → widget focus hand-off is a one-shot
   URL *entry* parameter, not persisted tab state:** arriving from a catalog direction-link, the widget reads
@@ -1360,7 +1360,7 @@ like the own-track column). `D-INV-28`
   the aimed is among the shown nearest**, the surface pins **only the single nearest of the aimed ones** as an
   extra entry — shown **even if it tints far/red**, because a declared aim is intent, not filler, and the
   nearest↔aimed gap ("aimed SCSI-9 · but far from it") is exactly the useful thing to see. The other aimed
-  directions live in the read panel, not the catalog cell. So at most one pinned aimed entry (D-29
+  directions live in the producer's read, not the catalog cell. So at most one pinned aimed entry (D-29
   resolved). `tags: D-INV-4 · intent-not-filler · D-29 resolved`
 
 **How it composes across the axes.**
@@ -1390,7 +1390,7 @@ number or rank; a click never edits a mapping and never changes the cards/read c
 the read compares against; and the read's focused direction never strands on a hidden or dropped direction
 (it falls back to the nearest). `D-INV-28`
 
-### D.10.2 The web-style plaque and the ★ cross-validation mark — 0.9
+### D.10.2 The web panel and the ★ cross-validation mark — 0.9
 
 **Beside the focused direction, a small plaque lists what the web told us about that direction's style — but
 only the parts we can tie to measurement.** When the read is focused on a direction (§D.10.1), a compact
@@ -1494,7 +1494,7 @@ current geometry no longer supports. The web fetch itself is cached on its own c
 from the measurement epoch. `tags: D-INV-24 · D-INV-29`
 
 **How it composes across the view ladder.** The plaque is **explanatory detail**, so it lives where detail
-lives: the **read panel** (when you click your track) and the **Detailed** per-track widget, **last in the read
+lives: the **producer's read** (when you click your track) and the **Detailed** per-track widget, **last in the read
 order (after the centroid, §D.10.3) and collapsed by default** — open it when you want the web's view, it never
 crowds the measured read above it. **Simple** keeps the prose read without the facet plaque; **quick** shows
 nothing (no fingerprint, no reference, D-INV-20). The **catalog cell never carries the plaque** — too dense for
@@ -1518,7 +1518,7 @@ overall closeness.
 **Where it sits in the read — the fixed order (Alexander 2026-06-29).** The Detailed read runs top-to-bottom
 in this order, so the eye moves from your own track outward to the reference and only then to the web: **(1) the
 producer's read** (the worded observation, §B.12) → **(2) tonal balance** (the spectrum) → **(3) the centroid
-reference read** (this section's per-facet bars) → **(4) the web-info plaque** (§D.10.2, what the web says about
+reference read** (this section's per-facet bars) → **(4) the web panel** (§D.10.2, what the web says about
 the direction's artist, tied to the axes it was confirmed on). The reference read therefore comes **after**
 tonal balance (today they are reversed in the shipped widget — this re-orders them) and **before** the web
 plaque, which is the last and most external layer. `tags: read-order · D-INV-30 · D-INV-29`

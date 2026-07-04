@@ -259,7 +259,7 @@ def cmd_analyze(args):
                                     "--out", j(f"result_notes_{_st}.json"))
                 except Exception as e:  # noqa: BLE001 — per-stem transcription is enrichment, never a hard dep
                     print(f"  · per-stem transcribe (G13) skipped: {e}", file=sys.stderr)
-        # E — web stems: MANDATORY, makes the player + per-stem lanes appear
+        # E — web stems: MANDATORY, makes the player + player lanes appear
         rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
         # …and the mix too → mix_web/mix.m4a, so the catalog's one-button preview player works on FULL
         # runs as well (the widget itself still uses the per-stem player; this is just for the catalog).

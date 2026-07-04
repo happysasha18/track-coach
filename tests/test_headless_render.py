@@ -132,7 +132,7 @@ def _build_ref_widget():
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class RefReadSurfacesRendered(unittest.TestCase):
-    """The reference read (#refRead), the web plaque (#webPanel) and the tonal-balance
+    """The reference read (#refRead), the web panel (#webPanel) and the tonal-balance
     panel (#tonalPanel) had their visibility + Detailed-only gate + read-order verified
     ONLY as CSS text / DOM-string order (inventory Tier-2 holes 12/14/15/16). A browser
     specificity conflict or load-time JS override would pass those and still ship a

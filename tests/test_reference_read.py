@@ -734,7 +734,7 @@ class ViewURLHash(unittest.TestCase):
                       "replaceState must write '#detailed' when toggling to Detailed view")
 
 
-# §D.10.2 / §D.10.3 — read order + web-info plaque (s28 redesign)
+# §D.10.2 / §D.10.3 — read order + web panel (s28 redesign)
 
 class ReadOrderWithRefRead(unittest.TestCase):
     """§D.10.3 read order: #tonalPanel must precede #refRead, which must precede #webPanel.
@@ -770,7 +770,7 @@ class ReadOrderWithRefRead(unittest.TestCase):
 
 
 class WebPanelRendering(unittest.TestCase):
-    """§D.10.2 web-info plaque — collapsed, summary, artist header, ★/☆ facet lines with phrases.
+    """§D.10.2 web panel — collapsed, summary, artist header, ★/☆ facet lines with phrases.
     Asserts on the OUTPUT of render_reference_read (the real shipped function), not source.
     """
 

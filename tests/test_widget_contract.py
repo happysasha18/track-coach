@@ -45,7 +45,7 @@ def _core(n=48, dur=96.0):
 
 
 def _render_widget():
-    """Render one full widget (stems + narrative so player and read panels are live) → output HTML."""
+    """Render one full widget (stems + narrative so player and producer's read are live) → output HTML."""
     tmp = Path(tempfile.mkdtemp(prefix="tc_contract_"))
     sdir = tmp / "stems_web"
     sdir.mkdir()
@@ -109,7 +109,7 @@ class SimpleViewGating(unittest.TestCase):
         # INV-18 (Sasha, 2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
         # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey), the recs panel filtered to
         # non-timecoded cards (#recs), the reference read (#refRead — §D.10.3 Detailed-only), and the
-        # web-info plaque (#webPanel — §D.10.2 Detailed-only, shipped 0.9.1).
+        # web panel (#webPanel — §D.10.2 Detailed-only, shipped 0.9.1).
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE))
         self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refRead", "webPanel"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")

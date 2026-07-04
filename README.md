@@ -82,7 +82,7 @@ Content panels collapse; the Evidence drawer (arrangement, stem map, rhythm, not
 |---|---|
 | **Quick read** | Vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. |
 | **Simple** (default, full analysis) | Everything in Quick, plus the synced multi-stem player. The Evidence drawer sits closed. |
-| **Detailed** | Adds the per-stem lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
+| **Detailed** | Adds the player lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
 
 ---
 

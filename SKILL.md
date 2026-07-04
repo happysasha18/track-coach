@@ -397,7 +397,7 @@ bash "$SKILL_DIR/scripts/tc_uv.sh" deep "$SKILL_DIR/scripts/separate.py" \
 # below matches the recommended htdemucs_6s run; use "$OUT_DIR/stems" if you ran the
 # 4-stem default model. NEVER hardcode stems/ vs stems_6s/ downstream — always use $STEMS,
 # or a step will read a missing dir and silently produce nothing (e.g. no stems_web → no
-# player → no stem lanes in the widget).
+# player → no player lanes in the widget).
 STEMS="$OUT_DIR/stems_6s"
 
 # Masking analysis — run on the SAME stem set the player/sequencer will draw.
@@ -468,9 +468,9 @@ character label, so it leans on the stemmap `clear` verdict or the neutral phras
 
 ### Web stems for the player (E) — MANDATORY in deep mode, do not skip
 
-This is what makes the widget's **synced multi-stem player AND the per-stem envelope
-lanes** appear. Skip it and `stems_web/` never exists, so the widget build (Step 4) drops
-`--audio-stems-rel` and you ship a deep analysis with NO player and NO stem lanes — the
+This is what makes the widget's **synced multi-stem player AND the player lanes** appear.
+Skip it and `stems_web/` never exists, so the widget build (Step 4) drops
+`--audio-stems-rel` and you ship a deep analysis with NO player and NO player lanes — the
 exact regression we hit before. Always run it as the last deep step.
 
 The raw Demucs WAVs are ~100 MB each — too heavy for the in-page player. Transcode

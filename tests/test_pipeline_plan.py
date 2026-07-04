@@ -63,7 +63,7 @@ class FullMode(unittest.TestCase):
             self.assertNotIn("stems/ ", line)  # never the bare 4-stem default here
 
     def test_web_stems_is_present(self):
-        # skipping it = a deep analysis with no player and no stem lanes (the old regression)
+        # skipping it = a deep analysis with no player and no player lanes (the old regression)
         self.assertGreaterEqual(step_index(self.lines, "make_web_stems.py"), 0)
 
     def test_full_also_encodes_a_web_mix_for_the_catalog(self):

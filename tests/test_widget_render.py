@@ -279,7 +279,7 @@ class ProducerReadRendersServerSide(unittest.TestCase):
         self.assertIn("<ul><li>one</li><li>two</li></ul>", out)
 
     def test_empty_narrative_on_a_flat_track_hides_the_panel(self):
-        # SPEC §B.12 (2026-06-23): the read panel hides only when there's no narrative AND no dev line.
+        # SPEC §B.12 (2026-06-23): the producer's read hides only when there's no narrative AND no dev line.
         # Force a FLAT core (no axis trends) so development_mode says nothing.
         flat = _synthetic_core()
         flat.update({k: 0.0 for k in ("energy_trend", "brightness_trend",
@@ -486,7 +486,7 @@ class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
 
 class ReadOrderTonalBeforeRefRead(unittest.TestCase):
     """§D.10.3 / INV-31: the read order in the widget is fixed — producer read → tonal balance →
-    centroid reference read → web-info plaque.
+    centroid reference read → web panel.
 
     Today the widget had tonal balance AFTER the reference read (reversed). Step 2 of the s28
     redesign swaps them. Pin the order on the rendered HTML so any future template edit that

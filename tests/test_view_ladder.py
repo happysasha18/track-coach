@@ -88,7 +88,7 @@ class CssGatingContract(unittest.TestCase):
 
     def test_simple_hide_set_is_exactly_the_known_four(self):
         # INV-22 + INV-18: Simple hides ONLY the deep stem viz, the non-timecoded recs, the
-        # reference read (§D.10.3 — Detailed-only), and the web-info plaque (§D.10.2 — Detailed-only).
+        # reference read (§D.10.3 — Detailed-only), and the web panel (§D.10.2 — Detailed-only).
         self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refRead", "webPanel"},
                          f"INV-22: Simple hide-set drifted: {sorted(HIDE_SIMPLE)}")
 

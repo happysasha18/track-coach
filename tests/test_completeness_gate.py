@@ -621,10 +621,10 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
                                f"(all transparent) — arc draw ops may have failed; "
                                f"total={r.get('total')}")
 
-    # ── 4. Player stem lanes ──────────────────────────────────────────────────
+    # ── 4. Player lanes ──────────────────────────────────────────────────────
 
     def test_4_player_stem_lanes_all_named(self):
-        """Player must have stem lanes for every stem; window.__ns_state must list them all.
+        """Player must have player lanes for every stem; window.__ns_state must list them all.
         #stemlanes is Detailed-only; switch to Detailed before measuring canvas height."""
         r = _probe(self.full,
             "(function(){"
@@ -641,7 +641,7 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
             self.assertIn(stem, names,
                           f"EMPTY SURFACE: stem '{stem}' missing from player lane grid; __ns_state={ns}")
         self.assertGreater(r.get("canvas_h", 0), 0,
-                           "EMPTY SURFACE: #stemlanes canvas has zero height — stem lanes not drawn")
+                           "EMPTY SURFACE: #stemlanes canvas has zero height — player lanes not drawn")
 
     def test_4_player_absent_on_partial(self):
         """Proves gate detects: partial widget (no stems_web) must have no __ns_state."""

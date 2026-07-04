@@ -2199,7 +2199,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             player = {"srcs": srcs}
     # Quick runs have no Demucs stems, but they DO have the mix — give them a single-track player
     # (transport + seek, no per-stem mute/solo). The widget reads player.kind=="mix" and skips the
-    # stem-lane grid. (Sasha 2026-06-20: "плеер какая разница быстрый прогон?")
+    # player lane grid. (Sasha 2026-06-20: "плеер какая разница быстрый прогон?")
     if player is None and audio_mix_rel:
         rel = audio_mix_rel.rstrip("/")
         adir = Path(out_path).parent / rel
@@ -2757,7 +2757,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         + '</details>'
     )
 
-    # §D.10.2 — web-info plaque for the focused (nearest) direction, collapsed by default.
+    # §D.10.2 — web panel for the focused (nearest) direction, collapsed by default.
     # Rich mode when web_notes provides data; simple mode (★/☆ only) when only confirmation supplied.
     focused = leans[0]
     focused_centroid = directions[focused.direction]
@@ -3852,7 +3852,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
 (function(){
  const PL=D.player,P=document.getElementById("playerControls");
  if(!PL||!PL.srcs||!PL.srcs.length){if(P)P.style.display="none";return;}
- const isMix=PL.kind==="mix";   // quick run: ONE mix source, transport only — no per-stem lane grid
+ const isMix=PL.kind==="mix";   // quick run: ONE mix source, transport only — no player lane grid
  const wrap=document.getElementById("playAudios");
  // Near-silent stems start MUTED (CR-2: they carry no real content — the listener should not be
  // surprised by silence on play, and they should be able to unmute/solo them deliberately).
@@ -3875,7 +3875,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const btn=document.getElementById("playBtn"),tEl=document.getElementById("playTime");
  btn.textContent=T.play_play;
  const dur=()=>master.duration||D.dur;
- let drawL=()=>{},lresize=()=>{};   // the per-stem lane grid is built below in FULL mode only
+ let drawL=()=>{},lresize=()=>{};   // the player lane grid is built below in FULL mode only
  const PN=document.getElementById("playNote");
  if(isMix){   // mix player: hide the per-stem grid + its key; seeking happens via the charts (window.__seek)
   const sl=document.getElementById("stemlanes");if(sl)sl.style.display="none";
