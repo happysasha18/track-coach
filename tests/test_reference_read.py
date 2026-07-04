@@ -914,26 +914,27 @@ class WebPanelRichRendering(unittest.TestCase):
         self.assertIn("☆", html, "☆ glyph must appear for confirmed indirect trait")
 
     def test_nosay_row_appears_for_none_tier(self):
-        """A none-tier trait must appear with 'web says' badge — never silently dropped (⟨D-30⟩)."""
+        """A none-tier trait must appear in the muted web-only group — never silently dropped (⟨D-30⟩).
+        Variant A (Alexander 2026-07-04): web-only traits collapse into ONE muted group with
+        a 'Web describes these' heading, not individual per-row pills."""
         html = self._rich_html()
         self.assertIn("odd time signatures", html,
                       "none-tier phrase must appear in the panel (show-labeled, not silent-drop)")
-        self.assertIn("web says", html,
-                      "'web says' pill must appear for none-tier traits")
+        self.assertIn("rn-webonly-group", html,
+                      "web-only/none-tier traits must appear in the .rn-webonly-group (variant A)")
 
     def test_nosay_row_appears_for_contradicted_direct(self):
-        """B3 design change (s29): the rich panel now uses render_reference_notes, which reads
+        """B3 design change (s29): the rich panel uses render_reference_notes, which reads
         the static `tier` field from the JSON entry — no centroid-Z dynamic re-sorting.
-        A trait with tier='direct' always renders as is-direct (★ pill), regardless of whether
-        the current track's centroid agrees. The phrase must still appear; now under the
-        static-tier class, not a centroid-dependent web-facet-nosay element."""
+        A trait with tier='direct' always renders in the confirmed section (★ glyph row),
+        regardless of whether the current track's centroid agrees.
+        Variant A (Alexander 2026-07-04): direct traits use glyph-led rows, not pills."""
         html = self._rich_html()
         self.assertIn("bright highs", html,
                       "contradicted direct phrase must still appear in the panel")
-        # Static tier: tier='direct' → is-direct pill, regardless of centroid agreement.
-        # (Centroid-Z re-sorting was removed from the web panel in B3/s29.)
-        self.assertIn("tc-rn-pill is-direct", html,
-                      "static tier=direct → is-direct pill (no centroid re-sort in B3)")
+        # Variant A: static tier=direct → ★ glyph row in confirmed section (no per-row pill)
+        self.assertIn("rn-trait-glyph", html,
+                      "static tier=direct → ★ glyph row in confirmed section (variant A)")
 
     def test_star_row_before_nosay_row(self):
         """★ tier row must appear BEFORE 'web says' row (sorted by status, strongest first)."""

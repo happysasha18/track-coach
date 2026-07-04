@@ -1460,6 +1460,21 @@ web says is dropped, never shown as untethered prose. Two marks, by how the tie 
 ☆ = measurement doesn't show it head-on but it's unambiguously tied to what we measure). No per-row "web said ·
 measured" tag strings — they read long and slow (Alexander 2026-06-29). `tags: compact-marking · D-INV-29`
 
+**Approved readable layout (Alexander 2026-07-04 — variant A on real-data mockup, both amendments
+accepted).** The panel body reads in this order: (1) **prose blurb first** — sets context before any
+measurement verdicts; (2) **note box** (if present) — the coverage-confidence callout, left-bordered;
+(3) **"YOUR MEASUREMENT BACKS THESE UP" section** — the ★/☆ confirmed traits, each as a glyph-led row
+(★ or ☆ in a column, phrase beside it); no pill on each row — the glyph IS the mark; (4) **one muted
+compact group line for web-only traits** — heading "Web describes these — your tracks don't bear them out"
+followed by the web-only trait phrases as a `·`-separated inline run (not one pill per row — the old
+repeated grey pills are the spec violation D-INV-29 forbids); (5) **sources links** — the list of source
+`<a href>` links stays VISIBLE at the panel bottom (Alexander 2026-07-04 amendment: the v2 mockup had
+dropped this; his call: keep it); (6) **one footnote legend** — a single line explaining ★/☆/· once:
+"★ web-described, your measurement confirms it directly · ☆ indirectly but soundly tied · unmarked ·
+= web-described, your measurement doesn't bear it out". This layout resolves the D-INV-29 contradiction
+(shipped code emitted a long pill on EVERY row — exactly the long-per-row labels the spec forbids). All
+content is preserved; only the layout changes. `tags: approved-layout-2026-07-04 · compact-marking · D-INV-29`
+
 **What ★ / ☆ are measured against — the direction's CENTROID.** Both marks judge the trait on the
 direction's **cloud centroid** — the same full-dimensional reference point that grounds "leans toward"
 (D-INV-21) — not on any single member track and not on a majority vote, so the plaque and the nearest-centroid

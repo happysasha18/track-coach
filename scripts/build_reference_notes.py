@@ -142,6 +142,56 @@ h1 {
   text-decoration: none;
 }
 .tc-rn-sources a:hover { text-decoration: underline; }
+/* Variant A readable layout (Alexander 2026-07-04) — glyph-led confirmed rows + muted web-only group */
+.rn-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin: 12px 0 7px;
+}
+.rn-webonly-label { margin-top: 16px; }
+.rn-webonly-qualifier { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: .75; }
+.rn-confirmed-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.rn-trait-row {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  font-size: 12.5px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.rn-trait-glyph {
+  flex: 0 0 16px;
+  text-align: center;
+  color: var(--good);
+  font-size: 13px;
+}
+.rn-trait-glyph.rn-trait-glyph-indirect { opacity: .8; }
+.rn-trait-text { flex: 1; line-height: 1.4; }
+.rn-webonly-group {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0 0 12px;
+  opacity: .85;
+}
+.rn-footnote {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: .72;
+  margin: 12px 0 0;
+  font-style: italic;
+  line-height: 1.5;
+}
 """
 
 

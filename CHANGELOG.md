@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.9.32] — 2026-07-04
+
+### Improved
+- **Similar-artist web panel is now readable.** The "What the web says about ⟨artist⟩" panel used to show
+  a long label on every single trait row — ten rows of "web says; our tracks don't show it" in a row read as
+  a wall of "we can't confirm this." Now: the confirmed traits (backed by measurement) lead with a clear
+  ★ or ☆ glyph and nothing else. The web-only traits fold into one compact muted line beneath a "Web describes
+  these — your tracks don't bear them out" heading. The sources list stays visible at the bottom. One footnote
+  legend explains ★/☆/· once. All the original content is preserved — only the layout changed.
+
 ## [0.9.31] — 2026-07-03
 
 ### Internal

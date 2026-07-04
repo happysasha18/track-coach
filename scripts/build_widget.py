@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.31"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "0.9.32"  # Track Coach analyzer version (early; bump as it matures)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -143,7 +143,7 @@ STRINGS = {
         "note_title": "Transcribed notes — {label}",
         "note_hint": "Pitches read straight from the audio of this stem, not from the project. Each bar is one note: position = time, height = pitch, brightness = how loud. Range {lo}–{hi}, {n} notes.",
         "note_label_other": "the melodic layer (synths / keys / pads)",
-        "note_hint_other": " This is the splitter’s everything-else part — where the track’s chords and lead lines live.",
+        "note_hint_other": " This is the splitter's everything-else part — where the track's chords and lead lines live.",
         "drum_title": "Drum breakdown — kick / snare / hat",
         "drum_hint": "Every hit in the drums stem, classified by spectral shape (not separated into audio). Bar height = hits per window. Kicks {k} · snares {s} · hats {h}.",
         "stem_title": "Stem frequency map",
@@ -2457,12 +2457,24 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
 def render_reference_notes(artist_entry):
     """§D.10.2 one-source shared renderer — emits semantic HTML for one artist entry.
 
-    Reads tier directly from the artist_entry dict (pre-computed, per reference_web_notes.json):
-      direct         → ★ pill  "★ measurement confirms"
-      indirect       → ☆ pill  "☆ measurement confirms (indirect)"
-      web-only       → grey    "web says; our tracks don't show it"
-      not-measurable → grey-italic  "not measurable with our axes"
-      none (legacy)  → grey    (treated as web-only for backward compat)
+    Approved layout (Alexander 2026-07-04, variant A):
+      1. Artist header (name + real name)
+      2. Genre / era line
+      3. Prose blurb (context first, before measurement verdicts)
+      4. Note box (coverage-confidence callout, left-border)
+      5. "YOUR MEASUREMENT BACKS THESE UP" — glyph-led rows for direct/indirect tiers
+         Each row: <span class="rn-trait-glyph">★</span> phrase  (no trailing pill)
+      6. "Web describes these — your tracks don't bear them out" — ONE muted group,
+         web-only and not-measurable traits as a dot-separated inline run (not N pills)
+      7. Sources list — visible <a href> links (Alexander 2026-07-04 amendment: keep visible)
+      8. Footnote legend (.rn-footnote) explaining ★/☆/·
+
+    Tiers from reference_web_notes.json:
+      direct         → ★ glyph in confirmed section
+      indirect       → ☆ glyph in confirmed section
+      web-only       → · dot in the muted web-only group
+      not-measurable → · dot in the muted web-only group
+      none (legacy)  → · dot in the muted web-only group
 
     Returns markup only; theme (dark / light) applied by CSS on tc-rn-* classes.
     Used by both the in-widget panel (dark theme) and the side-page generator (light theme).
@@ -2475,55 +2487,68 @@ def render_reference_notes(artist_entry):
     traits    = artist_entry.get("traits", [])
     sources   = artist_entry.get("sources", [])
 
-    # Header: artist name + real name (muted)
+    # 1. Header: artist name + real name (muted)
     rn_html = (f' <span class="tc-rn-realname">({_esc(real_name)})</span>'
                if real_name else "")
     head_html = f'<div class="tc-rn-head"><span class="tc-rn-artist">{_esc(artist)}</span>{rn_html}</div>'
 
-    # Genre / era line
+    # 2. Genre / era line
     genre_html = (f'<p class="tc-rn-genre">{_esc(genre_era)}</p>'
                   if genre_era else "")
 
-    # Note: album-variance callout (left-border)
+    # 3. Prose blurb (FIRST — context before verdicts, variant A)
+    blurb_html = f'<p class="tc-rn-blurb">{_esc(blurb)}</p>' if blurb else ""
+
+    # 4. Note: album-variance callout (left-border)
     note_html = (f'<div class="tc-rn-note"><strong>Note:</strong> {_esc(note)}</div>'
                  if note else "")
 
-    # Prose blurb
-    blurb_html = f'<p class="tc-rn-blurb">{_esc(blurb)}</p>' if blurb else ""
-
-    # Trait list — sorted by evidence strength: direct=0, indirect=1, web-only=2, not-measurable=3
+    # 5 + 6. Trait sections — split into confirmed (★/☆) and web-only groups
     _TIER_RANK = {"direct": 0, "indirect": 1, "web-only": 2, "not-measurable": 3}
-    traits_html = ""
+    confirmed_rows = []   # ★/☆ glyph-led rows
+    webonly_phrases = []  # dot-separated muted group
+
     if traits:
-        traits = sorted(traits, key=lambda t: _TIER_RANK.get(t.get("tier", "none"), 2))
-        rows = []
-        for t in traits:
+        sorted_traits = sorted(traits, key=lambda t: _TIER_RANK.get(t.get("tier", "none"), 2))
+        for t in sorted_traits:
             tier  = t.get("tier", "none")
             title = t.get("title") or t.get("phrase", "")
             if tier == "direct":
-                pill_cls  = "tc-rn-pill is-direct"
-                pill_text = "★ measurement confirms"
+                confirmed_rows.append(
+                    f'<li class="rn-trait-row">'
+                    f'<span class="rn-trait-glyph">★</span>'
+                    f'<span class="rn-trait-text">{_esc(title)}</span>'
+                    f'</li>'
+                )
             elif tier == "indirect":
-                pill_cls  = "tc-rn-pill is-indirect"
-                pill_text = "☆ measurement confirms (indirect)"
-            elif tier == "not-measurable":
-                pill_cls  = "tc-rn-pill is-na"
-                pill_text = "not measurable with our axes"
-            else:                        # "web-only" or legacy "none"
-                pill_cls  = "tc-rn-pill is-webonly"
-                pill_text = "web says; our tracks don’t show it"
-            rows.append(
-                f'<li class="tc-rn-trait">'
-                f'<span class="tc-rn-trait-title">{_esc(title)}</span>'
-                f'<span class="{pill_cls}">{pill_text}</span>'
-                f'</li>'
-            )
-        traits_html = (
-            '<p class="tc-rn-traits-label">Key style traits</p>'
-            f'<ul class="tc-rn-traits">{"".join(rows)}</ul>'
+                confirmed_rows.append(
+                    f'<li class="rn-trait-row">'
+                    f'<span class="rn-trait-glyph rn-trait-glyph-indirect">☆</span>'
+                    f'<span class="rn-trait-text">{_esc(title)}</span>'
+                    f'</li>'
+                )
+            else:   # web-only, not-measurable, none (legacy)
+                webonly_phrases.append(_esc(title))
+
+    confirmed_html = ""
+    if confirmed_rows:
+        confirmed_html = (
+            '<p class="rn-section-label">Your measurement backs these up</p>'
+            f'<ul class="rn-confirmed-list">{"".join(confirmed_rows)}</ul>'
         )
 
-    # Sources list
+    webonly_html = ""
+    if webonly_phrases:
+        group_text = " · ".join(webonly_phrases)
+        webonly_html = (
+            '<p class="rn-section-label rn-webonly-label">'
+            'Web describes these'
+            '<span class="rn-webonly-qualifier"> — your tracks don\'t bear them out</span>'
+            '</p>'
+            f'<p class="rn-webonly-group">{group_text}</p>'
+        )
+
+    # 7. Sources list (visible at panel bottom — Alexander 2026-07-04 amendment)
     sources_html = ""
     if sources:
         links = "".join(
@@ -2535,7 +2560,18 @@ def render_reference_notes(artist_entry):
             f'<ul class="tc-rn-sources">{links}</ul>'
         )
 
-    return head_html + genre_html + note_html + blurb_html + traits_html + sources_html
+    # 8. Footnote legend (one line explaining ★/☆/·)
+    footnote_html = (
+        '<p class="rn-footnote">'
+        '★ web-described, your measurement confirms it directly'
+        ' · ☆ indirectly but soundly tied'
+        ' · unmarked · = web-described, your measurement doesn\'t bear it out'
+        '</p>'
+    )
+
+    return (head_html + genre_html + blurb_html + note_html
+            + confirmed_html + webonly_html
+            + sources_html + footnote_html)
 
 
 def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_data=None):
@@ -2939,7 +2975,9 @@ body.simple #webPanel{display:none!important}
  letter-spacing:.04em;vertical-align:middle;margin-left:3px}
 #webPanel .web-note{font-size:11px;color:var(--muted);opacity:.65;margin:6px 0 0;font-style:italic}
 /* Rich web panel (§D.10.2) — tc-rn-* semantic markup, dark theme (in-widget). */
-/* Light theme for the same classes lives in build_reference_notes.py (side page). */
+/* Approved readable layout (Alexander 2026-07-04, variant A): blurb first, glyph-led confirmed  */
+/* rows, one muted web-only group, visible sources, one footnote legend. No per-row pills.        */
+/* Light theme for the same classes lives in build_reference_notes.py (side page).                */
 #webPanel .tc-rn-head{margin:0 0 3px}
 #webPanel .tc-rn-artist{font-size:13px;font-weight:700;color:var(--ink)}
 #webPanel .tc-rn-realname{font-size:11.5px;color:var(--muted);margin-left:5px;font-style:italic}
@@ -2948,21 +2986,26 @@ body.simple #webPanel{display:none!important}
  font-size:12px;color:var(--muted);line-height:1.5;background:rgba(255,180,84,.07);
  border-radius:0 6px 6px 0}
 #webPanel .tc-rn-blurb{font-size:12.5px;color:var(--ink);margin:0 0 12px;line-height:1.6}
-#webPanel .tc-rn-traits-label{font-size:10px;font-weight:700;text-transform:uppercase;
- letter-spacing:.07em;color:var(--muted);margin:0 0 6px}
-#webPanel .tc-rn-traits{list-style:none;margin:0 0 12px;padding:0;display:flex;
- flex-direction:column;gap:5px}
-#webPanel .tc-rn-trait{display:flex;align-items:baseline;justify-content:space-between;
- gap:8px;font-size:12px;color:var(--ink)}
-#webPanel .tc-rn-trait-title{flex:1;line-height:1.4}
-#webPanel .tc-rn-pill{flex:0 0 auto;font-size:9px;font-weight:700;text-transform:uppercase;
- letter-spacing:.04em;padding:2px 7px;border-radius:10px;white-space:nowrap}
-#webPanel .tc-rn-pill.is-direct{background:rgba(70,211,154,.18);color:var(--good)}
-#webPanel .tc-rn-pill.is-indirect{background:rgba(70,211,154,.1);color:var(--good);opacity:.8}
-#webPanel .tc-rn-pill.is-webonly{background:rgba(139,148,168,.12);color:var(--muted)}
-#webPanel .tc-rn-pill.is-na{background:rgba(139,148,168,.08);color:var(--muted);font-style:italic}
+/* Section labels (variant A) */
+#webPanel .rn-section-label{font-size:10px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.07em;color:var(--muted);margin:10px 0 6px}
+#webPanel .rn-webonly-label{margin-top:14px}
+#webPanel .rn-webonly-qualifier{font-weight:400;text-transform:none;letter-spacing:0;opacity:.75}
+/* Glyph-led confirmed trait rows (variant A) — no trailing pill */
+#webPanel .rn-confirmed-list{list-style:none;margin:0 0 4px;padding:0;
+ display:flex;flex-direction:column;gap:6px}
+#webPanel .rn-trait-row{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--ink);line-height:1.5}
+#webPanel .rn-trait-glyph{flex:0 0 14px;text-align:center;color:var(--good);font-size:13px}
+#webPanel .rn-trait-glyph.rn-trait-glyph-indirect{opacity:.8}
+#webPanel .rn-trait-text{flex:1;line-height:1.4}
+/* Muted web-only group — ONE dot-separated inline line (not N pills) */
+#webPanel .rn-webonly-group{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0 0 12px;opacity:.85}
+/* Footnote legend */
+#webPanel .rn-footnote{font-size:10.5px;color:var(--muted);opacity:.72;margin:12px 0 0;
+ font-style:italic;line-height:1.5}
+/* Sources */
 #webPanel .tc-rn-sources-label{font-size:10px;font-weight:700;text-transform:uppercase;
- letter-spacing:.07em;color:var(--muted);margin:0 0 5px}
+ letter-spacing:.07em;color:var(--muted);margin:10px 0 5px}
 #webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
 #webPanel .tc-rn-sources a{font-size:11.5px;color:var(--muted);text-decoration:none}
 #webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration:underline}

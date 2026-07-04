@@ -1012,5 +1012,124 @@ class WordingInvariants(unittest.TestCase):
                       "refread-axis must contain 'higher'; got: " + repr(res))
 
 
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class WebPanelReadableLayout(unittest.TestCase):
+    """D-INV-29 approved layout (Alexander 2026-07-04, variant A + visible sources).
+
+    The shipped #webPanel must:
+    (a) render glyph-led confirmed rows (★/☆ as leading glyph, not a trailing pill) — asserted
+        by checking the glyph appears BEFORE the trait text in the rendered HTML of a confirmed row;
+    (b) NOT render per-row 'WEB SAYS' pills — the old repeated grey pills that D-INV-29 forbids;
+        all web-only traits collapse into ONE muted group, not N pills;
+    (c) show the sources block with ≥1 <a href> link (Alexander 2026-07-04 amendment: keep visible);
+    (d) show one footnote legend line explaining ★/☆/·.
+
+    Uses _build_ref_widget() which loads bundled reference_web_notes.json (DeepChord as nearest
+    direction — has both direct and web-only traits, and 4 source links).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not _HAVE_CHROME:
+            raise unittest.SkipTest("headless Chrome not available")
+        cls.widget = _build_ref_widget()
+
+    def _open_webpanel_js(self, body_js):
+        """Wrap JS to open #webPanel and remove simple class before running body_js."""
+        return (
+            "(function(){"
+            "document.body.classList.remove('simple');"
+            "var wp=document.querySelector('#webPanel');"
+            "if(wp)wp.open=true;"
+            + body_js +
+            "})()"
+        )
+
+    def test_confirmed_trait_rows_lead_with_glyph(self):
+        """Confirmed-trait rows must use a leading glyph (★/☆), not a trailing pill.
+        We assert: a .rn-trait-glyph element exists with ★ or ☆ text (new layout),
+        AND the old trailing pill class 'tc-rn-pill is-direct' does NOT appear
+        (the pill-per-row pattern that D-INV-29 forbids)."""
+        r = hc.probe(
+            self.widget,
+            self._open_webpanel_js(
+                "var wp=document.querySelector('#webPanel');"
+                "var glyphEls=wp?wp.querySelectorAll('.rn-trait-glyph'):[];"
+                "var glyphCount=0;"
+                "glyphEls.forEach(function(e){var t=e.textContent.trim();"
+                "if(t==='★'||t==='☆')glyphCount++;});"
+                "var html=wp?wp.innerHTML:'';"
+                "var hasPill=html.indexOf('tc-rn-pill is-direct')>=0||"
+                "html.indexOf('tc-rn-pill is-indirect')>=0;"
+                "return {glyph_count:glyphCount,has_old_pill:hasPill};"
+            ),
+            width=1100, height=3600,
+        )
+        self.assertGreater(r["glyph_count"], 0,
+                           "#webPanel must have .rn-trait-glyph elements with ★/☆ "
+                           "(confirmed trait rows must lead with a glyph — variant A layout)")
+        self.assertFalse(r["has_old_pill"],
+                         "#webPanel must NOT contain the old 'tc-rn-pill is-direct/is-indirect' "
+                         "trailing pills — D-INV-29 forbids per-row pill labels")
+
+    def test_no_per_row_webonly_pill(self):
+        """Web-only traits must NOT render as individual per-row pills.
+        The old layout had N 'WEB SAYS' pills (one per web-only trait) — D-INV-29 forbids this.
+        The new layout collapses all web-only traits into ONE muted group with dot-separated text."""
+        r = hc.probe(
+            self.widget,
+            self._open_webpanel_js(
+                "var wp=document.querySelector('#webPanel');"
+                "var html=wp?wp.innerHTML:'';"
+                "var hasWebonlyPill=html.indexOf('tc-rn-pill is-webonly')>=0||"
+                "html.indexOf('tc-rn-pill is-na')>=0;"
+                "return {has_webonly_pill:hasWebonlyPill};"
+            ),
+            width=1100, height=3600,
+        )
+        self.assertFalse(r["has_webonly_pill"],
+                         "#webPanel must NOT contain per-row 'tc-rn-pill is-webonly/is-na' pills "
+                         "— D-INV-29: web-only traits collapse into ONE muted group, not N pills")
+
+    def test_sources_block_has_links(self):
+        """Sources block must be VISIBLE at the panel bottom with ≥1 <a href> link.
+        Alexander 2026-07-04 amendment: the v2 mockup dropped the sources block; his call: keep it."""
+        r = hc.probe(
+            self.widget,
+            self._open_webpanel_js(
+                "var wp=document.querySelector('#webPanel');"
+                "var links=wp?wp.querySelectorAll('a[href]'):[];"
+                "var count=0;"
+                "links.forEach(function(e){"
+                "if(e.offsetHeight>0&&getComputedStyle(e).display!=='none')count++;});"
+                "return {visible_link_count:count};"
+            ),
+            width=1100, height=3600,
+        )
+        self.assertGreater(r["visible_link_count"], 0,
+                           "#webPanel must have ≥1 visible <a href> source link "
+                           "(Alexander 2026-07-04 amendment: sources block stays visible)")
+
+    def test_footnote_legend_present(self):
+        """One footnote legend must appear in #webPanel explaining ★/☆/·.
+        Assert a .rn-footnote element exists with visible text containing ★."""
+        r = hc.probe(
+            self.widget,
+            self._open_webpanel_js(
+                "var wp=document.querySelector('#webPanel');"
+                "var fn=wp?wp.querySelector('.rn-footnote'):null;"
+                "var text=fn?fn.textContent:'';"
+                "var visible=fn?(fn.offsetHeight>0&&getComputedStyle(fn).display!=='none'):false;"
+                "return {text:text,visible:visible};"
+            ),
+            width=1100, height=3600,
+        )
+        self.assertTrue(r["visible"],
+                        "#webPanel must contain a visible .rn-footnote element "
+                        "(one footnote legend explaining ★/☆/·)")
+        self.assertIn("★", r["text"],
+                      ".rn-footnote must contain '★' in its text; got: " + repr(r["text"][:200]))
+
+
 if __name__ == "__main__":
     unittest.main()

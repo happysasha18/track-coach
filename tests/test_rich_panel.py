@@ -81,37 +81,55 @@ class RenderReferenceNotesUnit(unittest.TestCase):
         self.assertIn('class="tc-rn-note"', self.vs_html)
         self.assertIn("varies sharply", self.vs_html)
 
-    # -- pill labels for every tier ----------------------------------------------
-    def test_direct_pill_class_and_label(self):
-        """is-direct pill must exist for DeepChord (≥3 direct traits) and carry its label."""
-        self.assertIn('tc-rn-pill is-direct', self.dc_html)
-        self.assertIn("measurement confirms", self.dc_html)
+    # -- glyph-led layout (variant A, Alexander 2026-07-04) ---------------------
+    def test_direct_glyph_and_confirmed_section(self):
+        """direct traits render with ★ glyph inside .rn-trait-glyph span (variant A layout).
+        No trailing per-row pill — confirmed rows use glyph-led format."""
+        self.assertIn('class="rn-trait-glyph"', self.dc_html)
+        self.assertIn('★', self.dc_html)   # ★
+        # Old pill must NOT appear (D-INV-29: no per-row long labels)
+        self.assertNotIn('tc-rn-pill is-direct', self.dc_html)
 
-    def test_indirect_pill_class_and_label(self):
-        """is-indirect pill and label — at least one entry must use tier=indirect.
-        Venetian Snares has no indirect traits; build a synthetic entry."""
+    def test_indirect_glyph_in_confirmed_section(self):
+        """indirect traits render with ☆ glyph inside .rn-trait-glyph.rn-trait-glyph-indirect.
+        Builds a synthetic entry with an indirect trait."""
         entry = {"artist": "SynTest", "blurb": "test",
                  "traits": [{"phrase": "x", "title": "X title", "tier": "indirect"}]}
         html = build_widget.render_reference_notes(entry)
-        self.assertIn('tc-rn-pill is-indirect', html)
-        self.assertIn("measurement confirms (indirect)", html)
+        self.assertIn('rn-trait-glyph-indirect', html)
+        self.assertIn('☆', html)   # ☆
+        # Old indirect pill must NOT appear
+        self.assertNotIn('tc-rn-pill is-indirect', html)
 
-    def test_webonly_pill_class_and_label(self):
-        """is-webonly pill and label — DeepChord has many web-only traits."""
-        self.assertIn('tc-rn-pill is-webonly', self.dc_html)
-        self.assertIn("web says", self.dc_html)
+    def test_webonly_traits_in_muted_group_not_pills(self):
+        """web-only traits collapse into ONE muted group (rn-webonly-group), not N pills.
+        D-INV-29: the repeated grey pills are exactly what the spec forbids.
+        Variant A heading: 'Web describes these' (not 'web says' pill text)."""
+        self.assertIn('class="rn-webonly-group"', self.dc_html)
+        # Heading contains "describes these" (case-insensitive — the heading may be lower/upper)
+        self.assertIn("describes these", self.dc_html.lower())
+        # Old per-row pills must NOT appear
+        self.assertNotIn('tc-rn-pill is-webonly', self.dc_html)
 
-    def test_na_pill_class_and_label(self):
-        """is-na pill and label — Venetian Snares has odd-time-sig (not-measurable)."""
-        self.assertIn('tc-rn-pill is-na', self.vs_html)
-        self.assertIn("not measurable", self.vs_html)
+    def test_na_traits_in_muted_group_not_pills(self):
+        """not-measurable traits also go into the muted web-only group, not is-na pills.
+        Venetian Snares has an odd-time-sig (not-measurable) trait."""
+        self.assertNotIn('tc-rn-pill is-na', self.vs_html)
+        # The trait text itself must still appear (content is preserved — case-insensitive)
+        self.assertIn("Odd time", self.vs_html)
 
-    # -- trait titles ------------------------------------------------------------
-    def test_trait_title_span_present(self):
-        """Trait titles must appear inside tc-rn-trait-title spans."""
-        self.assertIn('class="tc-rn-trait-title"', self.dc_html)
-        # "Devastatingly deep" is the opening of the bass-anchor trait title
+    # -- trait text in new layout ------------------------------------------------
+    def test_trait_text_span_present(self):
+        """Confirmed trait text must appear inside rn-trait-text spans (variant A)."""
+        self.assertIn('class="rn-trait-text"', self.dc_html)
+        # "Devastatingly deep" is the opening of a direct (bass-anchor) trait title in DeepChord
         self.assertIn("Devastatingly deep", self.dc_html)
+
+    # -- footnote legend ---------------------------------------------------------
+    def test_footnote_legend_present(self):
+        """One .rn-footnote legend must appear explaining ★/☆/· (variant A)."""
+        self.assertIn('class="rn-footnote"', self.dc_html)
+        self.assertIn('★', self.dc_html)   # ★ must appear in footnote text
 
     # -- sources -----------------------------------------------------------------
     def test_sources_present_with_links(self):
@@ -154,10 +172,12 @@ class WebPanelHtmlRichMode(unittest.TestCase):
         """Body must come from render_reference_notes: tc-rn-blurb must be present."""
         self.assertIn('class="tc-rn-blurb"', self.html)
 
-    def test_has_direct_pill_and_label(self):
-        """Rich body must contain at least one is-direct pill."""
-        self.assertIn("tc-rn-pill is-direct", self.html)
-        self.assertIn("measurement confirms", self.html)
+    def test_has_direct_glyph_in_confirmed_section(self):
+        """Rich body must contain ★ glyph in the confirmed section (variant A layout)."""
+        self.assertIn('rn-trait-glyph', self.html)
+        self.assertIn('★', self.html)   # ★ glyph
+        # No old per-row pill
+        self.assertNotIn('tc-rn-pill is-direct', self.html)
 
     def test_has_sources(self):
         """Sources must appear (shared renderer path)."""
@@ -301,9 +321,9 @@ class SidePageParity(unittest.TestCase):
 # ── §D.10.2 — trait sort order and glyph mapping (0.9.4) ─────────────────────────────────
 
 class TraitSortOrder(unittest.TestCase):
-    """Traits must be sorted by evidence strength: direct first, then indirect,
-    then web-only, then not-measurable.  Glyph (★ / ☆) must appear in the
-    correct pill text for each tier."""
+    """Traits must be sorted by evidence strength: direct first (★ glyph), then indirect
+    (☆ glyph), then web-only and not-measurable (collapsed into ONE muted group).
+    Variant A layout (Alexander 2026-07-04): no per-row pills."""
 
     @classmethod
     def setUpClass(cls):
@@ -313,49 +333,53 @@ class TraitSortOrder(unittest.TestCase):
         # Venetian Snares: has direct AND not-measurable traits
         cls.vs_html = build_widget.render_reference_notes(notes["Venetian Snares"])
 
-    # -- sort: direct before web-only ------------------------------------------
+    # -- sort: confirmed section before web-only group -------------------------
     def test_direct_before_webonly_in_render(self):
-        """A tc-rn-pill is-direct row must appear before the first is-webonly row."""
-        direct_pos  = self.dc_html.find("tc-rn-pill is-direct")
-        webonly_pos = self.dc_html.find("tc-rn-pill is-webonly")
-        self.assertGreater(direct_pos,  -1, "is-direct pill must be present")
-        self.assertGreater(webonly_pos, -1, "is-webonly pill must be present")
+        """The confirmed section (rn-confirmed-list) must appear before the web-only group
+        (rn-webonly-group) — direct=0 comes before web-only=2 in the sorted layout."""
+        confirmed_pos = self.dc_html.find("rn-confirmed-list")
+        webonly_pos   = self.dc_html.find("rn-webonly-group")
+        self.assertGreater(confirmed_pos, -1, "rn-confirmed-list must be present (DeepChord has direct traits)")
+        self.assertGreater(webonly_pos,   -1, "rn-webonly-group must be present (DeepChord has web-only traits)")
         self.assertLess(
-            direct_pos, webonly_pos,
-            "is-direct row must appear before first is-webonly row (sort: direct=0 < web-only=2)",
+            confirmed_pos, webonly_pos,
+            "confirmed section must appear before the web-only group (sort: direct=0 < web-only=2)",
         )
 
-    # -- sort: direct before not-measurable ------------------------------------
+    # -- sort: confirmed section before web-only group (not-measurable) --------
     def test_direct_before_na_in_render(self):
-        """A tc-rn-pill is-direct row must appear before any is-na row."""
-        direct_pos = self.vs_html.find("tc-rn-pill is-direct")
-        na_pos     = self.vs_html.find("tc-rn-pill is-na")
-        self.assertGreater(direct_pos, -1, "is-direct pill must be present in Venetian Snares")
-        self.assertGreater(na_pos,     -1, "is-na pill must be present in Venetian Snares")
+        """The confirmed section must appear before any web-only/not-measurable group.
+        Venetian Snares has both direct and not-measurable traits."""
+        confirmed_pos = self.vs_html.find("rn-confirmed-list")
+        webonly_pos   = self.vs_html.find("rn-webonly-group")
+        self.assertGreater(confirmed_pos, -1, "rn-confirmed-list must be present (Venetian Snares has direct traits)")
+        self.assertGreater(webonly_pos,   -1, "rn-webonly-group must be present (not-measurable goes to muted group)")
         self.assertLess(
-            direct_pos, na_pos,
-            "is-direct row must appear before is-na row (sort: direct=0 < not-measurable=3)",
+            confirmed_pos, webonly_pos,
+            "confirmed section must appear before is-na group (sort: direct=0 < not-measurable=3)",
         )
 
     # -- glyph mapping ---------------------------------------------------------
-    def test_glyph_in_pill_text(self):
-        """★ must appear in is-direct pill text; ☆ in is-indirect pill text (no glyph for web-only/na)."""
-        # is-direct pill carries ★
+    def test_glyph_in_confirmed_rows(self):
+        """★ must appear in .rn-trait-glyph for direct; ☆ for indirect (variant A layout)."""
         import re
-        direct_pills = re.findall(r'<span class="tc-rn-pill is-direct">([^<]*)</span>', self.dc_html)
-        self.assertTrue(direct_pills, "at least one is-direct pill must be present")
-        for pill_text in direct_pills:
-            self.assertIn("★", pill_text, f"★ glyph must appear in is-direct pill: {pill_text!r}")
+        # ★ glyph in confirmed rows (DeepChord has direct traits)
+        glyph_els = re.findall(r'<span class="rn-trait-glyph"[^>]*>([^<]*)</span>', self.dc_html)
+        self.assertTrue(glyph_els, "at least one rn-trait-glyph element must be present for direct traits")
+        # At least one must be ★
+        star_glyphs = [g for g in glyph_els if "★" in g]
+        self.assertTrue(star_glyphs, "★ glyph must appear in .rn-trait-glyph for direct traits")
 
-        # is-indirect pill carries ☆ (build a synthetic entry that has an indirect trait)
+        # ☆ glyph for indirect trait (build a synthetic entry)
         entry = {"artist": "SynGlyph", "blurb": "test",
                  "traits": [{"title": "Indirect trait", "tier": "indirect"},
                              {"title": "Direct trait",  "tier": "direct"}]}
         html = build_widget.render_reference_notes(entry)
-        indirect_pills = re.findall(r'<span class="tc-rn-pill is-indirect">([^<]*)</span>', html)
-        self.assertTrue(indirect_pills, "at least one is-indirect pill must be present")
-        for pill_text in indirect_pills:
-            self.assertIn("☆", pill_text, f"☆ glyph must appear in is-indirect pill: {pill_text!r}")
+        indirect_glyphs = re.findall(
+            r'<span class="rn-trait-glyph rn-trait-glyph-indirect">([^<]*)</span>', html)
+        self.assertTrue(indirect_glyphs, "at least one rn-trait-glyph-indirect element must be present")
+        self.assertIn("☆", indirect_glyphs[0],
+                      "☆ glyph must appear in .rn-trait-glyph-indirect for indirect traits")
 
 
 if __name__ == "__main__":
