@@ -1131,5 +1131,71 @@ class WebPanelReadableLayout(unittest.TestCase):
                       ".rn-footnote must contain '★' in its text; got: " + repr(r["text"][:200]))
 
 
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class DesignTokenColourRendered(unittest.TestCase):
+    """Browser-level proof of the SEMANTIC COLOUR tokens (SPEC §I, DS-INV-2/3).
+
+    The 9 tests in test_design_tokens.py assert the tokens are DEFINED and that their
+    values match the catalog palette — but only as text in build_widget.TEMPLATE.
+    Nothing verified that a real browser RESOLVES --good/--warn/--bad at :root and
+    delivers them through the cascade to the elements that wear them. A malformed
+    :root, a specificity conflict, or a token indirection would pass every string
+    test and still ship a colourless (or wrong-coloured) MEANING to the eye — the
+    exact class the s34 overhaul targets, extended from visibility to COLOUR. Node
+    N16 (design tokens) was the weakest in the s52 coverage inventory: 9 tests, ALL
+    STRING, no computed-colour proof anywhere (data/test_coverage_inventory_s52.md).
+
+    Level: L3-BROWSER (the level a colour fact requires). The rgb values below are the
+    computed render of the §I :root hexes (--good #46d39a / --warn #ffb454 / --bad
+    #ff6b6b), verified by probe s52.
+    """
+
+    _GOOD_HEX, _GOOD_RGB = "#46d39a", "rgb(70, 211, 154)"
+    _WARN_HEX = "#ffb454"
+    _BAD_HEX = "#ff6b6b"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.full_widget = _build_rich_widget(with_stems=True)  # carries .modebadge.full
+        cls.ref_widget = _build_ref_widget()                   # carries #webPanel + a ★ glyph
+
+    def test_semantic_tokens_resolve_at_root_in_browser(self):
+        """--good/--warn/--bad must RESOLVE at :root AT RUNTIME, not merely exist in the
+        CSS text. Negative side (INV-6): a dropped token resolves to '' — that is the
+        failure a string test cannot see."""
+        js = ('({good:getComputedStyle(document.documentElement).getPropertyValue("--good").trim(),'
+              'warn:getComputedStyle(document.documentElement).getPropertyValue("--warn").trim(),'
+              'bad:getComputedStyle(document.documentElement).getPropertyValue("--bad").trim()})')
+        r = hc.probe(self.full_widget, js, width=1200, height=3000)
+        self.assertEqual(r["good"], self._GOOD_HEX, "--good must resolve at :root in the browser (not '')")
+        self.assertEqual(r["warn"], self._WARN_HEX, "--warn must resolve at :root in the browser (not '')")
+        self.assertEqual(r["bad"], self._BAD_HEX, "--bad must resolve at :root in the browser (not '')")
+
+    def test_full_mode_badge_computes_good_green(self):
+        """The 'full analysis' badge (.modebadge.full) wears color:var(--good). Assert the
+        browser COMPUTES that green through the cascade — not that a hex sits in the text.
+        Negative side (INV-6): it must NOT fall back to default black, the failure mode when
+        the token drops and the label silently loses its meaning-colour."""
+        js = ('(function(){var e=document.querySelector(".modebadge.full");'
+              'return {present:!!e,color:e?getComputedStyle(e).color:null};})()')
+        r = hc.probe(self.full_widget, js, width=1200, height=3000)
+        self.assertTrue(r["present"], "the full widget must render a .modebadge.full to test the token")
+        self.assertEqual(r["color"], self._GOOD_RGB,
+                         "the full-mode badge must render in --good green (real computed colour)")
+        self.assertNotEqual(r["color"], "rgb(0, 0, 0)",
+                            "the badge colour must not fall back to default black (token dropped)")
+
+    def test_confirmed_web_panel_glyph_computes_good_green(self):
+        """The ★ confirmed-trait glyph in the web panel (#webPanel .rn-trait-glyph — the
+        surface reworked in 0.9.32) wears color:var(--good). Browser proof the readable
+        layout the eye just approved stays green under the real cascade."""
+        js = ('(function(){var e=document.querySelector("#webPanel .rn-trait-glyph");'
+              'return {present:!!e,color:e?getComputedStyle(e).color:null};})()')
+        r = hc.probe(self.ref_widget, js, width=1200, height=3000)
+        self.assertTrue(r["present"], "the ref fixture must render a confirmed-trait ★ glyph to test")
+        self.assertEqual(r["color"], self._GOOD_RGB,
+                         "the confirmed ★ glyph must render in --good green (real computed colour)")
+
+
 if __name__ == "__main__":
     unittest.main()

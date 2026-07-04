@@ -518,6 +518,7 @@ level by `tests/test_design_tokens.py` (the CSS is emitted verbatim from `build_
 | DS-INV-3a | `--ink-dim` is defined in the widget `:root` (and catalog copy). | `test_design_tokens::test_ink_dim_token_defined` |
 | DS-INV-3b | The 8 near-white + 2 drift raw hexes (#eef1f8/#cfd6e6/#cdd5e6/#c3cbdc/#aab3c7/#a0a8bc/#8b93a7 + #ffb13f→warn, #6fdfb8→good) are tokenised in the CSS rules (token defs excepted). | `test_design_tokens::test_ladder_and_drift_tokenised_in_css` |
 | DS-INV-7c | The guard is by LOCATION: stem-colour arrays + the canvas meter label keep their raw hex (data-viz untouched). | `test_design_tokens::test_stem_and_canvas_literals_untouched` |
+| DS-INV-2/3 (browser) | The semantic tokens RENDER, not just exist in text: `--good/--warn/--bad` resolve at `:root` at runtime AND reach the elements that wear them — `.modebadge.full` and the confirmed `#webPanel .rn-trait-glyph` compute `rgb(70,211,154)` = --good. NEG: a resolved token is never '' (dropped) and the badge never falls back to default `rgb(0,0,0)` (cascade override). Closes the N16 level-gap (s52): design tokens were tested ALL-STRING, blind to a runtime colour break. | `test_headless_render::DesignTokenColourRendered` (L3-BROWSER, s52) |
 
 Deferred (next movement — surface named, not yet coded):
 | code | rule (1-line) | lands with |
