@@ -721,14 +721,55 @@ Simple↔Detailed and never writes `tc_view` (§B.15, INV-41); the `?direction` 
   performance — one class toggle + one scroll per click, no envelope change; two windows — no shared state,
   two open copies never interact.
 - *Non-goals:* the per-lane canvas highlight (stays deferred, above); a graph→card BACK pointer (clicking a
-  moment on the arc to light its card) — a separate story; any change to the based-on wording; any automatic
-  view switch. *Success measure:* on the library tracks, clicking one card of each family lands the panel its
-  based-on names in view with the pulse on it — verified by deed at landing; no usage counter `[default]`.
+  moment on the arc to light its card) — shipped as its own story, the block below (2026-07-05 late); any
+  change to the based-on wording; any automatic view switch. *Success measure:* on the library tracks,
+  clicking one card of each family lands the panel its based-on names in view with the pulse on it —
+  verified by deed at landing; no usage counter `[default]`.
 - **Subtle in the UI** — transparency, not overload (Alexander's "don't overload" steer). A quiet muted line under
   the card body.
 - **Machine-checkable invariant (the rest is authoring quality):** every `D.recs` entry has a **non-empty**
   `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
   unit-tested.
+
+**The arc answers back — a marked moment's whole column lights its card (2026-07-05 late, the backpointer
+half of card-evidence; the finishing pass before the project closes).** The arc already MARKS every moment
+the coach wrote a timecoded card about: the lettered triangle cues above the scenes, one shared identity
+with the letter badges on the cards. But only the thin triangle band (≈22 px tall) answered a click — on
+the arc BODY at the very same moment, the click just moved the playhead, and "what does the coach say
+about THIS moment?" had a 22-pixel answer zone. This story completes the loop the s61 block above began:
+cards lead to their evidence; the graph now leads back to its cards.
+*Fences — neighbouring promises that stay true:* the arc's plain click=seek away from cues (§B.14 seek
+sources, INV-33/38 — seek still preserves playback); the forward card→panel navigation is untouched
+(INV-48a–e); the flash stays a CSS/DOM class toggle, the canvas DRAWING code is not edited — this change
+lives in hit-testing, not rendering (INV-34's spirit); the view ladder is untouched, no card click or arc
+click ever switches Simple↔Detailed (§B.15, INV-41); the `?direction` entry-focus path is unaffected
+(D-INV-37).
+- **The cue's click zone is its whole column.** Hovering the arc within the snap radius (~11 px, the same
+  radius the triangle band uses today) of a cue's moment — at any height on the arc canvas (the full
+  canvas: family rows and axis strip included), not only the triangle band — shows that cue's tooltip
+  (letter · moment · the card's header · "click to read below") and the pointer cursor. `INV-49a`
+- **One click path, exactly the triangle's.** Clicking inside the column does precisely what clicking the
+  triangle does today: seek the playhead to the cue's moment, then light its card — the shared flash +
+  scroll (`flashRec`). The same hit-test (`cueAt`) serves band and column; no second wiring. `INV-49b`
+- **Away from every cue, nothing changes.** A click farther than the snap radius from all cues keeps the
+  plain seek to the exact clicked time — no card lit, no scroll-away. A run with no timecoded cards has no
+  cues, so the whole arc stays a pure seek surface. `INV-49c`
+- **Nothing persisted.** The backpointer writes no state (no localStorage, no URL), changes no view. `INV-49d`
+- *Composed across the axes:* view — the arc lives in `#storyPanel` (visible in both views) and every cue's
+  card is timecoded, which Simple shows (INV-22 hides only global cards — and a global card has no cue by
+  construction, `t=null`); mode — quick runs with timecoded cards get the same behaviour, runs without get
+  INV-49c; viewport — the radius is CSS pixels, same at any width; touch — the tap is the click and the
+  column is a far easier target than the 22-px band (an improvement); the tooltip stays advisory, never the
+  sole affordance `[default]`; keyboard — the canvas stays pointer-only, parity with today, a known gap
+  `[default]`; empty/error — INV-49c; performance — the same per-mousemove hit-test over the cue list, only
+  its y-bound widens; persistence/two-windows — INV-49d, no shared state.
+- *Trade-off, chosen:* inside a cue's column the hover tooltip shows the coach's remark INSTEAD of the
+  generic time·scene·playing readout — the marked moment's story is the more valuable read there, and the
+  readout returns 11 px away `[default]`.
+- *Non-goals:* the per-lane canvas highlight (stays deferred); a panel→card backlink from the evidence
+  panels; new DRAWN marks on the arc (the affordance is the existing triangles + hover line + cursor +
+  tooltip); any change to card texts. *Success measure:* on a library track, hovering mid-arc at a marked
+  moment shows the cue tooltip and the click lights the right card — verified by deed at landing `[default]`.
 
 ### B.14 The synced player as a STATE MACHINE (2026-06-23, cold-session maintenance — the most interactive, least-spec'd surface)
 The full-mode player is the widget's most interactive surface (play/pause × per-stem mute × solo × seek ×

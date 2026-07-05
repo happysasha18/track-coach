@@ -616,6 +616,9 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    noise). Shown on wide blocks + in the hover.
    **Timeline callouts (v0.5.3; de-duped v0.5.13):** the located recs are placed on the timeline as
    **downward triangles above the scenes**, lettered A·B·C… and coloured by class (crit/do/concept).
+   **The cue's click zone is its whole column (v1.4.0, SPEC §B.13 INV-49):** hovering the story canvas at
+   a marked moment — any height, not just the triangle — shows the card's headline; the click seeks to
+   the moment and flashes the card below. Away from the marks the chart stays plain click-to-seek.
    **One-card-one-text rule:** an insight's full prose belongs to its Recommendation card only;
    everything else (timeline triangle, lane verdicts) is a pointer/headline to it,
    never a re-statement. The "→ Try" action label is shown ONLY on the bottom rec cards — keep the

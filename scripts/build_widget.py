@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.3.0"  # Track Coach analyzer version — s61: a card leads to ITS evidence panel (§B.13 INV-48)
+TC_VERSION = "1.4.0"  # Track Coach analyzer version — s62: the arc answers back, a cue's whole column lights its card (§B.13 INV-49)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -3463,7 +3463,8 @@ const CUES=(D.recs||[]).map((r,i)=>({r,i})).filter(o=>o.r.t!=null)
   .sort((a,b)=>a.r.t-b.r.t).map((o,k)=>({r:o.r,idx:o.i,t:+o.r.t,letter:CUELET[k]||"•",cls:o.r.cls||""}));
 const cueByIdx={};CUES.forEach(c=>{cueByIdx[c.idx]=c;});
 // flash + scroll to the FULL recommendation card (the single place the
-// paragraph + "→ Try" fix live). Used when a timeline triangle / cue-index item is tapped.
+// paragraph + "→ Try" fix live). Used by the arc's cue click — triangle band or anywhere
+// in the cue's column (SPEC §B.13 INV-49b); the canvas click handler is its only caller.
 function flashRec(letter){if(!letter)return;const el=document.querySelector('#recs .rec[data-let="'+letter+'"]');
  if(!el)return;el.classList.add("flash");el.scrollIntoView({behavior:"smooth",block:"center"});
  setTimeout(()=>el.classList.remove("flash"),1600);}
@@ -3750,8 +3751,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    ctx.fillStyle="#ffd166";ctx.font="700 9px sans-serif";ctx.textAlign="center";ctx.fillText(c.sig,x,famBot()+10);});
   ctx.fillStyle=getCss("--muted");ctx.font="10px sans-serif";ctx.textAlign="center";for(let t=0;t<=ST.dur;t+=60)ctx.fillText(fmtT(t),xOf(t),H-7);
   if(hx!=null){ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,famBot());ctx.stroke();}}
- // find a callout cue under the cursor (the triangle band sits just above the scenes)
- function cueAt(mx,my){if(my<4||my>26)return null;let best=null,bd=11;
+ // find a callout cue near the cursor. The cue's click zone is its whole COLUMN on the
+ // canvas (SPEC §B.13 INV-49a, 2026-07-05) — any height, not only the triangle band; the
+ // snap radius (11 px) is unchanged. Away from every cue the arc stays plain click=seek.
+ function cueAt(mx){let best=null,bd=11;
   CUES.forEach(c=>{const d=Math.abs(mx-xOf(c.t));if(d<bd){bd=d;best=c;}});return best;}
  cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
   const cue=cueAt(mx,my);cv.style.cursor=cue?"pointer":"default";

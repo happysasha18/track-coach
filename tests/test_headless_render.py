@@ -1913,5 +1913,158 @@ class CardEvidenceNav(unittest.TestCase):
             self.assertIsNone(row.get("t"), "map-panel note cards must carry no timecode")
 
 
+def _globals_only_core(n=48, dur=120.0):
+    """A core that spawns ONLY global (t=None) cards — energy_flat, wobble, true-peak,
+    squashed, tonal — so the arc has NO timecoded cues at all (INV-49c zero bound):
+    flat energy with an EARLY peak (no climax), no section bounds (no long_section),
+    flat brightness (no brightness rec), low endpoint cosine (no endpoint rec)."""
+    tb = [round(i * dur / n, 3) for i in range(n)]
+    flat = [round(0.5 + (0.05 if i == 3 else 0.0), 3) for i in range(n)]  # peak at i=3, early
+    return {
+        "duration_s": dur, "time_bins": tb, "tempo": 123,
+        "energy": flat, "brightness": [0.5] * n,
+        "density": [0.5] * n, "stereo_width": [0.5] * n,
+        "energy_trend": 0.02, "brightness_trend": 0.03, "density_trend": 0.02,
+        "stereo_width_trend": 0.02,
+        "wobble_rate_start_hz": 3.0, "wobble_rate_end_hz": 3.2,
+        "endpoint_cosine": 0.5,
+        "vitals": {"true_peak_db": 0.6, "dynamic_range_db": 4.5},
+        "tonal_balance": [{"band": "250", "dev_db": 6.0}],
+    }
+
+
+def _build_globals_only_widget():
+    tmp = Path(tempfile.mkdtemp(prefix="tc_nocue_"))
+    out = tmp / "widget.html"
+    build_widget.build_html(_globals_only_core(), {}, None, None, str(out),
+                            "No Cues Test", build_widget.STRINGS, mode="full",
+                            narrative_md="Globals only.")
+    return str(out)
+
+
+# INV-49 probes — scan a DEEP horizontal line across the arc canvas (y = 60% of its
+# height, far below the 22px triangle band) with synthetic mousemoves; where the cursor
+# turns `pointer` is a cue COLUMN. The zone is discovered by scanning the real affordance,
+# never by re-computing the canvas layout constants (prover AB-1 discipline).
+_ARC_SCAN_JS = (
+    "(function(){document.body.classList.remove('simple');"
+    "var cv=document.getElementById('story');if(!cv)return {noCanvas:true};"
+    "var r=cv.getBoundingClientRect();var deepY=r.top+r.height*0.6;"
+    "var segs=[],cur=null,tips=[];"
+    "function mm(x){cv.dispatchEvent(new MouseEvent('mousemove',"
+    "{clientX:x,clientY:deepY,bubbles:true}));return getComputedStyle(cv).cursor;}"
+    "for(var x=Math.ceil(r.left)+1;x<r.right-1;x+=2){"
+    " if(mm(x)==='pointer'){"
+    "  if(!cur){cur={a:x,b:x};segs.push(cur);"
+    "   var tip=document.getElementById('ctip');tips.push(tip?tip.innerHTML:'');}"
+    "  else cur.b=x;}"
+    " else cur=null;}"
+    "return {segs:segs,tips:tips,h:r.height,"
+    "lets:document.querySelectorAll('#recs .rec[data-let]').length};})()"
+)
+
+
+def _arc_click_js(mode):
+    """mode='cue' clicks the centre of the first pointer segment at deep y;
+    mode='gap' clicks the deep-y point FARTHEST from every segment (>25px away)."""
+    return (
+        "(function(){document.body.classList.remove('simple');"
+        "var cv=document.getElementById('story');if(!cv)return {noCanvas:true};"
+        "var r=cv.getBoundingClientRect();var deepY=r.top+r.height*0.6;"
+        "var segs=[],cur=null;"
+        "function mm(x){cv.dispatchEvent(new MouseEvent('mousemove',"
+        "{clientX:x,clientY:deepY,bubbles:true}));return getComputedStyle(cv).cursor;}"
+        "for(var x=Math.ceil(r.left)+1;x<r.right-1;x+=2){"
+        " if(mm(x)==='pointer'){if(!cur){cur={a:x,b:x};segs.push(cur);}else cur.b=x;}"
+        " else cur=null;}"
+        "var scrolled=[],seeks=[];"
+        "var sp=Element.prototype.scrollIntoView;"
+        "Element.prototype.scrollIntoView=function(){scrolled.push(this.id||"
+        "(this.classList&&this.classList.contains('rec')?'rec':''));"
+        "return sp.apply(this,arguments);};"
+        "window.__seek=function(t){seeks.push(t);};"
+        "var href0=location.href,store0=localStorage.getItem('tc_view');"
+        "var cx=null;"
+        "if(" + ("true" if mode == "cue" else "false") + "){if(!segs.length)return {noSegs:true};"
+        " cx=(segs[0].a+segs[0].b)/2;}"
+        "else{var best=null,bd=-1;"
+        " for(var x=Math.ceil(r.left)+1;x<r.right-1;x+=2){var d=1e9;"
+        "  segs.forEach(function(s){d=Math.min(d,Math.max(s.a-x,x-s.b,0));});"
+        "  if(d>bd){bd=d;best=x;}}"
+        " if(bd<25)return {noGap:true,segs:segs.length};cx=best;}"
+        "cv.dispatchEvent(new MouseEvent('click',{clientX:cx,clientY:deepY,bubbles:true}));"
+        "var f=document.querySelector('#recs .rec.flash');"
+        "return {seeks:seeks,scrolled:scrolled,segs:segs.length,"
+        "flashLet:f?f.getAttribute('data-let'):null,"
+        "flashT:f?parseFloat(f.getAttribute('data-t')):null,"
+        "hrefSame:location.href===href0,"
+        "storeSame:localStorage.getItem('tc_view')===store0,"
+        "errors:TC.errors()};})()"
+    )
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class ArcBackpointer(unittest.TestCase):
+    """INV-49a-d (SPEC §B.13 "the arc answers back", 2026-07-05 late) — a cue's click
+    zone is its whole COLUMN on the arc canvas, not only the 22px triangle band. Written
+    RED against 1.3.0 (cueAt returned null below y=26, so a deep click never lit a card)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.nav = _build_nav_widget()            # timecoded cards → cues on the arc
+        cls.nocue = _build_globals_only_widget()  # global cards only → NO cues
+
+    def test_cue_column_is_hoverable_full_height(self):  # INV-49a
+        r = hc.probe(self.nav, _ARC_SCAN_JS, width=1100, height=900)
+        self.assertFalse(r.get("noCanvas"), "the nav fixture must render the arc canvas")
+        segs, lets = r.get("segs", []), r.get("lets", 0)
+        self.assertGreater(lets, 0, "the nav fixture must carry timecoded (lettered) cards")
+        self.assertGreaterEqual(len(segs), 1,
+                                "hovering DEEP below the triangle band at a cue's moment "
+                                "must read as clickable (the whole column is the zone)")
+        self.assertLessEqual(len(segs), lets,
+                             "there must be no pointer zones beyond the cues "
+                             "(nearby cues may merge into one segment)")
+        for tip in r.get("tips", []):
+            self.assertIn("click to read below", tip,
+                          "hovering the column must show the cue tooltip, not the "
+                          "generic time/scene readout")
+
+    def test_column_click_seeks_and_lights_the_card(self):  # INV-49b + INV-49d
+        r = hc.probe(self.nav, _arc_click_js("cue"), width=1100, height=900)
+        self.assertFalse(r.get("noSegs"), "no pointer column found on the arc — INV-49a broken")
+        self.assertEqual(len(r.get("seeks", [])), 1, "the column click must seek exactly once")
+        self.assertIsNotNone(r.get("flashLet"),
+                             "the column click must light (flash) the cue's card")
+        self.assertIn("rec", r.get("scrolled", []),
+                      "the lit card must be scrolled into view")
+        self.assertIsNotNone(r.get("flashT"), "the lit card must be a timecoded card")
+        self.assertLess(abs(r["seeks"][0] - r["flashT"]), 0.5,
+                        "the seek must land on the CUE'S moment, not the raw pixel time")
+        self.assertTrue(r.get("hrefSame"), "the backpointer must not touch the URL (INV-49d)")
+        self.assertTrue(r.get("storeSame"), "the backpointer must not write the store (INV-49d)")
+        self.assertEqual(r.get("errors"), [], "the arc backpointer must be JS-clean")
+
+    def test_click_between_cues_stays_plain_seek(self):  # INV-49c
+        r = hc.probe(self.nav, _arc_click_js("gap"), width=1100, height=900)
+        self.assertFalse(r.get("noGap"),
+                         f"no deep-y gap >25px from all {r.get('segs')} cue columns — "
+                         "fixture too crowded to test the plain-seek side")
+        self.assertEqual(len(r.get("seeks", [])), 1, "a gap click must still seek")
+        self.assertIsNone(r.get("flashLet"), "a gap click must light NO card")
+        self.assertNotIn("rec", r.get("scrolled", []),
+                         "a gap click must not scroll any card into view")
+        self.assertEqual(r.get("errors"), [], "plain seek must stay JS-clean")
+
+    def test_no_timecoded_cards_no_columns(self):  # INV-49c zero bound
+        r = hc.probe(self.nocue, _ARC_SCAN_JS, width=1100, height=900)
+        self.assertFalse(r.get("noCanvas"), "the globals-only fixture must render the arc")
+        self.assertEqual(r.get("lets", -1), 0,
+                         "fixture drift: the globals-only build grew a timecoded card — "
+                         "rebuild the core so every card stays global")
+        self.assertEqual(len(r.get("segs", [])), 0,
+                         "with no cues the whole arc must stay a pure seek surface")
+
+
 if __name__ == "__main__":
     unittest.main()

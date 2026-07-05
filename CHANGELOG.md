@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.4.0] — 2026-07-05
+
+### Added
+- **The arc answers back: clicking a marked moment anywhere on the story graph lights its advice card.**
+  The lettered triangles above the scenes already marked the moments the coach wrote a card about, but
+  only the thin triangle band answered a click — on the chart body at the same moment, a click just moved
+  the playhead. Now the marked moment's whole column is the click zone: hover anywhere at that time and
+  the cursor + tooltip show the card's headline; click and the player seeks to the moment while the card
+  flashes into view below. Between the marks nothing changes — the chart stays a plain click-to-listen
+  surface. Cards lead to their evidence (1.3.0); the graph now leads back to its cards.
+  Spec: §B.13 INV-49a–d; browser-tested by scanning the real rendered canvas.
+
 ## [1.3.0] — 2026-07-05
 
 ### Added
