@@ -5,6 +5,19 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.0.2] — 2026-07-05
+
+### Improved
+- **Source links use the conventional chain-link icon.** The web-panel "Sources" list — and the catalog's
+  "Open" links — now lead with the standard link glyph (an inline SVG) instead of a `↗` arrow, and are
+  underlined, so they read unmistakably as clickable links. (Alexander's review: the arrow read as the
+  wrong, ugly icon.)
+- **Panel spacing hierarchy fixed.** The gap between separate top-level panels is now clearly larger than
+  the gap between sub-panels nested inside the Evidence drawer — a two-role spacing split (`--gap` within a
+  group, `--rhythm` between sections; the DS-INV-9 minimal slice, taken from the design system). This fixes
+  the earlier inversion (inner gap larger than outer), which the eye read as broken. Broad spacing
+  normalisation of the remaining literals stays a later design pass.
+
 ## [1.0.1] — 2026-07-05
 
 ### Improved

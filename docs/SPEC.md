@@ -1518,7 +1518,10 @@ reads as "the letters are louder than their own heading"); (b) **type scale** �
 widget's whole-number scale (section labels + footnote 11px, blurb/traits 13px, genre/realname/web-only/sources
 12px), retiring the scattered 10 / 10.5 / 11.5 / 12.5 "fractional" sizes the font audit flagged — no widget-wide
 type-token rollout (out of scope); (c) **source links** — each source reads as a link: an underline plus a
-leading ↗ (U+2197) icon, so the sources block is unmistakably a list of clickable links, not muted prose.
+leading **chain-link icon** (the conventional link glyph, an inline SVG `svg.tc-rn-link-ico` coloured via
+`currentColor`), so the sources block is unmistakably a list of clickable links, not muted prose. *(Refined
+2026-07-05: the first cut used a ↗ arrow; Alexander read it as the wrong, ugly glyph and asked for the
+conventional chain-link link icon.)*
 `tags: readability-2026-07-05 · brightness-hierarchy · type-scale · D-INV-29-typo`
 
 **What ★ / ☆ are measured against — the direction's CENTROID.** Both marks judge the trait on the
@@ -2221,13 +2224,18 @@ project is its browsable component library. One role = one token = one name.
   existing `test_headless_render` recs column-count assertions are UPDATED to the new expected counts,
   not held constant (this is a deliberate layout change, not a restyle). The recs cap stays 2 columns
   (a rec card wants a readable line length; `<min>` picked so a ~1120px content column yields 2).**
-- **Spacing split (DS-INV-9) — POST-1.0 (deferred, F5/s54).** The intended system is two roles —
-  `--gap 8/12/16` (within a group) and `--rhythm 28/44` (between sections). It is **not built in 1.0**
-  and §I does not assert it as shipped: verified by deed (s54) the widget uses ~13 distinct raw `gap:`
-  literals (2–20 px), so snapping them to a three-value scale is a spacing NORMALISATION — a design/taste
-  pass (which of 5/6/7 px becomes 8 px is Alexander's call), not the mechanical token-snap the motion/radii
-  tokens were. Deferred to keep 1.0 free of a silent restyle. Until built, spacing stays as literals and
-  DS-INV-9 is a POST-1.0 promise, not a current-system claim. `tags: post-1.0 · design-call · F5`
+- **Spacing split (DS-INV-9) — PANEL-RHYTHM SLICE BUILT s57; broad normalisation still POST-1.0.**
+  The system is two roles — `--gap 8/12/16` (within a group) and `--rhythm 28/44` (between sections).
+  **Built (s57, Alexander's design-system values):** the two role tokens exist (`--gap:16px`,
+  `--rhythm:28px`) and drive the PANEL spacing — every top-level `.tc-panel` carries `margin-bottom:var(--rhythm)`
+  (between sections), while the sub-panels nested inside `#evidence` take `margin-bottom:var(--gap)`
+  (within the group). This makes the **inter-panel gap strictly larger than the intra-panel gap**, fixing
+  the earlier inversion (measured 24px between top-level panels < 30px between sub-panels — the reverse of
+  correct hierarchy; Alexander's 2026-07-05 review). The old per-id overrides that caused it
+  (`#webPanel{margin:10px 0 0}`, `#evidence,#catalog{margin:24px 0 0}` — both zeroed the bottom margin)
+  are removed. **Still POST-1.0 (deferred):** the BROADER normalisation of the ~13 remaining raw `gap:`
+  literals (2–20 px) inside components to the three-value scale — that stays a design/taste pass (which of
+  5/6/7 px becomes 8 px is Alexander's call), not done here. `tags: panel-rhythm-built-s57 · post-1.0-broad · design-call · F5`
 
 ### I.3 Motion (new tokens)
 - `--dur-fast 120ms` (hover, highlight, small colour change) · `--dur-base 180ms` (appear, state

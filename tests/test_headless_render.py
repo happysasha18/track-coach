@@ -1175,7 +1175,8 @@ class WebPanelReadableLayout(unittest.TestCase):
         heads — the `.rn-section-label` / `.tc-rn-sources-label` computed luminance must be ≥ the
         body (`.tc-rn-blurb` / `.rn-trait-row`) luminance (was `--muted` under `--ink` body — a
         brightness inversion). (b) Each source reads as a LINK: `.tc-rn-sources a` carries an
-        underline AND a leading ↗ (U+2197) icon via ::before."""
+        underline AND a leading chain-link icon (inline svg.tc-rn-link-ico, the conventional
+        link glyph — replaced the ↗ arrow per Alexander 2026-07-05)."""
         r = hc.probe(
             self.widget,
             self._open_webpanel_js(
@@ -1191,7 +1192,7 @@ class WebPanelReadableLayout(unittest.TestCase):
                 "sources_label_lum: slbl?lum(getComputedStyle(slbl).color):null,"
                 "body_lum: body?lum(getComputedStyle(body).color):null,"
                 "src_underline: a?getComputedStyle(a).textDecorationLine:null,"
-                "src_icon: a?getComputedStyle(a,'::before').content:null};"
+                "src_icon: a?(a.querySelector('svg.tc-rn-link-ico')?'chain':null):null};"
             ),
             width=1100, height=3600,
         )
@@ -1208,8 +1209,46 @@ class WebPanelReadableLayout(unittest.TestCase):
         self.assertIsNotNone(r["src_underline"], "fixture must render a .tc-rn-sources link")
         self.assertIn("underline", r["src_underline"],
                       f"source links must be underlined (read as links); got {r['src_underline']}")
-        self.assertIn("↗", (r["src_icon"] or ""),
-                      f"each source link must carry a leading ↗ icon (::before); got {r['src_icon']!r}")
+        self.assertEqual(r["src_icon"], "chain",
+                         "each source link must carry a leading chain-link icon "
+                         f"(inline svg.tc-rn-link-ico); got {r['src_icon']!r}")
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class PanelGapHierarchy(unittest.TestCase):
+    """DS-INV-9 panel-rhythm slice (Alexander 2026-07-05 review): the gap BETWEEN top-level
+    panels (--rhythm) must be strictly LARGER than the gap between the sub-panels nested inside
+    #evidence (--gap). This fixes the earlier INVERSION (measured 24px inter < 30px intra — the
+    reverse of correct hierarchy). Measured with real getBoundingClientRect, invisible to string
+    tests. Robust to WHICH panels render: it takes the first two top-level `.wrap > details.tc-panel`
+    and the first two `#evidence > details.tc-panel` sub-panels."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.widget = _build_rich_widget(with_stems=True)
+
+    def test_inter_panel_gap_exceeds_intra_panel_gap(self):
+        r = hc.probe(
+            self.widget,
+            "(function(){document.body.classList.remove('simple');"
+            # open #evidence so its nested sub-panels have layout to measure
+            "var ev=document.querySelector('#evidence');if(ev)ev.open=true;"
+            "function gap(list){if(list.length<2)return null;"
+            "return list[1].getBoundingClientRect().top-list[0].getBoundingClientRect().bottom;}"
+            "var wrap=document.querySelector('.wrap')||document.body;"
+            "var tops=Array.prototype.filter.call(wrap.children,"
+            "function(e){return e.matches&&e.matches('details.tc-panel');});"
+            "var subs=document.querySelectorAll('#evidence > details.tc-panel');"
+            "return {inter:gap(tops),intra:gap(Array.prototype.slice.call(subs))};})()",
+            width=1100, height=4200,
+        )
+        self.assertIsNotNone(r["inter"], "fixture must render ≥2 top-level .tc-panel sections")
+        self.assertIsNotNone(r["intra"], "fixture must render ≥2 sub-panels inside #evidence")
+        self.assertGreater(
+            r["inter"], r["intra"] + 4,
+            f"inter-panel gap (--rhythm, {r['inter']}px) must be clearly larger than the intra-panel "
+            f"gap (--gap, {r['intra']}px) — DS-INV-9 hierarchy; was inverted (24<30) before the s57 fix")
+
 
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")

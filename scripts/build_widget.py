@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.0.1"  # Track Coach analyzer version — s57 web-panel readability (brightness/type/links)
+TC_VERSION = "1.0.2"  # Track Coach analyzer version — s57 cosmetics: chain-link icon + panel-gap hierarchy
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -184,7 +184,7 @@ STRINGS = {
         "cat_hint": "Your analysis library. Each run is kept in its own dated folder (nothing is overwritten) — open an earlier version to compare verdicts.",
         "cat_this_track": "This track",
         "cat_other_tracks": "Other tracks",
-        "cat_open": "Open ↗",
+        "cat_open": "Open",
         "cat_current": "you are here",
         "cat_versions": "{n} version(s)",
         "cat_missing": "(widget file not found)",
@@ -2551,8 +2551,14 @@ def render_reference_notes(artist_entry):
     # 7. Sources list (visible at panel bottom — Alexander 2026-07-04 amendment)
     sources_html = ""
     if sources:
+        # Conventional chain-link glyph (inline SVG, currentColor) — reads unmistakably as a link.
+        # Alexander 2026-07-05: replaced the earlier ↗ arrow, which read as the wrong/ugly icon.
+        link_ico = ('<svg class="tc-rn-link-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                    '<path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/>'
+                    '<path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>')
         links = "".join(
-            f'<li><a href="{_esc(s["url"])}" target="_blank">{_esc(s["label"])}</a></li>'
+            f'<li><a href="{_esc(s["url"])}" target="_blank">{link_ico}{_esc(s["label"])}</a></li>'
             for s in sources
         )
         sources_html = (
@@ -2874,7 +2880,10 @@ TEMPLATE = r"""<!DOCTYPE html>
 :root{--bg:#0c0e14;--panel:#141822;--panel2:#1b2030;--ink:#e8ecf5;--ink-dim:#aeb6c8;--muted:#8b94a8;
  --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa;--accent:var(--wob);
  --radius:10px;--radius-lg:14px;--radius-xl:18px;--radius-pill:20px;
- --dur-fast:120ms;--dur-base:180ms;--ease:ease-out}
+ --dur-fast:120ms;--dur-base:180ms;--ease:ease-out;
+ /* DS-INV-9 minimal slice (s57, Alexander's design-system values): --gap WITHIN a group,
+    --rhythm BETWEEN top-level sections — so inter-panel > intra-panel (fixes the 24<30 inversion) */
+ --gap:16px;--rhythm:28px}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--bg) 60%);
  color:var(--ink);font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}
@@ -2962,7 +2971,8 @@ body.simple #refRead{display:none!important}
  color:var(--good);padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
 /* Web-info plaque (§D.10.2, "What the web says") — collapsed tc-panel, Detailed-only, after #refRead */
 body.simple #webPanel{display:none!important}
-#webPanel{margin:10px 0 0}
+/* #webPanel vertical spacing now governed by --rhythm (base .tc-panel margin-bottom); the old
+   per-id 10px top override zeroed the bottom and helped invert the gap hierarchy — removed (s57). */
 #webPanel .web-panel-body{padding:4px 0 4px}
 #webPanel .web-artist-hdr{font-size:12.5px;font-weight:600;margin:0 0 4px;color:var(--ink)}
 #webPanel .web-genre-era{font-size:11.5px;color:var(--muted);margin:0 0 6px;font-style:italic}
@@ -2981,7 +2991,7 @@ body.simple #webPanel{display:none!important}
 #webPanel .tc-rn-head{margin:0 0 3px}
 /* s57 (Alexander 2026-07-05): fonts snapped UP to the widget's whole-number scale (was scattered
    10/10.5/11.5/12.5 — the audit's "fractional" set); section headings lifted --muted→--ink so a heading is
-   never dimmer than its own body (brightness hierarchy); sources given a ↗ link icon + underline. */
+   never dimmer than its own body (brightness hierarchy); sources given a chain-link icon + underline. */
 #webPanel .tc-rn-artist{font-size:13px;font-weight:700;color:var(--ink)}
 #webPanel .tc-rn-realname{font-size:12px;color:var(--muted);margin-left:5px;font-style:italic}
 #webPanel .tc-rn-genre{font-size:12px;color:var(--muted);margin:2px 0 10px;font-style:italic}
@@ -3006,13 +3016,13 @@ body.simple #webPanel{display:none!important}
 /* Footnote legend */
 #webPanel .rn-footnote{font-size:11px;color:var(--muted);opacity:.72;margin:12px 0 0;
  font-style:italic;line-height:1.5}
-/* Sources — read as links: ↗ icon + underline (s57). Label --ink (heading ≥ body). */
+/* Sources — read as links: chain-link icon + underline (s57; ↗ arrow retired 2026-07-05). Label --ink. */
 #webPanel .tc-rn-sources-label{font-size:11px;font-weight:700;text-transform:uppercase;
  letter-spacing:.07em;color:var(--ink);margin:10px 0 5px}
 #webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 #webPanel .tc-rn-sources a{font-size:12px;color:var(--ink-dim);text-decoration:underline;
  text-underline-offset:2px;text-decoration-color:var(--muted)}
-#webPanel .tc-rn-sources a::before{content:"\2197 ";color:var(--wob);text-decoration:none;font-weight:700}
+#webPanel .tc-rn-sources a .tc-rn-link-ico{width:11px;height:11px;color:var(--wob);vertical-align:-1px;margin-right:5px}
 #webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration-color:var(--ink)}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
@@ -3073,7 +3083,7 @@ body.quick #recs .rec:not([data-t]){display:none!important}
 .tag.bad{background:rgba(255,107,107,.14);color:var(--bad)}
 /* ── tc-panel: ONE canonical collapsible panel — the single look for every section ────── */
 details.tc-panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;
- padding:14px 20px 18px;margin-bottom:30px}
+ padding:14px 20px 18px;margin-bottom:var(--rhythm)}  /* between top-level sections (DS-INV-9) */
 details.tc-panel>summary{cursor:pointer;list-style:none;user-select:none;
  color:var(--ink);font-size:15px;font-weight:600;padding:4px 0 10px}
 details.tc-panel>summary::-webkit-details-marker{display:none}
@@ -3164,8 +3174,10 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .seqkey .chip{display:inline-flex;align-items:center}
 .seqkey .ms{display:inline-block;min-width:13px;height:13px;line-height:13px;text-align:center;
  border-radius:3px;font-size:8px;font-weight:700;color:var(--bg);margin-right:4px}
-/* Evidence drawer and Catalog: tc-panel chrome, collapsed by default, margin override */
-#evidence,#catalog{margin:24px 0 0}
+/* Evidence drawer and Catalog: tc-panel chrome, collapsed by default. Top-level spacing comes from
+   --rhythm (base margin-bottom); the sub-panels nested INSIDE #evidence take the smaller --gap so the
+   intra-panel gap is clearly tighter than the inter-panel rhythm (DS-INV-9 minimal slice, s57). */
+#evidence>details.tc-panel{margin-bottom:var(--gap)}
 /* CATALOG inner tracks */
 .catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
  letter-spacing:.7px;font-weight:700}
@@ -3177,9 +3189,12 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .catrun .cmode{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
  border:1px solid var(--line);border-radius:20px;padding:1px 7px}
 .catrun .cverd{color:var(--ink);font-size:12.5px;flex:1;min-width:120px}
-.catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;text-decoration:none;
+.catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;
+ text-decoration:underline;text-underline-offset:2px;
  white-space:nowrap;border:1px solid var(--wob);border-radius:var(--radius);padding:3px 10px;transition:background var(--dur-fast)}
-.catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:none}
+/* same chain-link glyph as the web-panel sources, + underline (Alexander 2026-07-05: "такой же и подчёркнутый") */
+.catrun a.copen .tc-rn-link-ico{width:11px;height:11px;vertical-align:-1px;margin-right:5px}
+.catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:underline}
 .catrun .cnow{margin-left:auto;color:var(--wob);font-size:11px;font-weight:700;white-space:nowrap}
 .catrun .cmiss{margin-left:auto;color:var(--muted);font-size:11px}
 .cattrack{border:1px solid var(--line);border-radius:var(--radius-lg);margin:8px 0;background:rgba(0,0,0,.12)}
@@ -3417,7 +3432,7 @@ document.getElementById("recLegend").innerHTML=
  if(!wrap||!C||!C.tracks||!C.tracks.length){if(wrap)wrap.style.display="none";return;}
  const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
  const runRow=r=>{const right=r.self?`<span class="cnow">● ${T.cat_current||"you are here"}</span>`
-    :r.exists?`<a class="copen" href="${encodeURI(r.rel)}">${T.cat_open||"open →"}</a>`
+    :r.exists?`<a class="copen" href="${encodeURI(r.rel)}"><svg class="tc-rn-link-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>${T.cat_open||"Open"}</a>`
     :`<span class="cmiss">${T.cat_missing||"(file not found)"}</span>`;
   // self row may not have its verdict recorded in index.json yet — fall back to this build's
   const vt=(r.self&&!r.verdict)?(D.verdict||""):(r.verdict||"");
