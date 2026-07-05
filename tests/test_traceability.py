@@ -278,6 +278,72 @@ class TraceabilityChecks(unittest.TestCase):
             + "\n".join(f"  {i}" for i in stale_baseline))
 
     # ------------------------------------------------------------------
+    # Check 6 — the REVERSE direction: matrix-defined bare INVs anchor in SPEC
+    # ------------------------------------------------------------------
+
+    # SPEC prose writes compressed slash-lists ("INV-18/22", "D-INV-12/14/18");
+    # each listed number counts as a mention of its own id.
+    _SPEC_BARE_COMPRESSED_RE = re.compile(r"(?<![-A-Za-z])INV-(\d+(?:/\d+)*)")
+
+    # Legacy bare INVs defined in the matrix before the reverse-trace gate existed
+    # (s58, the s57-queued anchor backfill). The seam codes named in the matrix
+    # header (INV-32/35–40/42–44/47) are PAID — anchored in SPEC prose in the same
+    # landing. These remain acknowledged debt: early §B per-stem / source-header /
+    # implementation-contract rows whose SPEC statement predates the anchor
+    # convention. Pay one down by adding its trailing anchor to the SPEC prose
+    # that states the behaviour (or reclassifying it as a matrix-local
+    # implementation contract in the matrix header) and deleting it here.
+    KNOWN_SPEC_ANCHOR_GAPS_2026_07_05: set[str] = {
+        "INV-1", "INV-2", "INV-3", "INV-4", "INV-5", "INV-6", "INV-7",
+        "INV-8", "INV-9", "INV-10", "INV-11", "INV-13", "INV-14", "INV-15",
+        "INV-16", "INV-17", "INV-20", "INV-21", "INV-23", "INV-24",
+        "INV-27", "INV-28", "INV-31",
+    }
+
+    def test_every_active_bare_matrix_invariant_appears_in_spec(self):
+        """Matrix→SPEC reverse traceability for the bare INV namespace (s58).
+
+        Check 3 guards SPEC→matrix; nothing guarded the reverse, so a bare
+        `INV-nn` could be defined and cited in TEST_MATRIX.md while the SPEC
+        stated the behaviour with no anchor — the s57 adoption pass found ten
+        such codes (INV-32/36–40/42–44/47). Every ACTIVE (non-tombstoned)
+        matrix definition row whose id is a bare `INV-\\d+` must have that id
+        appear in SPEC.md; compressed slash-lists ("INV-18/22") count for each
+        number. Pre-existing gaps are baselined in
+        KNOWN_SPEC_ANCHOR_GAPS_2026_07_05; any NEW bare row without a SPEC
+        anchor fails, and a baselined id that gains its anchor must be pruned.
+        """
+        spec_text = _read(SPEC)
+
+        present: set[str] = set()
+        for m in self._SPEC_BARE_COMPRESSED_RE.finditer(spec_text):
+            for num in m.group(1).split("/"):
+                present.add(f"INV-{num}")
+
+        row_pat = re.compile(r"^\s*\|\s*(INV-\d+)\s*\|")
+        defined: set[str] = set()
+        for line in _lines(MATRIX):
+            m = row_pat.match(line)
+            if m and not _is_skip_row(line):
+                defined.add(m.group(1))
+
+        missing = sorted((i for i in defined if i not in present),
+                         key=lambda s: int(s.split("-")[1]))
+        new_gaps = [i for i in missing
+                    if i not in self.KNOWN_SPEC_ANCHOR_GAPS_2026_07_05]
+        stale_baseline = sorted(self.KNOWN_SPEC_ANCHOR_GAPS_2026_07_05
+                                - set(missing))
+
+        self.assertEqual(new_gaps, [],
+            "TEST_MATRIX.md defines ACTIVE bare invariant row(s) whose id never "
+            "appears in SPEC.md (the behaviour needs its trailing anchor):\n"
+            + "\n".join(f"  {i}" for i in new_gaps))
+        self.assertEqual(stale_baseline, [],
+            "These ids are in KNOWN_SPEC_ANCHOR_GAPS_2026_07_05 but NOW appear "
+            "in SPEC.md — remove them from the baseline (debt paid):\n"
+            + "\n".join(f"  {i}" for i in stale_baseline))
+
+    # ------------------------------------------------------------------
     # Check 4 — no stale ⟨DECIDE marker
     # ------------------------------------------------------------------
     def test_no_stale_decide_marker(self):

@@ -83,6 +83,7 @@ finding. "Don't cry wolf, and don't paint silence."
   little material to read"`), each via its identifying near-silent label (`INV-STEMNAME-NEARSILENT-ID`), never a
   bare count and never an anonymous "near-silent, near-silent" (that was the s45 regression — the fix that
   excluded them from the lanes/tiles erased which stem they were; Alexander wants them SEEN, identified).
+  The acknowledgment itself must RENDER — a missing lane reads as a decision, not a bug. `INV-42`
   Evidence: Lazy_Sparks vocals −92 dB (peak −61), piano −88 dB (peak −42). ⟨DECIDE⟩ floor value →
   **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)** — reused the existing empty-caveat floor, no
   dedicated peak floor. **INV-45 (APPROVED — Alexander 2026-07-03): a near-silent stem's lane starts MUTED
@@ -384,7 +385,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
   lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
   (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
-  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression, Alexander), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (Alexander's standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (s46, Alexander): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
+  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression, Alexander), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (Alexander's standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (= `INV-44`; s46, Alexander): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
   - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
     6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
     (`play_note`, `map_hint`, `note_hint`, `note_hint_other`) AND prose from `map_stems.py`
@@ -641,6 +642,7 @@ observation:
   development sentence (it does not say "no dominant mode" — that would double-cover `energy_flat`). Calibrated
   by deed on the 3 library tracks (Lazy → grows by loud+bright, idle density+stereo; Shared → busier + image
   tightens; Wobble → opens only in brightness) — matches the hand-written stories in `docs/signal_value_map.md`.
+  `INV-32`
 - **NOT a card** (no fake action) — an observation IN the read. The helper is pure + unit-tested; the prose is
   authored, and `SKILL.md` carries the writing rule so every read includes it.
 - **Standalone (2026-06-23, by deed on Wobble — a Demucs run with NO authored narrative):** the line renders
@@ -703,15 +705,15 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
     panel (DOM/CSS only, never the canvas — §B.13/INV-34).
 - **Cross-control INVARIANTS (the combinations that were untested).**
   1. **One mode at a time (Alexander, 2026-06-21 — he called the mixed state wrong).** After ANY sequence of mute/solo toggles,
-     never `(some stem muted) AND (some stem soloed)` simultaneously. `toggleStem` guarantees it.
+     never `(some stem muted) AND (some stem soloed)` simultaneously. `toggleStem` guarantees it. `INV-35`
   2. **Solo resolves gains.** When `anySolo`, the audible set is EXACTLY the soloed stems (every non-soloed
-     stem is muted), regardless of individual mute flags.
-  3. **Mute resolves gains.** When NOT `anySolo`, audible(stem) = `!stem.mute`.
+     stem is muted), regardless of individual mute flags. `INV-36`
+  3. **Mute resolves gains.** When NOT `anySolo`, audible(stem) = `!stem.mute`. `INV-37`
   4. **Seek preserves transport AND mix.** A seek does not change any stem's `{mute, solo}` and resumes iff
      it was playing (a seek while paused stays paused). So: solo a stem → seek while playing → the same one
-     stem is still the only one audible AND playback continues (INV-33 generalised to the combination).
+     stem is still the only one audible AND playback continues (INV-33 generalised to the combination). `INV-38`
   5. **Seek clamps.** The resulting time is always in [0, dur]; a gutter/negative/over-dur click never seeks
-     out of range.
+     out of range. `INV-39`
   6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability (2026-06-23, Alexander
      found by deed: solo a stem → switch to Simple → the soloed part visually vanishes and you can't un-solo
      it).** The stem grid (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
@@ -721,7 +723,7 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
      solo / muted part they can't see or undo. Re-entering Detailed starts from the full mix (no hidden
      leftover state). This is the general rule the original §B.14 missed by modelling the player on the audio
      axis ALONE: an interactive surface must be specified across EVERY view/mode axis it lives under, not just
-     its own. (Quick never has the grid, so it never reaches this state.)
+     its own. (Quick never has the grid, so it never reaches this state.) `INV-40`
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 
@@ -1290,6 +1292,11 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   analysis" (stale tool-version) chip (INV-12) is orthogonal and unchanged. The page **subtitle counts tracks**
   (the rows shown), so the stated count matches what is on screen — never a version total larger than the
   visible rows. `D-INV-35`
+- **The catalog speaks product words, never dev internals (Alexander 2026-07-01 — "это ПРОДАКШН для юзеров").**
+  A row's label is the track's human title (humanised from the file name when no authored title exists); a raw
+  run-folder slug never appears as visible text anywhere on the page. A run dir that broke the
+  `<track>/<stamp>` naming convention shows "—" in the Date column — degraded gracefully, never the slug
+  leaked as a date. `INV-43`
 
 **Never happens (safety), specific to this surface.** The reference line never shows a number — no raw
 distance, score, rank, percentage, or "match %"; it names a direction and a coarse cue. "leans toward" is
@@ -1755,6 +1762,13 @@ promised at all. Within a full (stemmed) run, a per-stem axis that a *partial* r
 surface as "not measured" on Simple/Detailed, because there the surface IS promised and its absence is
 information. So: **missing-by-mode is silent (the rung never promised it); missing-within-a-promised-surface is
 shown.** `RC-INV-7`
+
+**No visible collapsible ever opens onto NOTHING — completeness is composed across the render-config axis, not
+just within `full` (A0, Fable audit 2026-07-03).** A container whose sub-panels all self-hide for lack of data
+(e.g. the evidence drawer on a quick run, which structurally has no stems / no .als) must hide ITSELF, never
+render as an open panel with only its summary inside. The rule holds at every rung a widget can render —
+quick, full-Simple, full-Detailed — because a gate that only ever builds `full` fixtures is blind to the other
+configs (exactly how the empty quick-mode evidence drawer shipped). `INV-47`
 
 **The same missing axis reads identically in the coach, the catalog, and the reference layer** — one track's
 fingerprint, its catalog row, and its dot/divergence in §D all draw "not measured" from the same manifest, so a

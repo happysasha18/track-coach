@@ -10,9 +10,12 @@ This matrix is SPEC.md projected into a checkable grid. Tests trace to it. The S
 > contracts** (`METRE-1..7`, `INV-GATE`, `INV-CSS-*`) — node-level mechanics (a decoder table, a CSS
 > alignment root-cause, the completeness-gate mechanism itself) that SPEC covers as behaviour prose, not
 > per-value codes. An audit finding "matrix id absent from SPEC" for these two kinds is EXPECTED.
-> **Known seam (queued, s57):** a dozen bare `INV-nn` codes (32, 36–40, 42–44, 47) are used here while the
-> SPEC text describes the behaviour without stating the code — the backfill (trailing anchors into SPEC +
-> extending test_traceability to enforce the reverse direction) is a queued landing of its own.
+> **Seam PAID (s58, 2026-07-05):** the bare `INV-nn` codes the s57 pass flagged (32, 36–40, 42–44, 47 —
+> plus 35, same §B.14 list, missed by that scan) now carry trailing anchors in SPEC prose, and
+> `test_traceability::test_every_active_bare_matrix_invariant_appears_in_spec` enforces the reverse
+> direction (matrix→SPEC) from here on. The pre-anchor-convention legacy rows (INV-1…31 minus the
+> already-anchored) are baselined in that test as acknowledged debt — pay one down by anchoring it in
+> SPEC and pruning the baseline.
 
 > **Bug-found protocol:** bug → ① fix/clarify the matrix cell or invariant → ② failing test, proven
 > red-on-bug → ③ fix code. Code chases the matrix.
