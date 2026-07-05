@@ -395,8 +395,12 @@ class ReferenceReadTabSelector(unittest.TestCase):
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
         )
-        self.assertNotIn('querySelectorAll(".reftab")', html,
-                         "no tab JS for single-direction (no tabs to switch)")
+        self.assertNotIn('addEventListener("click"', html,
+                         "no tab-SWITCHING JS for single-direction (no tabs to switch); "
+                         "the D-INV-37 entry reader is NOT the switcher and is emitted "
+                         "regardless of tab count (single-direction entry still scrolls)")
+        self.assertIn("direction=", html,
+                      "the entry reader must be present even for a single direction (D-INV-37)")
 
     def test_bar_count_per_panel_equals_axes_count(self):
         """Each panel must contain bars for all fully-measured axes (len(FP.AXES) per panel)."""

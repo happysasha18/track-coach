@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.2.0] — 2026-07-05
+
+### Added
+- **A library direction link opens the track right on that comparison.** Clicking a direction name in the
+  library catalog (the "leans toward" column) now opens that track's page in Detailed view, scrolled to the
+  "You vs your closest match" panel with that direction's tab already selected — the cross-page hand-off the
+  0.9 links only promised. The link carries a one-shot `?direction=` entry parameter plus the existing
+  `#detailed` view override; neither is remembered — clicking tabs afterwards changes nothing in the URL,
+  and your usual view preference is untouched. A stale link (direction no longer among the nearest) falls
+  back to the nearest match; on pages built before 1.2.0 the parameter is simply ignored.
+
 ## [1.1.0] — 2026-07-05
 
 ### Added

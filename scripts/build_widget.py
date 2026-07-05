@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.1.0"  # Track Coach analyzer version — s58: the merged reference panel (D-INV-36)
+TC_VERSION = "1.2.0"  # Track Coach analyzer version — s59: URL entry-focus, catalog link → focused tab (D-INV-37)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2845,6 +2845,32 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
             '})()</script>'
         )
 
+    # D-INV-37 — the one-shot URL entry reader (catalog direction-link hand-off, s59).
+    # Reads ?direction= ONCE on load: focuses the named tab through the CLICK PATH
+    # (D-INV-36b — bars, web body, summary all follow) and scrolls the panel into view;
+    # an unknown name falls back to the nearest (default) and still scrolls. Emitted with
+    # the panel REGARDLESS of tab count (a single-direction entry still scrolls); sits
+    # AFTER tab_js so the click listeners are already attached. Never writes the URL or
+    # the view store — the Detailed entry rides the link's #detailed hash (§B.15).
+    # The .refpanel guard keeps the empty state ("no close direction yet") param-inert.
+    entry_js = (
+        '<script>(function(){var go=function(){try{'
+        'var m=/[?&]direction=([^&#]+)/.exec(location.search||"");'
+        'if(!m)return;'
+        'var rp=document.getElementById("refPanel");if(!rp)return;'
+        'if(!rp.querySelector(".refpanel"))return;'
+        'var want=decodeURIComponent(m[1]);'
+        'var btns=rp.querySelectorAll(".reftab");'
+        'for(var i=0;i<btns.length;i++){'
+        'if(btns[i].textContent.trim()===want){btns[i].click();break;}}'
+        'rp.open=true;'
+        'rp.scrollIntoView({block:"start"});'
+        '}catch(e){}};'
+        'if(document.readyState==="loading")'
+        'document.addEventListener("DOMContentLoaded",go);else go();'
+        '})()</script>'
+    )
+
     # The ONE merged reference panel (D-INV-36a): title → shared selector → centroid read →
     # web notes, both nested disclosures open by default (like the Evidence sub-panels).
     return (
@@ -2854,6 +2880,7 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         + refread_div
         + web_panel
         + tab_js
+        + entry_js
         + '</details>'
     )
 

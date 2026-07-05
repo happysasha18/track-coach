@@ -621,14 +621,14 @@ class CrossPageModeAgreement(unittest.TestCase):
                              f"INV-20: mode={mode} colour differs — catalog {cat_col} vs widget {wid_col}")
 
 
-class DirectionLinkIsReal(unittest.TestCase):
-    """Bug E-s31 / item E bug 3: catalog 'leans toward' direction links used `href="#"` (a dead
-    no-op). Per D-INV-28 ('direction → open read focused'), clicking a direction should navigate
-    to the track's widget focused on the #refRead reference-read section.
-
-    Fix: _lean_cell now accepts widget_href and emits `<widget_href>#refRead`; _row passes href.
-    Guard: rendered direction links must NOT be bare '#'; they must contain '#refRead' as the
-    anchor, pointing at the focused reference read section of the row's widget."""
+class DirectionLinksCarryEntryPair(unittest.TestCase):
+    """D-INV-37 (writer side, N20) — catalog direction links carry the ONE-SHOT ENTRY PAIR:
+    the row's own widget URL + `?direction=⟨URL-encoded direction name⟩#detailed`, so the
+    widget opens in Detailed (the panel is Simple-hidden, INV-18/22) focused on that
+    direction (the reader side is the widget's D-INV-37 entry reader, test_headless_render
+    ::EntryFocus). Supersedes the 0.9 `#refRead` placeholder anchor (which pointed INTO a
+    CSS-hidden panel for Simple-remembered users — the class this wiring kills).
+    Kept from bug E-s31: hrefs must never be bare '#' (a dead link)."""
 
     def _entry_with_lean(self, widget_href=None):
         """A catalog entry pre-injected with a synthetic Lean so _lean_cell is exercised."""
@@ -644,10 +644,10 @@ class DirectionLinkIsReal(unittest.TestCase):
         return e
 
     def test_direction_link_href_is_not_dead(self):
-        """When leans are present, the sim-dir links must NOT use bare '#' as the href.
-        Bug: href="#" scrolls nowhere; Fix: href="<widget>#refRead"."""
+        """When leans are present, the sim-dir links must NOT use bare '#' as the href
+        (bug E-s31: href="#" scrolls nowhere)."""
         e = self._entry_with_lean()
-        # Call _lean_cell directly with a widget href (mirrors what _row does after the fix)
+        # Call _lean_cell directly with a widget href (mirrors what _row does)
         import similarity_columns as SC
         leans = e["_leans"]
         cell = catalog._lean_cell(leans, widget_href="file:///test/widget.html")
@@ -656,32 +656,41 @@ class DirectionLinkIsReal(unittest.TestCase):
         for href in hrefs:
             self.assertNotEqual(href, "#",
                                 f"direction link href must not be bare '#' (dead link); got {href!r}. "
-                                f"Fix: wire to the widget's #refRead section per D-INV-28.")
+                                f"Fix: wire the D-INV-37 entry pair.")
 
-    def test_direction_link_points_to_refread_anchor(self):
-        """Direction links must point to the #refRead anchor on the track's widget (D-INV-28:
-        'direction → open read focused'). The anchor must be '#refRead', not a bare '#'."""
+    def test_direction_link_carries_entry_pair(self):
+        """Each direction link = own widget URL + `?direction=⟨enc name⟩#detailed` — the
+        spaced name URL-encoded (EF-8), the pair in query-then-hash order (D-INV-37)."""
         import similarity_columns as SC
-        leans = [SC.Lean(direction="Test Direction", level="close", runner=None, n_shared=8)]
+        leans = [SC.Lean(direction="Venetian Snares", level="close", runner=None, n_shared=8)]
         cell = catalog._lean_cell(leans, widget_href="file:///some/path/widget.html")
-        self.assertIn("#refRead", cell,
-                      "direction link must include the '#refRead' anchor so the page opens "
-                      "at the reference-read section (D-INV-28 'open read focused')")
+        hrefs = re.findall(r'<a class="sim-dir" href="([^"]*)"', cell)
+        self.assertEqual(len(hrefs), 1, "one lean ⇒ one direction link")
+        self.assertEqual(
+            hrefs[0], "file:///some/path/widget.html?direction=Venetian%20Snares#detailed",
+            "the direction link must carry the one-shot entry pair — the URL-encoded "
+            "direction name as `?direction=` plus the `#detailed` view override "
+            "(D-INV-37: the panel is Simple-hidden, entry rides the §B.15 override)")
 
-    def test_rendered_catalog_direction_link_not_dead(self):
-        """Smoke test: render a full catalog HTML and confirm no sim-dir link has bare '#'."""
+    def test_rendered_catalog_direction_link_carries_entry_pair(self):
+        """Render the full catalog HTML: every sim-dir href carries the entry pair and
+        none is bare '#'."""
         e = self._entry_with_lean(widget_href="file:///test/widget.html")
         # Build a proper entry with the src fields so _open_href resolves
         e["src_run_dir"] = "/test"
         e["src_widget"] = "widget.html"
         html = catalog.render_catalog_html([e])
-        # Find all sim-dir anchor hrefs in the rendered HTML
         sim_dir_hrefs = re.findall(r'<a class="sim-dir" href="([^"]*)"', html)
-        if sim_dir_hrefs:  # direction present in rendered output
-            for href in sim_dir_hrefs:
-                self.assertNotEqual(href, "#",
-                                    f"sim-dir href in rendered catalog must not be bare '#'; "
-                                    f"got {href!r}. The direction link must navigate, not scroll to top.")
+        self.assertTrue(sim_dir_hrefs, "the injected lean must render a sim-dir link")
+        for href in sim_dir_hrefs:
+            self.assertNotEqual(href, "#",
+                                f"sim-dir href in rendered catalog must not be bare '#'; "
+                                f"got {href!r}. The direction link must navigate, not scroll to top.")
+            self.assertIn("?direction=", href,
+                          f"rendered direction link must carry `?direction=`; got {href!r}")
+            self.assertTrue(href.endswith("#detailed"),
+                            f"rendered direction link must end with the `#detailed` "
+                            f"one-shot view override; got {href!r}")
 
 
 if __name__ == "__main__":

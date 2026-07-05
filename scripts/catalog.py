@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import library  # same scripts/ dir; reuses load_index + the pure metric/version helpers
 import build_widget  # for TC_VERSION only (stdlib-only import) — stamp the catalog with its version
@@ -256,8 +257,11 @@ def _lean_cell(leans, widget_href=None, mode=None) -> str:
       • quick-only row → 'full analysis only' — quick never promised a reference (D-INV-20/22);
       • full row, no close direction → 'no close direction yet' (SPEC §D, the reference miss).
 
-    widget_href: the row's own widget URL (from _open_href). Direction links navigate to
-    that widget's #refRead section (D-INV-28: 'direction → open read focused').
+    widget_href: the row's own widget URL (from _open_href). Direction links carry the
+    ONE-SHOT ENTRY PAIR `?direction=⟨URL-encoded name⟩#detailed` (D-INV-37, wired s59):
+    the widget's entry reader focuses that direction's tab and scrolls the panel into
+    view; `#detailed` is the §B.15 one-shot view override — the panel is Simple-hidden
+    (INV-18/22), so entry must ride it. Neither half persists anything.
     When None, falls back to '#refRead' (in-page no-op but never the dead bare '#')."""
     if not leans:
         msg = "full analysis only" if mode == "quick" else "no close direction yet"
@@ -266,7 +270,8 @@ def _lean_cell(leans, widget_href=None, mode=None) -> str:
     for lean in leans:
         col = _SIM_COL.get(lean.level, "#8b94a8")
         dn = html.escape(lean.direction)
-        dir_href = html.escape(f"{widget_href}#refRead") if widget_href else "#refRead"
+        dir_href = (html.escape(f"{widget_href}?direction={quote(lean.direction)}#detailed")
+                    if widget_href else "#refRead")
         chips += f'<a class="sim-dir" href="{dir_href}" style="color:{col}">{dn}</a>'
     return f'<td class="c-sim c-lean">{chips}</td>'
 

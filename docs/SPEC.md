@@ -1384,10 +1384,12 @@ like the own-track column). `D-INV-28`
   panel already focused on that direction. The catalog cell shows the up-to-three nearest directions **inline,
   as a nearest-first vertical stack of coloured links** (no collapse/expand gesture — what shipped, owner-approved
   2026-06-29) — the order IS the ranking and the stack IS the glance; it is a row of links, never a stateful
-  picker. Because every click is a jump, nothing on the list page can strand. **Click-to-focus wiring (a
-  direction link opening the read pre-focused on it) is 0.9.x** — in 0.9 the links render (`href` placeholder)
-  and carry the colour/order; the cross-page focus hand-off is specified below (URL entry-focus) and wired next.
-  `tags: clickable-navigation · inline-stack · F-INV-4`
+  picker. Because every click is a jump, nothing on the list page can strand. **Click-to-focus is WIRED
+  (2026-07-05, s59):** each direction link carries the track's own widget URL plus the one-shot entry pair —
+  `?direction=⟨URL-encoded direction name⟩` and the existing `#detailed` one-shot view override (§B.15) — so
+  the widget opens with the read panel visible and focused on that direction; the hand-off mechanics live
+  below (URL entry-focus, D-INV-37). *(0.9 history: links rendered with a `#refRead` placeholder anchor.)*
+  `tags: clickable-navigation · inline-stack · F-INV-4 · D-INV-37`
 - **In the per-track producer's read — ONE reference panel, one selector, both disclosures follow (MERGED,
   Alexander 2026-07-05, his screenshot annotation).** The centroid read (§D.10.3) and the web notes (§D.10.2)
   live in **one container panel** (`#refPanel`, titled "You vs your closest match"), built like the Evidence
@@ -1406,15 +1408,29 @@ like the own-track column). `D-INV-28`
   nested disclosures (nothing to disclose; the pre-merge widget wrongly printed the siblings phrase "No similar
   tracks" here — fixed with the merge, the phrase is the §F/D-INV-22 vocabulary, never this surface's). With no
   reference directions defined at all the panel is absent (gate: `when-reference`). `D-INV-36` **The catalog → widget focus hand-off is a one-shot
-  URL *entry* parameter, not persisted tab state:** arriving from a catalog direction-link, the widget reads
-  the wanted direction once on load and opens that tab; thereafter clicking tabs does NOT write back to the URL
-  (the tab stays ephemeral, D-INV-28). So "opens focused on that direction" is buildable across the page
+  URL *entry* parameter, not persisted tab state (WIRED 2026-07-05, s59):** arriving from a catalog
+  direction-link (`?direction=⟨name⟩` — the URL-encoded direction name, the SAME name the tab shows: one
+  surface, one name), a full widget reads the parameter ONCE on load; if the reference panel renders, it
+  activates that direction's tab — bars, web body and web summary artist all follow, through the same path
+  a human click takes (D-INV-36b) — and scrolls the panel into view. The view arrives Detailed via the
+  link's `#detailed` one-shot override (§B.15): the panel is Simple-hidden (INV-18/22), so entry MUST ride
+  the override — which never writes the view store; and the parameter is never written back — clicking tabs
+  afterwards leaves the URL alone (the tab stays ephemeral, D-INV-28). A name not among the shown directions
+  (a stale or foreign link) **falls back to the nearest** — the default focus — and still opens and scrolls
+  the panel; a widget with no reference panel (quick, or no directions defined, or the "no close direction
+  yet" empty state) ignores the parameter entirely; an already-deposited older widget without the reader
+  simply opens normally — the parameter is inert there, links degrade, never break. Narrow/touch: no new
+  layout or gesture — entry reuses the click path `[default]`. *Non-goals:* no persisted tab state anywhere
+  (URL or storage), no widget→catalog focus backpointer, no re-render of already-deposited widgets. *Success
+  measure:* clicking a direction in the catalog opens that track's widget in Detailed with the reference
+  panel in view and that direction's tab active (browser test + verified by deed on the real catalog).
+  `D-INV-37` So "opens focused on that direction" is buildable across the page
   boundary without contradicting the not-in-URL rule — entry-focus on load ≠ tab persisted in the URL. On a
   recompute (D-INV-24) that drops the focused direction out of the shown list, the read **falls back to the
   nearest**; and if the recompute leaves **no direction clearing the lean bar at all**, the open reference read
   **collapses to the "no close direction yet" state** — tabs and the §D.10.3 per-facet bars are removed, the
   one-line prose read is retained, and it re-stamps — so an open panel never strands on a vanished direction
-  and never shows empty tabs. `tags: ephemeral-view-state · url-entry-focus · no-strand · recompute-empties · D-INV-24 · D-INV-28`
+  and never shows empty tabs. `tags: ephemeral-view-state · url-entry-focus · no-strand · recompute-empties · D-INV-24 · D-INV-28 · D-INV-37`
 - **The aim glyph rides the list.** A direction you've *aimed at* (D-INV-4) is marked with the aim glyph
   wherever it appears. Because aspiration is many-to-many, several directions can be aimed at; when **none of
   the aimed is among the shown nearest**, the surface pins **only the single nearest of the aimed ones** as an

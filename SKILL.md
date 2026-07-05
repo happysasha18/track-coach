@@ -667,7 +667,10 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    The one selector drives BOTH — web bodies are embedded per direction, and a direction with no web
    content hides the web disclosure while focused. Empty state (directions defined, none close) = the
    one-line "no close direction yet". The whole panel is absent in quick mode (no fingerprint) and hidden
-   in Simple view.
+   in Simple view. **URL entry-focus (v1.2.0, D-INV-37):** a catalog direction-link carries
+   `?direction=⟨enc name⟩#detailed`; the widget reads it ONCE on load, opens that direction's tab through
+   the click path and scrolls the panel into view — never persisted (no URL write-back, no `tc_view`
+   write); unknown name → nearest; empty state / quick / pre-1.2.0 widgets ignore it.
    **The metric-card grid was REMOVED (v0.5.4):** trend cards duplicated the Track Story lanes
    (now carried as lane-edge verdicts); the snapshot facts moved into the vitals strip. `build_cards`
    is no longer called.

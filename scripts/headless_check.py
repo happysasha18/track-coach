@@ -98,10 +98,14 @@ def _run_chrome(args: list[str], timeout: int = 60) -> subprocess.CompletedProce
 
 
 def probe(html_path: str, js: str, width: int = 1200, height: int = 2400,
-          settle_ms: int = 250, virtual_time: int = 6000) -> dict:
+          settle_ms: int = 250, virtual_time: int = 6000,
+          url_suffix: str = "") -> dict:
     """Render html_path in headless Chrome, evaluate `js` (a JS expression that
     returns a JSON-serialisable object, with TC.* helpers available) after the
-    page settles, and return the parsed result dict."""
+    page settles, and return the parsed result dict.
+
+    url_suffix: appended verbatim to the file:// URI (e.g. "?direction=Beta#detailed"),
+    so entry-parameter behaviour (D-INV-37) is testable against a real page load."""
     src = Path(html_path).read_text(encoding="utf-8")
     injected = (
         "<script>window.addEventListener('load',function(){setTimeout(function(){"
@@ -132,7 +136,7 @@ def probe(html_path: str, js: str, width: int = 1200, height: int = 2400,
             f"--window-size={width},{height}",
             f"--virtual-time-budget={virtual_time}",
             "--run-all-compositor-stages-before-draw",
-            "--dump-dom", tmp.as_uri(),
+            "--dump-dom", tmp.as_uri() + url_suffix,
         ])
         m = re.search(
             r'<script id="__tc_probe"[^>]*>(.*?)</script>', cp.stdout, re.S)

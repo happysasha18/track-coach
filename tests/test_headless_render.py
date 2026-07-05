@@ -1402,21 +1402,26 @@ class CatalogSemanticColourRendered(unittest.TestCase):
 
 # ── D-INV-36 — the merged reference panel (Q5, Alexander 2026-07-05) ──────────────────────
 
-def _merged_ref_page(directions, web_notes, tmp_prefix="tc_merged_"):
+def _merged_ref_page(directions, web_notes, tmp_prefix="tc_merged_", lead_px=0):
     """Render render_reference_read() output into a standalone page for the harness.
 
     Pure-function fixture: synthetic directions/web_notes, identity norm, track at the
     origin — no run_dir, no real data files, so each test controls exactly which
-    directions qualify and which carry web content."""
+    directions qualify and which carry web content.
+
+    lead_px: height of a filler block ABOVE the panel — gives the page scroll room so
+    the D-INV-37 entry-focus scroll ('panel into view') is measurable, mirroring the
+    real widget where #refPanel sits far down the page."""
     import fingerprints as FP
     track = {ax: 0.0 for ax in FP.AXES}
     norm = {"mu": {ax: 0.0 for ax in FP.AXES}, "sd": {ax: 1.0 for ax in FP.AXES}}
     html = build_widget.render_reference_read(track, directions, norm, web_notes=web_notes)
+    lead = f"<div style='height:{lead_px}px'></div>" if lead_px else ""
     tmp = Path(tempfile.mkdtemp(prefix=tmp_prefix))
     out = tmp / "page.html"
     out.write_text(
         "<!doctype html><html><head><meta charset='utf-8'></head>"
-        f"<body>{html}</body></html>", encoding="utf-8")
+        f"<body>{lead}{html}</body></html>", encoding="utf-8")
     return str(out)
 
 
@@ -1583,6 +1588,165 @@ class MergedReferencePanel(unittest.TestCase):
                          "vocabulary — the pre-merge bug)")
         self.assertEqual(r.get("tabs"), 0, "the empty state renders no tabs")
         self.assertEqual(r.get("nested"), 0, "the empty state renders no nested disclosures")
+
+
+# ── D-INV-37 — URL entry-focus: catalog direction-link → widget opens on that tab ─────────
+
+# Shared entry-state readback: active tab labels, visible bars/web indices, scroll
+# geometry, the web summary, the view store, and the live URL search — everything the
+# D-INV-37 reader row asserts.
+_ENTRY_STATE_JS = (
+    "(function(){var rp=document.getElementById('refPanel');"
+    "var act=[];document.querySelectorAll('.reftab.active').forEach("
+    "function(b){act.push(b.textContent.trim());});"
+    "function visIdx(sel){var v=[];document.querySelectorAll(sel).forEach(function(p){"
+    "if(getComputedStyle(p).display!=='none')v.push(p.dataset.didx);});return v;}"
+    "var wp=document.getElementById('webPanel');"
+    "return {active:act,bars:visIdx('.refpanel'),"
+    "scrollY:Math.round(window.scrollY),"
+    "rpTop:rp?Math.round(rp.getBoundingClientRect().top):null,"
+    "vh:window.innerHeight,"
+    "bodySimple:document.body.classList.contains('simple'),"
+    "webSummary:wp?(wp.querySelector('summary')||{}).textContent||'':'',"
+    "store:(function(){try{return localStorage.getItem('tc_view');}catch(e){return 'ERR';}})(),"
+    "search:location.search,errors:TC.errors()};})()"
+)
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class EntryFocus(unittest.TestCase):
+    """D-INV-37 — the one-shot `?direction` entry reader (SPEC §D.10.1, wired s59).
+    A catalog direction-link opens the widget with THAT direction's tab active and the
+    reference panel scrolled into view; unknown names fall back to nearest (still
+    scrolled); no param means the default state with NO scroll; entry never writes the
+    view store, and tab clicks never touch the URL. Written RED against 1.1.0 (no
+    reader: the param was inert, the page stayed at the top)."""
+
+    LEAD = 1600  # px of filler above the panel — real widgets bury #refPanel this deep
+
+    @classmethod
+    def setUpClass(cls):
+        # "Beta Prime" carries the URL-encoding case (a spaced name, EF-8).
+        import fingerprints as FP
+        def z(**over):
+            d = {ax: 0.0 for ax in FP.AXES}
+            d.update(over)
+            return d
+        cls.dirs = {"Alpha": z(tempo=0.2), "Beta Prime": z(dynamics=0.35),
+                    "Gamma": z(brightness=0.5)}
+        notes = {n: _web_note(n) for n in cls.dirs}
+        cls.page = _merged_ref_page(cls.dirs, notes, tmp_prefix="tc_entry_",
+                                    lead_px=cls.LEAD)
+
+    def _probe(self, suffix):
+        return hc.probe(self.page, _ENTRY_STATE_JS, width=1100, height=900,
+                        url_suffix=suffix)
+
+    def test_entry_param_focuses_named_tab_and_scrolls(self):
+        """(a) `?direction=⟨2nd direction, URL-encoded⟩` ⇒ that tab active, bars + web
+        body + web summary follow (the click path, D-INV-36b), panel scrolled into view."""
+        r = self._probe("?direction=Beta%20Prime")
+        self.assertEqual(r.get("active"), ["Beta Prime"],
+                         "the named direction's tab must be ACTIVE on entry (D-INV-37)")
+        self.assertEqual(r.get("bars"), ["1"],
+                         "the named direction's bars must be the visible panel")
+        self.assertIn("Beta Prime", r.get("webSummary", ""),
+                      "the web summary must follow the entry focus (D-INV-36b path)")
+        self.assertGreater(r.get("scrollY", 0), 0,
+                           "entry must SCROLL the panel into view — the 1.1.0 defect: "
+                           "the page stayed at the top and the focus was invisible")
+        self.assertTrue(0 <= r.get("rpTop", -1) < r.get("vh", 0),
+                        f"#refPanel top must sit inside the viewport, got top="
+                        f"{r.get('rpTop')} vh={r.get('vh')}")
+        self.assertEqual(r.get("errors"), [], "entry must be JS-clean")
+
+    def test_unknown_direction_falls_back_to_nearest_still_scrolls(self):
+        """(b) A stale/foreign name ⇒ nearest (default) stays focused, panel STILL
+        opens and scrolls — the link never strands."""
+        r = self._probe("?direction=Nonexistent%20Direction")
+        self.assertEqual(r.get("active"), ["Alpha"],
+                         "unknown name must FALL BACK to the nearest direction")
+        self.assertEqual(r.get("bars"), ["0"], "nearest bars stay the visible panel")
+        self.assertGreater(r.get("scrollY", 0), 0,
+                           "even on fallback the panel must scroll into view")
+        self.assertEqual(r.get("errors"), [], "fallback must be JS-clean")
+
+    def test_no_param_default_state_no_scroll(self):
+        """(c) Regression fence: a NORMAL open (no param) keeps the default state and
+        does NOT scroll — the reader must be one-shot and param-gated."""
+        r = self._probe("")
+        self.assertEqual(r.get("active"), ["Alpha"], "default focus stays the nearest")
+        self.assertEqual(r.get("scrollY"), 0,
+                         "no param ⇒ NO scroll — a normal open must not jump the page")
+
+    def test_entry_writes_no_store_and_tab_click_keeps_url(self):
+        """(d) Fences: entry never writes the view store (§B.15), and a tab click after
+        entry leaves the URL search untouched (the tab stays ephemeral, D-INV-28)."""
+        js = ("(function(){var tabs=document.querySelectorAll('.reftab');"
+              "if(tabs.length>2)tabs[2].click();"
+              "var act=[];document.querySelectorAll('.reftab.active').forEach("
+              "function(b){act.push(b.textContent.trim());});"
+              "return {active:act,search:location.search,"
+              "store:(function(){try{return localStorage.getItem('tc_view');}"
+              "catch(e){return 'ERR';}})()};})()")
+        r = hc.probe(self.page, js, width=1100, height=900,
+                     url_suffix="?direction=Beta%20Prime")
+        self.assertEqual(r.get("active"), ["Gamma"],
+                         "the click path must still work after entry")
+        self.assertEqual(r.get("search"), "?direction=Beta%20Prime",
+                         "a tab click must NOT write the URL — the entry param is "
+                         "one-shot, the tab ephemeral (D-INV-28)")
+        self.assertIsNone(r.get("store"),
+                          "entry must never write the view store (§B.15 fence)")
+
+    def test_empty_state_ignores_param(self):
+        """(e) The 'no close direction yet' empty state ignores the parameter entirely —
+        no scroll, no focus, no error."""
+        import fingerprints as FP
+        def z(**over):
+            d = {ax: 0.0 for ax in FP.AXES}
+            d.update(over)
+            return d
+        far = {"x": z(tempo=9.0), "y": z(dynamics=9.0)}
+        page = _merged_ref_page(far, {}, tmp_prefix="tc_entry_far_", lead_px=self.LEAD)
+        r = hc.probe(page, _ENTRY_STATE_JS, width=1100, height=900,
+                     url_suffix="?direction=x")
+        self.assertEqual(r.get("scrollY"), 0,
+                         "the empty state must IGNORE the param — no scroll")
+        self.assertEqual(r.get("active"), [], "no tabs exist to focus")
+        self.assertEqual(r.get("errors"), [], "ignoring must be JS-clean")
+
+    def test_full_widget_entry_opens_detailed_and_scrolls(self):
+        """(f) Composition on the REAL full widget: the catalog link's entry pair
+        `?direction=⟨name⟩#detailed` opens the widget NOT in Simple (the panel is
+        Simple-hidden, INV-18/22 — entry rides the shipped §B.15 hash override) with
+        #refPanel inside the viewport."""
+        page = _build_ref_widget()
+        r0 = hc.probe(page,
+                      "(function(){var v=[];document.querySelectorAll('.reftab').forEach("
+                      "function(b){v.push(b.textContent.trim());});"
+                      "return {labels:v,bars:TC.count('.refpanel')};})()",
+                      width=1100, height=900)
+        self.assertGreaterEqual(r0.get("bars", 0), 1,
+                                "fixture guard: the full widget must render the reference read")
+        labels = r0.get("labels") or []
+        target = labels[1] if len(labels) >= 2 else None
+        import urllib.parse
+        suffix = ("?direction=" + urllib.parse.quote(target) if target
+                  else "?direction=whatever") + "#detailed"
+        r = hc.probe(page, _ENTRY_STATE_JS, width=1100, height=900, url_suffix=suffix)
+        self.assertFalse(r.get("bodySimple"),
+                         "the entry pair must land in Detailed — #refPanel is Simple-hidden")
+        self.assertGreater(r.get("scrollY", 0), 0,
+                           "the real widget must scroll the reference panel into view")
+        self.assertTrue(0 <= r.get("rpTop", -1) < r.get("vh", 0),
+                        f"#refPanel must sit inside the viewport, got top="
+                        f"{r.get('rpTop')} vh={r.get('vh')}")
+        if target:
+            self.assertEqual(r.get("active"), [target],
+                             "the named tab must be active on the real widget")
+        self.assertIsNone(r.get("store"), "entry must not write tc_view (§B.15)")
+        self.assertEqual(r.get("errors"), [], "the composed entry must be JS-clean")
 
 
 if __name__ == "__main__":
