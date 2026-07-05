@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.0.0"  # Track Coach analyzer version — 1.0 (3-pass preventive-maintenance gate green, s56)
+TC_VERSION = "1.0.1"  # Track Coach analyzer version — s57 web-panel readability (brightness/type/links)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2979,36 +2979,41 @@ body.simple #webPanel{display:none!important}
 /* rows, one muted web-only group, visible sources, one footnote legend. No per-row pills.        */
 /* Light theme for the same classes lives in build_reference_notes.py (side page).                */
 #webPanel .tc-rn-head{margin:0 0 3px}
+/* s57 (Alexander 2026-07-05): fonts snapped UP to the widget's whole-number scale (was scattered
+   10/10.5/11.5/12.5 — the audit's "fractional" set); section headings lifted --muted→--ink so a heading is
+   never dimmer than its own body (brightness hierarchy); sources given a ↗ link icon + underline. */
 #webPanel .tc-rn-artist{font-size:13px;font-weight:700;color:var(--ink)}
-#webPanel .tc-rn-realname{font-size:11.5px;color:var(--muted);margin-left:5px;font-style:italic}
-#webPanel .tc-rn-genre{font-size:11.5px;color:var(--muted);margin:2px 0 10px;font-style:italic}
+#webPanel .tc-rn-realname{font-size:12px;color:var(--muted);margin-left:5px;font-style:italic}
+#webPanel .tc-rn-genre{font-size:12px;color:var(--muted);margin:2px 0 10px;font-style:italic}
 #webPanel .tc-rn-note{border-left:3px solid var(--warn);padding:6px 10px;margin:0 0 10px;
  font-size:12px;color:var(--muted);line-height:1.5;background:rgba(255,180,84,.07);
  border-radius:0 6px 6px 0}
-#webPanel .tc-rn-blurb{font-size:12.5px;color:var(--ink);margin:0 0 12px;line-height:1.6}
-/* Section labels (variant A) */
-#webPanel .rn-section-label{font-size:10px;font-weight:700;text-transform:uppercase;
- letter-spacing:.07em;color:var(--muted);margin:10px 0 6px}
+#webPanel .tc-rn-blurb{font-size:13px;color:var(--ink);margin:0 0 12px;line-height:1.6}
+/* Section labels (variant A) — --ink so the heading is never dimmer than the body it heads (s57) */
+#webPanel .rn-section-label{font-size:11px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.07em;color:var(--ink);margin:10px 0 6px}
 #webPanel .rn-webonly-label{margin-top:14px}
 #webPanel .rn-webonly-qualifier{font-weight:400;text-transform:none;letter-spacing:0;opacity:.75}
 /* Glyph-led confirmed trait rows (variant A) — no trailing pill */
 #webPanel .rn-confirmed-list{list-style:none;margin:0 0 4px;padding:0;
  display:flex;flex-direction:column;gap:6px}
-#webPanel .rn-trait-row{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--ink);line-height:1.5}
+#webPanel .rn-trait-row{display:flex;gap:8px;align-items:baseline;font-size:13px;color:var(--ink);line-height:1.5}
 #webPanel .rn-trait-glyph{flex:0 0 14px;text-align:center;color:var(--good);font-size:13px}
 #webPanel .rn-trait-glyph.rn-trait-glyph-indirect{opacity:.8}
 #webPanel .rn-trait-text{flex:1;line-height:1.4}
 /* Muted web-only group — ONE dot-separated inline line (not N pills) */
-#webPanel .rn-webonly-group{font-size:11.5px;color:var(--muted);line-height:1.6;margin:0 0 12px;opacity:.85}
+#webPanel .rn-webonly-group{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px;opacity:.85}
 /* Footnote legend */
-#webPanel .rn-footnote{font-size:10.5px;color:var(--muted);opacity:.72;margin:12px 0 0;
+#webPanel .rn-footnote{font-size:11px;color:var(--muted);opacity:.72;margin:12px 0 0;
  font-style:italic;line-height:1.5}
-/* Sources */
-#webPanel .tc-rn-sources-label{font-size:10px;font-weight:700;text-transform:uppercase;
- letter-spacing:.07em;color:var(--muted);margin:10px 0 5px}
-#webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
-#webPanel .tc-rn-sources a{font-size:11.5px;color:var(--muted);text-decoration:none}
-#webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration:underline}
+/* Sources — read as links: ↗ icon + underline (s57). Label --ink (heading ≥ body). */
+#webPanel .tc-rn-sources-label{font-size:11px;font-weight:700;text-transform:uppercase;
+ letter-spacing:.07em;color:var(--ink);margin:10px 0 5px}
+#webPanel .tc-rn-sources{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+#webPanel .tc-rn-sources a{font-size:12px;color:var(--ink-dim);text-decoration:underline;
+ text-underline-offset:2px;text-decoration-color:var(--muted)}
+#webPanel .tc-rn-sources a::before{content:"\2197 ";color:var(--wob);text-decoration:none;font-weight:700}
+#webPanel .tc-rn-sources a:hover{color:var(--ink);text-decoration-color:var(--ink)}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's

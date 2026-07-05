@@ -1511,6 +1511,16 @@ dropped this; his call: keep it); (6) **one footnote legend** — a single line 
 (shipped code emitted a long pill on EVERY row — exactly the long-per-row labels the spec forbids). All
 content is preserved; only the layout changes. `tags: approved-layout-2026-07-04 · compact-marking · D-INV-29`
 
+**Readability pass (Alexander 2026-07-05 — D-INV-29-typo).** Three fixes, in-panel scope only: (a) **brightness
+hierarchy** — a section heading is NEVER dimmer than the body it heads; `.rn-section-label` /
+`.tc-rn-sources-label` are `--ink` (were `--muted` sitting under `--ink` body — a brightness inversion the eye
+reads as "the letters are louder than their own heading"); (b) **type scale** — the panel's fonts snap to the
+widget's whole-number scale (section labels + footnote 11px, blurb/traits 13px, genre/realname/web-only/sources
+12px), retiring the scattered 10 / 10.5 / 11.5 / 12.5 "fractional" sizes the font audit flagged — no widget-wide
+type-token rollout (out of scope); (c) **source links** — each source reads as a link: an underline plus a
+leading ↗ (U+2197) icon, so the sources block is unmistakably a list of clickable links, not muted prose.
+`tags: readability-2026-07-05 · brightness-hierarchy · type-scale · D-INV-29-typo`
+
 **What ★ / ☆ are measured against — the direction's CENTROID.** Both marks judge the trait on the
 direction's **cloud centroid** — the same full-dimensional reference point that grounds "leans toward"
 (D-INV-21) — not on any single member track and not on a majority vote, so the plaque and the nearest-centroid

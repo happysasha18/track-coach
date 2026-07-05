@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.0.1] — 2026-07-05
+
+### Improved
+- **The "What the web says about ⟨artist⟩" panel reads more clearly.** Section headings ("Your measurement
+  backs these up", "Sources") are no longer dimmer than the text beneath them — a heading now leads its own
+  content instead of being out-shouted by it. The panel's type sizes were tidied onto the widget's regular
+  scale (no more mix of 10 / 10.5 / 11.5 / 12.5 px). And each source now reads as a link — a ↗ icon and an
+  underline — instead of muted grey text.
+
 ## [1.0.0] — 2026-07-05
 
 **1.0 — first stable release.** No new feature this bump: 1.0 is the version at which the full analysis

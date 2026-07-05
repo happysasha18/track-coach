@@ -1170,6 +1170,47 @@ class WebPanelReadableLayout(unittest.TestCase):
         self.assertIn("★", r["text"],
                       ".rn-footnote must contain '★' in its text; got: " + repr(r["text"][:200]))
 
+    def test_s57_section_headings_not_dimmer_than_body_and_sources_are_links(self):
+        """s57 (Alexander 2026-07-05): (a) a section heading is NEVER dimmer than the body it
+        heads — the `.rn-section-label` / `.tc-rn-sources-label` computed luminance must be ≥ the
+        body (`.tc-rn-blurb` / `.rn-trait-row`) luminance (was `--muted` under `--ink` body — a
+        brightness inversion). (b) Each source reads as a LINK: `.tc-rn-sources a` carries an
+        underline AND a leading ↗ (U+2197) icon via ::before."""
+        r = hc.probe(
+            self.widget,
+            self._open_webpanel_js(
+                "function lum(c){var m=(c||'').match(/(\\d+),\\s*(\\d+),\\s*(\\d+)/);"
+                "if(!m)return -1;return 0.2126*+m[1]+0.7152*+m[2]+0.0722*+m[3];}"
+                "var wp=document.querySelector('#webPanel');"
+                "var lbl=wp?wp.querySelector('.rn-section-label'):null;"
+                "var slbl=wp?wp.querySelector('.tc-rn-sources-label'):null;"
+                "var body=wp?(wp.querySelector('.tc-rn-blurb')||wp.querySelector('.rn-trait-row')):null;"
+                "var a=wp?wp.querySelector('.tc-rn-sources a'):null;"
+                "return {"
+                "label_lum: lbl?lum(getComputedStyle(lbl).color):null,"
+                "sources_label_lum: slbl?lum(getComputedStyle(slbl).color):null,"
+                "body_lum: body?lum(getComputedStyle(body).color):null,"
+                "src_underline: a?getComputedStyle(a).textDecorationLine:null,"
+                "src_icon: a?getComputedStyle(a,'::before').content:null};"
+            ),
+            width=1100, height=3600,
+        )
+        self.assertIsNotNone(r["label_lum"], "fixture must render a .rn-section-label")
+        self.assertIsNotNone(r["body_lum"], "fixture must render web-panel body text")
+        self.assertGreaterEqual(
+            r["label_lum"], r["body_lum"] - 1,
+            f"a section heading must not be dimmer than its body (label lum {r['label_lum']} "
+            f"< body lum {r['body_lum']}) — s57 brightness-hierarchy fix")
+        if r["sources_label_lum"] is not None:
+            self.assertGreaterEqual(
+                r["sources_label_lum"], r["body_lum"] - 1,
+                "the Sources heading must not be dimmer than the body either")
+        self.assertIsNotNone(r["src_underline"], "fixture must render a .tc-rn-sources link")
+        self.assertIn("underline", r["src_underline"],
+                      f"source links must be underlined (read as links); got {r['src_underline']}")
+        self.assertIn("↗", (r["src_icon"] or ""),
+                      f"each source link must carry a leading ↗ icon (::before); got {r['src_icon']!r}")
+
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class DesignTokenColourRendered(unittest.TestCase):
