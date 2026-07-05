@@ -6,6 +6,7 @@ Tests assert against the REAL shipped artifact — actual functions from run_dir
 library.py, track_analyzer.py — never a source-string match.
 """
 import json
+import os
 import sys
 import types
 import unittest
@@ -72,6 +73,46 @@ class RelocationDefault(unittest.TestCase):
             # Instead, test via base_dir + track_root
             base = run_dir.base_dir(args, audio)
             self.assertTrue(str(base).startswith(str(Path.home() / ".track-coach" / "projects")))
+
+
+class LibraryHomeStable(unittest.TestCase):
+    """G-INV-5: the durable library stays at ~/.track-coach/library/ — only the transient
+    run dirs relocate. The library home was already under $HOME, so the relocation change
+    (G-INV-1) must NOT move it, and a runs `--base` override (which redirects run dirs) must
+    leave the library home untouched. Level: L0-DATA (pure path logic)."""
+
+    def setUp(self):
+        # library_root() honours TRACK_COACH_LIBRARY; the DEFAULT-home fact is what G-INV-5
+        # asserts, so clear the override for this test and restore it after.
+        self._saved = os.environ.pop("TRACK_COACH_LIBRARY", None)
+
+    def tearDown(self):
+        if self._saved is not None:
+            os.environ["TRACK_COACH_LIBRARY"] = self._saved
+
+    def test_library_home_is_home_track_coach_library(self):
+        """The default library home is ~/.track-coach/library — a sibling of projects/, both
+        under the one output root; it is NOT beside the audio and NOT under the runs base."""
+        self.assertEqual(library.library_root(),
+                         Path.home() / ".track-coach" / "library")
+        # library/ and projects/ share the ONE output root (~/.track-coach)
+        self.assertEqual(library.library_root().parent,
+                         Path.home() / ".track-coach")
+
+    def test_runs_base_override_does_not_move_library(self):
+        """A `--base` that relocates the transient run dirs must leave the library home put:
+        run dirs move to the custom base, the library stays at ~/.track-coach/library."""
+        with tempfile.TemporaryDirectory() as td:
+            audio = Path(td) / "project" / "Beat_v1.wav"
+            args = _fake_args(base=str(Path(td) / "custom_runs"))
+            runs_base = run_dir.base_dir(args, audio)
+            # the run dir followed --base ... (base_dir resolves symlinks, e.g. /var→/private/var)
+            self.assertEqual(runs_base, (Path(td) / "custom_runs").resolve())
+            # ... but the library home did NOT relocate with it
+            self.assertEqual(library.library_root(),
+                             Path.home() / ".track-coach" / "library")
+            self.assertFalse(str(library.library_root()).startswith(str(Path(td))),
+                             "the library must never relocate under a runs --base (G-INV-5)")
 
 
 # ─── Item 2: Collision disambiguation (G-INV-2 / G-INV-2b) ───────────────────

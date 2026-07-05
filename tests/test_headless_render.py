@@ -1197,5 +1197,88 @@ class DesignTokenColourRendered(unittest.TestCase):
                          "the confirmed ★ glyph must render in --good green (real computed colour)")
 
 
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class CatalogSemanticColourRendered(unittest.TestCase):
+    """Browser-level proof of the CATALOG semantic-colour cells (§D.10 / §F, D-INV-22 /
+    F-INV-1). The 6 hex-in-HTML tests in test_catalog_columns.py assert the direction /
+    sibling colour appears as TEXT in render_catalog_html output — but nothing verified a
+    real browser RESOLVES those inline `style="color:#…"` values and delivers them through
+    the cascade to the anchor the eye reads. The colour IS the meaning here: a close match
+    reads green, a mid match amber, a far sibling red. A malformed style attr, an anchor
+    default-colour override, or a link-colour reset would pass every hex string test and
+    still ship a colourless (or blue-link) meaning to the eye — the exact s34 class,
+    extended from visibility to the catalog's colour. This is the B2-remainder gap left
+    open after N16 closed the widget tokens (data/test_rework_s52.md, close-order item 2).
+
+    Level: L3-BROWSER (a colour fact's required level). The rgb values are the computed
+    render of the §D palette hexes (close #2e9e5b / mid #d8932a / far #c2503d).
+    """
+
+    _CLOSE_HEX, _CLOSE_RGB = "#2e9e5b", "rgb(46, 158, 91)"
+    _MID_HEX, _MID_RGB = "#d8932a", "rgb(216, 147, 42)"
+    _FAR_HEX, _FAR_RGB = "#c2503d", "rgb(194, 80, 61)"
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import catalog  # noqa: E402
+        import similarity_columns as S  # noqa: E402
+
+        def _e(track, **kw):
+            e = {"track": track, "audio_sha": f"sha_{track}", "stamp": "2026-06-20_2100",
+                 "audio_mtime": 1000, "widget": f"{track}.html", "mode": "full",
+                 "bpm": 123, "arc": [0.1, 0.5, 1.0], "title": track,
+                 "_leans": [], "_siblings": []}
+            e.update(kw)
+            return e
+
+        # Track A carries a CLOSE lean (green) + a MID lean (amber) and a FAR sibling to B (red,
+        # allowed per F-INV-1). Track B exists so the sibling chip resolves a title/href.
+        leans = [S.Lean(direction="DeepChord", level=S.CLOSE, runner=None, n_shared=13),
+                 S.Lean(direction="SCSI-9",    level=S.MID,   runner=None, n_shared=11)]
+        sibs = [S.Sibling(track="Bravo", level=S.FAR, n_shared=6)]
+        entries = [_e("Alpha", _leans=leans, _siblings=sibs), _e("Bravo")]
+        tmp = Path(tempfile.mkdtemp(prefix="tc_catcol_"))
+        out = tmp / "index.html"
+        out.write_text(catalog.render_catalog_html(entries))
+        cls.widget = str(out)
+
+    def _colours(self, selector):
+        """Computed color of every element matching selector, in document order."""
+        js = ("(function(){return Array.prototype.map.call("
+              "document.querySelectorAll('" + selector + "'),"
+              "function(e){return getComputedStyle(e).color;});})()")
+        return hc.probe(self.widget, js, width=1500, height=1200)
+
+    def test_close_lean_computes_green(self):
+        """The nearest direction (.sim-dir, CLOSE) must COMPUTE green through the cascade —
+        not merely carry the hex in the style text. Negative side: it must not fall back to
+        the default anchor blue (rgb(0,0,238)) — the failure a hex string test cannot see."""
+        cols = self._colours(".sim-dir")
+        self.assertGreaterEqual(len(cols), 1, "the catalog must render at least one .sim-dir direction")
+        self.assertEqual(cols[0], self._CLOSE_RGB,
+                         "the closest direction must render in close-green (real computed colour)")
+        self.assertNotEqual(cols[0], "rgb(0, 0, 238)",
+                            "the direction colour must not fall back to default anchor blue")
+
+    def test_mid_lean_computes_amber(self):
+        """The second direction (MID) must compute amber — proves the per-level colour map
+        survives the cascade for more than the first cell."""
+        cols = self._colours(".sim-dir")
+        self.assertGreaterEqual(len(cols), 2, "track Alpha must render both its leans (close + mid)")
+        self.assertEqual(cols[1], self._MID_RGB,
+                         "the second (mid) direction must render in amber (real computed colour)")
+
+    def test_far_sibling_computes_red(self):
+        """A FAR sibling chip (.sib-chip) is allowed (F-INV-1) and reads red. Assert the
+        browser computes that red — the colour that tells the eye 'last-resort match'."""
+        cols = self._colours(".sib-chip")
+        self.assertGreaterEqual(len(cols), 1, "the catalog must render the sibling chip")
+        self.assertEqual(cols[0], self._FAR_RGB,
+                         "the far sibling chip must render in far-red (real computed colour)")
+        self.assertNotEqual(cols[0], "rgb(0, 0, 238)",
+                            "the sibling colour must not fall back to default anchor blue")
+
+
 if __name__ == "__main__":
     unittest.main()

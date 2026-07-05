@@ -13,7 +13,7 @@ lived in the orchestration seams, so this is exactly where a regression test pay
 
 Pure stdlib unittest, so it runs with plain `python3 -m unittest` — no pytest needed.
 """
-import json, subprocess, sys, tempfile, unittest
+import json, re, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "track_analyzer.py"
@@ -184,6 +184,36 @@ class MalformedRunIndexTolerated(unittest.TestCase):
             self.assertEqual(out.returncode, 0, out.stderr)
             cat = json.loads((run / "catalog.json").read_text())
             self.assertEqual(cat["n_runs"], 1)                              # only the real dict counted
+
+
+class AutoDepositIsDefault(unittest.TestCase):
+    """G-INV-17 / H-INV-7: a successful `build` auto-deposits into the global library — it is
+    the DEFAULT ingest, not a separate manual step. The only way to skip it is the explicit
+    opt-OUT flag `--no-deposit`; there is no opt-IN `--deposit` flag. If deposit ever became
+    opt-in, the user would silently lose the catalog entry they expect. Level: L0-DATA
+    (the CLI contract + the `not args.no_deposit` gate at track_analyzer `_cmd_build`)."""
+
+    def _build_help(self):
+        out = subprocess.run([sys.executable, str(SCRIPT), "build", "--help"],
+                             text=True, capture_output=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return out.stdout + out.stderr
+
+    def test_no_deposit_is_an_opt_out_flag(self):
+        """`build --help` exposes `--no-deposit` as an opt-OUT (don't copy into the library)."""
+        help_txt = self._build_help()
+        self.assertIn("--no-deposit", help_txt,
+                      "build must expose --no-deposit (the opt-out for auto-deposit, G-INV-17)")
+        self.assertIn("don't copy", help_txt.lower().replace("’", "'"),
+                      "--no-deposit help must read as an opt-out (don't copy into the library)")
+
+    def test_no_opt_in_deposit_flag(self):
+        """Deposit is automatic — there is NO opt-IN `--deposit` flag; the default build path
+        deposits. A `--deposit` toggle would mean deposit is manual, breaking G-INV-17."""
+        help_txt = self._build_help()
+        # `--no-deposit` contains the substring "deposit"; assert no BARE `--deposit` opt-in.
+        self.assertIsNone(re.search(r"--deposit\b", help_txt),
+                          "there must be no opt-in --deposit flag; deposit is the default ingest")
 
 
 if __name__ == "__main__":

@@ -239,11 +239,11 @@ class TraceabilityChecks(unittest.TestCase):
     # matrix projection filled in. The widened guardrail below catches any NEW gap
     # in these namespaces; removing an id from this set (by adding its row) is the
     # way to pay the debt down.
-    KNOWN_EXT_MATRIX_GAPS_2026_07_03: set[str] = {
-        "DS-INV-4", "DS-INV-9",
-        "G-INV-4", "G-INV-5", "G-INV-6", "G-INV-9", "G-INV-13", "G-INV-17",
-        "H-INV-7", "H-INV-11", "H-INV-12",
-    }
+    # s53 (2026-07-05): all 11 ext-namespace gaps PAID DOWN — each now has a real TEST_MATRIX
+    # row (built rows cite an owning test; DS-INV-9 is a not-built row naming its surface). The
+    # baseline is now empty; a NEW ext-namespace invariant added to SPEC without a matrix row
+    # still fails test_every_extended_namespace_invariant_has_a_matrix_row.
+    KNOWN_EXT_MATRIX_GAPS_2026_07_03: set[str] = set()
 
     def test_every_extended_namespace_invariant_has_a_matrix_row(self):
         """Widened matrix-coverage guardrail (s50e): every G-INV / H-INV / DS-INV /
