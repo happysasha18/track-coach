@@ -26,13 +26,13 @@ Every run is kept under its own version and date. The library lists everything y
 
 ### Place it among your music
 
-A full run sets the track in context. It names the reference directions it leans toward — artists you've analysed — facet by facet, and finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Closeness shows as colour and bars; the read stays observation, the call stays yours.
+A full run sets the track in context, in one panel: *You vs your closest match*. It names the reference directions the track leans toward — artists you've analysed, up to three tabs — and reads the one you pick facet by facet. It also finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Closeness shows as colour and bars; the read stays observation, the call stays yours.
 
-![The reference read: facet-by-facet bars against the nearest direction](docs/similarity.png)
+![The reference read: pick a direction, see the facet-by-facet bars](docs/similarity.png)
 
-And for each direction it can tell you what the wider world hears in that artist — genre, era, signature moves — every claim cross-checked against your own measurements of their tracks: ★ means the web's description is confirmed directly by the numbers, ☆ indirectly, and what the numbers don't bear out is said so, plainly. Sources are linked, so you can read further.
+Below the bars, the same panel tells you what the wider world hears in the direction you picked — genre, era, signature moves — every claim cross-checked against your own measurements of their tracks: ★ means the web's description is confirmed directly by the numbers, ☆ indirectly, and what the numbers don't bear out is said so, plainly. Switch tabs and the web read follows. Sources are linked, so you can read further.
 
-![What the web says about the nearest artist — checked against measurement](docs/webpanel.png)
+![What the web says about the artist you picked — checked against measurement](docs/webpanel.png)
 
 *Similarity comes with the full analysis — a quick read has no fingerprint to compare.*
 
