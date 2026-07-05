@@ -30,6 +30,10 @@ A full run sets the track in context. It names the reference directions it leans
 
 ![The reference read: facet-by-facet bars against the nearest direction](docs/similarity.png)
 
+And for each direction it can tell you what the wider world hears in that artist — genre, era, signature moves — every claim cross-checked against your own measurements of their tracks: ★ means the web's description is confirmed directly by the numbers, ☆ indirectly, and what the numbers don't bear out is said so, plainly. Sources are linked, so you can read further.
+
+![What the web says about the nearest artist — checked against measurement](docs/webpanel.png)
+
 *Similarity comes with the full analysis — a quick read has no fingerprint to compare.*
 
 ---
