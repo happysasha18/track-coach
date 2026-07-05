@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# pre-push — track-coach push gate (the live-spec pack's 5-gate shape, adapted to this host).
+# Installed by guardrails/install.sh into .git/hooks/pre-push. Blocks a push unless every
+# blocking gate passes. See .live-spec/profile.md for the host's stated deviations.
+#
+# Gates (pack shape → track-coach adaptation):
+#   a. fresh review    → WARNING ONLY here: track-coach's prover cadence is per-feature
+#                        CROSS-LINK + milestone audits, not per-push same-day (host profile).
+#                        The hook still tells you when no prover record is dated today.
+#   b. tests green     → the full pytest suite (includes the completeness gate INV-45/46
+#                        and traceability tests — pack gate (c) rides on these).
+#   c. anchors owned   → covered by (b): tests/test_traceability.py.
+#   d. coverage walked → no unchecked `- [ ]` boxes in docs/TEST_MATRIX.md (the checklist
+#                        is a prose walk in §8; boxes would still block if ever added).
+#   e. prototype fence → a prod file must not reference anything under prototype/ (passes
+#                        if no prototype/ dir exists — none does today).
+#   f. tests-present   → code touched ⇒ a test touched (scripts/guardrails.py check 3).
+#
+# Emergency escape (documented, loud): TC_PUSH_SKIP_GATE=1 git push
+#   — prints a red banner; use only when Alexander explicitly says to ship around the gate.
+#
+# NOTE the human gate is NOT automated here on purpose: track-coach never pushes without
+# Alexander's explicit OK. A hook can't verify a conversation — the rule lives in
+# .live-spec/profile.md and NEXT_STEPS; this hook guards the MACHINE-checkable part.
+
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if [ "${TC_PUSH_SKIP_GATE:-0}" = "1" ]; then
+  echo "!!=============================================================!!"
+  echo "!!  TC_PUSH_SKIP_GATE=1 — PUSH GATE BYPASSED. This must have   !!"
+  echo "!!  been Alexander's explicit call. Log it in JOURNAL.md.      !!"
+  echo "!!=============================================================!!"
+  exit 0
+fi
+
+fail=0
+echo "== track-coach push gate (pack 5-gate shape) =="
+
+echo ""
+echo "-- gate a (warning): fresh prover record --"
+TODAY="$(date +%Y-%m-%d)"
+if ls docs/prover/*"$TODAY"* >/dev/null 2>&1; then
+  echo "   OK: a prover record dated $TODAY exists in docs/prover/."
+else
+  echo "   WARNING: no prover record dated $TODAY in docs/prover/."
+  echo "   (Non-blocking: host cadence is per-feature + milestone audits — .live-spec/profile.md.)"
+fi
+
+echo ""
+echo "-- gate b: full test suite green (this takes ~3-4 min) --"
+if python3 -m pytest -q; then
+  echo "   OK: suite green."
+else
+  echo "   FAIL: test suite not green."
+  fail=1
+fi
+
+echo ""
+echo "-- gate c: spec anchors owned --"
+echo "   Covered by gate b (tests/test_traceability.py)."
+
+echo ""
+echo "-- gate d: matrix coverage checklist fully walked --"
+if grep -qn '^\s*- \[ \]' docs/TEST_MATRIX.md; then
+  echo "   FAIL: unchecked '- [ ]' boxes in docs/TEST_MATRIX.md:"
+  grep -n '^\s*- \[ \]' docs/TEST_MATRIX.md | head
+  fail=1
+else
+  echo "   OK: no unchecked boxes (checklist is the §8 prose walk)."
+fi
+
+echo ""
+echo "-- gate e: prototype fence --"
+if [ -d prototype ]; then
+  hits="$(grep -rIl 'prototype/' --include='*.py' --include='*.html' --include='*.js' \
+          --exclude-dir=prototype --exclude-dir=.git --exclude-dir=docs \
+          --exclude-dir=attic --exclude-dir=data . 2>/dev/null | head)"
+  if [ -n "$hits" ]; then
+    echo "   FAIL: prod files reference the fenced prototype/ home:"; echo "$hits"
+    fail=1
+  else
+    echo "   OK: fence holds."
+  fi
+else
+  echo "   OK: no prototype/ dir — nothing fenced."
+fi
+
+echo ""
+echo "-- gate f: code touched => test touched --"
+if python3 scripts/guardrails.py --skip 1 >/tmp/tc_gate_f.out 2>&1; then
+  echo "   OK: traceability + tests-present green."
+else
+  echo "   FAIL — scripts/guardrails.py output:"
+  tail -30 /tmp/tc_gate_f.out
+  fail=1
+fi
+
+echo ""
+if [ "$fail" -ne 0 ]; then
+  echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, Alexander's word only.)"
+  exit 1
+fi
+echo "All blocking gates green — push allowed. (The HUMAN gate still applies: Alexander's OK.)"
+exit 0

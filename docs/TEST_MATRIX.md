@@ -4,6 +4,16 @@
 
 This matrix is SPEC.md projected into a checkable grid. Tests trace to it. The SPEC is the source of truth; this file is the enumerable projection. Written/updated in the same change as the code or spec.
 
+> **Matrix-local codes (legitimate, don't re-flag).** Two kinds of row id live ONLY here, by design:
+> (1) **sub-variant suffixes** (`DS-INV-3a/3b`, `D-INV-29-layout/-sources/-typo`) — one SPEC invariant
+> projected into several separately-testable rows; the SPEC anchor is the parent id. (2) **implementation
+> contracts** (`METRE-1..7`, `INV-GATE`, `INV-CSS-*`) — node-level mechanics (a decoder table, a CSS
+> alignment root-cause, the completeness-gate mechanism itself) that SPEC covers as behaviour prose, not
+> per-value codes. An audit finding "matrix id absent from SPEC" for these two kinds is EXPECTED.
+> **Known seam (queued, s57):** a dozen bare `INV-nn` codes (32, 36–40, 42–44, 47) are used here while the
+> SPEC text describes the behaviour without stating the code — the backfill (trailing anchors into SPEC +
+> extending test_traceability to enforce the reverse direction) is a queued landing of its own.
+
 > **Bug-found protocol:** bug → ① fix/clarify the matrix cell or invariant → ② failing test, proven
 > red-on-bug → ③ fix code. Code chases the matrix.
 > **Change protocol:** add/change/remove any element ⇒ update this doc in the same change + decide which
@@ -194,7 +204,7 @@ A flat per-surface grid can't see drift BETWEEN the two pages; these are the cro
 |---|---|---|---|---|
 | X1 | mode badge `.modebadge.{m}` | mode pill `.mode.{m}` | same word + same colour token (`full`→`--good`, `quick`→`--bright`) | INV-20 · `test_catalog::CrossPageModeAgreement` |
 | X2 | the widget a title link opens | row title link `_open_href` | the link opens THAT run's CURRENT widget; stale ⇒ flagged, not silently old | INV-12/17 · `test_catalog::StaleWidgetFlag`, `CatalogIsLocalIndex` |
-| X3 | Track Story arc (`story` curves) | signature ribbon `c-sig` | same underlying run curves (ribbon = downsample of the arc source) | `test_catalog::RunMetrics`, `Signature` |
+| X3 | Track Story arc (`story` curves) | signature ribbon `c-sig` | same underlying run curves (ribbon = downsample of the arc source) | `test_catalog::RunMetrics`, `test_catalog::SignatureSvg` |
 | X4 | S1 player (per-stem / mix) | S2 one-button preview | both play the SAME run's web mix; absent mix ⇒ no control on either (INV-7/8) | `test_catalog::CatalogRowPlayer` |
 
 ## §E — Run completeness & missing measurements (SPEC §E → RC-INV-1…12)
@@ -556,6 +566,7 @@ level by `tests/test_design_tokens.py` (the CSS is emitted verbatim from `build_
 | DS-INV-2/3 (browser) | The semantic tokens RENDER, not just exist in text: `--good/--warn/--bad` resolve at `:root` at runtime AND reach the elements that wear them — `.modebadge.full` and the confirmed `#webPanel .rn-trait-glyph` compute `rgb(70,211,154)` = --good. NEG: a resolved token is never '' (dropped) and the badge never falls back to default `rgb(0,0,0)` (cascade override). Closes the N16 level-gap (s52): design tokens were tested ALL-STRING, blind to a runtime colour break. | `test_headless_render::DesignTokenColourRendered` (L3-BROWSER, s52) |
 | DS-INV-4 | The UI red role is the `--bad` token (defined + resolves at `:root`); the magma/data reds — stem/canvas literals like kick `#ff5d73` — stay RAW in the gradient, never tokenised. NEG: a data-viz red is never rewritten to `var(--bad)`. The UI-red *application* to a rec-card stripe lands later with DS-INV-6 (deferred). Level: L0-token (the mapping) — the runtime `--bad` resolution is proven at browser by DS-INV-2/3 (browser) above. Retires the s52 ext-namespace baseline id. | `test_design_tokens::test_stem_and_canvas_literals_untouched`, `test_headless_render::DesignTokenColourRendered::test_semantic_tokens_resolve_at_root_in_browser` |
 | §I.10 ×viewport (§D refs) | The §D reference read `#refRead`, the web panel `#webPanel` and the up-to-three `.reftab` selector stay within the viewport when narrow — right edge inside the window, no internal horizontal scroll, no tab-row spill. Composes the §D reference surfaces across the **viewport** axis, which §I.10 previously named only for the recs grid + segmented control + cards (pass-3 composition, s56). The harness clamps the effective viewport to ~500 px min, so the guard asserts against the returned `innerWidth`. Level: **L3-BROWSER**. | `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow` |
+| DS-INV-9 (panel slice) | spacing split — `--gap` (within a group) vs `--rhythm` (between sections). **PANEL-RHYTHM SLICE BUILT (s57, Alexander 2026-07-05):** `:root` defines `--gap:16px` + `--rhythm:28px`; every top-level `.tc-panel` uses `margin-bottom:var(--rhythm)`, sub-panels nested inside `#evidence` use `margin-bottom:var(--gap)`, so the **inter-panel gap is strictly LARGER than the intra-panel gap** (fixes the measured 24<30 inversion). Old per-id overrides (`#webPanel{margin:10px 0 0}`, `#evidence,#catalog{margin:24px 0 0}`) removed. Level: **L3-BROWSER** (measured `getBoundingClientRect` gaps, invisible to string tests). | `test_headless_render::PanelGapHierarchy::test_inter_panel_gap_exceeds_intra_panel_gap` (L3-BROWSER, s57) |
 
 Deferred (next movement — surface named, not yet coded):
 | code | rule (1-line) | lands with |
@@ -567,6 +578,5 @@ Deferred (next movement — surface named, not yet coded):
 | DS-INV-11 | one state ladder (rest/hover/focus/active/selected/disabled). | §4 |
 | DS-INV-13 | one segmented control from `.seg`/`.viewtoggle`/`.reftabs`; selected = `--wob` fill. | §6 + browser test (new selected look) |
 | DS-INV-8 | recs grid `auto-fill minmax`, cap 2; REPLACES s34 container-query; column-count tests updated. | §2 — update `test_headless_render` recs rows |
-| DS-INV-9 (panel slice) | spacing split — `--gap` (within a group) vs `--rhythm` (between sections). **PANEL-RHYTHM SLICE BUILT (s57, Alexander 2026-07-05):** `:root` defines `--gap:16px` + `--rhythm:28px`; every top-level `.tc-panel` uses `margin-bottom:var(--rhythm)`, sub-panels nested inside `#evidence` use `margin-bottom:var(--gap)`, so the **inter-panel gap is strictly LARGER than the intra-panel gap** (fixes the measured 24<30 inversion). Old per-id overrides (`#webPanel{margin:10px 0 0}`, `#evidence,#catalog{margin:24px 0 0}`) removed. Level: **L3-BROWSER** (measured `getBoundingClientRect` gaps, invisible to string tests). | `test_headless_render::PanelGapHierarchy::test_inter_panel_gap_exceeds_intra_panel_gap` (L3-BROWSER, s57) |
-| DS-INV-9 (broad) | The BROADER normalisation of the remaining ~13 raw `gap:` literals (2–20 px) inside components to the `8/12/16` scale stays **POST-1.0 (deferred, F5)** — a design/taste call (which of 5/6/7 px becomes 8 px is Alexander's), not done in the panel slice. | POST-1.0 §I.2 spacing-token design pass — normalise the remaining literals (Alexander's call), then a `test_design_tokens` guard |
+| DS-INV-9 (broad) | The BROADER normalisation of the remaining ~13 raw `gap:` literals (2–20 px) inside components to the `8/12/16` scale stays **POST-1.0 (deferred, F5)** — a design/taste call (which of 5/6/7 px becomes 8 px is Alexander's), not done in the panel slice (the panel slice itself is BUILT — see its row in the live §I table above). | POST-1.0 §I.2 spacing-token design pass — normalise the remaining literals (Alexander's call), then a `test_design_tokens` guard |
 | DS-INV-14 | typography fractional sizes fold into `--fs-1..4`; weights ⟨DECIDE DS-1⟩ held for Alexander. | §8 audit |
