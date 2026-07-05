@@ -352,9 +352,22 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   the headline and the real track-name as supporting sub-text. Same data, different jobs.
 - Verified by deed (Lazy_Sparks 0.8.11–0.8.15): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
   vocals/piano→"near-silent"; guitar sub-line→"Guitar".
-- **INV (label set).** The displayed lane label is EXACTLY one of:
-  `bass`, `drums`, `kick`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `mid`, `high`, `near-silent`, `not measured`.
-  `near-silent` = measured and found empty; `not measured` = significance unknown / character unmeasurable (the third stem state from §A/RC-INV-11 — distinct, never collapsed into "near-silent").
+- **INV (label set).** The displayed lane label is EXACTLY one of three FORMS (this is a pattern, not a fixed
+  member list — the near-silent form is stated as a pattern per `INV-STEMNAME-NEARSILENT-ID` below, so a
+  membership test asserts the FORM, not a frozen word set):
+  - a **character label** — one of `bass`, `drums`, `perc`, `hats`, `lead`, `melody`, `chord`, `pad`, `mid`,
+    `high` — when the stem is **significant**;
+  - the pattern **`⟨identifying word⟩ (near-silent)`** when the stem is **measured and found empty** — the
+    identifying word is the mapped real project-track name, ELSE a frequency-band descriptor
+    (`low`/`low-mid`/`mid`/`high`); always suffixed ` (near-silent)`, **NEVER a bare `near-silent`** (that
+    erased which stem it was — the s45 regression);
+  - **`not measured`** when significance is unknown / character unmeasurable (the third stem state from
+    §A/RC-INV-11 — distinct, never collapsed into "near-silent").
+  **`kick` is NOT a lane label.** A `drums`-family stem renders as `drums` (§B.7 trusts the low families), and a
+  low+percussive UNTRUSTED stem is itself the drums family — so no path emits a standalone `kick` lane. `kick`
+  lives ONLY in the drum-hit breakdown (§B.11 — the kick/snare/hat sub-parts) and its stem colour there; it is
+  never a member of the lane-label set, so a membership test must not carry it. (F4, s54: closed the phantom
+  member the prover flagged.)
   **Never** `tonal`, never a `≈` prefix, never a raw Demucs family name. **Internal buckets that DON'T appear
   verbatim:** `tonal` (G13 fallback) is displayed as the base role `mid`; `air` (G12/G14 high-sustained) is
   displayed as `high`; `noise` is inert (the flatness gate never fires — §B.4/G13 — so it is never emitted,
@@ -1019,14 +1032,23 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   centroid of any direction it belongs to** (RC-INV-6) — not comparable as an own placement, never excluded
   from its cloud. Its written read still renders from whatever signals DID compute. `D-INV-9`
 
-### D.6 How the coaching changes — re-flavouring (the payoff)
+### D.6 How the coaching changes — re-flavouring (the payoff) — POST-1.0 (deferred, not a 1.0 promise)
 
-> **DEFERRED FROM 1.0 — the only input surface for aspiration mapping (the aim picker, ⟨DECIDE D-2⟩) was
-> excised in 0.9.15, so re-flavouring, the aim glyph, and pinned-aimed entries have no way to be created.
-> The descriptive 'leans toward' column ships WITHOUT aspiration mapping or re-flavouring.
-> ⟨pending Alexander's confirm to cut for 1.0 vs rebuild the mapping input⟩**
-> Design text below is preserved for when the input surface is re-specified; the D-INV-4/D-INV-13/D-INV-18
-> invariants and §D.10.1 aim rows are also deferred on the same basis (see §D.10.1 scope split).
+> **POST-1.0 — CUT FROM 1.0 (FINAL — Alexander, s54, 2026-07-05). This supersedes the earlier ⟨pending⟩
+> marker; the cut is DECIDED, not open.** The only input surface for aspiration mapping (the aim picker,
+> ⟨DECIDE D-2⟩) was excised in 0.9.15, so re-flavouring, the aim glyph, and pinned-aimed entries have no way to
+> be created. **1.0 §D ships as a DESCRIPTIVE mirror only** — nearest reference direction ("leans toward"), the
+> per-facet centroid read, the web panel, and §F own-library — with no aspiration mapping and no re-flavouring.
+> Everything in this §D.6, and the aim-dependent parts of §D.10.1, are **inert in 1.0 and must NOT read as 1.0
+> promises**: the inert invariants are D-INV-4 / D-INV-13 / D-INV-15 / D-INV-17 / D-INV-18 and the aim-glyph
+> parts of D-INV-28.
+> **Why aim waits (kept, do NOT lose).** The 0.9.15 excision happened because the persisted-per-track aim
+> (`localStorage`) auto-swapped the cards for the re-flavoured set and hid the centroid `#refRead` on reopen —
+> the widget "looked broken." Any future rebuild's spine is a **"never looks broken on reopen"** rule: a
+> restored aim is visibly labelled, never silently swapped; the centroid read never vanishes; composition
+> across persistence/reopen × view × references-switch is proven before code. Post-1.0 idea to explore: a
+> **minimal aim expressed IN the centroid read itself**, not a separate persisted picker.
+> Design text below is preserved for that rebuild.
 
 When your track is mapped to a direction, the *existing* cards and read are re-flavoured toward it. A track
 can aim at **several directions at once** (the mapping is many-to-many, D-INV-4), and re-flavouring **mixes
@@ -1301,17 +1323,31 @@ HAS an order, and the order carries the ranking exactly as §F's own-library lis
 direction are no longer a confusing second tint in one cell but their own clearly-ordered, clearly-cued
 entries. The runner-up is resolved by listing, not by tinting (D-24 resolved). `D-INV-27`
 
-**Scope split (what ships in 0.9 vs what waits on the mapping input ⟨D-2⟩).** The **descriptive** rows below —
-the up-to-three nearest *clouds* ranked by fingerprint distance, the per-entry colour/glyph cue, "no close
-direction yet", and the inline links — ship in **0.9**: they need no aspiration mapping, only the measured
-fingerprints. The **aim-dependent** rows — the aim glyph, the pinned-aimed-direction entry, and re-flavouring
-(§D.6) — are **inert until the mapping input surface (⟨DECIDE D-2⟩) exists**; they are authored here so the
-composition is proven, but a 0.9 build neither renders nor tests them. `tags: scope-0.9-descriptive · ⟨DECIDE D-2⟩`
+**Scope split — every §D surface is marked exactly one of SHIPS-1.0 / DEFERRED-post-1.0 (F1, s54).** The
+descriptive rows need no aspiration mapping — only the measured fingerprints — so they SHIP in 1.0; the
+aim-dependent rows are inert without the mapping input (⟨DECIDE D-2⟩, cut from 1.0 per §D.6) and are DEFERRED.
 
-> **DEFERRED FROM 1.0 (F2, s45):** the aim picker (⟨DECIDE D-2⟩) was excised in 0.9.15 (see §D.6.1
-> tombstone), so the aim glyph, the pinned-aimed-direction entry, and all re-flavouring have no input surface
-> and cannot be created. They remain authored here so the composition is proven; they do NOT ship in 1.0
-> unless the mapping input is re-specified. ⟨pending Alexander's confirm to cut for 1.0 vs rebuild the input⟩
+| §D surface | id | 1.0 | renders when | gated |
+|---|---|---|---|---|
+| Reference read — per-facet centroid + "leans toward" | `#refRead` | **SHIPS-1.0** | reference directions are defined for the track | yes — non-null `gated_by` |
+| Web descriptor — "what the web says about ⟨artist⟩" | `#webPanel` | **SHIPS-1.0** | a nearest direction exists (an artist to describe) | yes — non-null `gated_by` |
+| Up-to-three nearest-direction selector (`.reftab` tabs) | within `#refRead` | **SHIPS-1.0** | ≥1 real lean (green/amber) | folded into the `#refRead` gate |
+| Similar in your own library (§F own-library) | catalog `.sib-chip` column | **SHIPS-1.0** | ≥1 own sibling track in the library | yes — via the catalog gate (`test_19_catalog_rows_and_hrefs`) + the D-INV-26 browser colour test (`.sib-chip`); it is a catalog COLUMN, not a standalone panel |
+| Aim glyph · pinned-aimed entry · re-flavouring (§D.6) | — | **DEFERRED-post-1.0** | never in 1.0 (no mapping input) | no — not rendered, not gated |
+
+**Property (F1 — the anti-regression net covers what ships).** Every SHIPS-1.0 §D surface has a `USER_SURFACES`
+entry whose `gated_by` is **non-null** and asserts the surface POPULATED in a render where its "renders when"
+condition holds. A build that HAS reference directions yet blanks `#refRead`/`#webPanel` is a RED gate, not a
+thing Alexander finds by eye. The DEFERRED rows carry no gate — they do not render in 1.0. This closes the
+prior drift where `#refRead`/`#webPanel` rendered in a normal build but the gate marked them `DEFERRED` /
+`gated_by: None`. `tags: scope-1.0-descriptive · F1 · INV-46 · ⟨DECIDE D-2⟩ cut per §D.6`
+
+> **POST-1.0 — CUT FROM 1.0 (FINAL — Alexander, s54, 2026-07-05; supersedes the earlier ⟨pending⟩ marker).**
+> The aim picker (⟨DECIDE D-2⟩) was excised in 0.9.15 (see §D.6.1 tombstone), so the aim glyph, the
+> pinned-aimed-direction entry, and all re-flavouring have no input surface and cannot be created. They remain
+> authored here so the composition is proven, but they are **inert in 1.0** and do NOT ship — the cut is
+> decided (see §D.6 for the "never looks broken on reopen" rebuild spine). The DESCRIPTIVE rows below DO ship
+> in 1.0 (see the per-surface ship/defer table in the scope split above).
 
 **What the list holds and how it's cued.**
 - **Up to the three nearest reference clouds that are a REAL lean** — ranked nearest-first, in the **same
@@ -2175,8 +2211,13 @@ project is its browsable component library. One role = one token = one name.
   existing `test_headless_render` recs column-count assertions are UPDATED to the new expected counts,
   not held constant (this is a deliberate layout change, not a restyle). The recs cap stays 2 columns
   (a rec card wants a readable line length; `<min>` picked so a ~1120px content column yields 2).**
-- **Spacing split (DS-INV-9):** two roles — `--gap 8/12/16` (within a group) and `--rhythm 28/44`
-  (between sections).
+- **Spacing split (DS-INV-9) — POST-1.0 (deferred, F5/s54).** The intended system is two roles —
+  `--gap 8/12/16` (within a group) and `--rhythm 28/44` (between sections). It is **not built in 1.0**
+  and §I does not assert it as shipped: verified by deed (s54) the widget uses ~13 distinct raw `gap:`
+  literals (2–20 px), so snapping them to a three-value scale is a spacing NORMALISATION — a design/taste
+  pass (which of 5/6/7 px becomes 8 px is Alexander's call), not the mechanical token-snap the motion/radii
+  tokens were. Deferred to keep 1.0 free of a silent restyle. Until built, spacing stays as literals and
+  DS-INV-9 is a POST-1.0 promise, not a current-system claim. `tags: post-1.0 · design-call · F5`
 
 ### I.3 Motion (new tokens)
 - `--dur-fast 120ms` (hover, highlight, small colour change) · `--dur-base 180ms` (appear, state

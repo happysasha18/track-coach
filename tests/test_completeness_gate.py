@@ -62,7 +62,10 @@ DUR = 120.0
 #     "when-stemmap"  – present when stemmap data was loaded
 #     "when-rhythm"   – present when rhythm data was loaded
 #     "when-notes"    – present when notes data was loaded
-#     "DEFERRED"      – §D feature, not in 1.0 standard render
+#     "when-reference"– present when reference directions are defined (a run_dir with a
+#                       fingerprint + data/reference_directions.json → a real lean). SHIPS-1.0
+#                       descriptive §D surfaces (SPEC §D.10.1 scope-split, F1).
+#     "DEFERRED"      – authored but not rendered in 1.0 (aim/re-flavouring — cut per SPEC §D.6)
 #   "gated_by": the gate test method name that asserts this surface is populated
 # }
 #
@@ -83,10 +86,15 @@ USER_SURFACES = {
     "rhyPanel":    {"condition": "when-rhythm",  "gated_by": "test_8_rhythm_panel_nonempty"},
     "notePanel":   {"condition": "when-notes",   "gated_by": "test_8_notes_panel_nonempty"},
     "catalog":     {"condition": "always",       "gated_by": "test_19_catalog_rows_and_hrefs"},
-    # ── §D deferred — no reference direction in the standard 1.0 render ─────
-    # These appear ONLY when a reference aim is set; not required in standard render.
-    "refRead":     {"condition": "DEFERRED",     "gated_by": None},
-    "webPanel":    {"condition": "DEFERRED",     "gated_by": None},
+    # ── §D descriptive — SHIP in 1.0, gated when reference directions exist (F1, s54) ─────
+    # SPEC §D.10.1 scope-split: #refRead + #webPanel are the descriptive reference read; they
+    # render in a full build whose run_dir carries a fingerprint that leans toward a defined
+    # direction. They are Detailed-only via CSS. Gated by the refs-fixture tests below — this
+    # closes the prior drift where they rendered in a real build but the gate marked them DEFERRED.
+    # (The aim glyph / pinned-aimed entry / re-flavouring are DEFERRED-post-1.0 per SPEC §D.6 —
+    #  they have no input surface and do not render, so they carry no registry entry.)
+    "refRead":     {"condition": "when-reference", "gated_by": "test_22_ref_read_populated"},
+    "webPanel":    {"condition": "when-reference", "gated_by": "test_23_web_panel_populated"},
 }
 
 
@@ -406,6 +414,46 @@ def _build_muted_stem_widget(tmp: Path) -> str:
     return str(out)
 
 
+def _build_full_widget_with_refs(tmp: Path) -> str:
+    """Build a SYNTHETIC FULL widget WITH reference directions (F1, s54) so the descriptive
+    §D surfaces (#refRead + #webPanel) render POPULATED and can be gated.
+
+    SYNTHETIC + self-contained: writes the same `_core()` + `_masking()` data into a run_dir as
+    `result_core.json` + `result_masking.json`, then passes `run_dir=`. `build_widget._ref_read_html`
+    reads that run_dir's fingerprint against the repo's real `data/reference_directions.json`; the
+    synthetic fingerprint leans toward all three defined directions (Venetian Snares / SCSI-9 /
+    DeepChord — verified by deed s54), so #refRead renders with a real up-to-three tab selector and
+    #webPanel renders the top direction's descriptor. No external file dependency, no audio.
+    """
+    run_dir = tmp / "refs_run"
+    run_dir.mkdir(exist_ok=True)
+    (run_dir / "result_core.json").write_text(json.dumps(_core()), encoding="utf-8")
+    (run_dir / "result_masking.json").write_text(json.dumps(_masking()), encoding="utf-8")
+
+    sw = tmp / "stems_web_refs"
+    sw.mkdir(exist_ok=True)
+    for stem in ("drums", "bass", "other"):
+        (sw / f"{stem}.m4a").write_bytes(b"\x00" * 16)
+
+    out = tmp / "widget_refs.html"
+    from datetime import datetime
+    build_widget.build_html(
+        _core(), {}, _masking(), None, str(out),
+        "Refs Gate Track",
+        build_widget.STRINGS,
+        audio_stems_rel="stems_web_refs",
+        run_dir=str(run_dir),
+        meta={
+            "audio": "refs_test.wav",
+            "als": None,
+            "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "built_at":    datetime.now().strftime("%Y-%m-%d"),
+        },
+        mode="full",
+    )
+    return str(out)
+
+
 def _build_quick_widget(tmp: Path) -> str:
     """Build a SYNTHETIC QUICK widget: mix-only — NO stems, NO .als, NO stemmap/rhythm/notes.
     A quick run has no evidence data, so every #evidence sub-panel self-hides — the config that
@@ -533,6 +581,7 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
         cls.partial      = _build_partial_widget(cls._tmp)
         cls.probe        = _build_probe_widget(cls.full, cls._tmp)
         cls.muted_stem   = _build_muted_stem_widget(cls._tmp)
+        cls.refs         = _build_full_widget_with_refs(cls._tmp)
 
     # ── Convergence helpers ─────────────────────────────────────────────────
 
@@ -1208,6 +1257,75 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
                 self.assertFalse(by_name[stem].get("mute"),
                                  f"INV-45: '{stem}' (significant stem) incorrectly starts muted; "
                                  f"only near-silent stems auto-mute (CR-2); got: {by_name[stem]}")
+
+    # ── 22–23. Descriptive §D reference read — SHIPS-1.0, gated when references exist ──
+    #     (F1, s54 — SPEC §D.10.1 scope-split. Fixture: cls.refs, a full widget whose run_dir
+    #      fingerprint leans toward the defined directions. Both surfaces are Detailed-only.)
+
+    def test_22_ref_read_populated(self):
+        """#refRead (the 'You vs your closest match' reference read) must be present, visible in
+        Detailed view, carry a real up-to-three tab selector, and NOT read 'No similar tracks' —
+        in a build that HAS reference directions. Gates SPEC §D.10.1 SHIPS-1.0 (F1)."""
+        r = _probe(self.refs,
+            "(function(){"
+            "document.body.className='detailed';"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var p=document.getElementById('refRead');"
+            "if(!p)return {present:false};"
+            "var pv=getComputedStyle(p).display!=='none'&&p.offsetHeight>0;"
+            "var tabs=p.querySelectorAll('.reftab').length;"
+            "var bars=p.querySelectorAll('.refread-bars').length;"
+            "return {present:true,visible:pv,tabs:tabs,bars:bars,"
+            "text:(p.innerText||'').trim()};})()")
+        self.assertTrue(r.get("present"),
+                        "EMPTY SURFACE: #refRead not found in the reference-directions widget — "
+                        "the descriptive reference read must render when directions are defined (SPEC §D.10.1)")
+        self.assertTrue(r.get("visible"),
+                        "EMPTY SURFACE: #refRead is hidden in Detailed view of the reference widget")
+        self.assertNotIn("No similar tracks", r.get("text", ""),
+                         "EMPTY SURFACE: #refRead reads 'No similar tracks' in a build that HAS "
+                         "reference directions — the lean did not compute (F1 regression)")
+        self.assertGreater(r.get("bars", 0), 0,
+                           "EMPTY SURFACE: #refRead has no per-facet bars in the reference widget")
+        # up-to-three selector: with 3 qualifying directions there are 3 .reftab buttons
+        self.assertGreater(r.get("tabs", 0), 0,
+                           "EMPTY SURFACE: #refRead has no .reftab direction selector in the reference widget")
+
+    def test_23_web_panel_populated(self):
+        """#webPanel ('what the web says about ⟨artist⟩') must be present with a non-empty body in
+        a build that HAS reference directions. Gates SPEC §D.10.2 SHIPS-1.0 (F1)."""
+        r = _probe(self.refs,
+            "(function(){"
+            "document.body.className='detailed';"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var p=document.getElementById('webPanel');"
+            "if(!p)return {present:false};"
+            "var pv=getComputedStyle(p).display!=='none'&&p.offsetHeight>0;"
+            "var body=p.querySelector('.web-panel-body');"
+            "return {present:true,visible:pv,"
+            "bodyLen:body?(body.textContent||'').trim().length:0,"
+            "text:(p.innerText||'').trim().length};})()")
+        self.assertTrue(r.get("present"),
+                        "EMPTY SURFACE: #webPanel not found in the reference-directions widget — "
+                        "the web descriptor must render when a nearest direction exists (SPEC §D.10.2)")
+        self.assertTrue(r.get("visible"),
+                        "EMPTY SURFACE: #webPanel is hidden in Detailed view of the reference widget")
+        self.assertGreater(r.get("bodyLen", 0), 5,
+                           "EMPTY SURFACE: #webPanel body is empty in the reference widget")
+
+    def test_22_ref_read_absent_on_plain_full(self):
+        """Proves the gate distinguishes: the standard full widget (no run_dir → no reference
+        directions) must NOT render #refRead. Confirms the 'when-reference' condition is real,
+        not always-on."""
+        r = _probe(self.full,
+            "(function(){var p=document.getElementById('refRead');"
+            "if(!p)return {present:false};"
+            "return {present:true,display:getComputedStyle(p).display,h:p.offsetHeight};})()")
+        if r.get("present"):
+            hidden = r.get("display") == "none" or r.get("h", 0) == 0
+            self.assertTrue(hidden,
+                            "gate-self-check: #refRead is visible on the plain full widget (no run_dir) — "
+                            "the 'when-reference' condition is not being honoured")
 
     # ── CONVERGENCE MECHANISM (INV-46) ───────────────────────────────────────
     #
