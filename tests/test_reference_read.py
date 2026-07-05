@@ -157,6 +157,26 @@ class ReferenceReadHeader(unittest.TestCase):
             self.assertNotIn("No similar tracks", html,
                              "the §F siblings phrase must never appear on this surface "
                              "(D-INV-22 vocabulary — the pre-merge bug)")
+            self.assertNotIn("<details", html,
+                             "the empty state is a NON-expandable stub — a plain div, never "
+                             "a <details> (D-INV-36e, Alexander 2026-07-05)")
+            self.assertIn('id="refPanel"', html,
+                          "the stub keeps the #refPanel id (Simple-hide + entry-JS inertness)")
+
+    def test_missing_fingerprint_with_directions_shows_stub(self):
+        """D-INV-36e — directions defined but the run has NO fingerprint (an old or partial
+        full run): the panel's place gets the non-expandable 'no comparison data' stub, never
+        silence (Alexander 2026-07-05: the vanished panel read as a hole)."""
+        data_dir = Path(build_widget.__file__).resolve().parent.parent / "data"
+        if not (data_dir / "reference_directions.json").exists():
+            self.skipTest("reference_directions.json absent — reference feature not set up")
+        with tempfile.TemporaryDirectory(prefix="tc_nofp_") as td:
+            html = build_widget._ref_read_html(td)   # empty run dir → fingerprint is None
+        self.assertIn('id="refPanel"', html, "stub must render in the panel's place")
+        self.assertIn("no comparison data in this run", html)
+        self.assertNotIn("<details", html, "the stub never expands")
+        self.assertNotIn("No similar tracks", html,
+                         "the §F siblings phrase must never appear on this surface (D-INV-22)")
 
     def test_empty_directions_returns_empty_string(self):
         html = build_widget.render_reference_read(

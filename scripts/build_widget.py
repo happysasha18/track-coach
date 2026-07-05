@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.2.0"  # Track Coach analyzer version — s59: URL entry-focus, catalog link → focused tab (D-INV-37)
+TC_VERSION = "1.2.1"  # Track Coach analyzer version — s60: reference panel empty-state stub, absence said aloud (D-INV-36e)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2652,16 +2652,31 @@ def _web_body_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_
     )
 
 
+def _ref_stub_html(note):
+    """D-INV-36e — the reference panel's NON-expandable empty-state stub. When there is nothing
+    to compare (no close direction, or the run carries no comparison data), the plaque keeps its
+    place and title but is a plain div — no arrow, nothing to open (Alexander 2026-07-05: a
+    silently absent panel read as a hole; a one-line expandable panel read as broken). Keeps the
+    #refPanel id so Simple hides it (INV-18/22) and the D-INV-37 entry reader stays inert
+    (no .refpanel inside)."""
+    return (
+        '<div class="tc-panel refstub" id="refPanel">'
+        '<span class="refstub-title">You vs your closest match</span>'
+        f'<span class="refstub-note">{_esc(note)}</span>'
+        '</div>'
+    )
+
+
 def render_reference_read(track_raw_fp, directions, norm, confirmation=None, confirm_z=0.4,
                           web_notes=None):
     """§D.10.1 / §D.10.3 — pure-ish reference-read HTML block with up-to-3 direction tab selector.
 
     Takes a raw (un-normalised) fingerprint, the directions dict {name: centroid_z_fp},
-    and the z-norm params {"mu":{}, "sd":{}}. Returns the complete <div id="refRead">
-    HTML, or '' when:
-      • track_raw_fp or directions are absent;
-      • fingerprint can't be normalised (all axes missing);
-      • no direction qualifies (all FAR — nothing honest to show per SPEC §D.10.1).
+    and the z-norm params {"mu":{}, "sd":{}}. Returns the complete #refPanel HTML;
+    '' only when track_raw_fp or directions are absent (feature not in play). When
+    directions exist but nothing qualifies — all FAR, or no shared measured axes —
+    it returns the NON-expandable empty-state stub instead of vanishing (D-INV-36e:
+    nothing honest to *show* per SPEC §D.10.1, but the absence itself is said aloud).
     No I/O; all data supplied by the caller. Detailed-only via CSS (body.simple #refRead).
 
     confirmation: optional dict {dir_name: [{axis, expect, tier}, …]} for bar ★/☆ marks.
@@ -2699,15 +2714,11 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     leans = SC.leans_toward_topk(track_z, directions)
 
     if not leans:
-        # Empty state (D-INV-36e): directions defined, none clears the lean bar — the one-line
-        # prose, no tabs, no nested disclosures. NEVER the §F siblings phrase "No similar tracks"
-        # (D-INV-22 vocabulary — the pre-merge bug this branch shipped).
-        return (
-            '<details class="tc-panel" id="refPanel" open>'
-            '<summary>You vs your closest match</summary>'
-            '<p class="refread-hdr" style="color:var(--muted)">no close direction yet</p>'
-            '</details>'
-        )
+        # Empty state (D-INV-36e): directions defined, none clears the lean bar — the NON-expandable
+        # stub plaque, no tabs, no nested disclosures. NEVER the §F siblings phrase "No similar
+        # tracks" (D-INV-22 vocabulary — the pre-merge bug this branch shipped).
+        return _ref_stub_html("no close direction yet — none of your reference artists "
+                              "sits close to this track")
 
     # Build one content panel per qualifying direction. `shown` keeps the rendered leans with
     # CONTIGUOUS indices, so tabs / bars / web bodies can never disagree about which didx is
@@ -2724,7 +2735,9 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         shown.append((lean, rows_html, summary))
 
     if not shown:
-        return ""   # all directions had no shared axes (degenerate)
+        # All directions had no shared measured axes (degenerate) — still say so (D-INV-36e).
+        return _ref_stub_html("can't compare yet — this run and your reference artists "
+                              "share no measured facets")
 
     panels_html = []
     for i, (lean, rows_html, summary) in enumerate(shown):
@@ -2887,7 +2900,9 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
 
 def _ref_read_html(run_dir):
     """§D.10.3 — load fingerprint from disk + reference_directions.json + reference_web_notes.json,
-    delegate to render_reference_read. Returns '' when any input is missing or I/O fails.
+    delegate to render_reference_read. Returns '' when the reference feature isn't set up
+    (no run_dir / no directions file / I/O fails); when directions ARE defined but the run has
+    no fingerprint, returns the D-INV-36e stub so the panel's absence never reads as a hole.
 
     Loads reference_web_notes.json as the one-source file (§D.10.2): it drives both the rich
     web panel and the bar ★/☆ marks (confirmation derived from its direct/indirect traits).
@@ -2911,7 +2926,10 @@ def _ref_read_html(run_dir):
         return ""
     raw_fp = FP.fingerprint_from_run_dir(run_dir)
     if raw_fp is None:
-        return ""
+        # Directions ARE defined but this run carries no fingerprint (an old or partial full
+        # run) — say so in the panel's place instead of vanishing (D-INV-36e stub).
+        return _ref_stub_html("no comparison data in this run — re-run the analysis "
+                              "to compare with your reference artists")
 
     # Primary source: reference_web_notes.json (supersedes facet_confirmation.json)
     web_notes = {}
@@ -3165,6 +3183,12 @@ details.tc-panel[open]>summary::before{content:"▾ "}
    (Alexander 2026-07-02). Open keeps the larger bottom padding for the content below. */
 details.tc-panel:not([open]){padding-bottom:14px}
 details.tc-panel:not([open])>summary{padding-bottom:4px}
+/* D-INV-36e — the reference panel's empty-state stub: the same plaque look as a COLLAPSED
+   tc-panel, but a plain div — no arrow, no pointer, nothing to open. */
+div.tc-panel.refstub{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+ padding:18px 20px;margin-bottom:var(--rhythm)}
+.refstub-title{color:var(--ink);font-size:15px;font-weight:600}
+.refstub-note{color:var(--muted);font-size:13px;margin-left:10px}
 .hint{color:var(--muted);font-size:12px;margin:0 0 16px}
 .legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px;font-size:12px}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
@@ -3346,7 +3370,8 @@ __MODENOTE__
 <!-- 4. REFERENCE PANEL (§D.10, D-INV-36) — ONE merged container: shared direction selector +
      nested centroid read + nested web notes (both open). Server-side rendered; Detailed-only
      via CSS on the container (body.simple hides it whole). Empty string when quick mode or
-     no run_dir; one-line "no close direction yet" when no direction clears the lean bar. -->
+     no run_dir; a NON-expandable stub plaque ("no close direction yet" / "no comparison
+     data in this run") when directions exist but there is nothing to compare (D-INV-36e). -->
 __REFREAD__
 
 <details class="tc-panel" id="evidence">

@@ -26,7 +26,7 @@ Every run is kept under its own version and date. The library lists everything y
 
 ### Place it among your music
 
-A full run sets the track in context, in one panel: *You vs your closest match*. It names the reference directions the track leans toward — artists you've analysed, up to three tabs — and reads the one you pick facet by facet. It also finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Closeness shows as colour and bars; the read stays observation, the call stays yours. And the library links straight into it: click a direction name in the catalog and the track's page opens right on that comparison.
+A full run sets the track in context, in one panel: *You vs your closest match*. It names the reference directions the track leans toward — artists you've analysed, up to three tabs — and reads the one you pick facet by facet. It also finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Closeness shows as colour and bars; the read stays observation, the call stays yours. And the library links straight into it: click a direction name in the catalog and the track's page opens right on that comparison. When there's nothing close to show — no direction near, or a run with no comparison data — the panel doesn't vanish: it stays in its place as a quiet one-liner saying exactly that.
 
 ![The reference read: pick a direction, see the facet-by-facet bars](docs/similarity.png)
 

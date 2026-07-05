@@ -1565,8 +1565,9 @@ class MergedReferencePanel(unittest.TestCase):
         self.assertTrue(r.get("back"), "switching back must restore the web disclosure")
 
     def test_empty_state_says_no_close_direction_yet(self):
-        """(e) Directions defined but none close ⇒ the one-line 'no close direction yet'
-        prose — never the §F siblings phrase 'No similar tracks' (pre-merge bug)."""
+        """(e) Directions defined but none close ⇒ the NON-expandable stub plaque with the
+        one-line 'no close direction yet' prose — never the §F siblings phrase 'No similar
+        tracks' (pre-merge bug), and never anything to open (Alexander 2026-07-05)."""
         import fingerprints as FP
         def z(**over):
             d = {ax: 0.0 for ax in FP.AXES}
@@ -1577,6 +1578,8 @@ class MergedReferencePanel(unittest.TestCase):
         r = hc.probe(page,
             "(function(){var c=document.getElementById('refPanel');"
             "return {container:!!c,text:c?(c.innerText||''):'',"
+            "tag:c?c.tagName:'',"
+            "summaries:c?c.querySelectorAll('summary').length:0,"
             "tabs:document.querySelectorAll('.reftab').length,"
             "nested:c?c.querySelectorAll('details').length:0};})()",
             width=1100, height=1200)
@@ -1586,8 +1589,43 @@ class MergedReferencePanel(unittest.TestCase):
         self.assertNotIn("no similar tracks", r.get("text", "").lower(),
                          "the §F siblings phrase must NEVER appear on this surface (D-INV-22 "
                          "vocabulary — the pre-merge bug)")
+        self.assertEqual(r.get("tag"), "DIV",
+                         "the empty state is a NON-expandable stub — a plain div, never a "
+                         "<details> (D-INV-36e, Alexander 2026-07-05)")
+        self.assertEqual(r.get("summaries"), 0, "the stub has no summary — nothing to click open")
         self.assertEqual(r.get("tabs"), 0, "the empty state renders no tabs")
         self.assertEqual(r.get("nested"), 0, "the empty state renders no nested disclosures")
+
+    def test_missing_fingerprint_renders_no_comparison_data_stub(self):
+        """(e) Directions defined but the run carries NO fingerprint (an old or partial full
+        run) ⇒ the same NON-expandable stub with the 'no comparison data in this run' note —
+        never a silently absent panel (D-INV-36e, Alexander 2026-07-05: the vanished panel
+        read as a hole in the page)."""
+        data_dir = Path(build_widget.__file__).resolve().parent.parent / "data"
+        if not (data_dir / "reference_directions.json").exists():
+            self.skipTest("reference_directions.json absent — reference feature not set up")
+        with tempfile.TemporaryDirectory(prefix="tc_nofp_run_") as td:
+            stub = build_widget._ref_read_html(td)   # empty run dir → fingerprint is None
+        tmp = Path(tempfile.mkdtemp(prefix="tc_nofp_page_"))
+        page = tmp / "page.html"
+        page.write_text("<!doctype html><html><head><meta charset='utf-8'></head>"
+                        f"<body>{stub}</body></html>", encoding="utf-8")
+        r = hc.probe(str(page),
+            "(function(){var c=document.getElementById('refPanel');"
+            "return {container:!!c,text:c?(c.innerText||''):'',"
+            "tag:c?c.tagName:'',"
+            "summaries:c?c.querySelectorAll('summary').length:0,"
+            "nested:c?c.querySelectorAll('details').length:0};})()",
+            width=1100, height=800)
+        self.assertTrue(r.get("container"),
+                        "no-fingerprint run must still render #refPanel (the stub)")
+        self.assertIn("no comparison data in this run", r.get("text", "").lower(),
+                      "the stub must say the run has no comparison data (D-INV-36e)")
+        self.assertNotIn("no similar tracks", r.get("text", "").lower(),
+                         "the §F siblings phrase must NEVER appear on this surface (D-INV-22)")
+        self.assertEqual(r.get("tag"), "DIV", "the stub is a plain div — nothing to open")
+        self.assertEqual(r.get("summaries"), 0, "the stub has no summary")
+        self.assertEqual(r.get("nested"), 0, "the stub has no nested disclosures")
 
 
 # ── D-INV-37 — URL entry-focus: catalog direction-link → widget opens on that tab ─────────

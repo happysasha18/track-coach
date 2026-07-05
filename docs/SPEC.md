@@ -1404,10 +1404,17 @@ like the own-track column). `D-INV-28`
   The nested summaries: the centroid disclosure reads **"What the numbers show"** (static — the direction is
   named inside, in the "Leans toward ⟨Direction⟩" header); the web disclosure reads **"What the web says about
   ⟨artist⟩"** and its artist name follows the selector (§D.10.2). **Empty state:** with directions defined but
-  none clearing the lean bar, `#refPanel` renders the one-line **"no close direction yet"** prose — no tabs, no
-  nested disclosures (nothing to disclose; the pre-merge widget wrongly printed the siblings phrase "No similar
-  tracks" here — fixed with the merge, the phrase is the §F/D-INV-22 vocabulary, never this surface's). With no
-  reference directions defined at all the panel is absent (gate: `when-reference`). `D-INV-36` **The catalog → widget focus hand-off is a one-shot
+  nothing to compare, `#refPanel` renders a **NON-expandable stub plaque** — the panel look and title, a plain
+  div with a one-line muted note, no arrow, no tabs, no nested disclosures, nothing to open (Alexander
+  2026-07-05, s60: a silently absent panel read as a hole, and the earlier one-line `<details>` read as
+  broken). The note names the reason in this surface's own words: none clearing the lean bar ⇒ **"no close
+  direction yet"**; a run with no fingerprint (an old or partial full run) ⇒ **"no comparison data in this
+  run"** — the stub replaces the pre-s60 silent absence for that case; no shared measured facets (degenerate)
+  ⇒ **"can't compare yet"**. Never the siblings phrase "No similar tracks" (the pre-merge widget wrongly
+  printed it here — fixed with the merge, the phrase is the §F/D-INV-22 vocabulary, never this surface's).
+  The stub keeps the `#refPanel` id, so Simple hides it (INV-18/22) and the D-INV-37 entry reader stays
+  inert on it. With no reference directions defined at all the panel is absent — the feature isn't in play,
+  so there is no absence to announce (gate: `when-reference`); quick renders none of it. `D-INV-36` **The catalog → widget focus hand-off is a one-shot
   URL *entry* parameter, not persisted tab state (WIRED 2026-07-05, s59):** arriving from a catalog
   direction-link (`?direction=⟨name⟩` — the URL-encoded direction name, the SAME name the tab shows: one
   surface, one name), a full widget reads the parameter ONCE on load; if the reference panel renders, it

@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.2.1] — 2026-07-05
+
+### Changed
+- **When there is nothing to compare, the comparison panel now says so instead of vanishing.** The
+  "You vs your closest match" panel used to disappear entirely when a run had no comparison data
+  (old or partial runs), and to render as a near-empty expandable panel when no reference artist
+  was close. Both cases now show one non-expandable stub plaque in the panel's place — the panel
+  title plus a short muted note naming the reason: "no close direction yet", "no comparison data
+  in this run — re-run the analysis…", or "can't compare yet". A silently missing panel read as a
+  hole in the page (Alexander 2026-07-05). Spec: D-INV-36e; browser + unit tested.
+
 ## [1.2.0] — 2026-07-05
 
 ### Added
