@@ -152,7 +152,11 @@ class ReferenceReadHeader(unittest.TestCase):
                 {ax: 0.0 for ax in FP.AXES}, dirs, _norm_identity()
             )
             self.assertNotIn("Leans toward", html, "far lean must not name a direction")
-            self.assertIn("No similar tracks", html, "far lean must show 'No similar tracks'")
+            self.assertIn("no close direction yet", html,
+                          "far lean must show 'no close direction yet' (SPEC §D.10.1 / D-INV-36e)")
+            self.assertNotIn("No similar tracks", html,
+                             "the §F siblings phrase must never appear on this surface "
+                             "(D-INV-22 vocabulary — the pre-merge bug)")
 
     def test_empty_directions_returns_empty_string(self):
         html = build_widget.render_reference_read(
@@ -422,11 +426,12 @@ class ReferenceReadDetailedOnly(unittest.TestCase):
                       "refRead block must be in the widget HTML when run_dir is supplied")
 
     def test_css_hides_refread_in_simple(self):
-        """CSS must gate refRead to Detailed-only."""
+        """CSS must gate the reference panel to Detailed-only — since the D-INV-36 merge ONE
+        rule hides the container #refPanel (nested #refRead/#webPanel hide with it)."""
         import re
         self.assertRegex(self.html,
-                         r"body\.simple\s+#refRead\s*\{[^}]*display\s*:\s*none",
-                         "must have body.simple #refRead { display:none ... } rule")
+                         r"body\.simple\s+#refPanel\s*\{[^}]*display\s*:\s*none",
+                         "must have body.simple #refPanel { display:none ... } rule")
 
     def test_refread_absent_without_run_dir(self):
         """No run_dir supplied → __REFREAD__ replaced with '' → no block in output."""
@@ -770,7 +775,8 @@ class ReadOrderWithRefRead(unittest.TestCase):
 
 
 class WebPanelRendering(unittest.TestCase):
-    """§D.10.2 web panel — collapsed, summary, artist header, ★/☆ facet lines with phrases.
+    """§D.10.2 web panel — since the D-INV-36 merge (s58) a NESTED-OPEN disclosure inside
+    #refPanel: summary with the focused artist, artist header, ★/☆ facet lines with phrases.
     Asserts on the OUTPUT of render_reference_read (the real shipped function), not source.
     """
 
@@ -795,18 +801,25 @@ class WebPanelRendering(unittest.TestCase):
         self.assertIn('id="webPanel"', html,
                       "web panel must be present when ≥1 facet earns ★ or ☆")
 
-    def test_web_panel_collapsed_no_open_attr(self):
-        """Panel must be collapsed — <details> must NOT carry the `open` attribute."""
+    def test_web_panel_nested_open(self):
+        """Since the D-INV-36 merge the web disclosure is nested inside #refPanel and OPEN by
+        default (like the Evidence sub-panels) — supersedes the standalone-collapsed panel."""
         html = self._html_with_web_data()
-        import re
-        # `<details id="webPanel"` must NOT be followed immediately by ` open`
-        self.assertNotRegex(html, r'<details\s+id="webPanel"\s+open',
-                            "web panel <details> must not carry the `open` attribute (stays collapsed)")
+        self.assertRegex(html, r'<details class="tc-panel" id="webPanel" open',
+                         "web disclosure must carry the `open` attribute (nested-open, D-INV-36)")
+        refpanel_pos = html.find('id="refPanel"')
+        webpanel_pos = html.find('id="webPanel"')
+        self.assertGreater(refpanel_pos, -1, "the merged container #refPanel must be present")
+        self.assertGreater(webpanel_pos, refpanel_pos,
+                           "webPanel must be nested inside the #refPanel container")
 
     def test_web_panel_summary_names_artist(self):
         html = self._html_with_web_data()
-        self.assertIn("What the web says about TestArtist", html,
-                      "web panel summary must name the focused artist")
+        self.assertIn("What the web says about", html,
+                      "web panel summary must carry the 'What the web says about' title")
+        self.assertRegex(html, r'<span id="webPanelArtist">TestArtist</span>',
+                         "web panel summary must name the focused artist (in the selector-driven "
+                         "span, D-INV-36b)")
 
     def test_web_panel_has_artist_sub_header(self):
         html = self._html_with_web_data()

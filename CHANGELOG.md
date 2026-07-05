@@ -5,6 +5,25 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.1.0] — 2026-07-05
+
+### Added
+- **One reference panel.** "You vs your closest match" and "What the web says about ⟨artist⟩" merged into a
+  single panel: the direction selector on top, then two open sub-sections — the measured facet-by-facet read
+  ("What the numbers show") and the web notes — built like the Evidence drawer (Alexander's screenshot
+  annotation, 2026-07-05).
+- **The web notes follow the selector.** Switching direction now switches BOTH the measured bars and the web
+  notes (before, the web panel stayed stuck on the top match — bars could say DeepChord while the web notes
+  still said SCSI-9). Web notes are embedded for every shown direction (up to three), not only the nearest;
+  a direction the web has nothing on simply hides the web section while selected.
+
+### Fixed
+- **Empty state wording.** A track with directions defined but none close now reads "no close direction
+  yet" — the catalog's own phrase for this state — instead of the misleading "No similar tracks" (which is
+  the library-siblings column's vocabulary).
+- **Nested panel spacing.** The sub-section gap rule is now structural (any panel nested in a container),
+  so the merged reference panel gets the same tight inner spacing as the Evidence drawer.
+
 ## [1.0.2] — 2026-07-05
 
 ### Improved

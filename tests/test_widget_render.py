@@ -517,18 +517,23 @@ class ReadOrderTonalBeforeRefRead(unittest.TestCase):
         self.assertIn('id="tonalPanel"', self.html, "tonalPanel is present in every render")
 
     def test_refread_css_present(self):
-        """The CSS rule gating refRead to Detailed-only must always be in the widget."""
+        """The CSS rule gating the reference panel to Detailed-only must always be in the
+        widget — since the D-INV-36 merge ONE rule on the container #refPanel (nested
+        #refRead/#webPanel hide with it)."""
         import re
         self.assertRegex(self.html,
-                         r"body\.simple\s+#refRead\s*\{[^}]*display\s*:\s*none",
-                         "body.simple #refRead{display:none} CSS rule must always be present")
+                         r"body\.simple\s+#refPanel\s*\{[^}]*display\s*:\s*none",
+                         "body.simple #refPanel{display:none} CSS rule must always be present")
 
     def test_webpanel_css_gate_present(self):
-        """The CSS rule gating the web panel to Detailed-only must be in every rendered widget."""
+        """The web notes need NO separate Simple gate since the D-INV-36 merge — they ride the
+        container rule. A resurrected per-id #webPanel hide rule would be a second mechanism
+        for the same fact (one home per fact) — assert it stays absent."""
         import re
-        self.assertRegex(self.html,
-                         r"body\.simple\s+#webPanel\s*\{[^}]*display\s*:\s*none",
-                         "body.simple #webPanel{display:none} CSS rule must always be present")
+        self.assertNotRegex(self.html,
+                            r"body\.simple\s+#webPanel\s*\{",
+                            "no separate body.simple #webPanel rule — the container #refPanel "
+                            "rule is the one gate (D-INV-36)")
 
 
 class NoDeadRefReadComment(unittest.TestCase):

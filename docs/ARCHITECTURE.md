@@ -92,11 +92,11 @@
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
 | **N12** | Widget assembly & the element grid — which panel shows per view-state × data-state | `build_widget.py` `build_html:1983` (assembly), `build_story:1802` | §4/§5 | test_widget_render, test_widget_contract |
-| **N13** | The synced player as a STATE MACHINE (play/seek/mute/solo, playhead) | `build_widget.py` `PLAYER_LOGIC:3928–3936` (markers) | §B.14 | test_player_logic (L2-NODE) |
-| **N14** | The view selector as remembered state (one global view, calm first use) | `build_widget.py` `VIEW_LOGIC:3386–3398` (markers) | §B.15 | test_view_ladder (L2-NODE) |
+| **N13** | The synced player as a STATE MACHINE (play/seek/mute/solo, playhead) | `build_widget.py` `PLAYER_LOGIC:3974–3982` (markers) | §B.14 | test_player_logic (L2-NODE) |
+| **N14** | The view selector as remembered state (one global view, calm first use) | `build_widget.py` `VIEW_LOGIC:3432–3444` (markers) | §B.15 | test_view_ladder (L2-NODE) |
 | **N15** | Card evidence ("based-on" line) + the producer's read (artistic layer) | `build_widget.py` `build_cards:1618`, `build_recommendations:1355`, `_read_html:2314` | §B.12, §B.13 | test_widget_render (part) |
-| **N16** | The visual design system — single token source, colour/layout/motion, 10 component contracts | `build_widget.py` CSS `<style>:2879`, `:root:2880` | §I (DS-INV-1..14) | test_design_tokens, test_headless_render |
-| **N17** | In-widget reference panel display (the read + web panel inside the widget, not the catalog) | `build_widget.py` `_ref_read_html:2817`, `_refread_bars_html:2363`, `render_reference_read:2665`, `render_reference_notes:2457`, `_web_panel_html:2583` | §D.7, §D.10 display | test_reference_read, test_headless_render |
+| **N16** | The visual design system — single token source, colour/layout/motion, 10 component contracts | `build_widget.py` CSS `<style>:2923`, `:root:2924` | §I (DS-INV-1..14) | test_design_tokens, test_headless_render |
+| **N17** | In-widget reference panel display — since the D-INV-36 merge (s58) ONE container `#refPanel`: shared selector + nested centroid read + nested web notes (not the catalog) | `build_widget.py` `_ref_read_html:2861`, `_refread_bars_html:2363`, `render_reference_read:2655`, `render_reference_notes:2457`, `_web_body_html:2583` | §D.7, §D.10 display, D-INV-36 | test_reference_read, test_headless_render (incl. MergedReferencePanel) |
 
 *Level expectation:* N12/N16/N17 are **the** visibility/layout/colour nodes → **L3-BROWSER is mandatory**; L1-STRING here is the level-gap class. N13/N14 → L2-NODE (real JS). §I.9 already states "all at ≥ browser-rendered level."
 

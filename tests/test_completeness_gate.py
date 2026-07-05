@@ -93,6 +93,9 @@ USER_SURFACES = {
     # closes the prior drift where they rendered in a real build but the gate marked them DEFERRED.
     # (The aim glyph / pinned-aimed entry / re-flavouring are DEFERRED-post-1.0 per SPEC §D.6 —
     #  they have no input surface and do not render, so they carry no registry entry.)
+    # Since the D-INV-36 merge (s58) they are NESTED inside the one container #refPanel —
+    # registered like the Evidence sub-panels (nested tc-panels carry their own entries).
+    "refPanel":    {"condition": "when-reference", "gated_by": "test_24_ref_panel_container_populated"},
     "refRead":     {"condition": "when-reference", "gated_by": "test_22_ref_read_populated"},
     "webPanel":    {"condition": "when-reference", "gated_by": "test_23_web_panel_populated"},
 }
@@ -1263,9 +1266,10 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
     #      fingerprint leans toward the defined directions. Both surfaces are Detailed-only.)
 
     def test_22_ref_read_populated(self):
-        """#refRead (the 'You vs your closest match' reference read) must be present, visible in
-        Detailed view, carry a real up-to-three tab selector, and NOT read 'No similar tracks' —
-        in a build that HAS reference directions. Gates SPEC §D.10.1 SHIPS-1.0 (F1)."""
+        """#refRead (the centroid read, nested in #refPanel since the D-INV-36 merge) must be
+        present, visible in Detailed view, carry per-facet bars, and NOT read 'No similar
+        tracks' — in a build that HAS reference directions. Gates SPEC §D.10.1 SHIPS-1.0 (F1).
+        (The shared `.reftab` selector moved to the container — gated by test_24.)"""
         r = _probe(self.refs,
             "(function(){"
             "document.body.className='detailed';"
@@ -1273,9 +1277,8 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
             "var p=document.getElementById('refRead');"
             "if(!p)return {present:false};"
             "var pv=getComputedStyle(p).display!=='none'&&p.offsetHeight>0;"
-            "var tabs=p.querySelectorAll('.reftab').length;"
             "var bars=p.querySelectorAll('.refread-bars').length;"
-            "return {present:true,visible:pv,tabs:tabs,bars:bars,"
+            "return {present:true,visible:pv,bars:bars,"
             "text:(p.innerText||'').trim()};})()")
         self.assertTrue(r.get("present"),
                         "EMPTY SURFACE: #refRead not found in the reference-directions widget — "
@@ -1287,9 +1290,6 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
                          "reference directions — the lean did not compute (F1 regression)")
         self.assertGreater(r.get("bars", 0), 0,
                            "EMPTY SURFACE: #refRead has no per-facet bars in the reference widget")
-        # up-to-three selector: with 3 qualifying directions there are 3 .reftab buttons
-        self.assertGreater(r.get("tabs", 0), 0,
-                           "EMPTY SURFACE: #refRead has no .reftab direction selector in the reference widget")
 
     def test_23_web_panel_populated(self):
         """#webPanel ('what the web says about ⟨artist⟩') must be present with a non-empty body in
@@ -1313,19 +1313,50 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
         self.assertGreater(r.get("bodyLen", 0), 5,
                            "EMPTY SURFACE: #webPanel body is empty in the reference widget")
 
+    def test_24_ref_panel_container_populated(self):
+        """#refPanel — the ONE merged reference panel (D-INV-36, s58) — must be present, visible
+        in Detailed, hold the shared `.reftab` selector (this fixture leans toward all 3
+        directions ⇒ 3 tabs) and BOTH nested open disclosures in order: #refRead then #webPanel."""
+        r = _probe(self.refs,
+            "(function(){"
+            "document.body.className='detailed';"
+            "document.querySelectorAll('details').forEach(function(d){d.open=true;});"
+            "var c=document.getElementById('refPanel');"
+            "if(!c)return {present:false};"
+            "var rr=document.getElementById('refRead'),wp=document.getElementById('webPanel');"
+            "return {present:true,"
+            "visible:getComputedStyle(c).display!=='none'&&c.offsetHeight>0,"
+            "tabs:c.querySelectorAll('.reftab').length,"
+            "rrNested:!!rr&&c.contains(rr),wpNested:!!wp&&c.contains(wp),"
+            "ordered:!!(rr&&wp)&&!!(rr.compareDocumentPosition(wp)&Node.DOCUMENT_POSITION_FOLLOWING)"
+            "};})()")
+        self.assertTrue(r.get("present"),
+                        "EMPTY SURFACE: #refPanel not found — the merged reference panel must "
+                        "render when directions are defined (SPEC §D.10.1, D-INV-36)")
+        self.assertTrue(r.get("visible"), "EMPTY SURFACE: #refPanel hidden in Detailed")
+        self.assertGreaterEqual(r.get("tabs", 0), 2,
+                                "the shared selector must render in the container (≥2 tabs on the "
+                                "3-direction fixture)")
+        self.assertTrue(r.get("rrNested"), "#refRead must be nested inside #refPanel")
+        self.assertTrue(r.get("wpNested"), "#webPanel must be nested inside #refPanel")
+        self.assertTrue(r.get("ordered"), "centroid read before web notes (D-INV-30)")
+
     def test_22_ref_read_absent_on_plain_full(self):
         """Proves the gate distinguishes: the standard full widget (no run_dir → no reference
-        directions) must NOT render #refRead. Confirms the 'when-reference' condition is real,
-        not always-on."""
+        directions) must NOT render #refPanel or its nested disclosures. Confirms the
+        'when-reference' condition is real, not always-on."""
         r = _probe(self.full,
-            "(function(){var p=document.getElementById('refRead');"
-            "if(!p)return {present:false};"
-            "return {present:true,display:getComputedStyle(p).display,h:p.offsetHeight};})()")
-        if r.get("present"):
-            hidden = r.get("display") == "none" or r.get("h", 0) == 0
-            self.assertTrue(hidden,
-                            "gate-self-check: #refRead is visible on the plain full widget (no run_dir) — "
-                            "the 'when-reference' condition is not being honoured")
+            "(function(){var out={};['refPanel','refRead'].forEach(function(id){"
+            "var p=document.getElementById(id);"
+            "out[id]=p?{present:true,display:getComputedStyle(p).display,h:p.offsetHeight}"
+            ":{present:false};});return out;})()")
+        for pid in ("refPanel", "refRead"):
+            e = r.get(pid, {})
+            if e.get("present"):
+                hidden = e.get("display") == "none" or e.get("h", 0) == 0
+                self.assertTrue(hidden,
+                                f"gate-self-check: #{pid} is visible on the plain full widget (no "
+                                "run_dir) — the 'when-reference' condition is not being honoured")
 
     # ── CONVERGENCE MECHANISM (INV-46) ───────────────────────────────────────
     #

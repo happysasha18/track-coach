@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.0.2"  # Track Coach analyzer version — s57 cosmetics: chain-link icon + panel-gap hierarchy
+TC_VERSION = "1.1.0"  # Track Coach analyzer version — s58: the merged reference panel (D-INV-36)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2580,40 +2580,36 @@ def render_reference_notes(artist_entry):
             + sources_html + footnote_html)
 
 
-def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_data=None):
-    """§D.10.2 — collapsible 'What the web says about <artist>' panel.
+def _web_body_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_data=None):
+    """§D.10.2 — one direction's web-notes BODY ('what the web says about <artist>').
+
+    Since the D-INV-36 merge (s58) the `<details id="webPanel">` wrapper is built ONCE by
+    `render_reference_read`, nested inside the merged `#refPanel` with one body per shown
+    direction — the web notes follow the shared selector. This builds a per-direction body
+    only; '' when the direction has no web content at all (§D.10.2 liveness — the web
+    disclosure is then hidden while that direction is focused, never an empty-open box).
 
     Two rendering modes:
 
     Rich mode (web_data is a dict with keys artist / genre_era / blurb / traits):
-      Shows genre/era line, prose blurb, and ALL traits sorted into three tiers:
+      Genre/era line, prose blurb, and ALL traits sorted into three tiers:
       (1) ★ direct+confirmed, (2) ☆ indirect+confirmed,
       (3) 'web says · our tracks don't show it' (none-tier, contradicted, or axis unmeasured).
-      Within each tier: stable sort by (axis, phrase). Panel is absent only when both blurb
-      and traits list are empty (no web content at all — §D.10.2 liveness rule).
+      Within each tier: stable sort by (axis, phrase).
 
     Simple mode (web_data is None, uses conf_entries list):
-      Shows only confirmed (★/☆) traits — backward-compatible with facet_confirmation.json.
-      Panel is absent when no facet earns a mark.
-
-    Both modes: collapsed by default (no `open`). Detailed-only via body.simple #webPanel CSS.
+      Only confirmed (★/☆) traits — backward-compatible with facet_confirmation.json.
+      '' when no facet earns a mark.
     """
     if web_data and isinstance(web_data, dict):
         # ── Rich mode (reference_web_notes.json source) ──────────────────────────────────
         # Body is built by the shared one-source renderer (also used by build_reference_notes.py).
         # Theme (dark here, light for the side page) is applied by CSS on tc-rn-* classes.
-        artist = web_data.get("artist", direction_name)
         blurb  = web_data.get("blurb", "")
         traits = web_data.get("traits", [])
         if not traits and not blurb:
-            return ""                                   # no web content → panel absent (§D.10.2)
-        body = render_reference_notes(web_data)
-        return (
-            f'<details class="tc-panel" id="webPanel">'
-            f'<summary>What the web says about {_esc(artist)}</summary>'
-            f'<div class="web-panel-body">{body}</div>'
-            f'</details>'
-        )
+            return ""                                   # no web content → body absent (§D.10.2)
+        return render_reference_notes(web_data)
 
     # ── Simple mode (backward-compat: only confirmed ★/☆ traits from conf_entries) ─────────
     if not conf_entries or not centroid_z:
@@ -2646,19 +2642,13 @@ def _web_panel_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web
         )
     if not rows:
         return ""
-    artist_section = (
+    return (
         f'<p class="web-artist-hdr">{_esc(direction_name)}</p>'
         f'<ul class="web-facets">{"".join(rows)}</ul>'
         f'<p class="web-note">'
         f'★ web-described, confirmed by measurement · '
         f'☆ web-described, soundly tied to measurement'
         f'</p>'
-    )
-    return (
-        f'<details class="tc-panel" id="webPanel">'
-        f'<summary>What the web says about {_esc(direction_name)}</summary>'
-        f'<div class="web-panel-body">{artist_section}</div>'
-        f'</details>'
     )
 
 
@@ -2709,16 +2699,21 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
     leans = SC.leans_toward_topk(track_z, directions)
 
     if not leans:
+        # Empty state (D-INV-36e): directions defined, none clears the lean bar — the one-line
+        # prose, no tabs, no nested disclosures. NEVER the §F siblings phrase "No similar tracks"
+        # (D-INV-22 vocabulary — the pre-merge bug this branch shipped).
         return (
-            '<details class="tc-panel" id="refRead" open>'
+            '<details class="tc-panel" id="refPanel" open>'
             '<summary>You vs your closest match</summary>'
-            '<p class="refread-hdr" style="color:var(--muted)">No similar tracks</p>'
+            '<p class="refread-hdr" style="color:var(--muted)">no close direction yet</p>'
             '</details>'
         )
 
-    # Build one content panel per qualifying direction
-    panels_html = []
-    for i, lean in enumerate(leans):
+    # Build one content panel per qualifying direction. `shown` keeps the rendered leans with
+    # CONTIGUOUS indices, so tabs / bars / web bodies can never disagree about which didx is
+    # which direction (a skipped no-shared-axes direction used to leave a hole).
+    shown = []                                             # [(lean, rows_html, summary), …]
+    for lean in leans:
         centroid_z  = directions[lean.direction]
         conf_entries = (confirmation or {}).get(lean.direction, [])
         rows_html, summary = _refread_bars_html(track_z, centroid_z,
@@ -2726,6 +2721,13 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
                                                 confirm_z=confirm_z)
         if not rows_html:
             continue                                        # no shared measured axes — skip this direction
+        shown.append((lean, rows_html, summary))
+
+    if not shown:
+        return ""   # all directions had no shared axes (degenerate)
+
+    panels_html = []
+    for i, (lean, rows_html, summary) in enumerate(shown):
         hidden = ' style="display:none"' if i > 0 else ""
         # Axis orientation label: "lower · them · higher" sits above the bars so the reader knows
         # which side of the center line means "I'm lower than the direction" vs "higher". Matches the
@@ -2747,37 +2749,19 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
             f'</div>'
         )
 
-    if not panels_html:
-        return ""   # all directions had no shared axes (degenerate)
-
-    # Tab buttons: only rendered when ≥2 panels (1 qualifying direction → no tab bar)
+    # Tab buttons: only rendered when ≥2 panels (1 qualifying direction → no tab bar).
+    # Since the D-INV-36 merge the tabs are the ONE shared selector at the top of #refPanel,
+    # driving BOTH nested disclosures (bars + web notes).
     # Chips are neutral — no level colour. Nearest-first order carries the rank.
     # Only the active chip is distinguished (via .reftab.active CSS — accent border, full opacity).
     tabs_html = ""
-    if len(panels_html) > 1:
+    if len(shown) > 1:
         btns = ""
-        for i, lean in enumerate(leans[:len(panels_html)]):
+        for i, (lean, _, _) in enumerate(shown):
             active = ' class="reftab active"' if i == 0 else ' class="reftab"'
             btns += (f'<button{active} data-didx="{i}">'
                      f'{_esc(lean.direction)}</button>')
         tabs_html = f'<div class="reftabs seg">{btns}</div>'
-
-    # Inline tab-switching JS (ephemeral view state, D-INV-28 — never persists across reload)
-    tab_js = ""
-    if len(panels_html) > 1:
-        tab_js = (
-            '<script>(function(){'
-            'var rd=document.getElementById("refRead");if(!rd)return;'
-            'var btns=rd.querySelectorAll(".reftab");'
-            'var panels=rd.querySelectorAll(".refpanel");'
-            'btns.forEach(function(b){'
-            'b.addEventListener("click",function(){'
-            'var idx=b.dataset.didx;'
-            'btns.forEach(function(x){x.classList.toggle("active",x.dataset.didx===idx);});'
-            'panels.forEach(function(p){p.style.display=p.dataset.didx===idx?"":"none";});'
-            '});});'
-            '})()</script>'
-        )
 
     # Legend — explains ★/☆ and the char chip. Always shown when the block renders.
     legend_html = (
@@ -2789,29 +2773,89 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         '</div>'
     )
 
+    # First nested disclosure — the centroid read (§D.10.3), open by default.
     refread_div = (
         '<details class="tc-panel" id="refRead" open>'
-        '<summary>You vs your closest match</summary>'
-        + tabs_html
+        '<summary>What the numbers show</summary>'
         + ''.join(panels_html)
-        + tab_js
         + legend_html
         + '</details>'
     )
 
-    # §D.10.2 — web panel for the focused (nearest) direction, collapsed by default.
-    # Rich mode when web_notes provides data; simple mode (★/☆ only) when only confirmation supplied.
-    focused = leans[0]
-    focused_centroid = directions[focused.direction]
-    focused_conf = (confirmation or {}).get(focused.direction, [])
-    focused_web  = (web_notes or {}).get(focused.direction) if web_notes else None
-    web_panel = _web_panel_html(focused.direction, focused_conf, focused_centroid, confirm_z,
-                                web_data=focused_web)
+    # §D.10.2 / D-INV-36c — web bodies for EVERY shown direction (not only the nearest), so the
+    # web notes can follow the shared selector client-side. A direction with no web content gets
+    # no body — the whole disclosure hides while that direction is focused (D-INV-36d).
+    web_divs = []
+    web_artist_by_idx = {}
+    for i, (lean, _, _) in enumerate(shown):
+        conf_e = (confirmation or {}).get(lean.direction, [])
+        wd = (web_notes or {}).get(lean.direction) if web_notes else None
+        body = _web_body_html(lean.direction, conf_e, directions[lean.direction], confirm_z,
+                              web_data=wd)
+        if not body:
+            continue
+        artist = wd.get("artist", lean.direction) if isinstance(wd, dict) else lean.direction
+        web_artist_by_idx[i] = artist
+        hidden = ' style="display:none"' if i > 0 else ""
+        web_divs.append(
+            f'<div class="webdir web-panel-body" data-didx="{i}"'
+            f' data-artist="{_esc(artist)}"{hidden}>{body}</div>'
+        )
 
-    result = refread_div
-    if web_panel:
-        result += "\n" + web_panel
-    return result
+    # Second nested disclosure — the web notes, open by default; absent entirely when NO shown
+    # direction has web content (§D.10.2 liveness). Hidden initially if the DEFAULT (nearest)
+    # direction has no body — the selector JS re-shows it on a direction that does.
+    web_panel = ""
+    if web_divs:
+        wp_style = "" if 0 in web_artist_by_idx else ' style="display:none"'
+        first_artist = web_artist_by_idx.get(0, next(iter(web_artist_by_idx.values())))
+        web_panel = (
+            f'<details class="tc-panel" id="webPanel" open{wp_style}>'
+            f'<summary>What the web says about'
+            f' <span id="webPanelArtist">{_esc(first_artist)}</span></summary>'
+            + ''.join(web_divs)
+            + '</details>'
+        )
+
+    # Inline selector JS (ephemeral view state, D-INV-28 — never persists across reload).
+    # One selector drives BOTH disclosures (D-INV-36b): bars, web body, web summary artist,
+    # and the web disclosure's own visibility (D-INV-36d).
+    tab_js = ""
+    if len(shown) > 1:
+        tab_js = (
+            '<script>(function(){'
+            'var rp=document.getElementById("refPanel");if(!rp)return;'
+            'var btns=rp.querySelectorAll(".reftab");'
+            'var panels=rp.querySelectorAll(".refpanel");'
+            'var webs=rp.querySelectorAll(".webdir");'
+            'var wp=document.getElementById("webPanel");'
+            'var wa=document.getElementById("webPanelArtist");'
+            'btns.forEach(function(b){'
+            'b.addEventListener("click",function(){'
+            'var idx=b.dataset.didx;'
+            'btns.forEach(function(x){x.classList.toggle("active",x.dataset.didx===idx);});'
+            'panels.forEach(function(p){p.style.display=p.dataset.didx===idx?"":"none";});'
+            'var found=null;'
+            'webs.forEach(function(w){var on=w.dataset.didx===idx;'
+            'w.style.display=on?"":"none";if(on)found=w;});'
+            'if(wp){if(found){wp.style.display="";'
+            'if(wa)wa.textContent=found.dataset.artist||"";}'
+            'else{wp.style.display="none";}}'
+            '});});'
+            '})()</script>'
+        )
+
+    # The ONE merged reference panel (D-INV-36a): title → shared selector → centroid read →
+    # web notes, both nested disclosures open by default (like the Evidence sub-panels).
+    return (
+        '<details class="tc-panel" id="refPanel" open>'
+        '<summary>You vs your closest match</summary>'
+        + tabs_html
+        + refread_div
+        + web_panel
+        + tab_js
+        + '</details>'
+    )
 
 
 def _ref_read_html(run_dir):
@@ -2935,11 +2979,12 @@ h1{font-size:20px;margin:0 0 2px;font-weight:700}
    repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
    The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
-/* Reference read (§D.10.1/§D.10.3): up-to-3 tab selector + per-facet bars — Detailed-only */
-body.simple #refRead{display:none!important}
+/* The merged reference panel (§D.10.1/D-INV-36): ONE container #refPanel — shared selector +
+   nested centroid read (#refRead) + nested web notes (#webPanel) — Detailed-only as a unit. */
+body.simple #refPanel{display:none!important}
 /* reference-direction tabs: the same `.seg` segmented bar (container styling comes from
    `.seg`; the buttons from `.seg>button`); only spacing below is bespoke here. */
-#refRead .reftabs{margin-bottom:14px}
+#refPanel .reftabs{margin-bottom:14px}
 #refRead .refread-hdr{font-size:14.5px;font-weight:600;margin:0 0 8px}
 #refRead .refread-summary{color:var(--muted);font-size:12.5px;margin:0 0 16px}
 #refRead .refread-bars{display:flex;flex-direction:column;gap:7px}
@@ -2969,8 +3014,8 @@ body.simple #refRead{display:none!important}
 #refRead .refread-legend b{color:var(--ink)}
 #refRead .refread-legend .refread-chip{font-size:8.5px;background:rgba(111,223,184,.12);
  color:var(--good);padding:0 4px;border-radius:5px;font-weight:500;cursor:help}
-/* Web-info plaque (§D.10.2, "What the web says") — collapsed tc-panel, Detailed-only, after #refRead */
-body.simple #webPanel{display:none!important}
+/* Web-info plaque (§D.10.2, "What the web says") — since the D-INV-36 merge a NESTED-OPEN
+   disclosure inside #refPanel, after #refRead; hidden with the container in Simple. */
 /* #webPanel vertical spacing now governed by --rhythm (base .tc-panel margin-bottom); the old
    per-id 10px top override zeroed the bottom and helped invert the gap hierarchy — removed (s57). */
 #webPanel .web-panel-body{padding:4px 0 4px}
@@ -3175,9 +3220,10 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .seqkey .ms{display:inline-block;min-width:13px;height:13px;line-height:13px;text-align:center;
  border-radius:3px;font-size:8px;font-weight:700;color:var(--bg);margin-right:4px}
 /* Evidence drawer and Catalog: tc-panel chrome, collapsed by default. Top-level spacing comes from
-   --rhythm (base margin-bottom); the sub-panels nested INSIDE #evidence take the smaller --gap so the
-   intra-panel gap is clearly tighter than the inter-panel rhythm (DS-INV-9 minimal slice, s57). */
-#evidence>details.tc-panel{margin-bottom:var(--gap)}
+   --rhythm (base margin-bottom); sub-panels nested INSIDE a container panel (#evidence, and #refPanel
+   since the D-INV-36 merge — structural, not per-id) take the smaller --gap so the intra-panel gap
+   is clearly tighter than the inter-panel rhythm (DS-INV-9 minimal slice, s57; widened s58). */
+#evidence>details.tc-panel,#refPanel>details.tc-panel{margin-bottom:var(--gap)}
 /* CATALOG inner tracks */
 .catgrp{margin:4px 0 2px;color:var(--muted);font-size:10.5px;text-transform:uppercase;
  letter-spacing:.7px;font-weight:700}
@@ -3270,10 +3316,10 @@ __MODENOTE__
  <canvas id="tonal" height="170"></canvas>
 </details>
 
-<!-- 4. REFERENCE READ (§D.10.3) — how this track sits vs the nearest direction's centroid,
-     per fingerprint axis. Server-side rendered; Detailed-only via CSS (body.simple #refRead).
-     Empty string when quick mode, no run_dir, or lean is far. Followed by the web-info
-     panel (§D.10.2, "What the web says") — both emitted server-side via the REFREAD substitution. -->
+<!-- 4. REFERENCE PANEL (§D.10, D-INV-36) — ONE merged container: shared direction selector +
+     nested centroid read + nested web notes (both open). Server-side rendered; Detailed-only
+     via CSS on the container (body.simple hides it whole). Empty string when quick mode or
+     no run_dir; one-line "no close direction yet" when no direction clears the lean bar. -->
 __REFREAD__
 
 <details class="tc-panel" id="evidence">

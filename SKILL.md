@@ -658,7 +658,16 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    that stick out from their NEIGHBOURS (a resonance = boxy/harsh) or sit in a hole (dull/thin) via
    `dev_db`, rather than against a guessed genre target. A deviation ≥4 dB also emits a
    `tonal_resonance` recommendation with a concrete EQ move.
-   **Reference read (Detailed-only, full run required, §D.10.1):** two panels sit together right after the tonal balance panel: ① `#refRead` — per-facet bar chart vs the nearest offerable direction centroid (up to 3 tabs when multiple directions qualify; bars show the gap signed + in plain words; ★/☆ marks where web-described traits are measurement-confirmed). ② `#webPanel` — collapsed panel with the web description of the focused direction (blurb, traits, sources). Both panels are absent in quick mode (no fingerprint) and in Simple view.
+   **Reference panel (Detailed-only, full run required, §D.10.1, D-INV-36 — merged v1.1.0):** ONE panel
+   ("You vs your closest match", `#refPanel`) right after the tonal balance panel, built like the Evidence
+   drawer: the up-to-3 direction tab selector on top (1 direction = no tabs), then two nested OPEN
+   disclosures — ① `#refRead` "What the numbers show": per-facet bar chart vs the focused direction's
+   centroid (signed gap + plain words; ★/☆ marks where web-described traits are measurement-confirmed);
+   ② `#webPanel` "What the web says about ⟨artist⟩": blurb, traits, sources for the focused direction.
+   The one selector drives BOTH — web bodies are embedded per direction, and a direction with no web
+   content hides the web disclosure while focused. Empty state (directions defined, none close) = the
+   one-line "no close direction yet". The whole panel is absent in quick mode (no fingerprint) and hidden
+   in Simple view.
    **The metric-card grid was REMOVED (v0.5.4):** trend cards duplicated the Track Story lanes
    (now carried as lane-edge verdicts); the snapshot facts moved into the vitals strip. `build_cards`
    is no longer called.

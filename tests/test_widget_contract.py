@@ -108,10 +108,10 @@ class SimpleViewGating(unittest.TestCase):
     def test_gated_set_is_exactly_the_known_four(self):
         # INV-18 (Sasha, 2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
         # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey), the recs panel filtered to
-        # non-timecoded cards (#recs), the reference read (#refRead — §D.10.3 Detailed-only), and the
-        # web panel (#webPanel — §D.10.2 Detailed-only, shipped 0.9.1).
+        # non-timecoded cards (#recs), and the merged reference panel (#refPanel — §D.10/D-INV-36,
+        # ONE container rule since the s58 merge; nested #refRead/#webPanel hide with it).
         hidden = set(re.findall(r"#([A-Za-z][\w-]*)", SIMPLE_HIDE))
-        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refRead", "webPanel"},
+        self.assertEqual(hidden, {"stemlanes", "seqKey", "recs", "refPanel"},
                          f"Simple view gates an unexpected set: {sorted(hidden)}")
 
     def test_evidence_drawer_is_always_visible(self):

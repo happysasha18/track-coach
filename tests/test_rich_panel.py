@@ -143,30 +143,30 @@ class RenderReferenceNotesUnit(unittest.TestCase):
         self.assertIn('target="_blank"', self.dc_html)
 
 
-# ── §D.10.2 — _web_panel_html rich mode ───────────────────────────────────────────────────
+# ── §D.10.2 — _web_body_html rich mode (per-direction body since the D-INV-36 merge) ───────
 
 class WebPanelHtmlRichMode(unittest.TestCase):
-    """_web_panel_html in rich mode uses render_reference_notes as the body builder."""
+    """_web_body_html in rich mode uses render_reference_notes as the body builder. Since the
+    D-INV-36 merge (s58) the <details id="webPanel"> wrapper is built once by
+    render_reference_read (nested in #refPanel, one body per shown direction) — the wrapper
+    facts live in test_reference_read::WebPanelRendering + the MergedReferencePanel browser
+    tests; this class covers the per-direction BODY."""
 
     @classmethod
     def setUpClass(cls):
         dc = _load_notes()["DeepChord"]
         # centroid_z can be a neutral dict — tier is read from JSON, not from centroid
-        cls.html = build_widget._web_panel_html(
+        cls.html = build_widget._web_body_html(
             "DeepChord", [], {ax: 0.0 for ax in ("tempo", "bass_share", "brightness")},
             web_data=dc,
         )
 
-    def test_has_webpanel_id(self):
-        self.assertIn('id="webPanel"', self.html)
-
-    def test_is_details_with_tc_panel_class(self):
-        """The outer element must be <details class="tc-panel">."""
-        self.assertRegex(
-            self.html,
-            r'<details[^>]*class="tc-panel[^"]*"[^>]*id="webPanel"'
-            r'|<details[^>]*id="webPanel"[^>]*class="tc-panel[^"]*"',
-        )
+    def test_body_has_no_wrapper(self):
+        """The body builder returns CONTENT only — the webPanel details wrapper is the merged
+        panel's job (render_reference_read), never duplicated here (E-BUG-1: the id must
+        appear exactly once in a widget)."""
+        self.assertNotIn('id="webPanel"', self.html)
+        self.assertNotIn("<details", self.html)
 
     def test_has_rich_blurb_markup(self):
         """Body must come from render_reference_notes: tc-rn-blurb must be present."""
@@ -184,8 +184,9 @@ class WebPanelHtmlRichMode(unittest.TestCase):
         self.assertIn("tc-rn-sources", self.html)
 
     def test_returns_empty_when_no_blurb_no_traits(self):
-        """Panel absent (§D.10.2 liveness) when both blurb and traits are empty."""
-        result = build_widget._web_panel_html(
+        """Body absent (§D.10.2 liveness) when both blurb and traits are empty — the merged
+        panel then hides the web disclosure for this direction (D-INV-36d)."""
+        result = build_widget._web_body_html(
             "Empty", [], {},
             web_data={"artist": "Empty", "blurb": "", "traits": []},
         )
@@ -193,7 +194,7 @@ class WebPanelHtmlRichMode(unittest.TestCase):
 
     def test_simple_mode_empty_when_no_conf_entries(self):
         """Simple (fallback) mode with no conf_entries and no centroid → empty string."""
-        result = build_widget._web_panel_html("X", [], {})
+        result = build_widget._web_body_html("X", [], {})
         self.assertEqual(result, "")
 
 
@@ -265,11 +266,12 @@ class PanelStructureIsDetails(unittest.TestCase):
         )
 
     def test_webpanel_is_hidden_in_simple_view(self):
-        """Confirm the existing Simple-view gate on webPanel survives the B3 refactor."""
+        """The Simple-view gate on the web notes — since the D-INV-36 merge it rides the ONE
+        container rule: body.simple #refPanel hides the nested #webPanel with it."""
         self.assertRegex(
             self.html,
-            r"body\.simple\s+#webPanel\s*\{[^}]*display\s*:\s*none",
-            "body.simple #webPanel { display:none } rule must be present",
+            r"body\.simple\s+#refPanel\s*\{[^}]*display\s*:\s*none",
+            "body.simple #refPanel { display:none } rule must be present (hides nested #webPanel)",
         )
 
 

@@ -762,10 +762,11 @@ brand-new user still meets the calm screen first.*
   at each rung — `quick ⊆ Simple ⊆ Detailed` (INV-18/22) is untouched, and entering Simple still resets the
   per-stem mix (§B.14) so no soloed part strands. Remembering Detailed never makes a Simple-hidden surface
   visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-41`
-- **Why it matters for the reference read.** The reference read + web panel live in Detailed (depth, §D.10.3),
-  and Simple hides `#refRead`. With the old always-calm open they were invisible unless you switched every
-  time — the reason a producer couldn't find them. Remembering Detailed is what makes them reliably present.
-  `tags: INV-41 · D-INV-30`
+- **Why it matters for the reference read.** The reference panel (centroid read + web notes, one container
+  since the 2026-07-05 merge, D-INV-36) lives in Detailed (depth, §D.10.3), and Simple hides `#refPanel` —
+  its nested disclosures with it. With the old always-calm open it was invisible unless you switched every
+  time — the reason a producer couldn't find it. Remembering Detailed is what makes it reliably present.
+  `tags: INV-41 · D-INV-30 · D-INV-36`
 
 ## D. Reference & Compare — «хочу как Aphex Twin» (0.9)
 
@@ -1336,18 +1337,20 @@ aim-dependent rows are inert without the mapping input (⟨DECIDE D-2⟩, cut fr
 
 | §D surface | id | 1.0 | renders when | gated |
 |---|---|---|---|---|
-| Reference read — per-facet centroid + "leans toward" | `#refRead` | **SHIPS-1.0** | reference directions are defined for the track | yes — non-null `gated_by` |
-| Web descriptor — "what the web says about ⟨artist⟩" | `#webPanel` | **SHIPS-1.0** | a nearest direction exists (an artist to describe) | yes — non-null `gated_by` |
-| Up-to-three nearest-direction selector (`.reftab` tabs) | within `#refRead` | **SHIPS-1.0** | ≥1 real lean (green/amber) | folded into the `#refRead` gate |
+| Reference panel — the ONE container: shared selector + two nested disclosures (merged 2026-07-05, D-INV-36) | `#refPanel` | **SHIPS-1.0** | reference directions are defined for the track | yes — non-null `gated_by` |
+| Centroid read — per-facet bars + "leans toward" (nested disclosure, open) | `#refRead` (inside `#refPanel`) | **SHIPS-1.0** | reference directions are defined for the track | yes — non-null `gated_by` |
+| Web descriptor — "what the web says about ⟨artist⟩" (nested disclosure, open; follows the selector) | `#webPanel` (inside `#refPanel`) | **SHIPS-1.0** | the focused direction has web content | yes — non-null `gated_by` |
+| Up-to-three nearest-direction selector (`.reftab` tabs) | top of `#refPanel` | **SHIPS-1.0** | ≥2 real leans (green/amber; 1 lean = no tab bar) | folded into the `#refPanel` gate |
 | Similar in your own library (§F own-library) | catalog `.sib-chip` column | **SHIPS-1.0** | ≥1 own sibling track in the library | yes — via the catalog gate (`test_19_catalog_rows_and_hrefs`) + the D-INV-26 browser colour test (`.sib-chip`); it is a catalog COLUMN, not a standalone panel |
 | Aim glyph · pinned-aimed entry · re-flavouring (§D.6) | — | **DEFERRED-post-1.0** | never in 1.0 (no mapping input) | no — not rendered, not gated |
 
 **Property (F1 — the anti-regression net covers what ships).** Every SHIPS-1.0 §D surface has a `USER_SURFACES`
 entry whose `gated_by` is **non-null** and asserts the surface POPULATED in a render where its "renders when"
-condition holds. A build that HAS reference directions yet blanks `#refRead`/`#webPanel` is a RED gate, not a
-thing Alexander finds by eye. The DEFERRED rows carry no gate — they do not render in 1.0. This closes the
-prior drift where `#refRead`/`#webPanel` rendered in a normal build but the gate marked them `DEFERRED` /
-`gated_by: None`. `tags: scope-1.0-descriptive · F1 · INV-46 · ⟨DECIDE D-2⟩ cut per §D.6`
+condition holds — since the merge that is the container `#refPanel` AND its nested `#refRead`/`#webPanel`
+(registered like the Evidence sub-panels). A build that HAS reference directions yet blanks any of them is a
+RED gate, not a thing Alexander finds by eye. The DEFERRED rows carry no gate — they do not render in 1.0.
+This closes the prior drift where `#refRead`/`#webPanel` rendered in a normal build but the gate marked them
+`DEFERRED` / `gated_by: None`. `tags: scope-1.0-descriptive · F1 · INV-46 · D-INV-36 · ⟨DECIDE D-2⟩ cut per §D.6`
 
 > **POST-1.0 — CUT FROM 1.0 (FINAL — Alexander, s54, 2026-07-05; supersedes the earlier ⟨pending⟩ marker).**
 > The aim picker (⟨DECIDE D-2⟩) was excised in 0.9.15 (see §D.6.1 tombstone), so the aim glyph, the
@@ -1385,10 +1388,24 @@ like the own-track column). `D-INV-28`
   direction link opening the read pre-focused on it) is 0.9.x** — in 0.9 the links render (`href` placeholder)
   and carry the colour/order; the cross-page focus hand-off is specified below (URL entry-focus) and wired next.
   `tags: clickable-navigation · inline-stack · F-INV-4`
-- **In the per-track producer's read.** Here the up-to-three list is a set of **direction tabs**: the read defaults
-  to the **nearest**, and switching a tab re-targets the read's in-zone/diverge words and the web panel
-  (§D.10.2) to that direction. The tab is **ephemeral view state** (it changes no analysis, and does not
-  persist across a reload — like the view ladder itself). **The catalog → widget focus hand-off is a one-shot
+- **In the per-track producer's read — ONE reference panel, one selector, both disclosures follow (MERGED,
+  Alexander 2026-07-05, his screenshot annotation).** The centroid read (§D.10.3) and the web notes (§D.10.2)
+  live in **one container panel** (`#refPanel`, titled "You vs your closest match"), built like the Evidence
+  drawer: the panel opens with the **up-to-three direction tabs** (only when ≥2 qualify — one direction means
+  no tab bar), then **two nested disclosures, both open by default**: first the centroid read (`#refRead`),
+  then the web notes (`#webPanel`). The tabs are the **single shared selector**: the read defaults to the
+  **nearest**, and switching a tab re-targets **BOTH** nested disclosures — the per-facet bars AND the web
+  notes — to that direction, client-side, in the embedded per-direction content. The two disclosures can
+  **never show two different directions at once** (the shipped pre-merge widget did exactly that: bars on the
+  selected direction, web notes stuck on the top match — the defect this merge kills). The tab is **ephemeral
+  view state** (it changes no analysis, and does not persist across a reload — like the view ladder itself).
+  The nested summaries: the centroid disclosure reads **"What the numbers show"** (static — the direction is
+  named inside, in the "Leans toward ⟨Direction⟩" header); the web disclosure reads **"What the web says about
+  ⟨artist⟩"** and its artist name follows the selector (§D.10.2). **Empty state:** with directions defined but
+  none clearing the lean bar, `#refPanel` renders the one-line **"no close direction yet"** prose — no tabs, no
+  nested disclosures (nothing to disclose; the pre-merge widget wrongly printed the siblings phrase "No similar
+  tracks" here — fixed with the merge, the phrase is the §F/D-INV-22 vocabulary, never this surface's). With no
+  reference directions defined at all the panel is absent (gate: `when-reference`). `D-INV-36` **The catalog → widget focus hand-off is a one-shot
   URL *entry* parameter, not persisted tab state:** arriving from a catalog direction-link, the widget reads
   the wanted direction once on load and opens that tab; thereafter clicking tabs does NOT write back to the URL
   (the tab stays ephemeral, D-INV-28). So "opens focused on that direction" is buildable across the page
@@ -1444,9 +1461,11 @@ decides** (D-INV-2). `D-INV-29`
 **It is a READABLE, RICH panel — the side page's depth, folded into the widget (Alexander 2026-06-29/30 — "I
 don't see the internet info anywhere" + "I hoped for more info").** The first cut showed only the 4 confirmed
 ★ lines; Alexander wants the fuller picture the side `reference_notes.html` already has (Image: artist blurb +
-a full trait list, each badged). This brings that in: a **collapsible panel** ("What the web says about
-⟨artist⟩"), **sitting last in the read, right after the centroid read** (§D.10.3 order), **collapsed by
-default**. Per artist of the focused direction it shows:
+a full trait list, each badged). This brings that in: a **nested disclosure** ("What the web says about
+⟨artist⟩") **inside the one reference panel (`#refPanel`, D-INV-36), sitting right after the centroid-read
+disclosure** (§D.10.3 order), **open by default** *(supersedes the earlier "standalone panel, collapsed by
+default" — Alexander 2026-07-05 merged the two reference panels into one, nested-open like the Evidence
+sub-panels)*. Per artist of the focused direction it shows:
 - **a one-line genre / era** + **a short prose blurb** of what the web says the artist's sound IS (e.g. "DeepChord —
   dub/ambient techno, Detroit; the second-wave Basic Channel sound, ambient-led, kick added last");
 - **the FULL trait list, not only the confirmed ones** — each trait = a short readable phrase + the measured
@@ -1474,6 +1493,17 @@ D-INV-2 · RC-INV-1`
 **Header styled like its sibling drawers (Alexander 2026-06-30).** The panel's `<summary>` uses the **same
 visual style as the other collapsibles** (the Evidence drawer, the catalog) — same weight, same disclosure
 arrow — not a fainter, smaller heading; it reads as a peer drawer, not an afterthought. `tags: consistent-summary`
+
+**The web notes FOLLOW the shared selector, for every shown direction (Alexander 2026-07-05 — the merge's
+payoff; folds in the s47 "web-descriptor for all 3 nearest" feature).** The build embeds the web content
+**per shown direction** (all ≤3 that qualify, from the one-source file), and switching a `#refPanel` tab swaps
+the web disclosure's body AND its `<summary>` artist name to the focused direction — client-side, no re-run,
+ephemeral like the tab itself (D-INV-28). The pre-merge widget rendered web notes only for the top match and
+never re-targeted them (bars said DeepChord, web said SCSI-9 — Alexander's screenshot); that state is now
+impossible by construction: one selector, both disclosures. A focused direction **with no web content hides
+the web disclosure entirely while it is focused** (the §D.10.2 liveness rule composed across the selector —
+absent, never a blank box implying "no style"); switching back to a direction with content brings it back.
+`D-INV-36`
 
 **One disclosure per direction**, with an **artist sub-header per artist inside it** for a multi-artist
 direction (one collapse, artist sections within — never one box per artist, D-INV-2), never blended. The
@@ -1565,13 +1595,14 @@ current geometry no longer supports. The web fetch itself is cached on its own c
 from the measurement epoch. `tags: D-INV-24 · D-INV-29`
 
 **How it composes across the view ladder.** The plaque is **explanatory detail**, so it lives where detail
-lives: the **producer's read** (when you click your track) and the **Detailed** per-track widget, **last in the read
-order (after the centroid, §D.10.3) and collapsed by default** — open it when you want the web's view, it never
-crowds the measured read above it. **Simple** keeps the prose read without the facet plaque; **quick** shows
-nothing (no fingerprint, no reference, D-INV-20). The **catalog cell never carries the plaque** — too dense for
-a glance; the cell stays name + cue, and the plaque opens with the read. It is governed by the **one
-show/hide-references switch** (D-INV-23) like every reference surface. `tags: view-ladder · collapsible ·
-D-INV-23 · D-INV-20`
+lives: the **producer's read** (when you click your track) and the **Detailed** per-track widget, **last inside
+the reference panel (after the centroid disclosure, §D.10.3), open by default** — nested-open like the Evidence
+sub-panels (the 2026-07-05 merge), and collapsible when you don't want the web's view; it never displaces the
+measured read above it. **Simple** keeps the prose read without the facet plaque (Simple hides the whole
+`#refPanel`); **quick** shows nothing (no fingerprint, no reference, D-INV-20). The **catalog cell never carries
+the plaque** — too dense for a glance; the cell stays name + cue, and the plaque opens with the read. It is
+governed by the **one show/hide-references switch** (D-INV-23) like every reference surface. `tags: view-ladder ·
+collapsible · D-INV-23 · D-INV-20 · D-INV-36`
 
 **Never happens (safety), specific to the plaque.** The plaque never shows a web claim the facet→signal map
 can't tie to measurement; **★** appears only when measurement directly confirms and **☆** only when the tie is
@@ -1586,13 +1617,16 @@ of that artist's cloud in fingerprint space. This is where "the centroid and all
 producer who reads vectors. It is **not a map** (dropped, D-INV-11); it is a per-facet decomposition plus the
 overall closeness.
 
-**Where it sits in the read — the fixed order (Alexander 2026-06-29).** The Detailed read runs top-to-bottom
-in this order, so the eye moves from your own track outward to the reference and only then to the web: **(1) the
-producer's read** (the worded observation, §B.12) → **(2) tonal balance** (the spectrum) → **(3) the centroid
-reference read** (this section's per-facet bars) → **(4) the web panel** (§D.10.2, what the web says about
-the direction's artist, tied to the axes it was confirmed on). The reference read therefore comes **after**
-tonal balance (today they are reversed in the shipped widget — this re-orders them) and **before** the web
-plaque, which is the last and most external layer. `tags: read-order · D-INV-30 · D-INV-29`
+**Where it sits in the read — the fixed order (Alexander 2026-06-29; merged into one panel 2026-07-05).** The
+Detailed read runs top-to-bottom in this order, so the eye moves from your own track outward to the reference
+and only then to the web: **(1) the producer's read** (the worded observation, §B.12) → **(2) tonal balance**
+(the spectrum) → **(3) the reference panel** (`#refPanel`, D-INV-36) — ONE container holding the shared
+direction selector, then **the centroid read** (this section's per-facet bars, first nested disclosure) →
+**the web notes** (§D.10.2, second nested disclosure, what the web says about the direction's artist). The
+outward order is unchanged by the merge: the centroid read still comes **after** tonal balance and **before**
+the web plaque, which stays the last and most external layer — the merge changed the packaging (two top-level
+panels → one panel, two nested-open disclosures), never the reading order. `tags: read-order · D-INV-30 ·
+D-INV-29 · D-INV-36`
 
 **What it shows (Detailed, against the focused direction).**
 - **Per-facet comparison — your value vs the centroid, axis by axis.** For each producer facet (a fingerprint
@@ -2328,16 +2362,16 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 
 ### I.10 Composition across the axes
 - **× view (Simple/Detailed/quick):** the tokens are view-independent, but the components they style
-  are gated (e.g. `#stemlanes`/`#seqKey` Detailed-only, `#refRead` Detailed-only, the view-toggle
-  hidden on quick → `.viewhint`). The refactor must not change any view-VISIBILITY rule — the existing
+  are gated (e.g. `#stemlanes`/`#seqKey` Detailed-only, `#refPanel` Detailed-only — its nested
+  `#refRead`/`#webPanel` hidden with it, D-INV-36 — the view-toggle hidden on quick → `.viewhint`). The refactor must not change any view-VISIBILITY rule — the existing
   view-ladder visibility browser tests pass UNCHANGED. (Distinct from the recs COLUMN-COUNT tests,
   which DO change per DS-INV-8 — visibility is held, layout counts are updated.)
 - **× persistence/reopen:** the `.tc-panel` open/closed state and the remembered global view survive a
   reopen; the animated-height change (I.7 #3) must not break the persisted-open render (a panel
   restored open shows expanded, no first-frame collapse).
 - **× viewport:** the grid (DS-INV-8) yields column counts by width with no media-query cliff; the
-  segmented control and cards stay within `--w-content`. The §D reference read (`#refRead`), the web
-  panel (`#webPanel`) and the up-to-three tab selector (`.reftab`) also stay within the viewport when
+  segmented control and cards stay within `--w-content`. The §D reference panel (`#refPanel`), its nested
+  read (`#refRead`), web notes (`#webPanel`) and the up-to-three tab selector (`.reftab`) also stay within the viewport when
   narrow — no horizontal overflow, no internal h-scroll, no tab-row spill (pass-3 composition s56;
   pinned browser-level, `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow`).
 

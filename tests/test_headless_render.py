@@ -1400,5 +1400,190 @@ class CatalogSemanticColourRendered(unittest.TestCase):
                             "the sibling colour must not fall back to default anchor blue")
 
 
+# ── D-INV-36 — the merged reference panel (Q5, Alexander 2026-07-05) ──────────────────────
+
+def _merged_ref_page(directions, web_notes, tmp_prefix="tc_merged_"):
+    """Render render_reference_read() output into a standalone page for the harness.
+
+    Pure-function fixture: synthetic directions/web_notes, identity norm, track at the
+    origin — no run_dir, no real data files, so each test controls exactly which
+    directions qualify and which carry web content."""
+    import fingerprints as FP
+    track = {ax: 0.0 for ax in FP.AXES}
+    norm = {"mu": {ax: 0.0 for ax in FP.AXES}, "sd": {ax: 1.0 for ax in FP.AXES}}
+    html = build_widget.render_reference_read(track, directions, norm, web_notes=web_notes)
+    tmp = Path(tempfile.mkdtemp(prefix=tmp_prefix))
+    out = tmp / "page.html"
+    out.write_text(
+        "<!doctype html><html><head><meta charset='utf-8'></head>"
+        f"<body>{html}</body></html>", encoding="utf-8")
+    return str(out)
+
+
+def _three_close_dirs():
+    """Three directions that all qualify as leans for a track at the origin (small,
+    distinct offsets on different axes), nearest-first = Alpha, Beta, Gamma."""
+    import fingerprints as FP
+    def z(**over):
+        d = {ax: 0.0 for ax in FP.AXES}
+        d.update(over)
+        return d
+    return {"Alpha": z(tempo=0.2), "Beta": z(dynamics=0.35), "Gamma": z(brightness=0.5)}
+
+
+def _web_note(artist):
+    return {
+        "artist": artist,
+        "genre_era": f"{artist} — test genre, test era",
+        "blurb": f"What the web says about {artist}: a distinctive test sound.",
+        "traits": [
+            {"phrase": f"{artist} wide pads", "axis": "stereo_width", "tier": "direct",
+             "expect": "high"},
+            {"phrase": f"{artist} dubby depths", "axis": None, "tier": "none"},
+        ],
+        "sources": [{"label": f"{artist} source", "url": "https://example.com"}],
+    }
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class MergedReferencePanel(unittest.TestCase):
+    """D-INV-36 — ONE reference panel: shared selector, two nested open disclosures,
+    web notes follow the selector and exist for every shown direction (SPEC §D.10.1/.2,
+    the Q5 merge, Alexander 2026-07-05). Written RED against the pre-merge render
+    (two top-level panels; web stuck on the top match; the forbidden empty-state copy)."""
+
+    @classmethod
+    def setUpClass(cls):
+        dirs = _three_close_dirs()
+        notes = {n: _web_note(n) for n in dirs}
+        cls.page = _merged_ref_page(dirs, notes)
+        # Fixture guard: all three directions must actually qualify, else the selector
+        # tests pass vacuously.
+        import fingerprints as FP
+        import similarity_columns as SC
+        track = {ax: 0.0 for ax in FP.AXES}
+        leans = SC.leans_toward_topk(track, dirs)
+        assert len(leans) == 3, f"fixture must yield 3 qualifying directions, got {len(leans)}"
+
+    def test_one_container_selector_and_two_nested_open_disclosures(self):
+        """(a) #refPanel is the ONE container: selector at the top, then the centroid
+        disclosure (#refRead), then the web disclosure (#webPanel) — both nested, both open."""
+        r = hc.probe(self.page,
+            "(function(){"
+            "var c=document.getElementById('refPanel');"
+            "if(!c)return {container:false};"
+            "var rr=document.getElementById('refRead'),wp=document.getElementById('webPanel');"
+            "return {container:true,cOpen:c.open===true,"
+            "cTitle:(c.querySelector('summary')||{}).textContent||'',"
+            "rrNested:!!rr&&c.contains(rr),wpNested:!!wp&&c.contains(wp),"
+            "rrOpen:!!rr&&rr.open===true,wpOpen:!!wp&&wp.open===true,"
+            "rrBeforeWp:!!(rr&&wp)&&!!(rr.compareDocumentPosition(wp)&Node.DOCUMENT_POSITION_FOLLOWING),"
+            "tabsInContainer:c.querySelectorAll('.reftab').length,"
+            "tabsBeforeRr:(function(){var t=c.querySelector('.reftabs');"
+            "return !!(t&&rr)&&!!(t.compareDocumentPosition(rr)&Node.DOCUMENT_POSITION_FOLLOWING);})()"
+            "};})()", width=1100, height=2400)
+        self.assertTrue(r.get("container"),
+                        "MERGE: #refPanel container not found — the two reference panels must "
+                        "merge into ONE (D-INV-36a)")
+        self.assertTrue(r.get("cOpen"), "#refPanel must be open by default")
+        self.assertIn("You vs your closest match", r.get("cTitle", ""),
+                      "the container keeps the established title")
+        self.assertTrue(r.get("rrNested"), "#refRead must be NESTED inside #refPanel")
+        self.assertTrue(r.get("wpNested"), "#webPanel must be NESTED inside #refPanel")
+        self.assertTrue(r.get("rrOpen"), "the centroid disclosure must be open by default")
+        self.assertTrue(r.get("wpOpen"), "the web disclosure must be open by default (nested-open, "
+                                         "supersedes the standalone-collapsed panel)")
+        self.assertTrue(r.get("rrBeforeWp"), "centroid read must precede web notes (D-INV-30)")
+        self.assertEqual(r.get("tabsInContainer"), 3,
+                         "the shared selector (3 qualifying directions = 3 tabs) must sit in the "
+                         "container, above both disclosures")
+        self.assertTrue(r.get("tabsBeforeRr"), "the selector must precede the first disclosure")
+
+    def test_tab_switch_retargets_both_bars_and_web(self):
+        """(b) Clicking a tab re-targets BOTH disclosures — bars AND web body + summary.
+        The pre-merge defect: bars switch, web notes stay on the top match."""
+        r = hc.probe(self.page,
+            "(function(){"
+            "var tabs=document.querySelectorAll('.reftab');"
+            "if(tabs.length<2)return {tabs:tabs.length};"
+            "tabs[1].click();"
+            "function visIdx(sel){var v=[];document.querySelectorAll(sel).forEach(function(p){"
+            "if(getComputedStyle(p).display!=='none')v.push(p.dataset.didx);});return v;}"
+            "var wp=document.getElementById('webPanel');"
+            "return {tabs:tabs.length,"
+            "barsVisible:visIdx('.refpanel'),"
+            "webVisible:visIdx('.webdir'),"
+            "webSummary:wp?(wp.querySelector('summary')||{}).textContent||'':''"
+            "};})()", width=1100, height=2400)
+        self.assertGreaterEqual(r.get("tabs", 0), 2, "fixture must render ≥2 tabs")
+        self.assertEqual(r.get("barsVisible"), ["1"],
+                         "after clicking tab 2, ONLY that direction's bars are visible")
+        self.assertEqual(r.get("webVisible"), ["1"],
+                         "after clicking tab 2, the web disclosure must show THAT direction's "
+                         "body — not stay on the top match (the Q5 defect, D-INV-36b)")
+        self.assertIn("Beta", r.get("webSummary", ""),
+                      "the web disclosure summary must follow the selector (artist name)")
+
+    def test_all_shown_directions_have_embedded_web_bodies(self):
+        """(c) The build embeds a web body for EVERY shown direction, not only the nearest."""
+        r = hc.probe(self.page,
+            "(function(){var v=[];document.querySelectorAll('.webdir').forEach(function(p){"
+            "v.push(p.dataset.didx);});"
+            "return {bodies:v,tabs:document.querySelectorAll('.reftab').length};})()",
+            width=1100, height=2400)
+        self.assertEqual(r.get("bodies"), ["0", "1", "2"],
+                         "all 3 shown directions must carry an embedded web body "
+                         "(pre-merge: only the top match, D-INV-36c)")
+
+    def test_direction_without_web_content_hides_web_disclosure(self):
+        """(d) A focused direction with NO web content hides the web disclosure entirely
+        (never an empty-open box, INV-47 composed); switching back restores it."""
+        dirs = _three_close_dirs()
+        notes = {"Alpha": _web_note("Alpha"), "Gamma": _web_note("Gamma")}   # Beta: none
+        page = _merged_ref_page(dirs, notes, tmp_prefix="tc_merged_gap_")
+        js = (
+            "(function(){"
+            "var tabs=document.querySelectorAll('.reftab');"
+            "var wp=document.getElementById('webPanel');"
+            "function wpVisible(){return !!wp&&wp.offsetParent!==null&&wp.offsetHeight>0;}"
+            "var out={tabs:tabs.length,initial:wpVisible()};"
+            "if(tabs.length>=2){tabs[1].click();out.onGap=wpVisible();"
+            "tabs[0].click();out.back=wpVisible();}"
+            "return out;})()"
+        )
+        r = hc.probe(page, js, width=1100, height=2400)
+        self.assertGreaterEqual(r.get("tabs", 0), 2, "fixture must render ≥2 tabs")
+        self.assertTrue(r.get("initial"), "web disclosure visible for a direction WITH content")
+        self.assertFalse(r.get("onGap"),
+                         "focusing a direction with NO web content must HIDE the web disclosure "
+                         "(absent, never empty-open — D-INV-36d)")
+        self.assertTrue(r.get("back"), "switching back must restore the web disclosure")
+
+    def test_empty_state_says_no_close_direction_yet(self):
+        """(e) Directions defined but none close ⇒ the one-line 'no close direction yet'
+        prose — never the §F siblings phrase 'No similar tracks' (pre-merge bug)."""
+        import fingerprints as FP
+        def z(**over):
+            d = {ax: 0.0 for ax in FP.AXES}
+            d.update(over)
+            return d
+        far = {"x": z(tempo=9.0), "y": z(dynamics=9.0)}
+        page = _merged_ref_page(far, {}, tmp_prefix="tc_merged_far_")
+        r = hc.probe(page,
+            "(function(){var c=document.getElementById('refPanel');"
+            "return {container:!!c,text:c?(c.innerText||''):'',"
+            "tabs:document.querySelectorAll('.reftab').length,"
+            "nested:c?c.querySelectorAll('details').length:0};})()",
+            width=1100, height=1200)
+        self.assertTrue(r.get("container"), "the empty state still renders #refPanel")
+        self.assertIn("no close direction yet", r.get("text", "").lower(),
+                      "the empty state must read 'no close direction yet' (SPEC §D.10.1)")
+        self.assertNotIn("no similar tracks", r.get("text", "").lower(),
+                         "the §F siblings phrase must NEVER appear on this surface (D-INV-22 "
+                         "vocabulary — the pre-merge bug)")
+        self.assertEqual(r.get("tabs"), 0, "the empty state renders no tabs")
+        self.assertEqual(r.get("nested"), 0, "the empty state renders no nested disclosures")
+
+
 if __name__ == "__main__":
     unittest.main()

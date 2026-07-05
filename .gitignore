@@ -45,3 +45,4 @@ JOURNAL.md
 # Session scratch / working notes under data/ — resume trail, kept on disk, not committed.
 # (Real data under data/ is JSON: reference_*.json, facet_confirmation.json — those stay tracked.)
 data/*.md
+/catalog.json
