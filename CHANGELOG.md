@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.4.1] — 2026-07-05
+
+### Changed
+- **Three advice cards now say whether their number is a lot — «в апельсинах».** A raw figure without
+  a reference made the producer do the calibration himself. The swing card now frames the measured
+  offset as a feel — a gentle human push / a hard, unmistakably human swing / loose to the point of
+  broken-beat — while naming the machine-tight window (~25–30 ms); the dynamic-range card puts the
+  measured DR on a ladder (loud club masters ~6–8 dB; open mixes 10 and up); the tonal-resonance card
+  translates its dB offset to the ear ("half again as loud as its neighbours…"), keeping the measured
+  number beside the phrase. The swing and tonal phrases are computed from the measurement, so the
+  framing varies with the track instead of reciting one template. Spec: §B.16 INV-50a–c.
+
 ## [1.4.0] — 2026-07-05
 
 ### Added

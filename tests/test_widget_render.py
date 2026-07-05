@@ -630,5 +630,67 @@ class RecordHistorySurvivesLegacyStrEntry(unittest.TestCase):
                          "the legacy string entry is left untouched, not crashed on")
 
 
+class CardScalePhrases(unittest.TestCase):
+    """INV-50a-c (SPEC §B.16, 2026-07-05 late) — a number wears its scale. The swing,
+    squashed and tonal-resonance bodies carry a reference scale IN the sentence, and the
+    swing/tonal framing is COMPUTED from the measurement (three bands / three steps per
+    sign) so the fix doesn't re-template. Written RED against 1.4.0 (canned bodies)."""
+
+    @staticmethod
+    def _html(core_extra=None, detail=None):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_scale_"))
+        core = _synthetic_core()
+        core.update(core_extra or {})
+        out = tmp / "widget.html"
+        build_widget.build_html(core, detail or {}, None, None, str(out), "Scale Test",
+                                build_widget.STRINGS, mode="full",
+                                narrative_md="Scale fixture.")
+        return out.read_text(encoding="utf-8")
+
+    def test_swing_feel_matches_band(self):  # INV-50a
+        cases = (
+            (45.0, "gentle human push", ("unmistakably human", "broken-beat")),
+            (75.0, "unmistakably human", ("gentle human push", "broken-beat")),
+            (192.0, "broken-beat", ("gentle human push", "unmistakably human")),
+        )
+        for ms, phrase, others in cases:
+            html = self._html(detail={"swing_global_ms": ms})
+            self.assertIn("25–30 ms", html,
+                          f"swing {ms}: the tight-grid window must be named in the card")
+            self.assertIn(phrase, html,
+                          f"swing {ms}: the feel phrase must match the measured band")
+            for o in others:
+                self.assertNotIn(o, html,
+                                 f"swing {ms}: only ONE feel phrase may render")
+            self.assertNotIn("sounds human rather than machine", html,
+                             "the canned one-size swing line must be gone")
+
+    def test_squashed_ladder_present(self):  # INV-50b
+        html = self._html(core_extra={"vitals": {"dynamic_range_db": 4.5}})
+        self.assertIn("6–8", html, "the squashed card must name the club-master rung")
+        self.assertIn("10 and up", html, "the squashed card must name the open-mix rung")
+
+    def test_tonal_phrase_matches_magnitude_and_sign(self):  # INV-50c
+        all_phrases = ("about twice as loud", "half again as loud", "clearly audible bump",
+                       "about half as loud", "noticeably recessed", "clearly audible dip")
+        cases = (
+            (9.5, "about twice as loud"),
+            (6.5, "half again as loud"),
+            (4.5, "clearly audible bump"),
+            (-9.5, "about half as loud"),
+            (-6.5, "noticeably recessed"),
+            (-4.5, "clearly audible dip"),
+        )
+        for dev, phrase in cases:
+            html = self._html(core_extra={"tonal_balance": [{"band": "250", "dev_db": dev}]})
+            self.assertIn(phrase, html,
+                          f"dev {dev:+.1f}: the perceived-loudness phrase must match")
+            for o in all_phrases:
+                if o != phrase and not (o in phrase or phrase in o):
+                    self.assertNotIn(o, html, f"dev {dev:+.1f}: only ONE phrase may render")
+            self.assertIn(f"{dev:+.1f}", html,
+                          f"dev {dev:+.1f}: the measured dB must stay in the sentence")
+
+
 if __name__ == "__main__":
     unittest.main()

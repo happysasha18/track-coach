@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.4.0"  # Track Coach analyzer version — s62: the arc answers back, a cue's whole column lights its card (§B.13 INV-49)
+TC_VERSION = "1.4.1"  # Track Coach analyzer version — s62: a number wears its scale — swing/DR/tonal cards carry their reference (§B.16 INV-50)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -279,8 +279,8 @@ STRINGS = {
             "header": "Groove · swing {sw:.0f} ms",
             "title": "Hits sit noticeably off the straight grid",
             "body": "Swing of {sw:.0f} ms means the notes aren't locked to the grid — they're shifted by {sw:.0f} ms, so the "
-                    "groove clearly “swings”, sounds human rather than machine. Great for live, hip-hop, organic material. "
-                    "If this is straight techno and the drums should be dead-tight, pull them closer to the grid (~25–30 ms).",
+                    "groove {feel} (a machine-tight groove stays within ~25–30 ms). Great for live, hip-hop, organic material. "
+                    "If this is straight techno and the drums should be dead-tight, pull them closer to the grid.",
             "fix": "Keep it if you want a human feel. For dead-tight techno, pull the drums toward the grid (~25–30 ms)."},
         "truepeak_clip": {
             "header": "Master · true peak {tp:+.1f} dBTP",
@@ -293,14 +293,15 @@ STRINGS = {
             "header": "Tone · {band} Hz stands out",
             "title": "One frequency band sticks out from the rest",
             "body": "Across the whole track the <b>{band} Hz</b> region sits about <b>{dev:+.1f} dB</b> "
-                    "against its neighbours — a {kind}. {flavour} It colours the whole mix because it's "
+                    "against its neighbours — {rel} — a {kind}. {flavour} It colours the whole mix because it's "
                     "there constantly, not just on one hit.",
             "fix": "{action} around <b>{band} Hz</b> on the master (a wide, gentle {dir} of ~{amt:.0f} dB) and A/B it."},
         "squashed": {
             "header": "Master · dynamic range DR {dr:.0f}",
             "title": "The mix is heavily limited — little dynamic range left",
             "body": "Peak-to-RMS is only <b>{dr:.0f} dB</b> — the loud and quiet parts sit almost at the same level, so the "
-                    "track sounds flat and fatiguing, with no punch on the transients. This usually means the limiter / clipper "
+                    "track sounds flat and fatiguing, with no punch on the transients. For scale: even loud club masters keep "
+                    "around 6–8 dB of range; open, punchy mixes sit at 10 and up. This usually means the limiter / clipper "
                     "is working too hard.",
             "fix": "Back off the limiter / master clipper so transients breathe (aim DR ≥ ~8) — or lower the input into it and let the loudest hits poke through."},
         "empty_stem": {
@@ -390,6 +391,23 @@ STRINGS = {
             "fix": "Solo & export <b>Grp Bass</b> in Ableton and do low-end EQ/sidechain there — not on the separated bass stem."},
     },
 }
+
+# §B.16 INV-50 — a number wears its scale. The step boundaries live HERE, once, beside the
+# card maps: the swing feel bands and the tonal perceived-loudness steps (hot / dip mirrors).
+# The phrases are chosen from the MEASUREMENT so the framing varies per track (the
+# de-templating steer, signal_value_map.md).
+SWING_FEEL_BANDS = (          # sw ms threshold → the feel phrase (INV-50a)
+    (90.0, "is loose to the point of broken-beat"),
+    (60.0, "swings hard — unmistakably human"),
+    (30.0, "has a gentle human push off the grid"),
+)
+TONAL_SCALE_STEPS = (         # |dev| dB threshold → (resonance phrase, dip phrase) (INV-50c)
+    (9.0, "about twice as loud as its neighbours, to the ear",
+          "about half as loud as its neighbours, to the ear"),
+    (6.0, "half again as loud as its neighbours, to the ear",
+          "noticeably recessed against its neighbours"),
+    (4.0, "a clearly audible bump", "a clearly audible dip"),
+)
 
 # which colour class each recommendation uses
 REC_CLASS = {
@@ -1438,7 +1456,8 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
 
     sw = detail.get("swing_global_ms")
     if sw is not None and sw > 30:
-        add("swing", sw=sw)
+        feel = next(ph for thr, ph in SWING_FEEL_BANDS if sw >= thr)
+        add("swing", sw=sw, feel=feel)
 
     # ── mastering vitals → actionable recs (true-peak clipping, over-limiting) ──
     vit = core.get("vitals", {})
@@ -1461,7 +1480,8 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
             low = any(band.startswith(p) for p in ("20", "60", "120", "250"))
             flavour = (("That usually reads as boxy or muddy." if low else "That usually reads as harsh or fatiguing.")
                        if hot else ("That can leave the mix sounding dull or thin." if not low else "The low end may feel hollow there."))
-            add("tonal_resonance", band=band, dev=dev,
+            rel = next((h if hot else d) for thr, h, d in TONAL_SCALE_STEPS if abs(dev) >= thr)
+            add("tonal_resonance", band=band, dev=dev, rel=rel,
                 kind=("resonance / build-up" if hot else "dip / hole"), flavour=flavour,
                 action=("Dip" if hot else "Lift"), dir=("cut" if hot else "boost"),
                 amt=min(4.0, abs(dev) * 0.6))

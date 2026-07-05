@@ -859,6 +859,39 @@ brand-new user still meets the calm screen first.*
   time — the reason a producer couldn't find it. Remembering Detailed is what makes it reliably present.
   `tags: INV-41 · D-INV-30 · D-INV-36`
 
+### B.16 A number wears its scale — «много или мало? в апельсинах» (2026-07-05 late, the wording finish)
+A card that headlines a raw number without a reference scale makes the producer do the calibration
+himself — "192 ms: is that a lot?" The map (`docs/signal_value_map.md`) named exactly which Tier-A cards
+read as "a meter with a sentence" for this reason, and the de-templating steer says the cure is not a
+LONGER canned sentence but a frame that varies with THIS track's measurement. Three cards carry a bare
+number today; each gets its scale IN the sentence, and where a fixed reference would itself template, the
+phrase is COMPUTED from the measurement.
+*Fences — what stays true:* the based-on lines are untouched (INV-31); no card appears or disappears, no
+ordering change (`_rank`, §B.11 sort law); headers keep their formats (golden fixtures); the "→ Try" fix
+lines keep their content save the swing card's unchanged grid reference; the tonal card's flavour/action
+fields (boxy/harsh/dip/lift) are untouched — the scale phrase is ADDED, not swapped in.
+- **Swing speaks in feel, on a named grid.** The swing card's body replaces its canned "so the groove
+  clearly swings, sounds human rather than machine" with a phrase chosen by the measured offset — a gentle
+  human push (30–60 ms) / a hard, unmistakably human swing (60–90) / loose to the point of broken-beat
+  (>90) — and keeps naming the tight-grid window (~25–30 ms) so the number has a floor to stand on. `INV-50a`
+- **Dynamic range stands on a ladder.** The squashed card's body adds the scale sentence: even loud club
+  masters keep around 6–8 dB; open, punchy mixes sit at 10 and up. The measured DR then reads as a position
+  on that ladder, not a lone figure. `INV-50b`
+- **The tonal offset is translated to the ear.** The tonal-resonance card renders the dB deviation with a
+  computed perceived-loudness phrase: ≥9 dB ≈ "about twice as loud as its neighbours, to the ear" / ≥6 ≈
+  "half again as loud" / ≥4 ≈ "a clearly audible bump" (mirrored wording for dips: "about half as loud" /
+  "noticeably recessed" / "a clearly audible dip"). The step boundaries live in ONE place in code beside
+  the card. `INV-50c`
+- *Composed across the axes:* view — card bodies render identically in Simple/Detailed (the view ladder
+  gates WHICH cards show, never their text); mode — quick runs that produce these cards get the same
+  bodies; viewport/touch — text only, wraps as any body text; empty — a card that doesn't fire has no
+  sentence to scale; persistence — none.
+- *Non-goals:* re-writing based-on lines; scales for numbers already relative in-sentence (long-section %,
+  climax's "usually around 70%", true-peak's 0 dBTP ceiling, per-stem "vs the rest" cards, wobble's
+  start→end pair); any new card. *Success measure:* on the library tracks the three bodies read with their
+  scales and the tonal/swing phrases match each track's measured magnitude — verified by deed at landing
+  `[default]`.
+
 ## D. Reference & Compare — «хочу как Aphex Twin» (0.9)
 
 Point track-coach at someone else's music as a *direction* you're reaching toward, see where your track
