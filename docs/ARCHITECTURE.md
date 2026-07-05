@@ -69,7 +69,7 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N8** | The credibility layer — never say more than the numbers support; name the PART not a template; freq-role from the analyzer; precise masking phrasing | `build_widget.py` (claim assembly), `render_spec.py`, `track_analyzer.py` | §B.1–B.9 (CR-*/G-*) | test_credibility (93) |
+| **N8** | The credibility layer — never say more than the numbers support; name the PART not a template; freq-role from the analyzer; precise masking phrasing | `build_widget.py` claim assembly (`build_recommendations:1355`, `build_cards:1618`), `render_spec.py`, `track_analyzer.py` | §B.1–B.9 (CR-*/G-*) | test_credibility (93) |
 
 *Level expectation:* mostly L0/L1 — the *claim strings* are data, but where a claim's **presence/absence per data-state** is a rendered fact it wants L1 at least, L3 where visibility depends on it.
 
@@ -78,7 +78,7 @@
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
 | **N9** | Reference directions — the measured centroids you compare against | `gen_reference_directions.py` | §D.5, §D.10 | (data fixtures) |
-| **N10** | Reference notes & the web panel + ★ cross-validation render | `build_reference_notes.py` | §D.10.2, §D.10.3 | test_reference_read, test_rich_panel |
+| **N10** | Reference-notes DATA (curated web notes) + the standalone light-theme side-page that REUSES the N17 renderer — NOT the in-widget render itself (that is N17) | `build_reference_notes.py` (`build:198`), `data/reference_web_notes.json` | §D.10.2 side-page | test_reference_read, test_rich_panel |
 | **N11** | Similar-in-your-own-library — the DJ column + click-to-scroll | `similarity_columns.py` | §F | test_similarity_columns |
 
 *Level expectation:* N9 L0-DATA; N10/N11 are **rendered surfaces** → visibility/layout facts need **L3-BROWSER**.
@@ -87,12 +87,12 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N12** | Widget assembly & the element grid — which panel shows per view-state × data-state | `build_widget.py` | §4/§5 | test_widget_render, test_widget_contract |
-| **N13** | The synced player as a STATE MACHINE (play/seek/mute/solo, playhead) | `build_widget.py` `__PLAYER_LOGIC__` | §B.14 | test_player_logic (L2-NODE) |
-| **N14** | The view selector as remembered state (one global view, calm first use) | `build_widget.py` `VIEW_LOGIC` | §B.15 | test_view_ladder (L2-NODE) |
-| **N15** | Card evidence ("based-on" line) + the producer's read (artistic layer) | `build_widget.py` | §B.12, §B.13 | test_widget_render (part) |
-| **N16** | The visual design system — single token source, colour/layout/motion, 10 component contracts | `build_widget.py` CSS | §I (DS-INV-1..14) | test_design_tokens, test_headless_render |
-| **N17** | In-widget reference panel display (the read + web panel inside the widget, not the catalog) | `build_widget.py` | §D.7, §D.10 display | test_reference_read, test_headless_render |
+| **N12** | Widget assembly & the element grid — which panel shows per view-state × data-state | `build_widget.py` `build_html:1983` (assembly), `build_story:1802` | §4/§5 | test_widget_render, test_widget_contract |
+| **N13** | The synced player as a STATE MACHINE (play/seek/mute/solo, playhead) | `build_widget.py` `PLAYER_LOGIC:3908–3916` (markers) | §B.14 | test_player_logic (L2-NODE) |
+| **N14** | The view selector as remembered state (one global view, calm first use) | `build_widget.py` `VIEW_LOGIC:3366–3378` (markers) | §B.15 | test_view_ladder (L2-NODE) |
+| **N15** | Card evidence ("based-on" line) + the producer's read (artistic layer) | `build_widget.py` `build_cards:1618`, `build_recommendations:1355`, `_read_html:2314` | §B.12, §B.13 | test_widget_render (part) |
+| **N16** | The visual design system — single token source, colour/layout/motion, 10 component contracts | `build_widget.py` CSS `<style>:2873`, `:root:2874` | §I (DS-INV-1..14) | test_design_tokens, test_headless_render |
+| **N17** | In-widget reference panel display (the read + web panel inside the widget, not the catalog) | `build_widget.py` `_ref_read_html:2811`, `_refread_bars_html:2363`, `render_reference_read:2659`, `render_reference_notes:2457`, `_web_panel_html:2577` | §D.7, §D.10 display | test_reference_read, test_headless_render |
 
 *Level expectation:* N12/N16/N17 are **the** visibility/layout/colour nodes → **L3-BROWSER is mandatory**; L1-STRING here is the level-gap class. N13/N14 → L2-NODE (real JS). §I.9 already states "all at ≥ browser-rendered level."
 

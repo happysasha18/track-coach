@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "0.9.32"  # Track Coach analyzer version (early; bump as it matures)
+TC_VERSION = "1.0.0"  # Track Coach analyzer version — 1.0 (3-pass preventive-maintenance gate green, s56)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {

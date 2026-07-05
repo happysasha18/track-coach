@@ -179,6 +179,46 @@ class RefReadSurfacesRendered(unittest.TestCase):
         self.assertLess(r["tonal"], r["ref"], "tonal panel must sit above the reference read")
         self.assertLess(r["ref"], r["web"], "reference read must sit above the web panel")
 
+    def test_ref_panels_stay_within_viewport_when_narrow(self):
+        # §I.10 × viewport, for the §D reference surfaces (pass-3 composition, s56). The ×viewport
+        # clause named only the recs grid + segmented control + cards; #refRead/#webPanel and the
+        # up-to-3-tab selector (.reftab) were only ever probed at width=1100. On a narrow screen a
+        # panel or the tab row could overflow horizontally (right edge past the viewport, or an
+        # internal h-scroll) and the string/wide tests would never see it. Assert the read stays
+        # within its width envelope. (The harness clamps the effective viewport to ~500px min, so
+        # assert against the RETURNED vw, not the requested width.)
+        r = hc.probe(
+            self.widget,
+            "(function(){document.body.classList.remove('simple');"
+            "document.querySelectorAll('details.tc-panel').forEach(function(d){d.open=true;});"
+            "var vw=window.innerWidth;"
+            "function box(sel){var e=document.querySelector(sel);if(!e)return null;"
+            "var r=e.getBoundingClientRect();"
+            "return {right:Math.round(r.right),scrollW:e.scrollWidth,clientW:e.clientWidth};}"
+            "var tabs=document.querySelectorAll('#refRead .reftab');var tmax=0;"
+            "tabs.forEach(function(t){var rr=t.getBoundingClientRect();if(rr.right>tmax)tmax=rr.right;});"
+            "return {vw:vw,refRead:box('#refRead'),webPanel:box('#webPanel'),"
+            "tab_count:tabs.length,tab_maxright:Math.round(tmax)};})()",
+            width=460, height=4000)
+        vw = r["vw"]
+        for name in ("refRead", "webPanel"):
+            b = r[name]
+            self.assertIsNotNone(b, f"#{name} must render in Detailed (fixture guard)")
+            self.assertLessEqual(b["right"], vw + 1,
+                                 f"#{name} right edge ({b['right']}) must stay within the viewport "
+                                 f"({vw}) — no horizontal overflow on a narrow screen (§I.10 ×viewport)")
+            self.assertLessEqual(b["scrollW"], b["clientW"] + 1,
+                                 f"#{name} must not scroll horizontally inside itself "
+                                 f"(scrollW {b['scrollW']} > clientW {b['clientW']})")
+        # When the read renders a multi-direction selector, the tab row must ALSO fit within the
+        # viewport (a 3-tab row is the overflow risk). This fixture is single-direction (0 tabs), so
+        # the fit is asserted conditionally — the up-to-3-tab case is exercised whenever a fixture
+        # yields tabs; the panel-containment above is the always-on guard.
+        if r["tab_count"] > 0:
+            self.assertLessEqual(r["tab_maxright"], vw + 1,
+                                 f"the reference tab selector ({r['tab_count']} tabs, right {r['tab_maxright']}) "
+                                 f"must fit within the viewport ({vw}) — no tab-row overflow when narrow")
+
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class RecsGridReflow(unittest.TestCase):

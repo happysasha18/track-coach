@@ -5,6 +5,19 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.0.0] — 2026-07-05
+
+**1.0 — first stable release.** No new feature this bump: 1.0 is the version at which the full analysis
+pipeline, the interactive widget, and the catalog have passed the complete 3-pass preventive-maintenance
+gate (whole-spec prove → matrix audit → surface-composition) with the whole-artifact completeness net in
+place, so the product ships whole and every user-facing surface is guarded against silent regression.
+
+### Under the hood (no user-visible change vs 0.9.32)
+- Completed the 1.0 gate: spec, architecture, and test matrix reconciled; every rendered surface's
+  visibility/layout/colour facts pinned at browser level; fact-ownership made walkable (one fact → one code
+  owner); the §D reference read/web panel confirmed to hold within a narrow viewport.
+- Suite: 764 tests. The analyzer version printed in the widget footer is now `1.0.0`.
+
 ## [0.9.32] — 2026-07-04
 
 ### Improved

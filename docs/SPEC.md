@@ -2304,7 +2304,10 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
   reopen; the animated-height change (I.7 #3) must not break the persisted-open render (a panel
   restored open shows expanded, no first-frame collapse).
 - **× viewport:** the grid (DS-INV-8) yields column counts by width with no media-query cliff; the
-  segmented control and cards stay within `--w-content`.
+  segmented control and cards stay within `--w-content`. The §D reference read (`#refRead`), the web
+  panel (`#webPanel`) and the up-to-three tab selector (`.reftab`) also stay within the viewport when
+  narrow — no horizontal overflow, no internal h-scroll, no tab-row spill (pass-3 composition s56;
+  pinned browser-level, `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow`).
 
 ### I.11 Open decisions
 - **⟨DECIDE DS-1⟩** — §I.8 typography weight placement (above). The only open taste call.

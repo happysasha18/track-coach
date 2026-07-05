@@ -206,7 +206,7 @@ pure-logic invariants are unit-tested NOW, the surface-rendering ones land with 
 | code | rule (1-line) | owning test / status |
 |---|---|---|
 | RC-INV-1 | missing (None/NaN) ≠ measured-zero; never collapse | `test_completeness::MissingIsNotZero` ✓ |
-| RC-INV-2 | a run carries a completeness manifest; read it, not a sentinel | `test_completeness::MissingIsNotZero::manifest` ✓ |
+| RC-INV-2 | a run carries a completeness manifest; read it, not a sentinel | `test_completeness::MissingIsNotZero::test_manifest_lists_only_measured_axes` ✓ |
 | RC-INV-3 | never impute missing→real value then show/compare | `test_completeness::CompareOverSharedAxesOnly` ✓ |
 | RC-INV-4 | surface shows "not measured", omits the card (no evidence) | not built — lands with the per-facet/catalog render |
 | RC-INV-5 | compare over BOTH-present axes only; never 0-gap/max-gap | `test_completeness::CompareOverSharedAxesOnly` ✓ |
@@ -327,6 +327,30 @@ owning test lands with the §D render. The own-library column is NOT under the r
 state hides the reference column but leaves the DJ column visible; owning test lands with the switch render.
 
 ## §8 — Coverage status
+
+**▶ 1.0-gate coverage walk (s56, 2026-07-05 — pass 2 of the pre-1.0 audit; the block below this is the older
+s12 status, kept as history).** Walked against the CURRENT invariant set (through the 24 `ARCHITECTURE.md`
+nodes), answering the four rework-questions:
+- **Q1 — every node has ≥1 owning test?** YES for 22/24. The two without a DIRECT test — N2 (Demucs
+  separation) and N9 (reference directions) — are exercised indirectly via fixtures (a direct test would
+  assert a mock, not the behaviour; they need real audio / a Demucs run). Not bare holes.
+- **Q2 — every rendered node has L3-BROWSER for its visibility/layout facts?** YES. N10/N11/N12/N16/N17/N20 +
+  N19-display all carry `test_headless_render` rows; the §D shipping surfaces (#refRead/#webPanel) are gated
+  browser-level (F1, INV-GATE test_22/23). No visibility/layout fact sits at L1-STRING only.
+- **Q3 — every SPEC invariant projects to a row at the RIGHT level?** YES. The 11 previously-baselined
+  ext-namespace invariants (DS-INV-4/9, G-INV-4/5/6/9/13/17, H-INV-7/11/12) all now have exactly one row;
+  the newer INV-42..47 + INV-GATE are rostered in §3 at browser level.
+- **Q4 — positive AND negative per fact?** Held for the gate class (INV-GATE proves-it-catches-emptiness +
+  the `test_completeness_gate::WholeArtifactCompletenessGate::test_22_ref_read_absent_on_plain_full` negative;
+  INV-46 `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_probe_scan_detects_unregistered`;
+  INV-47 proven red-on-bug on the quick fixture).
+- **Matrix→test existence:** every named owning-test resolves (s56 worker cross-ref of all 20 cited files;
+  one stale label `MissingIsNotZero::manifest` → `::test_manifest_lists_only_measured_axes` fixed). Suite
+  763/2, skip-set = {INV-29, INV-30} exactly.
+- **Two-family reminder still holds:** this INV grid does NOT enumerate the credibility G-guards (CR-*/G1–G21,
+  `test_credibility`, SPEC §B.2–B.10) — a full "what's uncovered?" sweep reads BOTH.
+
+**— older status (s12, 2026-06-23) —**
 - **INV-11 — CLOSED.** `CrossVersionPanelData` pins the `D.catalog` passthrough + the hide-when-empty
   guard.
 - **INV-12 — CLOSED (option a).** The catalog now flags a row whose linked widget version ≠ current
@@ -530,6 +554,7 @@ level by `tests/test_design_tokens.py` (the CSS is emitted verbatim from `build_
 | DS-INV-7c | The guard is by LOCATION: stem-colour arrays + the canvas meter label keep their raw hex (data-viz untouched). | `test_design_tokens::test_stem_and_canvas_literals_untouched` |
 | DS-INV-2/3 (browser) | The semantic tokens RENDER, not just exist in text: `--good/--warn/--bad` resolve at `:root` at runtime AND reach the elements that wear them — `.modebadge.full` and the confirmed `#webPanel .rn-trait-glyph` compute `rgb(70,211,154)` = --good. NEG: a resolved token is never '' (dropped) and the badge never falls back to default `rgb(0,0,0)` (cascade override). Closes the N16 level-gap (s52): design tokens were tested ALL-STRING, blind to a runtime colour break. | `test_headless_render::DesignTokenColourRendered` (L3-BROWSER, s52) |
 | DS-INV-4 | The UI red role is the `--bad` token (defined + resolves at `:root`); the magma/data reds — stem/canvas literals like kick `#ff5d73` — stay RAW in the gradient, never tokenised. NEG: a data-viz red is never rewritten to `var(--bad)`. The UI-red *application* to a rec-card stripe lands later with DS-INV-6 (deferred). Level: L0-token (the mapping) — the runtime `--bad` resolution is proven at browser by DS-INV-2/3 (browser) above. Retires the s52 ext-namespace baseline id. | `test_design_tokens::test_stem_and_canvas_literals_untouched`, `test_headless_render::DesignTokenColourRendered::test_semantic_tokens_resolve_at_root_in_browser` |
+| §I.10 ×viewport (§D refs) | The §D reference read `#refRead`, the web panel `#webPanel` and the up-to-three `.reftab` selector stay within the viewport when narrow — right edge inside the window, no internal horizontal scroll, no tab-row spill. Composes the §D reference surfaces across the **viewport** axis, which §I.10 previously named only for the recs grid + segmented control + cards (pass-3 composition, s56). The harness clamps the effective viewport to ~500 px min, so the guard asserts against the returned `innerWidth`. Level: **L3-BROWSER**. | `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow` |
 
 Deferred (next movement — surface named, not yet coded):
 | code | rule (1-line) | lands with |
