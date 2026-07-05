@@ -87,6 +87,16 @@ class GoldenRenderFromRealData(unittest.TestCase):
                                     f"{label}: card {r['h']!r} based-on is a bare tag")
             self.assertIn('class="based"', html, f"{label}: based-on line did not render")
 
+    def test_every_card_carries_an_evidence_target(self):  # INV-48a (SPEC §B.13) — card→evidence nav
+        # Every card on REAL data names the panel its based-on evidence renders in — the
+        # widget's click wiring reads it as `ev`; an unknown/empty target would strand the click.
+        import build_widget
+        allowed = set(build_widget.EVIDENCE_TARGETS)
+        for label, payload, _html in (("quick", self.q, self.q_html), ("full", self.f, self.f_html)):
+            for r in payload["recs"]:
+                self.assertIn(r.get("ev"), allowed,
+                              f"{label}: card {r['h']!r} carries no evidence target (ev={r.get('ev')!r})")
+
     def test_based_on_avoids_technical_method_jargon(self):  # INV-31 / §B.13 — Alexander 2026-07-02
         # Keep the RESULT + a simple unit (dB); drop technical METHOD jargon (oversampling,
         # peak-to-RMS, self-similarity, dBTP) from the user-facing based-on copy — those describe

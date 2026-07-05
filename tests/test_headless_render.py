@@ -1787,5 +1787,131 @@ class EntryFocus(unittest.TestCase):
         self.assertEqual(r.get("errors"), [], "the composed entry must be JS-clean")
 
 
+def _build_nav_widget():
+    """SYNTHETIC full widget for card→evidence navigation (INV-48) — every evidence target
+    from the §B.13 map that the fixture can host is PRESENT: a resonant 250 Hz band → the
+    tonal card + a visible #tonalPanel; swing in `detail` → the swing card whose target
+    #rhyPanel sits inside the COLLAPSED "Evidence & detail" drawer; masking + stems → a
+    timecoded card; .als → #autoPanel. Reuses the completeness-gate fixture data (the one
+    synthetic build where every panel is populated)."""
+    import test_completeness_gate as gate
+    tmp = Path(tempfile.mkdtemp(prefix="tc_nav_"))
+    sw = tmp / "stems_web"
+    sw.mkdir()
+    for stem in ("drums", "bass", "other"):
+        (sw / f"{stem}.m4a").write_bytes(b"\x00" * 16)
+    out = tmp / "widget.html"
+    build_widget.build_html(
+        gate._core(), {"swing_global_ms": 45.0}, gate._masking(), gate._als(), str(out),
+        "Card Nav Test", build_widget.STRINGS, als_offset_s=0.0,
+        stemmap=gate._stemmap(), rhythm=gate._rhythm(), notes=gate._notes(),
+        audio_stems_rel="stems_web",
+        narrative_md="The track builds steadily.")
+    return str(out)
+
+
+# Click a card selected by `sel` with a scrollIntoView spy + a seek spy installed first,
+# then read back the SYNCHRONOUS facts of the click (pulse classes, drawer state, spies).
+def _click_js(sel):
+    return (
+        "(function(){document.body.classList.remove('simple');"
+        "var scrolled=[],seeked=false;"
+        "var sp=Element.prototype.scrollIntoView;"
+        "Element.prototype.scrollIntoView=function(){scrolled.push(this.id||'');return sp.apply(this,arguments);};"
+        "window.__seek=function(){seeked=true;};"
+        "var c=document.querySelector(" + repr(sel) + ");"
+        "if(!c)return {missing:true,evs:Array.prototype.map.call("
+        "document.querySelectorAll('#recs .rec'),function(e){return e.getAttribute('data-ev');})};"
+        "var pre={cursor:getComputedStyle(c).cursor,title:c.getAttribute('title')||''};"
+        "c.click();"
+        "function pulsed(id){var e=document.getElementById(id);return !!(e&&e.classList.contains('pulse'));}"
+        "return {cursor:pre.cursor,title:pre.title,scrolled:scrolled,seeked:seeked,"
+        "story:pulsed('storyPanel'),tonal:pulsed('tonalPanel'),rhy:pulsed('rhyPanel'),"
+        "vitals:pulsed('vitals'),"
+        "drawerOpen:(document.getElementById('evidence')||{}).open===true,"
+        "rhyH:(document.getElementById('rhyPanel')||{offsetHeight:-1}).offsetHeight,"
+        "store:localStorage.getItem('tc_view'),"
+        "errors:TC.errors()};})()"
+    )
+
+
+@unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
+class CardEvidenceNav(unittest.TestCase):
+    """INV-48b/c/d/e (SPEC §B.13, s61) — a card leads to ITS evidence. Clicking a card
+    scrolls + pulses the panel its based-on names (not always the story arc), opens a
+    collapsed ancestor drawer on the way, makes global cards clickable where their target
+    is present, and degrades to the 0.8.28 behaviour when the target is absent. Written
+    RED against 1.2.1 (every click went to #storyPanel; global cards were inert)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.nav = _build_nav_widget()      # every target present
+        cls.bare = _build_rich_widget()    # no stems/als/rhythm; 1-band tonal → panel hidden
+
+    def test_click_pulses_the_cards_own_target(self):  # INV-48b
+        r = hc.probe(self.nav, _click_js('#recs .rec[data-ev="tonalPanel"]'),
+                     width=1100, height=900)
+        self.assertFalse(r.get("missing"), f"no tonal card in the nav fixture: {r.get('evs')}")
+        self.assertTrue(r.get("tonal"), "the click must pulse the card's OWN target (#tonalPanel)")
+        self.assertFalse(r.get("story"), "the story arc must NOT pulse for a tonal card")
+        self.assertIn("tonalPanel", r.get("scrolled", []),
+                      "the click must scroll the target panel into view")
+        self.assertEqual(r.get("errors"), [], "card navigation must be JS-clean")
+
+    def test_global_card_clickable_with_pointer_and_title(self):  # INV-48e
+        r = hc.probe(self.nav, _click_js('#recs .rec[data-ev="tonalPanel"]'),
+                     width=1100, height=900)
+        self.assertFalse(r.get("missing"), f"no tonal card in the nav fixture: {r.get('evs')}")
+        self.assertEqual(r.get("cursor"), "pointer",
+                         "a global card with a present target must read as clickable")
+        self.assertTrue(r.get("title"), "the clickable global card must carry a jump title")
+        self.assertFalse(r.get("seeked"), "a global card has no moment — the click must NOT seek")
+
+    def test_collapsed_drawer_opens_and_target_has_height(self):  # INV-48c
+        r = hc.probe(self.nav, _click_js('#recs .rec[data-ev="rhyPanel"]'),
+                     width=1100, height=900)
+        self.assertFalse(r.get("missing"), f"no swing card in the nav fixture: {r.get('evs')}")
+        self.assertTrue(r.get("drawerOpen"),
+                        "navigation must OPEN the collapsed Evidence & detail drawer")
+        self.assertGreater(r.get("rhyH", -1), 0,
+                           "after the click the target panel must be visible with real height "
+                           "(the drawer's toggle listeners resized it — prover CN-2)")
+        self.assertTrue(r.get("rhy"), "the pulse must land on #rhyPanel")
+        self.assertIsNone(r.get("store"), "navigation must persist NOTHING (§B.15 fence)")
+        self.assertEqual(r.get("errors"), [], "drawer navigation must be JS-clean")
+
+    def test_missing_target_falls_back_and_global_goes_inert(self):  # INV-48d
+        # The bare fixture's 1-band tonal_balance fires the tonal CARD but hides the PANEL.
+        r = hc.probe(self.bare, _click_js('#recs .rec[data-ev="tonalPanel"]'),
+                     width=1100, height=900)
+        self.assertFalse(r.get("missing"), f"no tonal card in the bare fixture: {r.get('evs')}")
+        self.assertNotEqual(r.get("cursor"), "pointer",
+                            "a global card whose target is hidden must NOT read as clickable")
+        self.assertEqual(r.get("title", ""), "", "an inert card carries no jump title")
+        self.assertFalse(r.get("tonal") or r.get("story"),
+                         "an inert card's click must pulse nothing — and not error")
+        self.assertEqual(r.get("errors"), [], "the inert click must be JS-clean")
+        # A timecoded card keeps the 0.8.28 behaviour: seek + story scroll + pulse.
+        r2 = hc.probe(self.bare, _click_js('#recs .rec[data-t]'), width=1100, height=900)
+        self.assertFalse(r2.get("missing"), "no timecoded card in the bare fixture")
+        self.assertTrue(r2.get("story"), "a timecoded card still pulses the story arc")
+        self.assertTrue(r2.get("seeked"), "a timecoded card still seeks the playhead")
+
+    def test_map_panel_note_cards_stay_inert(self):  # prover CN-8 — `.rec` outside #recs
+        js = ("(function(){document.body.classList.remove('simple');"
+              "var ev=document.getElementById('evidence');if(ev)ev.open=true;"
+              "return Array.prototype.map.call("
+              "document.querySelectorAll('#mapNotes .rec'),function(e){"
+              "return {cursor:getComputedStyle(e).cursor,ev:e.getAttribute('data-ev'),"
+              "t:e.getAttribute('data-t')};});})()")
+        rows = hc.probe(self.nav, js, width=1100, height=900)
+        self.assertTrue(rows, "the nav fixture must render at least one map-panel note card")
+        for row in rows:
+            self.assertNotEqual(row.get("cursor"), "pointer",
+                                "map-panel note cards reuse .rec but are NOT recs — never clickable")
+            self.assertIsNone(row.get("ev"), "map-panel note cards must carry no evidence target")
+            self.assertIsNone(row.get("t"), "map-panel note cards must carry no timecode")
+
+
 if __name__ == "__main__":
     unittest.main()

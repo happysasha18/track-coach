@@ -668,12 +668,62 @@ finding, so it stays out of the user-facing line (Alexander 2026-07-02). `tags: 
   the track"), the fusion from `signal_value_map.md`. Source is multi-level: a whole-track signal / a separated
   part / an `.als` moment.
 - **Build order = MEANING then NAVIGATION** (Alexander): (1) the plain based-on line per card — done 0.8.27;
-  (2) **NAVIGATION (0.8.28):** clicking a timecoded card seeks the playhead to that moment AND scrolls the
-  main graph into view (already wired), now plus a brief **attention pulse on the graph container** so the eye
-  catches that the playhead jumped there. The pulse is a **CSS/DOM class toggle on the graph panel — it does
-  NOT touch the canvas drawing** (deliberately low-risk: the canvas render is the fragile surface we never edit
-  blind). A deeper per-lane / per-part highlight (light up the exact lane the card is about) stays deferred —
-  it needs canvas work and a live render review.
+  (2) navigation — a click takes you to the card's evidence (the block below). The attention pulse is a
+  **CSS/DOM class toggle on the target panel — it does NOT touch the canvas drawing** (deliberately low-risk:
+  the canvas render is the fragile surface we never edit blind). A deeper per-lane / per-part highlight (light
+  up the exact lane the card is about) stays deferred — it needs canvas work and a live render review. `INV-34`
+
+**A card leads to ITS evidence — the click shows what the based-on line names (2026-07-05, the navigation
+half of Alexander's "card evidence" wish).** The based-on line SAYS where the advice came from; clicking the
+card SHOWS it. Before this, every clickable card scrolled to the story arc even when its evidence renders
+elsewhere — the automation card pulsed the arc while the "intention vs result" envelopes sat further down,
+closed; the tonal-resonance card wasn't clickable at all though the offending band is right there in the
+Tonal-balance bars.
+*Fences — neighbouring promises that stay true through this change:* the based-on line itself is untouched
+(INV-31); the pulse stays CSS/DOM-only (INV-34, above); a timecoded card's click still seeks the playhead and
+seek still preserves playback (§B.14, INV-33/38); the view ladder is untouched — a card click never switches
+Simple↔Detailed and never writes `tc_view` (§B.15, INV-41); the `?direction` entry-focus path is unaffected
+(D-INV-37).
+
+- **Every card carries an evidence target** — the id of the panel where its based-on evidence actually
+  renders, shipped on the card as `ev` in `D.recs`. The map is honest — a card whose evidence has no
+  dedicated panel keeps the story arc, because the player IS that evidence (seek to the worst moment, solo
+  the named parts): `INV-48a`
+  | evidence target | cards |
+  |---|---|
+  | `#storyPanel` — the arc + player | structure/arc/energy family (long section, flat energy, brightness, ending≈opening, wobble, climax, plateau, breakdown), late entry, per-part repetition, masking, per-stem cards |
+  | `#tonalPanel` — the spectrum bars | tonal resonance |
+  | `#vitals` — the master's numbers strip | true-peak clipping, squashed dynamics |
+  | `#rhyPanel` — drum timing | swing |
+  | `#autoPanel` — intention vs result | automation parts-ways |
+- **Click = seek (when timecoded) + reveal + pulse the TARGET.** Clicking a card whose target panel is
+  present scrolls THAT panel into view and fires the attention pulse on it — one shared pulse style for every
+  target, so the emphasis reads the same everywhere `[default]`. A timecoded card seeks the playhead first,
+  exactly as today. `INV-48b`
+- **Global cards become clickable too** — a whole-track card (tonal resonance, squashed dynamics…) with a
+  present target gets the same pointer cursor + jump title as timecoded cards and navigates on click (no seek
+  — it has no moment). Simple never sees this: it hides global cards (INV-22), so the interaction exists only
+  where the card does. `INV-48e`
+- **A collapsed ancestor opens on the way.** `#rhyPanel` and `#autoPanel` live inside the collapsed
+  "Evidence & detail" drawer — navigation sets `open` on every closed ancestor `<details>` before scrolling,
+  so the click never lands on a shut drawer; the user can fold it back, nothing is persisted. `INV-48c`
+- **A missing target degrades to today's behaviour.** When the target panel isn't in this run's DOM (quick
+  run, no `.als`, a data-gated panel): a timecoded card behaves exactly as before (seek + story-arc scroll +
+  pulse); a global card renders NOT clickable — no cursor, no title, no dead click. `INV-48d`
+- *Composed across the axes:* view — targets in the map are visible in both Simple and Detailed (nothing in
+  the map is Simple-hidden; `#stemlanes` is inside `#storyPanel`, whose container always shows), and the
+  click changes no view state; mode — quick runs simply lack most sources, so INV-48d covers them; viewport —
+  the same scroll-into-view at any width, panels stack vertically `[default]`; persistence — navigation
+  writes NOTHING (no localStorage, no URL), reopening the widget starts neutral; touch — a tap is the click,
+  the hover title is advisory only, never the sole affordance `[default]`; keyboard — card clicks stay
+  pointer-only this increment, parity with the existing timecoded cards `[default]`, a known gap; empty/
+  error/loading — the widget is a static local page (no loading state) and INV-48d is the empty/error rule;
+  performance — one class toggle + one scroll per click, no envelope change; two windows — no shared state,
+  two open copies never interact.
+- *Non-goals:* the per-lane canvas highlight (stays deferred, above); a graph→card BACK pointer (clicking a
+  moment on the arc to light its card) — a separate story; any change to the based-on wording; any automatic
+  view switch. *Success measure:* on the library tracks, clicking one card of each family lands the panel its
+  based-on names in view with the pulse on it — verified by deed at landing; no usage counter `[default]`.
 - **Subtle in the UI** — transparency, not overload (Alexander's "don't overload" steer). A quiet muted line under
   the card body.
 - **Machine-checkable invariant (the rest is authoring quality):** every `D.recs` entry has a **non-empty**

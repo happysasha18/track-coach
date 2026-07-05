@@ -297,7 +297,8 @@ class TraceabilityChecks(unittest.TestCase):
         "INV-1", "INV-2", "INV-3", "INV-4", "INV-5", "INV-6", "INV-7",
         "INV-8", "INV-9", "INV-10", "INV-11", "INV-13", "INV-14", "INV-15",
         "INV-16", "INV-17", "INV-20", "INV-21", "INV-23", "INV-24",
-        "INV-27", "INV-28", "INV-31",
+        "INV-27", "INV-28",
+        # INV-31 paid down s61 — the §B.13 card-navigation delta's fence line states it in prose.
     }
 
     def test_every_active_bare_matrix_invariant_appears_in_spec(self):

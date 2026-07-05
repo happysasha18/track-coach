@@ -645,14 +645,22 @@ version and date** (from `--src-audio`/`--src-als`/`--track-version`/`--analyzed
    into it ("loud at −9 LUFS but DR 12 keeps it punchy", "true peak clips at +0.5 dBTP").
 3. **Recommendations** (renamed from "Start here", v0.5.4) — the few things worth attention, most
    important first (auto-generated). **Time-bound vs global is now VISUAL:** a rec tied to a moment
-   gets a yellow **⏱ {timecode}** pill and is clickable (jump + scroll to story); a global rec gets
-   a quiet **"whole track"** pill. Each rec also carries an explicit highlighted **"→ Try"** line
-   (the concrete fix option(s)) so the action is visible, not buried. Body = what's wrong + why;
-   Try = what to do (often two options, "… — or …"). Driven by `fix` + `t` fields per rec.
+   gets a yellow **⏱ {timecode}** pill, a global rec gets a quiet **"whole track"** pill. Each rec
+   also carries an explicit highlighted **"→ Try"** line (the concrete fix option(s)) so the action
+   is visible, not buried. Body = what's wrong + why; Try = what to do (often two options,
+   "… — or …"). Driven by `fix` + `t` fields per rec. **A click leads to the card's EVIDENCE
+   (1.3.0, SPEC §B.13 INV-48):** every card ships an `ev` target — the panel its "Based on" line
+   points at (tonal resonance → the tonal bars, true-peak/squashed → the vitals strip, swing → the
+   drum-timing table, automation → the envelopes; everything arc/player-shaped keeps the story
+   panel). The click scrolls + pulses THAT panel, opens the drawer on the way if it's shut, and a
+   timecoded card seeks first. A card whose target isn't in this run stays as before (timecoded →
+   story arc) or simply isn't clickable (global) — no dead clicks.
 4. **Evidence & detail** — a **collapsed `<details>` drawer** (`#evidence`) holding the power-user
-   panels: **tonal balance** · **arrangement from the project** (MIDI blocks + audio strips +
-   locators) · **stem ↔ project** mapping · **rhythm & separation quality** · **transcribed notes**.
-   Collapsed by default; opening it dispatches a resize so its canvases draw at full width.
+   panels: **arrangement from the project** (MIDI blocks + audio strips + locators) ·
+   **stem ↔ project** mapping · **rhythm & separation quality** · **transcribed notes**.
+   (Tonal balance moved OUT of the drawer — it sits above, between the producer's read and the
+   reference panel, always visible.) Collapsed by default; opening it dispatches a resize so its
+   canvases draw at full width.
    **Tonal balance (v0.5.10):** a bar chart of the mix's average spectrum per octave band
    (`core["tonal_balance"]` from analyze_core), coloured low→high. Reference-free: it flags bands
    that stick out from their NEIGHBOURS (a resonance = boxy/harsh) or sit in a hole (dull/thin) via

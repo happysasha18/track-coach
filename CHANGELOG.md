@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.3.0] — 2026-07-05
+
+### Added
+- **Clicking an advice card now takes you to the panel its evidence lives in.** Every card's
+  "Based on" line already SAID where the advice came from; the click now SHOWS it. A tonal-resonance
+  card scrolls to the Tonal-balance bars and pulses them; the true-peak / squashed-dynamics cards
+  point at the master's numbers strip; the swing card opens the Evidence & detail drawer onto the
+  drum-timing table; the automation "intention vs result" card lands on the automation envelopes.
+  Whole-track cards become clickable for the first time (pointer + "Show the evidence" hint);
+  timecoded cards keep their jump-to-the-moment seek on top. A card whose evidence has no dedicated
+  panel keeps the story arc — the player IS that evidence (seek to the worst moment, solo the parts
+  it names). If a run lacks the target panel, a timecoded card behaves as before and a whole-track
+  card simply isn't clickable — no dead clicks. Spec: §B.13 INV-48a–e; browser + unit tested.
+
 ## [1.2.1] — 2026-07-05
 
 ### Changed

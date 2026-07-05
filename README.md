@@ -76,11 +76,11 @@ The player and the reference read above are two panels on one page. The rest:
 
 **Stem ↔ project map.** Each separated stem is matched to the real project tracks by envelope similarity; confident matches are named, quiet ones labelled by their frequency range.
 
-**Recommendations.** A short ranked list, most important first — each card carries the measurement behind it and one concrete move. Timecoded cards seek the player to their moment on click.
+**Recommendations.** A short ranked list, most important first — each card carries the measurement behind it and one concrete move. Clicking a card takes you to the panel its evidence lives in — the tonal bars, the master's numbers, the drum timing, the automation envelopes — and timecoded cards also seek the player to their moment.
 
 **Producer's read.** A plain-language account of how the track develops: which dimensions trend (louder, brighter, busier, wider) and which sit idle.
 
-Content panels collapse; the Evidence drawer (arrangement, stem map, rhythm, notes, tonal balance) sits closed until you want the depth. Three views on one ladder — Quick, Simple, Detailed — each adds to the last, and the page remembers which you used.
+Content panels collapse; the Evidence drawer (arrangement, stem map, rhythm, notes) sits closed until you want the depth — tonal balance sits above it, always visible. Three views on one ladder — Quick, Simple, Detailed — each adds to the last, and the page remembers which you used.
 
 | View | What you see |
 |---|---|

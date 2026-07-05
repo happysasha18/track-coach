@@ -1092,5 +1092,20 @@ class EvalRecSpecificityMetrics(unittest.TestCase):
         self.assertIsNone(self.ev.FREQ_RE.search("the 250–600 Hz band"))   # a plain band range, not a spot
 
 
+class RecTargetCompleteness(unittest.TestCase):
+    """INV-48a (SPEC §B.13, prover CN-3) — the evidence-target map is COMPLETE: every rec key
+    with a based-on entry has an evidence target, and every target is a real panel id from the
+    §B.13 map. Same completeness rule as the based-on line itself (INV-31)."""
+
+    def test_every_based_key_has_a_target(self):
+        missing = set(bw.REC_BASED) - set(bw.REC_TARGET)
+        self.assertFalse(missing,
+                         f"rec keys with a based-on line but NO evidence target: {sorted(missing)}")
+
+    def test_targets_are_known_panels(self):
+        bad = {k: v for k, v in bw.REC_TARGET.items() if v not in bw.EVIDENCE_TARGETS}
+        self.assertFalse(bad, f"evidence targets outside the §B.13 map: {bad}")
+
+
 if __name__ == "__main__":
     unittest.main()

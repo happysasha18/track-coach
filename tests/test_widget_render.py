@@ -196,13 +196,14 @@ class PlayerIsWired(unittest.TestCase):
         self.assertIn("if(r.resume)Promise.all(auds.map(s=>s.a.play()))", html,
                       "seekTo must resume (and re-sync) playback when seekResult says so")
 
-    def test_card_click_pulses_the_graph(self):  # INV-34 (SPEC §B.13 navigation), 0.8.28
-        # Clicking a timecoded card must draw the eye to the moment on the graph: seek + scroll + a brief
-        # CSS pulse on the graph panel. The pulse is DOM/CSS only — it must not touch the canvas draw.
+    def test_card_click_pulses_the_graph(self):  # INV-34 (SPEC §B.13 navigation), 0.8.28 / s61
+        # Clicking a card must draw the eye to its evidence: a brief CSS pulse on the TARGET panel.
+        # The pulse is DOM/CSS only — it must not touch the canvas draw — and ONE shared pulse rule
+        # serves every evidence target (s61, INV-48b; the 0.8.28 shape was #storyPanel-only).
         html, _ = _render(stems=("drums", "bass"))
-        self.assertIn('classList.add("pulse")', html, "card click must pulse the graph panel")
+        self.assertIn('classList.add("pulse")', html, "card click must pulse the target panel")
         self.assertRegex(html, r"@keyframes\s+graphpulse", "missing the graph pulse animation")
-        self.assertRegex(html, r"#storyPanel\.pulse", "missing the .pulse rule on the graph panel")
+        self.assertRegex(html, r"\.tc-panel\.pulse,\.vitals\.pulse", "missing the SHARED .pulse rule")
 
 
 class QuickRunGivesAMixPlayer(unittest.TestCase):

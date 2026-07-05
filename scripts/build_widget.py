@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.2.1"  # Track Coach analyzer version — s60: reference panel empty-state stub, absence said aloud (D-INV-36e)
+TC_VERSION = "1.3.0"  # Track Coach analyzer version — s61: a card leads to ITS evidence panel (§B.13 INV-48)
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -157,7 +157,7 @@ STRINGS = {
         "story_title": "Track story — the shape at a glance",
         "story_hint": "One map. Top: the structure bar — named scenes (Intro/Build/Drop), each coloured by its musical part; same colour + same letter = that part RETURNS (e.g. A at the intro and again at the outro), outlined when it repeats. Then the POWER curve (a blend of loudness+busy-ness+brightness) with its peak ★ and key moments. Below it the same curve DECOMPOSED into the lanes that drive it — energy (loudness), brightness (treble), density (how busy), modulation (how fast it pulses/throbs per second), stereo width. Bottom: which families play. Press play, click anywhere to jump.",
         "recs_title": "Recommendations",
-        "recs_hint": "The few things that stood out, most important first. Red = worth fixing · green = working / do it · yellow = a creative choice. A ⏱ tag means it's tied to a moment in the track — click it to jump there; the rest apply to the whole mix.",
+        "recs_hint": "The few things that stood out, most important first. Red = worth fixing · green = working / do it · yellow = a creative choice. Click a card to see the evidence behind it; a ⏱ tag means it's tied to a moment in the track — that click also jumps there. The rest apply to the whole mix.",
         "legend_crit": "worth fixing",
         "legend_do": "working — do it",
         "legend_concept": "creative choice",
@@ -423,6 +423,24 @@ REC_BASED = {
     "breakdown":       "a dip in overall energy at {t} — a breakdown in the arc.",
     "late_entry":      "a part whose level rises only near the end, at {t}.",
     "intention_result":"your “{param}” automation in the .als against the measured result — they part ways after {a_end}.",
+}
+
+# Card evidence NAVIGATION (SPEC §B.13 / INV-48a, s61) — the panel each card's click leads to: the place
+# its based-on evidence actually RENDERS. The map is honest: a card with no dedicated visual panel keeps
+# the story arc, because the player IS that evidence (seek to the worst moment, solo the named parts —
+# the per-lane highlight stays deferred). Keys mirror REC_BASED (RecTargetCompleteness is the twin guard);
+# per-stem cards set theirs in per_stem_cards. Values must stay inside EVIDENCE_TARGETS.
+EVIDENCE_TARGETS = ("storyPanel", "tonalPanel", "vitals", "rhyPanel", "autoPanel")
+REC_TARGET = {
+    "long_section":    "storyPanel", "energy_flat":  "storyPanel", "brightness":   "storyPanel",
+    "endpoint":        "storyPanel", "wobble":       "storyPanel", "climax":       "storyPanel",
+    "plateau":         "storyPanel", "breakdown":    "storyPanel", "late_entry":   "storyPanel",
+    "stem_evolves":    "storyPanel", "masking_stem": "storyPanel", "masking_real": "storyPanel",
+    "masking_clean":   "storyPanel",
+    "tonal_resonance": "tonalPanel",
+    "truepeak_clip":   "vitals",     "squashed":     "vitals",
+    "swing":           "rhyPanel",
+    "intention_result":"autoPanel",
 }
 
 # §D.6 stage-2: maps each rec key to the FP axis it primarily reflects (for divergence/on-style calc).
@@ -877,7 +895,8 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
                 continue
             phrase, why = worded
             based = f"the {p} read against the whole-track arc (a cross-signal move)."   # §B.13
-            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None, based, None))
+            out.append(("concept", f"Layers · the {p}", f"The {p} {phrase}", why, "", None, based, None,
+                        "storyPanel"))   # §B.13 INV-48a — a per-stem card's evidence is the player's lanes
             continue
         if "measures" in c:                   # merged opposite-direction card ("louder but sparser")
             adjs = []
@@ -902,7 +921,8 @@ def per_stem_cards(per_stem_core, mix_core=None, character=None, levels=None, bu
                     f"The {p} — {adj} than the rest of the track",
                     f"For much of the track this part runs {adj} than everything else, pulling against "
                     f"the mix. A deliberate contrast, or worth a second listen.",
-                    "", None, based, None))
+                    "", None, based, None,
+                    "storyPanel"))   # §B.13 INV-48a — a per-stem card's evidence is the player's lanes
     return out
 
 
@@ -1366,9 +1386,10 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
         fix = tpl.get("fix", "")
         based = REC_BASED.get(key, "").format(**kw)   # SPEC §B.13 — where this card came from (plain)
         axis = REC_AXIS.get(key)                      # §D.6 stage-2: FP axis for divergence/on-style calc
+        ev = REC_TARGET.get(key, "storyPanel")        # §B.13 INV-48a — the panel the click leads to
         recs.append((cls, tpl["header"].format(**kw), tpl["title"].format(**kw),
                      tpl["body"].format(**kw), fix.format(**kw) if fix else "",
-                     round(_t, 2) if _t is not None else None, based, axis))
+                     round(_t, 2) if _t is not None else None, based, axis, ev))
 
     if len(bounds) >= 2:
         edges = bounds + [dur]
@@ -2169,7 +2190,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                            levels=stem_prominence(masking))
     # Most important first: fix (crit) → actionable (do) → creative choice (concept).
     _rank = {"crit": 0, "do": 1, "concept": 2}
-    recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t, based, axis)
+    recs.sort(key=lambda r: _rank.get(r[0], 3))   # tuple: (cls, when, head, body, fix, t, based, axis, ev)
 
     player = None
     if audio_stems_rel:
@@ -2223,8 +2244,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "stem": stem_block,
         "mcards": [{"label": z, "pct": p, "diff": d, "fw": fw, "tw": tw} for z, p, d, fw, tw in masking_cards],
         "flags": flag_times,
-        "recs": [{"cls": c, "when": w, "h": h, "p": p, "fix": fx, "t": t, "based": b}
-                 for c, w, h, p, fx, t, b, _ax in recs],
+        "recs": [{"cls": c, "when": w, "h": h, "p": p, "fix": fx, "t": t, "based": b, "ev": e}
+                 for c, w, h, p, fx, t, b, _ax, e in recs],
         "als": als_overlay,
         "stemmap": stemmap,
         "rhythm": rhythm,
@@ -3230,7 +3251,9 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 /* INV-34 — card-click navigation: a brief pulse on the graph panel so the eye lands where the playhead
    jumped. CSS-only (the canvas draw is untouched). */
 @keyframes graphpulse{0%{box-shadow:0 0 0 0 rgba(124,107,255,0)}18%{box-shadow:0 0 0 3px rgba(124,107,255,.55)}100%{box-shadow:0 0 0 0 rgba(124,107,255,0)}}
-#storyPanel.pulse{animation:graphpulse 1.1s ease-out;border-radius:var(--radius-lg)}
+/* one shared pulse look for EVERY evidence target (§B.13 INV-48b — story arc, tonal bars,
+   vitals strip, drawer panels), so the emphasis reads the same wherever a card leads. */
+.tc-panel.pulse,.vitals.pulse{animation:graphpulse 1.1s ease-out;border-radius:var(--radius-lg)}
 .empty-note{color:var(--bad);font-size:12px;margin:0 0 12px;font-weight:600}
 .foot{color:var(--muted);font-size:11.5px;margin-top:8px;text-align:center}
 .scale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:8px}
@@ -3606,19 +3629,15 @@ document.getElementById("recLegend").innerHTML=
 document.getElementById("recs").innerHTML=D.recs.map((r,i)=>{
  const tb=r.t!=null;
  const jump=tb?` data-t="${r.t}" style="cursor:pointer" title="Jump to ${r.when}"`:"";
+ const dev=r.ev?` data-ev="${r.ev}"`:"";
  const fix=r.fix?`<p class="fix"><span class="fixlab">→ Try</span> ${r.fix}</p>`:"";
  const based=r.based?`<p class="based"><span class="basedlab">Based on</span> ${r.based}</p>`:"";
  const cue=cueByIdx[i];const tag=cue?`<b style="color:var(--ink);text-transform:uppercase">${cue.letter}</b> `:"";
  const chip=tb?`<span class="when tbound">⏱ ${r.when}</span>`:`<span class="when glob">whole track</span>`;
  const dl=cue?` data-let="${cue.letter}"`:"";
- return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}${based}</div>`;}).join("")||"<p class='hint'>—</p>";
-document.getElementById("recs").querySelectorAll(".rec[data-t]").forEach(el=>
- el.onclick=()=>{const t=+el.dataset.t;if(window.__seek)window.__seek(t);
-  const sp=document.getElementById("storyPanel");sp.scrollIntoView({behavior:"smooth",block:"start"});
-  // INV-34: a brief attention pulse on the graph PANEL (CSS/DOM only — never the canvas) so the eye
-  // catches that the playhead jumped to this card's moment. Reflow reset lets repeat clicks re-fire it.
-  sp.classList.remove("pulse");void sp.offsetWidth;sp.classList.add("pulse");
-  setTimeout(()=>sp.classList.remove("pulse"),1200);});
+ return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}${dev}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}${based}</div>`;}).join("")||"<p class='hint'>—</p>";
+// The card CLICK wiring (INV-48) lives AFTER the panel-gating IIFEs below — a card's target must be
+// judged present/hidden only once every panel has decided whether it renders on this run's data.
 
 const getCss=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 // floating tooltip that follows the cursor over a chart (replaces the fixed bottom readout)
@@ -4007,6 +4026,32 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect();const t=Math.max(0,Math.min(D.dur,(e.clientX-r.left-PADL)/(W-PADL-PADR)*D.dur));if(window.__seek)window.__seek(t);});
  PH.push(t=>draw(xOf(t)));
  window.addEventListener("resize",resize);resize();
+})();
+
+// ── §B.13 INV-48: a card leads to ITS evidence ──
+// Runs AFTER every panel-gating IIFE above, so "present" means what the eye can actually reach on this
+// run's data. Scoped to #recs — the map-panel note cards reuse the .rec class but are NOT recs (CN-8).
+// Click = seek (when timecoded) + open closed ancestor <details> + scroll + pulse the TARGET panel;
+// the pulse stays a CSS/DOM class toggle, never a canvas edit (INV-34). A hidden/absent target degrades:
+// timecoded cards keep the story arc (INV-48d), global cards stay inert (no pointer, no title, no click).
+(function(){
+ const present=id=>{const e=id?document.getElementById(id):null;
+  return (e&&e.style.display!=="none")?e:null;};
+ document.getElementById("recs").querySelectorAll(".rec").forEach(el=>{
+  const tb=el.dataset.t!=null&&el.dataset.t!=="";
+  let tgt=present(el.dataset.ev);
+  if(!tgt){if(!tb)return;tgt=document.getElementById("storyPanel");}          // INV-48d
+  if(!tb){el.style.cursor="pointer";el.title="Show the evidence";}            // INV-48e
+  el.onclick=()=>{
+   if(tb&&window.__seek)window.__seek(+el.dataset.t);
+   // INV-48c: never land on a shut drawer — open every closed ancestor first (its toggle
+   // listeners resize the canvases inside); nothing is persisted, the user can fold it back.
+   for(let d=tgt.closest("details");d;d=d.parentElement?d.parentElement.closest("details"):null){if(!d.open)d.open=true;}
+   tgt.scrollIntoView({behavior:"smooth",block:"start"});
+   // INV-34: the attention pulse on the TARGET panel. Reflow reset lets repeat clicks re-fire it.
+   tgt.classList.remove("pulse");void tgt.offsetWidth;tgt.classList.add("pulse");
+   setTimeout(()=>tgt.classList.remove("pulse"),1200);};
+ });
 })();
 
 // ── Part E: synced stem player ──
