@@ -92,7 +92,7 @@ Content panels collapse; the Evidence drawer (arrangement, stem map, rhythm, not
 
 ## Why it exists
 
-It began when another AI made things up about one of my tracks — wrong duration, an arc that wasn't there, gear I never used — and the real measurements settled it. So track-coach reports only what `librosa` and `Demucs` actually measure; the orchestration just conducts, and all the work lives in deterministic scripts, so the same track gives the same answer every time.
+It began with one word from a DJ friend I'd handed a track to: **raw** («очень сыро»). She couldn't tell what the track was reaching for — the elements never came together into a picture. That's the gap track-coach was built to close: measure the signals and *show how a track is actually heard* — its shape, its style — instead of guessing at it. So it reports only what `librosa` and `Demucs` actually measure; the orchestration just conducts, and all the work lives in deterministic scripts, so the same track gives the same answer every time.
 
 The read stays in three layers: **measured** (exact numbers), **what it means** (a concrete reading — *bass dominates 250–500 Hz for the first two minutes, mids present but buried*), and **your call** (the decision is yours). Built for my own music as **[Total Reboot](https://totalreboot.com)** — more at [github.com/happysasha18](https://github.com/happysasha18).
 
