@@ -24,6 +24,25 @@ This matrix is SPEC.md projected into a checkable grid. Tests trace to it. The S
 
 ---
 
+## Contents
+
+- [§1 — Entities & glossary](#1--entities--glossary)
+- [§2 — States & transitions](#2--states--transitions)
+- [§3 — Invariants](#3--invariants-hold-in-every-state-each-owns-a-test)
+- [§4 — Surfaces & layers](#4--surfaces--layers)
+- [§5 — Widget element grid](#5--s1-widget-element-grid-show-per-view-state--data-state--how--layer)
+- [§6 — Catalog element grid](#6--s2-catalog-element-grid)
+- [§7 — Cross-page correspondences](#7--cross-page-correspondences-same-run-two-surfaces--each-row-is-an-invariant)
+- [§E — Run completeness](#e--run-completeness--missing-measurements-spec-e--rc-inv-112)
+- [§D10F — Catalog similarity columns](#d10f--catalog-similarity-columns-spec-d10--f--d-inv-2125-f-inv-18)
+- [§8 — Coverage status](#8--coverage-status)
+- [§9 — Known issues](#9--known-issues)
+- [§G — Storage relocation](#g--storage-relocation-spec-g--g-inv-120)
+- [§H — Commands, library & cleanup](#h--commands-library-management--cleanup-spec-h--h-inv-17)
+- [§E-s31 — Bug fixes](#e-s31--bug-fixes-build-item-e)
+- [§A-metre — Arrangement metre changes](#a-metre--arrangement-metre-changes-spec-a-metre-changes)
+- [§I — Visual design system](#i--visual-design-system-spec-i--ds-inv-114)
+
 ## §1 — Entities & glossary
 - **run** — one analysis of one audio file, in its own dated dir (`<base>/<track>/<stamp>/`). Holds
   `result_*.json`, `narrative.md`, web audio (`stems_web/` and/or `mix_web/`), and a rendered widget.
@@ -93,7 +112,10 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-45 | **Near-silent stem's lane auto-starts MUTED on first load (SPEC CR-2, APPROVED — Alexander 2026-07-03).** A stem below `STEM_EMPTY_FLOOR_DB` (−55 dB broadband) is added to `D.stem.omitted`; the player JS (`build_widget.py:3868`) sets `a.muted=true` for that stem's `<audio>` element on initial load. This is approved behaviour: the lane carries no real content, so auto-muting avoids surprise silence on play. The lane remains VISIBLE and IDENTIFIED per CR-2 (visibility unaffected). The M/S buttons still work — the mute is initial-state only. Verified: `window.__ns_state[i].mute = true` for the near-silent stem, `false` for significant stems. Level = **browser**. | `test_completeness_gate::WholeArtifactCompletenessGate::test_21_auto_mute_approved_behavior` |
 | INV-46 | **Surface registry + DOM-scan convergence (s46, 2026-07-03).** `USER_SURFACES` is the single source of truth for every user-facing panel. (a) Every `<details class="tc-panel" id="…">` in a rendered full widget must be in `USER_SURFACES` — the DOM-scan test fails naming any unregistered id. (b) Every non-DEFERRED registry entry must have a real gate test method — the registry-gated check fails if a method is missing. Together: `rendered ⊆ registry ⊆ gated ⟹ rendered ⊆ gated` (100% by construction). PROOF: `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_probe_scan_detects_unregistered` injects a `__probe_unregistered` panel and verifies the scan catches it, then `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_all_rendered_panels_are_registered` verifies the real widget is clean. `refPanel` (the merged container, D-INV-36) + its nested `refRead` / `webPanel` are the descriptive §D surfaces — registered like the Evidence sub-panels (nested tc-panels carry their own entries); condition `when-reference`, SHIP-1.0 per SPEC §D.10.1 scope-split; gated by the refs-fixture tests (F1, s54), no longer `DEFERRED`/`gated_by:None`. Only the aim/re-flavouring surfaces (no input in 1.0, SPEC §D.6) carry no registry entry. Level = **browser**. | `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_probe_scan_detects_unregistered`; `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_all_rendered_panels_are_registered`; `test_completeness_gate::WholeArtifactCompletenessGate::test_CONV_every_registry_entry_has_gate_test` |
 
-### Per-stem measurements (SPEC §B.11, #2 advanced) — CODED + tested in `tests/test_per_stem.py`, EXCEPT INV-25/INV-26 (feature not built — still planned). Owning tests reconciled to the REAL class names 2026-06-23 (the earlier "planned" names — `SignificanceGates`/`DivergenceGate`/`ScoreBudgetDiversity`/`PlacementLadder`/`SortToggleIsReorderOnly`/`eval_per_stem_usefulness` — never existed under those names; this is the fix).
+### Per-stem measurements   [SPEC §B.11]
+
+Coded + tested in `tests/test_per_stem.py`, EXCEPT INV-25/INV-26 (feature not built — still planned). Owning tests reconciled to the REAL class names (the earlier "planned" names — `SignificanceGates`/`DivergenceGate`/`ScoreBudgetDiversity`/`PlacementLadder`/`SortToggleIsReorderOnly`/`eval_per_stem_usefulness` — never existed under those names; this is the fix).
+
 | INV | Claim | Owning test (real, audited 2026-06-23) |
 |---|---|---|
 | INV-23 | **Per-stem features are gated on significance (CR-2/CR-11).** A per-stem time-series (`result_core_<stem>.json`) is computed ONLY for `significant` stems; an empty/quiet stem yields no per-stem feature and no per-stem card. Reuses the §1 significance gate, not a fresh floor. | `test_per_stem::DivergenceCandidates`, `PerStemCards`; the `significant_stems` gate itself in `test_credibility` (G1–G7) |
@@ -106,13 +128,19 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-26 | **Sort toggle reorders, never mutates.** The Detailed-only card-sort toggle switches the `#recs` order between by-urgency (`_rank`, default) and chronological (by `t`, matching the a/b/c cues); the SET of cards is identical in both orders — a pure presentation reorder, no add/drop. | **PLANNED — not built.** The Detailed-only urgency↔chronological sort toggle does not exist yet. No test. |
 | INV-28 | **Near-silent stems rank below louder ones (CR-11, Alexander 2026-06-22).** Each candidate's importance score is multiplied by a prominence weight (0..1) = how loud the stem is RELATIVE to the loudest significant stem, from the §1 `loud_level` (dB), NOT the self-normalized per-stem energy curve. A quiet part's card therefore sorts BELOW a loud part's at equal divergence — a soft down-rank, never a drop (it still wins a slot on strong-enough divergence). Default weight 1.0 leaves prior behaviour unchanged. | `test_per_stem::Prominence` |
 
-### PLANNED (not built) — source-file header symmetry & readability (Alexander 2026-06-22, NOT critical). The display path already wires both audio + .als (`build_widget.py:2276-2281`); these rows formalize the requirement + tripwire it. Both owning tests EXIST but are `@unittest.skip`ped (the suite's 2 skips) until implemented.
+### PLANNED (not built) — source-file header symmetry & readability
+
+Not critical. The display path already wires both audio + .als (`build_widget.py:2276-2281`); these rows formalize the requirement + tripwire it. Both owning tests EXIST but are `@unittest.skip`ped (the suite's 2 skips) until implemented.
+
 | INV | Claim | Owning test (skipped — planned) |
 |---|---|---|
 | INV-29 | **Source-file symmetry: if the audio source is shown, the .als source is shown too.** The header `srcmeta` line lists what was analysed. Whenever an audio source is present and shown (`Audio: …`), and an `.als` project was part of the run, it MUST be shown alongside (`Project: …`) with the same treatment — never audio-only when a project exists. (`.als` absent ⇒ no Project bit, by INV-16 gating; this is about NOT dropping it when present.) | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_source_file_symmetry` (skipped) |
 | INV-30 | **Long source paths stay readable.** A long audio/`.als` path/filename must not overflow the line ugly: it wraps or middle-ellipsis-truncates with the full value available on hover (`title`), and the `srcmeta` row degrades gracefully on narrow widths. The current `.srcmeta{flex-wrap:wrap}` (`build_widget.py:1951`) wraps but does not truncate a single very-long token — the open work is the nice truncation/hover. | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_long_source_path_readable` (skipped) |
 
-### Card evidence, artistic read & player invariants (SPEC §B.12/§B.13, shipped 0.8.27–0.8.29) — CODED + tested. Owning tests reconciled to real names 2026-06-23.
+### Card evidence, artistic read & player invariants   [SPEC §B.12–§B.13]
+
+Shipped; coded + tested. Owning tests reconciled to real names.
+
 | INV | Claim | Owning test (real, audited 2026-06-23) |
 |---|---|---|
 | INV-31 | **Every advice card names where it came from (card evidence, SPEC §B.13, Alexander 2026-06-23).** Every entry in `D.recs` (the `#recs` "Start here" list — mix-level recs AND per-stem cards) carries a NON-EMPTY `based_on` line. It is plain language, never a bare metric identifier (`true_peak_db`); a single-signal (Tier-A) card may name one signal in words, a fused (Tier-B/C) card names the combination. Panel note cards (separation/rhythm/project) are out of scope this increment (F2). Machine-checkable part = non-empty + present on all `D.recs`; the plain-language/non-restating quality is authored. The based-on names the RESULT + a simple unit, never the measurement METHOD (`4× oversampled`, `peak-to-RMS`, `self-similarity`) — Alexander 2026-07-02, guarded. | `test_fixtures::GoldenRenderFromRealData::test_every_card_carries_a_based_on_line`, `::test_based_on_avoids_technical_method_jargon`, `test_per_stem::PerStemCards` |
@@ -132,7 +160,10 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-50b | **Dynamic range stands on a ladder (SPEC §B.16, 2026-07-05 late).** A rendered widget with DR < 6 shows the squashed card body carrying the ladder sentence ("6–8", "10 and up"). Level: **DOM-text on the rendered widget**. | `test_widget_render::CardScalePhrases::test_squashed_ladder_present` |
 | INV-50c | **The tonal offset is translated to the ear (SPEC §B.16, 2026-07-05 late).** The tonal-resonance card body carries the perceived-loudness phrase matching the fixture's deviation: +9 → "about twice as loud", +6 → "half again as loud", +4 → "clearly audible bump"; mirrored wording for dips (−9 → "about half as loud", −6 → "noticeably recessed", −4 → "clearly audible dip"); the measured dB stays in the sentence beside the phrase. Level: **DOM-text on the rendered widget** (six renders, one per step/sign). | `test_widget_render::CardScalePhrases::test_tonal_phrase_matches_magnitude_and_sign` |
 
-### Player state machine (SPEC §B.14, 2026-06-23) — CODED + tested by EXECUTING the real shipped JS in node (not a Python mirror). The pure helpers (`pgains`/`toggleStem`/`seekResult`) are extracted between `__PLAYER_LOGIC_START__`/`__PLAYER_LOGIC_END__` markers in the rendered widget; the test pulls that block out of the HTML, runs it in node, and asserts the combinations the old string-match tests never reached.
+### Player state machine   [SPEC §B.14]
+
+Coded + tested by EXECUTING the real shipped JS in node (not a Python mirror). The pure helpers (`pgains`/`toggleStem`/`seekResult`) are extracted between `__PLAYER_LOGIC_START__`/`__PLAYER_LOGIC_END__` markers in the rendered widget; the test pulls that block out of the HTML, runs it in node, and asserts the combinations the old string-match tests never reached.
+
 | INV | Claim | Owning test (real) |
 |---|---|---|
 | INV-35 | **One mode at a time.** After ANY sequence of mute/solo toggles via `toggleStem`, the player is never in `(some stem muted) AND (some stem soloed)` at once — muting clears solos, soloing clears mutes (Alexander 2026-06-21). | `test_player_logic::PlayerStateMachine::test_one_mode_at_a_time` |
@@ -142,7 +173,10 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-39 | **Seek clamps.** `seekResult` always returns t ∈ [0, dur] — a negative / gutter / over-duration click never seeks out of range. | `test_player_logic::PlayerStateMachine::test_seek_clamps` |
 | INV-40 | **Player composes with the VIEW axis — entering Simple resets the per-stem mix (SPEC §B.14 inv 6; Alexander found by deed 2026-06-23).** Solo/mute is a Detailed-only capability (the M/S controls live in `#stemlanes`, hidden in Simple, INV-18/22). Switching to Simple calls `resetMix` → every stem `{mute:false,solo:false}` → `pgains` all-audible, so a soloed/muted part is never left audible-but-invisible-and-unundoable. `resetMix(stems)` is pure (all-false) and the `apply("simple")` toggle wires `window.__resetMix`. | `test_player_logic::PlayerStateMachine::test_simple_resets_mix`, `test_widget_render::SoloAndMuteAreMutuallyExclusive::test_simple_toggle_resets_the_mix` |
 
-### View selector as remembered state (SPEC §B.15, 2026-06-29) — CODED + tested. resolveView extracted between VIEW_LOGIC_START/END markers and run in node (same pattern as player logic).
+### View selector as remembered state   [SPEC §B.15]
+
+Coded + tested. resolveView extracted between VIEW_LOGIC_START/END markers and run in node (same pattern as player logic).
+
 | INV | Claim | Owning test (real) |
 |---|---|---|
 | INV-41 | **Global remembered view (Simple/Detailed).** One localStorage-backed preference (`tc_view`), read on open by precedence URL-hash > stored > calm-first-use; only a toggle writes; read-on-load (no live cross-tab sync); degrade-safe (a store throw never breaks view init); ladder visibility (INV-18/22) unchanged — only which view opens. | node `resolveView` test + widget-render order/panel tests |
@@ -488,7 +522,7 @@ Invariants added 2026-06-30 (s31). All owned by `tests/test_storage_relocation.p
 | G-INV-13 | Cleanup operates on WHOLE runs, never individual measurements — so §E's per-axis measured/missing state is untouched: a pruned run is simply absent, the surviving runs keep their manifest. NEG: removing one version leaves the other versions + the index entry intact (whole-run granularity, not per-measurement). Level: L0-DATA. Retires the s52 baseline id. | `test_cleanup::RemoveCommand::test_remove_one_version_leaves_others_and_updates_index`, `test_cleanup::GcCommand::test_apply_deletes_only_orphan` |
 | G-INV-17 | A successful `build` auto-deposits into the global library — the DEFAULT ingest, not a manual step; the only opt-OUT is the explicit `--no-deposit` flag (there is no opt-IN `--deposit`). NEG: deposit is never opt-in; a non-reference own run deposits by default. Level: L0-DATA (CLI contract + the `not args.no_deposit` gate in `_cmd_build`). Retires the s52 baseline id. | `test_pipeline_plan::AutoDepositIsDefault::test_no_deposit_is_an_opt_out_flag`, `test_pipeline_plan::AutoDepositIsDefault::test_no_opt_in_deposit_flag`, `test_library::ReferenceNotDeposited::test_own_run_still_deposits` |
 
-## §H — Commands, library management & cleanup (SPEC §H → H-INV-1..7, 2026-07-01 s31)
+## §H — Commands, library management & cleanup (SPEC §H → H-INV-1..7)
 
 All owned by `tests/test_cleanup.py`.
 
@@ -546,7 +580,7 @@ All owned by `tests/test_cleanup.py`.
 | H-INV-11 | The cleanup verbs form one reversibility ladder defined over the tiers; only the last rung is irreversible — `reset` keeps `backups/` (recoverable via `restore`), while `hard-reset` is the single point of no return that also wipes `backups/`. NEG: a `reset` never removes `backups/`; only the double-confirmed `hard-reset` does. Level: L0-DATA. Retires the s52 baseline id. | `test_cleanup::ResetRevisedCommand::test_reset_keeps_backups_dir`, `test_cleanup::HardResetCommand::test_hard_reset_wipes_everything_incl_backups` |
 | H-INV-12 | Confirmation is graduated to match how much a verb can destroy — the prune tier is dry-run by default and acts on `--apply`; legacy `clean` reads the same way (its old `--yes` kept only as a silent alias). NEG: a bare `clean` previews and removes nothing; `--apply` and the legacy `--yes` both remove. Level: L0-DATA. Retires the s52 baseline id. | `test_library::CleanCommandConvention::test_dry_run_by_default_older_than`, `test_library::CleanCommandConvention::test_apply_flag_actually_removes`, `test_library::CleanCommandConvention::test_yes_flag_back_compat_still_removes` |
 
-## §E-s31 — Bug fixes (build item E, 2026-06-30)
+## §E-s31 — Bug fixes (build item E)
 
 Three targeted bugs fixed; each owns tests asserting the REAL rendered artifact.
 
@@ -556,7 +590,7 @@ Three targeted bugs fixed; each owns tests asserting the REAL rendered artifact.
 | E-BUG-2 | **`char` chip has a visible legend explaining it = 'Character axis — assessed without loudness weighting'.** The chip appears on per-row items in the refRead bars (only a hover tooltip per item); a legend block at the bottom of the refRead panel provides the visible explanation. Investigation: legend was already present at `build_widget.py:2586` — no code change needed; test added as regression guard. | `test_reference_read::CharLegend::test_char_legend_explains_the_chip`, `::test_char_chip_has_tooltip` |
 | E-BUG-3 | **Catalog 'leans toward' direction links navigate to the track's widget focused on the #refRead section (D-INV-28), not `href="#"`.** Fix: `_lean_cell` now accepts `widget_href`; emits `<widget_href>#refRead`; `_row` passes the resolved `href`. Fallback (no widget): `#refRead` in-page anchor (never bare `#`). | `test_catalog::DirectionLinkIsReal::test_direction_link_href_is_not_dead`, `::test_direction_link_points_to_refread_anchor`, `::test_rendered_catalog_direction_link_not_dead` |
 
-## §A-metre — Arrangement metre changes (SPEC §A "metre changes", 2026-07-02)
+## §A-metre — Arrangement metre changes (SPEC §A "metre changes")
 
 Owned by `tests/test_parse_als.py`.
 
@@ -570,7 +604,7 @@ Owned by `tests/test_parse_als.py`.
 | METRE-6 | `time_sig_changes` beats are ascending [disk-gated] | `test_parse_als::FragileMeterChanges::test_beats_ascending` |
 | METRE-7 | `time_sig_changes[*].time_s` ≈ beat × 60/bpm [disk-gated] | `test_parse_als::FragileMeterChanges::test_time_s_consistent_with_beat` |
 
-## §I — Visual design system (SPEC §I → DS-INV-1…14, 2026-07-02)
+## §I — Visual design system (SPEC §I → DS-INV-1…14)
 
 Movement 1 (landed): the single token source + colour ladder/drift. Guarded at source-of-shipped-CSS
 level by `tests/test_design_tokens.py` (the CSS is emitted verbatim from `build_widget.TEMPLATE`).

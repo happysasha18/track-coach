@@ -19,6 +19,20 @@ session-by-session "why we changed it" live in `JOURNAL.md`, not here.
 This SPEC is the source; `TEST_MATRIX.md` is it projected into a checkable grid, and the tests are derived
 from it (`spec → prove → matrix → test → code`). Points still needing Alexander's call are marked ⟨DECIDE⟩.
 
+## Contents
+
+- [**0.** What it's for](#0-what-its-for-and-the-gap-it-had-to-close)
+- [**A.** The building blocks](#a-the-building-blocks-what-track-coach-reasons-about)
+- [**B.** The credibility layer](#b-the-credibility-layer--never-say-more-than-the-numbers-support)
+- [**C.** Increment-1 domain calls (resolved)](#c-resolved-increment-1-inputs-that-needed-alexanders-domain-call)
+- [**D.** Reference & Compare](#d-reference--compare--хочу-как-aphex-twin)
+- [**E.** Run completeness](#e-run-completeness--missing-measurements-cross-cutting--applies-to-a-b-the-catalog-incl-its-d10f-similarity-columns-d-and-f)
+- [**F.** Similar in your own library](#f-similar-in-your-own-library--the-dj-column)
+- [**G.** Where things live on disk](#g-where-things-live-on-disk--output-locations-the-library-and-cleanup)
+- [**H.** Commands, library & cleanup](#h-commands-library-management--cleanup)
+- [**I.** The visual design system](#i-the-visual-design-system--tokens--components)
+- [Glossary](#glossary-plain-language-definitions-expand-it-whenever-a-term-needed-explaining)
+
 ## 0. What it's for, and the gap it had to close
 
 track-coach's whole value is **trust**: a true, specific reading you can act on — the arc, the masking,
@@ -139,7 +153,7 @@ finding. "Don't cry wolf, and don't paint silence."
   the correlation is strong; stay silent / caveat where it isn't. (Base exists: `map_stems`.) Hard —
   flagged for design, not a hard promise yet.
 
-### B.1 Phase-2 resolutions (folded back from `prover_runs/spec_credibility_2026-06-20.md`)
+### B.1 Phase-2 resolutions
 - **CR-1a (from P2):** mix-level claims (energy/brightness/density/vitals/arc) are INDEPENDENT of stem
   significance — an all-insignificant-stems run still gives the full arc; only the stem layer is omitted.
 - **CR-2a (from P1) — DEFERRED (2026-06-23): the shipped gate is whole-track.** The intent: significance
@@ -153,7 +167,7 @@ finding. "Don't cry wolf, and don't paint silence."
   (…C E C…) IS a drop — don't require a new global peak.
 Open ⟨DECIDE⟩ thresholds remain tuning, to settle on fixtures.
 
-### B.2 Phase-3 resolutions (0.8.1, 2026-06-21 — coded + tested, `tests/test_credibility.py` G1–G7)
+### B.2 Phase-3 resolutions   [G1–G7]
 RESOLVED in code (guard in parens): **CR-2/CR-7** insignificant stems dropped + named (G1), gate =
 `significant_stems()` at **−55 dB** (`STEM_EMPTY_FLOOR_DB`); **CR-1a** mix arc survives all-insignificant
 (G2); **CR-3** per-stem viz scales vs an absolute **−60 dB** floor (`STEM_COLOUR_FLOOR_DB`), not per-stem
@@ -166,7 +180,7 @@ before it) — encoded that + a positive "real drops still detected" test instea
 STILL OPEN (not in the G1–G7 layer-1 set): **CR-4** leakage honesty (windowed caveat), **CR-6** the actual
 per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-7** Ableton↔stem.
 
-### B.3 Phase-3 cont. (0.8.2, 2026-06-21 — CR-4/CR-6/CR-7, guards G9–G11)
+### B.3 Phase-3 cont.   [CR-4 · CR-6 · CR-7 · G9–G11]
 - **CR-4 (G9) DONE:** `leakage_caveats()` flags a SIGNIFICANT stem's single loudest band as likely bleed
   when a carrier owns that band ≥ `LEAK_LOUDER_DB` (10) louder AND r ≥ `LEAK_CORR_MIN` (0.2). Conservative
   + identity-agnostic (a naive "any louder neighbour" rule over-flags); rendered in the separation panel.
@@ -184,7 +198,7 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
   bass keeps changing (recurrence 0.14) — carrying the development — while the mid and the drums mostly loop."*
   Tests: `G20_RepetitionSurfacing` (7). ⟨DECIDE⟩ the two thresholds (tune as tracks land).
 
-### B.4 Stem CHARACTER labels (0.8.3 → 0.8.6, 2026-06-21 — G12, G13)
+### B.4 Stem CHARACTER labels   [G12–G13]
 > ⚠ **SUPERSEDED FOR THE DISPLAYED LABEL by §B.7 (0.8.11) + §B.8/G18 (0.8.15).** The displayed label no
 > longer uses `tonal` (→ base role `mid`), no longer uses `air` (→ `high`), and shows NO `≈` marker; the
 > freq-role is taken from the per-stem spectral CENTROID (§B.8), with the G14 high-pass kept only as a
@@ -276,7 +290,7 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
   - Verify-by-deed (Simon Fava): `other` → `pad` (was `perc`), `vocals` → `melody` (was `perc`); drums
     still `kick`, bass still `bass`.
 
-### B.5 Individual recommendations — name the PART, not a template (G16, 0.8.8, Alexander's #2)
+### B.5 Individual recommendations — name the PART, not a template   [G16]
 Alexander's standing complaint (2026-06-20, looking at the Lazy_Sparks render): recommendations "feel samey
 because `build_recommendations` is a FIXED template catalog fired by thresholds — same handful repeats
 track-to-track." The bet: now that we measure each stem, a rec can name the SPECIFIC part, band, and time
@@ -295,7 +309,7 @@ conflict (`masking_flags`: which low stem buries which mid stem, in which band, 
   Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
   melody 15%"), piano (empty) dropped.
 
-### B.6 The `late_entry` rec — name the part, never the raw Demucs name (G17, 0.8.9, Alexander's #2 cont.)
+### B.6 The `late_entry` rec — name the part, never the raw Demucs name   [G17]
 Continuing #2 ("wire per-stem character into MORE recs beyond masking"): the `late_entry` rec — fired
 when a stem is silent for almost the whole track and only appears near the end — was the last LIVE rec
 still printing the **raw Demucs stem name** (`Stem "{st}" is silent… bring "{st}" in earlier`). That
@@ -324,7 +338,7 @@ stem is a synth, etc.) exactly as the masking card did before G16.
   proves it's real content. On Lazy_Sparks this card now correctly DISAPPEARS. INV: late_entry never
   fires on a stem whose entering peak is below the empty floor.
 
-### B.7 ONE plain label per stem — kill the label salad (0.8.11, Alexander s14)
+### B.7 ONE plain label per stem — kill the label salad
 Alexander, looking at the real Lazy_Sparks render: *"what is this salad?"* The stem area had THREE overlapping,
 half-confident systems stacked on each stem — (1) measured `character` with a `≈` "uncertain" prefix,
 (2) the stem↔project map verdict (which ALSO used `≈`, meaning the OPPOSITE — "matches a family"), and
@@ -414,7 +428,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
     (the CLAUDE.md re-render-all rule applied as a ship precondition, so the catalog never opens a stale leaking
     widget). `INV-STEMNAME-BACKCOMPAT`
 
-### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid) — G18, 0.8.14/0.8.15 (Alexander's idea, s14)
+### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid)   [G18]
 Alexander (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
 analysis on the MIX; per stem we only had 6 coarse bands + flatness. So `masking.py:stem_spectrum(y)` now
 computes, per stem (reusing the loaded audio, one extra STFT):
@@ -440,7 +454,7 @@ computes, per stem (reusing the loaded audio, one extra STFT):
 - IDEA (Alexander s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
   the bass") — **DONE: §B.9 (G19) named the spot; 0.8.20 bumped the grid 32→64 bins** (see §B.9 note).
 
-### B.9 PRECISE masking frequency — name the cut spot, not the whole band (G19, 0.8.17, Alexander's idea a)
+### B.9 PRECISE masking frequency — name the cut spot, not the whole band   [G19]
 The §B.5 masking card said *"the bass buries the lead around **250–600 Hz**"* — the whole coarse band, the
 same range for every conflict. Alexander's s14 idea (a): the per-stem spectra (§B.8 `spectrum`/`spectrum_freqs`)
 already say WHERE inside the band the two parts fight, so the card can name a cut frequency.
@@ -466,7 +480,7 @@ already say WHERE inside the band the two parts fight, so the card can name a cu
   guitar ≈260) and stay STABLE through 96. Chose 64 (~6.6/oct): clear discrimination, stable, not so fine it
   chases spectral spikes. Pure schema change (spectrum array 32→64 long); G19/centroid consume it unchanged.
 
-### B.10 "Where does it get boring?" — the development plateau (G21, 0.8.19, Alexander's idea)
+### B.10 "Where does it get boring?" — the development plateau   [G21]
 Alexander (2026-06-22): *"for evolving tracks, the idea is to show at what point it gets boring."* For an
 EVOLVING track, mark the onset after which it stops introducing NEW material and only recombines sections
 already heard.
@@ -488,7 +502,7 @@ already heard.
   END plateau (last new material → end). An INTERNAL repetitive stretch (e.g. Lazy's `C E C E C` oscillation
   in the middle, before a later new section) is NOT yet caught — a future "longest no-new run" variant could.
 
-### B.11 Per-stem measurements — run the track tools on each stem (Alexander 2026-06-22)
+### B.11 Per-stem measurements — run the track tools on each stem
 
 In plain words: we already measure energy/brightness/density/etc. on the whole mix; this points the same
 tools at each significant stem, and shows a card ONLY when a stem behaves notably differently from the rest
@@ -593,7 +607,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   to switch the CARD list between **by urgency** (default, unchanged) and **chronological** (matching the
   letters). Pure presentation reorder; never adds/removes a card. ⟨DECIDE⟩ default = urgency (current).
 
-#### B.11.1 Resolution (2026-06-22) — BRIGHTNESS is descriptive, not a prescriptive per-stem card (Alexander)
+#### B.11.1 Resolution — BRIGHTNESS is descriptive, not a prescriptive per-stem card
 When A1 (per-measure validity) reached brightness, Alexander rejected the *premise*, not just the threshold:
 *"I'm not convinced yet that anything *should* be brighter than anything else — and whether it's a mistake,
 how would you know? Maybe the drums are meant to burst in, maybe a synth. Better to push this to some
@@ -616,7 +630,7 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
    in a viz / one balance card). Default to descriptive unless an axis has a defensible "this fights the track"
    reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
 
-### B.12 Producer's read — name HOW it develops, flag an idle axis (2026-06-23, Alexander — the artistic layer)
+### B.12 Producer's read — name HOW it develops, flag an idle axis
 The Producer's read is authored prose — *"here's what I hear, and my thoughts as I go"* (Alexander). Its job is
 **OBSERVATION**, not a command: the actionable "do X" lives in the **cards**; the read carries thinking-aloud
 + technical remarks (the two-layer principle, memory `track-coach-two-layers-cards-vs-read`). So the read MAY
@@ -650,7 +664,7 @@ observation:
   observation. The producer's read hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
   (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
 
-### B.13 Card evidence — every card names where it came from (the "based-on" line; 2026-06-23, Alexander)
+### B.13 Card evidence — every card names where it came from
 Alexander: *"show which signals drove each card."* Every recommendation card carries a plain
 line saying what it is **based on**. The credibility trap (memory `track-coach-card-evidence`): a raw lone
 number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what, oranges?"* (Alexander). So the based-on line is
@@ -771,7 +785,7 @@ click ever switches Simple↔Detailed (§B.15, INV-41); the `?direction` entry-f
   tooltip); any change to card texts. *Success measure:* on a library track, hovering mid-arc at a marked
   moment shows the cue tooltip and the click lights the right card — verified by deed at landing `[default]`.
 
-### B.14 The synced player as a STATE MACHINE (2026-06-23, cold-session maintenance — the most interactive, least-spec'd surface)
+### B.14 The synced player as a STATE MACHINE
 The full-mode player is the widget's most interactive surface (play/pause × per-stem mute × solo × seek ×
 card-click) and was, until this pass, NOT in the spec and tested only by string-matching the JS source — so
 the COMBINATIONS were never exercised (the seek-stops-playback bug, 0.8.28/INV-33, was exactly this class).
@@ -818,7 +832,7 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 
-### B.15 The view selector as remembered state (2026-06-29, Alexander — one global view, calm on first use)
+### B.15 The view selector as remembered state
 The Simple/Detailed selector is the second interactive widget-state machine (beside the player, §B.14). Until
 this pass each widget opened in Simple and **deliberately did NOT restore** a prior choice — the "opens calm by
 default" stance (it was even in the skill's one-liner). Alexander revised that (2026-06-29): the chosen view is
@@ -859,7 +873,7 @@ brand-new user still meets the calm screen first.*
   time — the reason a producer couldn't find it. Remembering Detailed is what makes it reliably present.
   `tags: INV-41 · D-INV-30 · D-INV-36`
 
-### B.16 A number wears its scale — «много или мало? в апельсинах» (2026-07-05 late, the wording finish)
+### B.16 A number wears its scale — «много или мало? в апельсинах»
 A card that headlines a raw number without a reference scale makes the producer do the calibration
 himself — "192 ms: is that a lot?" The map (`docs/signal_value_map.md`) named exactly which Tier-A cards
 read as "a meter with a sentence" for this reason, and the de-templating steer says the cure is not a
@@ -892,7 +906,15 @@ fields (boxy/harsh/dip/lift) are untouched — the scale phrase is ADDED, not sw
   scales and the tonal/swing phrases match each track's measured magnitude — verified by deed at landing
   `[default]`.
 
-## D. Reference & Compare — «хочу как Aphex Twin» (0.9)
+## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
+All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
+`STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
+of **Drop** — strictly-lower predecessor, `LIFT` = 0.12, sustained-high = "Main" (§B.2, CR-5); (3) which
+stems count as significant for repetition — `significant_stems()` gate (§B.3, CR-6). The method (write SPEC
+→ product-prover → derive matrix/tests → fix code, bug → spec → test → code) is now the standing process,
+not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thresholds, flagged inline above.
+
+## D. Reference & Compare — «хочу как Aphex Twin»
 
 Point track-coach at someone else's music as a *direction* you're reaching toward, see where your track
 already sits relative to it and where it goes its own way, and let that gently re-flavour the coaching you
@@ -1159,7 +1181,7 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   centroid of any direction it belongs to** (RC-INV-6) — not comparable as an own placement, never excluded
   from its cloud. Its written read still renders from whatever signals DID compute. `D-INV-9`
 
-### D.6 How the coaching changes — re-flavouring (the payoff) — POST-1.0 (deferred, not a 1.0 promise)
+### D.6 How the coaching changes — re-flavouring (the payoff)   [deferred · post-1.0]
 
 > **POST-1.0 — CUT FROM 1.0 (FINAL — Alexander, s54, 2026-07-05). This supersedes the earlier ⟨pending⟩
 > marker; the cut is DECIDED, not open.** The only input surface for aspiration mapping (the aim picker,
@@ -1319,7 +1341,7 @@ structural holes:
 > column** beside the reference one, scoped to **1.0**. It is specced as its own surface in **§F**, not
 > folded into the reference line.)_
 
-### D.10 The reference line — the «leans toward» surface (catalog column + Detailed plaque) — 0.9
+### D.10 The reference line — the «leans toward» surface (catalog column + Detailed plaque)
 
 One compact surface that answers, at a glance, *which direction is this track closest to?* — without opening
 the full producer's read. It appears in two places but is **ONE surface**: a **column on the catalog** (the library page) and a
@@ -1445,7 +1467,7 @@ column** (one direction per cell, no order to lean on) a **greyscale-safe glyph 
 ●○○ no real lean) sits beside the name. A **hover label** names the closeness on both. So the cue stays
 readable in greyscale, in print, and for a colour-blind reader without adding closeness words. `D-INV-26`
 
-### D.10.1 The up-to-three selector — your three nearest directions, chosen one at a time — 0.9
+### D.10.1 The up-to-three selector — your three nearest directions, chosen one at a time
 
 **The «leans toward» surface lists up to your three nearest directions, not just the single nearest.**
 Earlier the surface named one direction and a runner-up was deferred, because cramming a *second* colour tint
@@ -1597,7 +1619,7 @@ number or rank; a click never edits a mapping and never changes the cards/read c
 the read compares against; and the read's focused direction never strands on a hidden or dropped direction
 (it falls back to the nearest). `D-INV-28`
 
-### D.10.2 The web panel and the ★ cross-validation mark — 0.9
+### D.10.2 The web panel and the ★ cross-validation mark
 
 **Beside the focused direction, a small plaque lists what the web told us about that direction's style — but
 only the parts we can tie to measurement.** When the read is focused on a direction (§D.10.1), a compact
@@ -1756,7 +1778,7 @@ can't tie to measurement; **★** appears only when measurement directly confirm
 sound and unambiguous (neither is ever decorative); no numbers, no grade (D-INV-25 stance); and "leans toward"
 + its plaque remain observation, never "you should sound like this" (D-INV-1). `D-INV-29`
 
-### D.10.3 The reference read — how you sit vs the direction's centroid, per facet — 0.9
+### D.10.3 The reference read — how you sit vs the direction's centroid, per facet
 
 When you click your track in the catalog, the per-track widget opens a **reference read**: not a coloured
 word, but the geometry of how your track sits against the focused direction's **centroid** — the mean point
@@ -1798,79 +1820,6 @@ D-INV-23 · D-INV-28`
 
 **Never happens (safety).** No raw distance, score, or percentage; observation, never a grade (D-INV-1/25); a
 missing facet is never drawn as zero-divergence (it is left out). `D-INV-30`
-
-## F. Similar in your own library — the DJ column (1.0)
-
-A second catalog column, sitting beside the reference one (§D.10), that answers a different question:
-*which of MY OWN other tracks does this one sound closest to?* Alexander's use case (2026-06-25): a DJ
-glances down the library and sees, per track, its **1–3 nearest siblings** — handy for building a set, a
-transition, an A/B. It is a 1.0 surface; 0.9 finishes on the reference feature (§D).
-
-It is deliberately **not** a reference surface: the neighbours are tracks already in *your* library, so this
-column is **always-on library data, never under the show/hide-references switch** (D-INV-7 keeps other
-people's music out of your signatures; this column only ever lists your own). `tags: own-library · not-a-reference`
-
-### F.1 What it shows
-
-- **Up to three nearest own-tracks — but only the close ones.** The versions in your library nearest this one
-  by **full-dimensional fingerprint** (same geometry as §D, D-INV-12/19, straight-line ⟨DECIDE D-17⟩,
-  axis-count-fair RC-INV-5b), capped at three and ranked nearest-first. **By default it lists the green/amber
-  (close/medium) siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly
-  tinted red (far)** — a last resort, never empty when another track exists (Alexander 2026-06-25). Because
-  the red tint reads plainly as "far", it isn't a distant track dressed up as close — that was the worry, and
-  the colour answers it. **This own-sibling last-resort red differs from the §D reference list**, which shows
-  "no close direction yet" rather than a far direction (Alexander 2026-06-29, §D.10.1): a far *sibling* is
-  still a real track you might mix, a far *direction* is just noise. «no comparison yet» (F-INV-7) is reserved
-  for when there is truly no other placeable track at all. `F-INV-1`
-- **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
-  (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
-- **No number shown — closeness is a colour, not a score.** It names the neighbour tracks, each tinted by the
-  same green/amber/red closeness cue as §D (D-INV-26), never a percentage, rank number, or raw distance. Same
-  observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
-
-### F.2 Navigation — click a neighbour, scroll to it (Alexander: «чтобы к ним скроллилось»)
-
-- **Click a listed neighbour → the catalog scrolls to that track's row and highlights it.** The catalog is
-  the one surface that moves; the click is a pure navigation, it changes no analysis state. `F-INV-4`
-- **If the target row is currently hidden by a search/sort filter**, the click must not scroll to nothing:
-  ⟨DECIDE F-1⟩ either clear the filter first, or briefly surface the row — never a silent no-op that looks
-  broken. `tags: ⟨DECIDE F-1⟩`
-- **On a track's own widget plaque** (not the catalog) there is no catalog to scroll, so ⟨DECIDE F-2⟩
-  whether the own-library neighbours appear on the plaque at all, and if so each name **opens that track's
-  widget** rather than scrolling. Recommend: catalog-only for 1.0; revisit the plaque later.
-
-### F.3 How it composes across the axes
-
-- **Run mode.** Nearest-own uses the full-dimensional fingerprint, so it is **full-run-only** like §D: a
-  **quick-only** version has no fingerprint, so its cell reads "full analysis only" — silent, not an error
-  (RC-INV-7), exactly as the reference column does (D-INV-22). `F-INV-5`
-- **Completeness.** A version **missing a fingerprint axis is not comparable**, so it neither lists neighbours
-  nor is offered AS a neighbour to others (it would be a fabricated nearest) — its cell reads "can't compare —
-  ⟨missing signals⟩" from the same run manifest as the coach, the catalog, and §D (E.3, RC-INV-5a). `F-INV-6`
-- **A library of one (or of one placeable track).** With no other placeable own-track, the column reads
-  "no comparison yet" rather than an empty cell that looks broken. `F-INV-7`
-- **Recompute, never stale.** Neighbours are a pure function of (the library's fingerprints, the current
-  normalisation epoch); when the library grows or an epoch changes, every row's neighbour list recomputes and
-  re-stamps together (D-INV-12/14) — the catalog never shows a neighbour the current geometry no longer
-  supports, and never points at a deleted version (cascade like D-INV-13). `F-INV-8`
-- **The two columns side by side.** The reference column (§D.10) and this own-library column read the same
-  fingerprint geometry but answer different questions (a *direction* you reach toward vs a *sibling* already in
-  your library); they are two named columns, never merged, and only the reference one is under the references
-  switch. `tags: two-columns · cross-link §D.10`
-
-### F.4 Open decisions (need Alexander)
-
-- ⟨DECIDE F-1⟩ click-to-scroll when the target row is filtered out (clear filter vs surface-the-row).
-- ⟨DECIDE F-2⟩ do own-library neighbours also appear on the per-track plaque (and open the track), or stay
-  catalog-only for 1.0 (recommend catalog-only).
-- ⟨DECIDE F-3⟩ how many neighbours — **SETTLED 2026-06-25 (Alexander): up to 3, and only the close ones**
-  (high/medium proximity bucket, D-INV-26), so a distant sibling is never listed as if close (F-INV-1).
-- ⟨DECIDE F-4⟩ the distance measure for own↔own — **SETTLED 2026-06-25 (Alexander): inherit §D's straight-line
-  (⟨DECIDE D-17⟩), one geometry across the whole tool.**
-- ⟨DECIDE D-27⟩ (shared with §D.9) the own-library high/medium/low bucket boundaries — relative to the
-  library's own distance distribution, since §F has no cloud spread to borrow.
-- **Placement (P-1).** This column is the **other of the last two columns**, beside the §D.10 reference one,
-  with the same slightly-smaller font (Alexander 2026-06-25). Both are catalog-tail columns.
 
 ## E. Run completeness & missing measurements (cross-cutting — applies to §A, §B, the catalog incl. its §D.10/§F similarity columns, §D, and §F)
 
@@ -1992,14 +1941,87 @@ genuinely-incomplete run is re-run, its missing axes stay *missing* under the ru
 comparison, shown as "not measured"). E-1 (resolved) **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
 (a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
 
-### E.5 Decisions (settled 2026-06-25, Alexander)
+### E.5 Decisions
 
 - **E-1 — SETTLED:** a partial run is a technical error → flag "incomplete run — re-run", manual re-run,
   no auto-trigger, no imputation (RC-INV-10). Missing-by-mode (quick has no stems) is not an error.
 - **E-2 — SETTLED:** `MIN_SHARED_AXES` = **10**. Below 10 shared measured axes a pair is not comparable
   (RC-INV-5a) — guards against too little DATA (quick vs full), not against dissimilar music.
 
-## G. Where things live on disk — output locations, the library, and cleanup (1.0)
+## F. Similar in your own library — the DJ column
+
+A second catalog column, sitting beside the reference one (§D.10), that answers a different question:
+*which of MY OWN other tracks does this one sound closest to?* Alexander's use case (2026-06-25): a DJ
+glances down the library and sees, per track, its **1–3 nearest siblings** — handy for building a set, a
+transition, an A/B. It is a 1.0 surface; 0.9 finishes on the reference feature (§D).
+
+It is deliberately **not** a reference surface: the neighbours are tracks already in *your* library, so this
+column is **always-on library data, never under the show/hide-references switch** (D-INV-7 keeps other
+people's music out of your signatures; this column only ever lists your own). `tags: own-library · not-a-reference`
+
+### F.1 What it shows
+
+- **Up to three nearest own-tracks — but only the close ones.** The versions in your library nearest this one
+  by **full-dimensional fingerprint** (same geometry as §D, D-INV-12/19, straight-line ⟨DECIDE D-17⟩,
+  axis-count-fair RC-INV-5b), capped at three and ranked nearest-first. **By default it lists the green/amber
+  (close/medium) siblings** (D-INV-26); if **none** qualify it falls back to the **single nearest, honestly
+  tinted red (far)** — a last resort, never empty when another track exists (Alexander 2026-06-25). Because
+  the red tint reads plainly as "far", it isn't a distant track dressed up as close — that was the worry, and
+  the colour answers it. **This own-sibling last-resort red differs from the §D reference list**, which shows
+  "no close direction yet" rather than a far direction (Alexander 2026-06-29, §D.10.1): a far *sibling* is
+  still a real track you might mix, a far *direction* is just noise. «no comparison yet» (F-INV-7) is reserved
+  for when there is truly no other placeable track at all. `F-INV-1`
+- **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
+  (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
+- **No number shown — closeness is a colour, not a score.** It names the neighbour tracks, each tinted by the
+  same green/amber/red closeness cue as §D (D-INV-26), never a percentage, rank number, or raw distance. Same
+  observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
+
+### F.2 Navigation — click a neighbour, scroll to it
+
+- **Click a listed neighbour → the catalog scrolls to that track's row and highlights it.** The catalog is
+  the one surface that moves; the click is a pure navigation, it changes no analysis state. `F-INV-4`
+- **If the target row is currently hidden by a search/sort filter**, the click must not scroll to nothing:
+  ⟨DECIDE F-1⟩ either clear the filter first, or briefly surface the row — never a silent no-op that looks
+  broken. `tags: ⟨DECIDE F-1⟩`
+- **On a track's own widget plaque** (not the catalog) there is no catalog to scroll, so ⟨DECIDE F-2⟩
+  whether the own-library neighbours appear on the plaque at all, and if so each name **opens that track's
+  widget** rather than scrolling. Recommend: catalog-only for 1.0; revisit the plaque later.
+
+### F.3 How it composes across the axes
+
+- **Run mode.** Nearest-own uses the full-dimensional fingerprint, so it is **full-run-only** like §D: a
+  **quick-only** version has no fingerprint, so its cell reads "full analysis only" — silent, not an error
+  (RC-INV-7), exactly as the reference column does (D-INV-22). `F-INV-5`
+- **Completeness.** A version **missing a fingerprint axis is not comparable**, so it neither lists neighbours
+  nor is offered AS a neighbour to others (it would be a fabricated nearest) — its cell reads "can't compare —
+  ⟨missing signals⟩" from the same run manifest as the coach, the catalog, and §D (E.3, RC-INV-5a). `F-INV-6`
+- **A library of one (or of one placeable track).** With no other placeable own-track, the column reads
+  "no comparison yet" rather than an empty cell that looks broken. `F-INV-7`
+- **Recompute, never stale.** Neighbours are a pure function of (the library's fingerprints, the current
+  normalisation epoch); when the library grows or an epoch changes, every row's neighbour list recomputes and
+  re-stamps together (D-INV-12/14) — the catalog never shows a neighbour the current geometry no longer
+  supports, and never points at a deleted version (cascade like D-INV-13). `F-INV-8`
+- **The two columns side by side.** The reference column (§D.10) and this own-library column read the same
+  fingerprint geometry but answer different questions (a *direction* you reach toward vs a *sibling* already in
+  your library); they are two named columns, never merged, and only the reference one is under the references
+  switch. `tags: two-columns · cross-link §D.10`
+
+### F.4 Open decisions (need Alexander)
+
+- ⟨DECIDE F-1⟩ click-to-scroll when the target row is filtered out (clear filter vs surface-the-row).
+- ⟨DECIDE F-2⟩ do own-library neighbours also appear on the per-track plaque (and open the track), or stay
+  catalog-only for 1.0 (recommend catalog-only).
+- ⟨DECIDE F-3⟩ how many neighbours — **SETTLED 2026-06-25 (Alexander): up to 3, and only the close ones**
+  (high/medium proximity bucket, D-INV-26), so a distant sibling is never listed as if close (F-INV-1).
+- ⟨DECIDE F-4⟩ the distance measure for own↔own — **SETTLED 2026-06-25 (Alexander): inherit §D's straight-line
+  (⟨DECIDE D-17⟩), one geometry across the whole tool.**
+- ⟨DECIDE D-27⟩ (shared with §D.9) the own-library high/medium/low bucket boundaries — relative to the
+  library's own distance distribution, since §F has no cloud spread to borrow.
+- **Placement (P-1).** This column is the **other of the last two columns**, beside the §D.10 reference one,
+  with the same slightly-smaller font (Alexander 2026-06-25). Both are catalog-tail columns.
+
+## G. Where things live on disk — output locations, the library, and cleanup
 
 Every analysis writes files: separated stems, web-preview audio, result JSONs, the built widget. Until now those
 landed **inside the user's Ableton project folder** (a `track-coach-output/` dir next to the audio). Alexander
@@ -2196,7 +2218,7 @@ pruned run is simply absent (not a "missing measurement" to flag), and a relocat
 it always had. Cleanup operates on whole runs, never on individual measurements, so §E's per-axis honesty is
 untouched. `G-INV-13`
 
-### G.5 Decisions made (Alexander, 2026-06-30)
+### G.5 Decisions made
 
 These were the open ⟨DECIDE⟩ points; all are now settled and folded into the invariants above.
 
@@ -2213,7 +2235,7 @@ These were the open ⟨DECIDE⟩ points; all are now settled and folded into the
   the named pre-1.0 path `<audio_parent>/track-coach-output/index.json`; disclose the split only if it isn't
   found (G-INV-12).
 
-## H. Commands, library management & cleanup (1.0)
+## H. Commands, library management & cleanup
 
 The command surface a user actually types, plus the safe-cleanup commands. All destructive verbs obey §G's
 rails (dry-run by default G-INV-8; only under the configured output root G-INV-7; keep referenced + best
@@ -2352,7 +2374,7 @@ user never has to remember to save. The management verbs (`backup`, `restore`, `
   removes `backups/` (H-INV-10); plain `reset` keeps the safety net (H-INV-6). Backups capture the curated tiers
   only (keep + references), scratch excluded unless `--full` (H-INV-8).
 
-## I. The visual design system — tokens & components (1.0, 2026-07-02, Alexander's design session)
+## I. The visual design system — tokens & components
 
 **Why this exists.** The widget CSS kept drifting: the same visual role lived as several raw hex
 values, radii were ad-hoc (6/8/9/11/12), three near-identical segmented controls were maintained
@@ -2534,14 +2556,6 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 - **⟨DECIDE DS-4⟩** (s43, RECONCILED) — the category backgrounds (`_CAT_COLORS` Mix/Balance/Character) are
   categorical identity colours, LEFT as literals (like stems). Confirm this is right, or does Alexander want
   them re-derived from panels? Lean: LEAVE (they colour-code the categories).
-
-## C. (RESOLVED) Increment-1 inputs that needed Alexander's domain call
-All three original blocking ⟨DECIDE⟩ inputs are settled and shipped: (1) the dB floors — empty/don't-parse
-`STEM_EMPTY_FLOOR_DB` = −55, colour floor `STEM_COLOUR_FLOOR_DB` = −60 (§B.2); (2) the musical definition
-of **Drop** — strictly-lower predecessor, `LIFT` = 0.12, sustained-high = "Main" (§B.2, CR-5); (3) which
-stems count as significant for repetition — `significant_stems()` gate (§B.3, CR-6). The method (write SPEC
-→ product-prover → derive matrix/tests → fix code, bug → spec → test → code) is now the standing process,
-not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thresholds, flagged inline above.
 
 ## Glossary (plain-language definitions; expand it whenever a term needed explaining)
 - **red on the band strip** = high energy shown on the per-stem band strip.

@@ -1,4 +1,4 @@
-# track-coach — ARCHITECTURE (node map for the test rework)
+# track-coach — ARCHITECTURE
 
 > **Why this file exists.** livespec E-5: the test matrix is "organized by **architecture node × spec
 > fact** once the architecture doc exists." It didn't exist — the matrix was organized by SPEC section
