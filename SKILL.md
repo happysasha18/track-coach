@@ -943,3 +943,7 @@ gc / prune-versions / remove  → prune scratch or a named member; library + bes
 reset                    → wipe working state; backups/ + auto-snapshot remain; restore recovers it
 hard-reset               → wipe everything including backups; no recovery except re-analysis
 ```
+
+---
+
+*made with [live-spec](https://github.com/happysasha18/live-spec).*

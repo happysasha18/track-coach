@@ -149,3 +149,7 @@ Built on [`librosa`](https://librosa.org) (analysis), [Demucs](https://github.co
 ## License
 
 [MIT](LICENSE) © Alexander Abramovich — covers this repository's own orchestration and analysis code. Deep mode pulls in **Demucs** and **PyTorch**, which carry their own licenses; check those before any commercial or redistributive use.
+
+---
+
+*made with [live-spec](https://github.com/happysasha18/live-spec).*

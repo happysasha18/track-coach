@@ -46,3 +46,6 @@ JOURNAL.md
 # (Real data under data/ is JSON: reference_*.json, facet_confirmation.json — those stay tracked.)
 data/*.md
 /catalog.json
+
+# harness worktree/isolation state — never commit
+.claude/
