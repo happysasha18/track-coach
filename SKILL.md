@@ -946,4 +946,4 @@ hard-reset               → wipe everything including backups; no recovery exce
 
 ---
 
-*made with [live-spec](https://github.com/happysasha18/live-spec).*
+*made with [live-spec](https://github.com/happysasha18/live-spec) v1.0.9.*

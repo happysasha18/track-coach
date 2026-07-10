@@ -6,3 +6,6 @@
   (commit 6e46e71; §G G.4 dup, ARCHITECTURE §refs, dangling ids, §C label).
 - **2026-07-10-made-with-live-spec-attribution.md** — LANDED. `made with [live-spec](…)` footer added to
   README + SKILL.md (exact wording from the publish skill's floor). Committed local; PUSH HELD per host gate.
+- **2026-07-10-attribution-line-carries-pack-version.md** — LANDED. `made with [live-spec](…) v1.0.9`
+  (version folded into both footers; doubles as adoption tracker). versions.md refreshed 1.0.8→1.0.9.
+  Committed local; PUSH HELD.
