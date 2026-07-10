@@ -24,7 +24,7 @@ from it (`spec → prove → matrix → test → code`). Points still needing Al
 - [**0.** What it's for](#0-what-its-for-and-the-gap-it-had-to-close)
 - [**A.** The building blocks](#a-the-building-blocks-what-track-coach-reasons-about)
 - [**B.** The credibility layer](#b-the-credibility-layer--never-say-more-than-the-numbers-support)
-- [**C.** Increment-1 domain calls (resolved)](#c-resolved-increment-1-inputs-that-needed-alexanders-domain-call)
+- [**C.** (resolved) Increment-1 domain inputs](#c-resolved-increment-1-inputs-that-needed-alexanders-domain-call)
 - [**D.** Reference & Compare](#d-reference--compare--хочу-как-aphex-twin)
 - [**E.** Run completeness](#e-run-completeness--missing-measurements-cross-cutting--applies-to-a-b-the-catalog-incl-its-d10f-similarity-columns-d-and-f)
 - [**F.** Similar in your own library](#f-similar-in-your-own-library--the-dj-column)
@@ -1277,7 +1277,7 @@ structural holes:
 - ⟨DECIDE D-2⟩ **SETTLED 2026-07-01 (Alexander):** the aim is set **in the widget, from a dropdown**, and
   persists per-track in `localStorage` (same mechanism + file:// share-caution as `tc_view`, INV-41). Clearing
   it returns the track to plain coaching. The dropdown drives the new **aim panel** of prioritized steps
-  (§D.6.1, D-INV-31/32/33/34). Not a file the user hand-edits; not a re-run.
+  (§D.6.1, D-INV-31; the further aim-panel ids 32–34 were never defined and went with the removed feature). Not a file the user hand-edits; not a re-run.
   _(Feature REMOVED 0.9.15 → see §D.6.1 tombstone and JOURNAL 2026-07-02.)_
 - ⟨DECIDE D-5⟩ ~~does style ever need a number for the map~~ → **DROPPED 2026-06-26**: the map is gone;
   style stays a label.
@@ -1565,7 +1565,7 @@ like the own-track column). `D-INV-28`
   direction-link (`?direction=⟨name⟩` — the URL-encoded direction name, the SAME name the tab shows: one
   surface, one name), a full widget reads the parameter ONCE on load; if the reference panel renders, it
   activates that direction's tab — bars, web body and web summary artist all follow, through the same path
-  a human click takes (D-INV-36b) — and scrolls the panel into view. The view arrives Detailed via the
+  a human click takes (D-INV-36) — and scrolls the panel into view. The view arrives Detailed via the
   link's `#detailed` one-shot override (§B.15): the panel is Simple-hidden (INV-18/22), so entry MUST ride
   the override — which never writes the view store; and the parameter is never written back — clicking tabs
   afterwards leaves the URL alone (the tab stays ephemeral, D-INV-28). A name not among the shown directions
@@ -2073,18 +2073,6 @@ does: gc keeps it, never lists it as orphan. Your references are as safe as your
 never counted — the "N tracks have analysis data in project folders" number always means *your* tracks whose
 data lives outside `$HOME`, never someone else's reference album. `G-INV-16b`
 
-### G.4 One-off cleanup of pre-marker references
-
-**References analysed before the marker existed must be removed from the library by a one-off migration.** The
-guard (G-INV-18) is going-forward only: reference albums deposited before the `reference` flag existed carry no
-marker in their `run_meta.json`, so nothing distinguishes them by flag. The one-off cleanup identifies them by
-their **source-album run-dir path** (an explicit set of the known reference albums, e.g. the DeepChord / SCSI-9 /
-Venetian Snares folders under `Downloads/`) — not by the marker — and drops exactly those entries from
-`library/index.json`. It is **backup-first** (the index is copied aside before any write) and all-or-clean-report
-like every destructive command (G-INV-8/G-INV-11): it reports what it would remove, and removes nothing until
-applied. The reference run dirs themselves stay on disk (G-INV-19 keeps them for centroid regen); only the
-library *entries* are removed. `G-INV-20`
-
 ### G.1 Output never lands in the user's project folder
 
 **By default, track-coach writes nothing into the Ableton project folder — all output goes under `$HOME`.**
@@ -2234,6 +2222,18 @@ These were the open ⟨DECIDE⟩ points; all are now settled and folded into the
 - **G-4 — split history.** Seed the new shared index from the old per-folder one on the first post-move run, from
   the named pre-1.0 path `<audio_parent>/track-coach-output/index.json`; disclose the split only if it isn't
   found (G-INV-12).
+
+### G.6 One-off cleanup of pre-marker references
+
+**References analysed before the marker existed must be removed from the library by a one-off migration.** The
+guard (G-INV-18) is going-forward only: reference albums deposited before the `reference` flag existed carry no
+marker in their `run_meta.json`, so nothing distinguishes them by flag. The one-off cleanup identifies them by
+their **source-album run-dir path** (an explicit set of the known reference albums, e.g. the DeepChord / SCSI-9 /
+Venetian Snares folders under `Downloads/`) — not by the marker — and drops exactly those entries from
+`library/index.json`. It is **backup-first** (the index is copied aside before any write) and all-or-clean-report
+like every destructive command (G-INV-8/G-INV-11): it reports what it would remove, and removes nothing until
+applied. The reference run dirs themselves stay on disk (G-INV-19 keeps them for centroid regen); only the
+library *entries* are removed. `G-INV-20`
 
 ## H. Commands, library management & cleanup
 

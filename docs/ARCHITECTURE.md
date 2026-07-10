@@ -65,7 +65,7 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N7** | Parse the `.als` — tracks, MIDI/audio clips, automation envelopes, locators, metre changes; pick the render offset | `parse_als.py` | §A (arrangement), §A-metre | test_parse_als, test_offset |
+| **N7** | Parse the `.als` — tracks, MIDI/audio clips, automation envelopes, locators, metre changes; pick the render offset | `parse_als.py` | §A (arrangement, metre changes) | test_parse_als, test_offset |
 
 *Level expectation:* L0-DATA.
 
@@ -91,7 +91,7 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N12** | Widget assembly & the element grid — which panel shows per view-state × data-state | `build_widget.py` `build_html:1983` (assembly), `build_story:1802` | §4/§5 | test_widget_render, test_widget_contract |
+| **N12** | Widget assembly & the element grid — which panel shows per view-state × data-state | `build_widget.py` `build_html:1983` (assembly), `build_story:1802` | §B.14–§B.15, §E | test_widget_render, test_widget_contract |
 | **N13** | The synced player as a STATE MACHINE (play/seek/mute/solo, playhead) + CARD-CLICK NAVIGATION (s61): a card click seeks (when timecoded), opens closed ancestor `<details>`, scrolls the card's evidence-target panel into view and pulses IT (INV-48b/c/d/e); wiring stays scoped to `#recs .rec` (the map-panel note cards reuse the `.rec` class but are not recs — prover CN-8). SEAM with N15: the `ev` field in `D.recs` — N15 writes it, N13 reads it, format owned by SPEC INV-48a. + ARC→CARD BACKPOINTER (INV-49, 2026-07-05 late): a cue's click zone is its whole column on the arc canvas — `cueAt` is the one hit-test for band and column; a cue hit seeks to the cue's moment and lights its card via `flashRec`; away from cues the arc keeps plain click=seek. | `build_widget.py` `PLAYER_LOGIC:4071` (markers), card render `#recs`:3629, click wiring (post-gating block):4031, `cueAt`:3754, `flashRec`:3467 | §B.14, §B.13 INV-48b/c/d/e + INV-49a–d | test_player_logic (L2-NODE), test_headless_render (card nav + arc backpointer, L3) |
 | **N14** | The view selector as remembered state (one global view, calm first use) | `build_widget.py` `VIEW_LOGIC:3432–3444` (markers) | §B.15 | test_view_ladder (L2-NODE) |
 | **N15** | Card evidence ("based-on" line + the evidence-TARGET map: every rec key → the panel its evidence renders in, `REC_TARGET` beside `REC_BASED`, shipped as `ev` in `D.recs` — INV-48a) + the producer's read (artistic layer) + the card TEXT templates and their SCALE phrases (§B.16 INV-50, 2026-07-05 late: swing feel bands, DR ladder, tonal perceived-loudness steps — computed beside the card, one home) | `build_widget.py` `build_cards:1639`, `build_recommendations:1375`, `REC_BASED:407`, `REC_TARGET:434`, `_read_html:2335`, rec templates `"recs":233` | §B.12, §B.13 incl. INV-48a, §B.16 INV-50a–c | test_widget_render (part, incl. scale phrases), test_credibility (REC_TARGET completeness) |
@@ -113,7 +113,7 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N20** | The catalog page — one row per track (newest), signature ribbon, similarity columns, stale chip; direction links carry the one-shot entry pair `?direction=⟨enc name⟩#detailed` (writer side of the D-INV-37 seam — the reader is N17) | `catalog.py` (`_lean_cell:247`) | §6, §D10F, §F, D-INV-35, D-INV-37 (writer side) | test_catalog, test_catalog_columns |
+| **N20** | The catalog page — one row per track (newest), signature ribbon, similarity columns, stale chip; direction links carry the one-shot entry pair `?direction=⟨enc name⟩#detailed` (writer side of the D-INV-37 seam — the reader is N17) | `catalog.py` (`_lean_cell:247`) | §G, §D.10, §F, D-INV-35, D-INV-37 (writer side) | test_catalog, test_catalog_columns |
 | **N21** | Library CRUD — deposit, index.json, list/remove/prune, backup/restore, reset, gc, dereference | `library.py` | §G, §H | test_library, test_storage_relocation, test_cleanup |
 | **N22** | Run-dir versioning — timestamped run folders, resume, catalog.json per run | `run_dir.py` | §G.0 | test_storage_relocation (part) |
 
