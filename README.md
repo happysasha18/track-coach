@@ -47,7 +47,7 @@ git clone https://github.com/happysasha18/track-coach.git ~/.claude/skills/track
 bash ~/.claude/skills/track-coach/setup.sh
 ```
 
-`setup.sh` is safe to re-run — it checks each dependency (Homebrew, ffmpeg, uv, Python 3.11) and installs what's missing, printing the exact fix if anything trips. Details in [`references/install_troubleshooting.md`](references/install_troubleshooting.md).
+`setup.sh` is safe to re-run — it checks each dependency (Homebrew, ffmpeg, uv, Python 3.11), installs what's missing, and copies the `/tc` and `/tc-quick` commands into your Claude commands folder, printing the exact fix if anything trips. Details in [`references/install_troubleshooting.md`](references/install_troubleshooting.md).
 
 Then open Claude Code and either run a command:
 

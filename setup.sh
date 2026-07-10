@@ -26,6 +26,7 @@ err()  { printf "  ${RED}✗${RST} %s\n" "$*"; }
 step() { printf "\n${BOLD}── %s ──${RST}\n" "$*"; }
 
 FAILED=0
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # this repo's own dir
 
 say ""
 say "=== track-coach setup ==="
@@ -169,6 +170,23 @@ if command -v uv &>/dev/null; then
     fi
 else
     warn "uv unavailable — skipping cache warm-up."
+fi
+
+# ── Claude Code commands (/tc, /tc-quick) ───────────────────────────────────
+# The two slash-commands live in the repo and are copied into the user's Claude
+# commands folder, so a fresh clone gets /tc and /tc-quick — not just the skill.
+step "Claude Code commands (/tc, /tc-quick)"
+CMD_DIR="$HOME/.claude/commands"
+if mkdir -p "$CMD_DIR" 2>/dev/null; then
+    for c in tc tc-quick; do
+        if cp "$SKILL_DIR/commands/$c.md" "$CMD_DIR/$c.md" 2>/dev/null; then
+            ok "/$c ready  (→ $CMD_DIR/$c.md)"
+        else
+            warn "could not install /$c — you can still ask for the track-coach skill by name."
+        fi
+    done
+else
+    warn "could not create $CMD_DIR — /tc and /tc-quick unavailable; ask for the skill by name instead."
 fi
 
 # ── summary ─────────────────────────────────────────────────────────────────
