@@ -95,7 +95,8 @@ The layer a flat grid misses — these catch cross-state bugs (e.g. INV-7 = the 
 | INV-9 | The S2 preview scrubber rides the TIME-axis ribbon only (playhead `y2=RIB_H`), never the frequency strip. | `test_catalog::CatalogRowPlayer` |
 | INV-10 | S2 column count is fixed (play/scrub live inside the existing track/signature cells) ⇒ responsive column-shedding is stable. | `test_catalog::ResponsiveTable`; **browser-level** `test_headless_render::CatalogPageResponsive` (computed `display:none` of cols 9–12 below 1100px + col 3 below 880px, real viewport widths) |
 | INV-11 | The in-widget cross-version panel (`#catalog`) carries exactly the build's catalog and hides iff there are no tracks; empty/orphan build ⇒ hidden, not a false panel. | `test_widget_render::CrossVersionPanelData` |
-| INV-12 | A catalog row whose linked widget is built on an OLDER `TC_VERSION` is flagged 'stale'. The version is stored in the index entry at deposit time (`tc_version`, from the widget's embedded payload) so the check is filename-INDEPENDENT (option-b); old entries fall back to the filename, and a version that's unknown by both paths is not flagged (don't cry wolf). | `test_catalog::StaleWidgetFlag`, `test_library::StoresBuildVersion` |
+| INV-12 | A catalog row whose linked widget is built on an OLDER ANALYSIS version (`TC_ANALYSIS_VERSION`) is flagged 'stale'; the tool version (`TC_VERSION`) is the build stamp only and takes no part in the verdict, so an infra/render release never flags a row. The analysis version is stored at deposit (`tc_analysis_version`, from the widget payload). A widget deposited before stamping carries only its tool version and is judged against `TC_ANALYSIS_BASELINE_TCV` (preserving today's verdict); unknown by every path ⇒ not flagged (don't cry wolf). | `test_catalog::StaleWidgetFlag`, `test_library::StoresBuildVersion` |
+| INV-ANALYSIS-RERENDER | Raising `TC_ANALYSIS_VERSION` moves `TC_ANALYSIS_BASELINE_TCV` to the releasing tool version in lockstep, and every deposited widget is re-rendered (re-stamped) before that release; a render-only or infra release leaves the analysis version untouched. | `test_catalog::StaleWidgetFlag::test_version_constants_stay_consistent` |
 | INV-13 | `_fmt_date` formats `YYYY-MM-DD_HHMM` and never crashes on odd/multi-underscore stamps. | `test_catalog::FmtDate` |
 | INV-14 | At most ONE catalog preview plays at a time — starting a row stops any other (one shared `cur` + an unconditional `stop()` before `a.play()`). | `test_catalog::CatalogRowPlayer` |
 | INV-15 | A deposit either targets the run's real track slug or aborts (raises `DepositError`) BEFORE any write — no partial widget copy / junk index entry. Junk slug = output root, `*-output`, or a dated stamp. | `test_library::DepositAtomicity` |
@@ -241,7 +242,7 @@ element depends on (§2 data axis); where it says "—", visibility is view-only
 | signature `c-sig` | ✓ | ✓ | curves present (else dash) | ribbon (time) over 9-band tonal strip (freq) · catalog.py |
 | spec cols (bpm/key/len/LUFS/…) | ✓ | ✓ | per-metric dash if absent | INV-13 date fmt · catalog.py |
 | `mode` pill `.mode.{m}` | ✓ | ✓ | — | word+colour agree with S1 badge (INV-20) · catalog.py |
-| `stale` chip | ‡ | ‡ | linked widget < TC_VERSION | INV-12 · catalog.py |
+| `stale` chip | ‡ | ‡ | linked widget behind current analysis version | INV-12 · catalog.py |
 | `modeseg` filter / search box | ✓ | ✓ | — | client filter/sort · L-js |
 | responsive column-shed | ✓ | ✓ | — | fixed col count, progressive shed (INV-10) · catalog.py |
 | footer version | ✓ | ✓ | — | catalog.py |

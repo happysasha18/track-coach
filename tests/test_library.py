@@ -121,6 +121,28 @@ class StoresBuildVersion(unittest.TestCase):
             finally:
                 del os.environ["TRACK_COACH_LIBRARY"]
 
+    def test_analysis_version_from_widget_reads_the_embedded_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            w = Path(d) / "analysis_widget.html"
+            w.write_text('<script>const D={"version":"1.4.1","analysis_version":3,"meta":{}};</script>')
+            self.assertEqual(library.analysis_version_from_widget(w), 3)
+            w.write_text('<script>const D={"version":"1.4.1","meta":{}};</script>')  # pre-stamping widget
+            self.assertIsNone(library.analysis_version_from_widget(w))
+
+    def test_deposit_records_the_analysis_version(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"
+                w.write_text('<script>const D={"version":"1.4.1","analysis_version":1,"meta":{}};</script>')
+                entry = library.deposit_from_run(run, w, {"track": "T", "mode": "full"})
+                self.assertEqual(entry.get("tc_analysis_version"), 1)
+                idx = json.loads((library.library_root() / "index.json").read_text())
+                self.assertEqual(idx["entries"][0].get("tc_analysis_version"), 1)
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
 
 class DepositAtomicity(unittest.TestCase):
     """INV-15 / KI-6: a deposit either targets the run's real track slug or ABORTS without writing a

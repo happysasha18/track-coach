@@ -424,9 +424,13 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
       lane's character role (fold into byte-identical set) rather than show the arrangement name⟩
   - **Back-compat (F4 — widgets deposited before 0.9.22).** When `stem_display` is absent from a payload (any
     widget deposited before 0.9.22), no surface shows the raw stem key — the `disp()` fallback is `"a part"`,
-    never the raw key — and every deposited widget is **re-rendered to the current version before a release**
-    (the CLAUDE.md re-render-all rule applied as a ship precondition, so the catalog never opens a stale leaking
-    widget). `INV-STEMNAME-BACKCOMPAT`
+    never the raw key. `INV-STEMNAME-BACKCOMPAT`
+  - **Re-render-on-analysis-bump ship gate.** Every deposited widget is **re-rendered before a release when
+    the analysis version has advanced**, so the catalog never opens a widget whose numbers are behind. Raising
+    `TC_ANALYSIS_VERSION` is done in lockstep with moving `TC_ANALYSIS_BASELINE_TCV` to the releasing tool
+    version, and the re-render restamps each widget with the current `analysis_version`. A release that changes
+    only the widget render or the infrastructure leaves the analysis version untouched and needs no re-render.
+    `INV-ANALYSIS-RERENDER`
 
 ### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid)   [G18]
 Alexander (s14): *"you can run the frequency analyzer on each stem too."* We already run full spectral
@@ -2559,12 +2563,28 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 
 ## Glossary (plain-language definitions; expand it whenever a term needed explaining)
 - **red on the band strip** = high energy shown on the per-stem band strip.
-- **"stale" / outdated catalog row (INV-12)** = the widget that row links to was built on an OLDER analyzer
-  version than the one installed now (e.g. the row's widget is v0.6.2 but the tool is v0.9.1), so it may be
-  missing newer analysis (e.g. the reference read). It is NOT about the music being old — only the analysis.
-  **UI clarity fix (Alexander 2026-06-30 — "I didn't get what stale is"):** don't show the bare word "stale";
-  show a plain, self-explaining marker WITH the version, e.g. **"older analysis · v0.6.2 → re-analyse"**, so
-  the meaning + the fix are visible without hovering. The bare-jargon chip was the confusion. `INV-12`
+- **"stale" / outdated catalog row (INV-12)** = the widget that row links to was built on an OLDER
+  ANALYSIS VERSION than the one installed now, so a fresh run could produce different numbers. The analysis
+  version (`TC_ANALYSIS_VERSION`, a plain integer) advances when a change alters any value or label the widget
+  can show for the same input audio — the analysis OUTPUT — wherever in the code that change lives. Its usual
+  home is the content layers (signal analysis, project parsing, credibility/claims, reference —
+  ARCHITECTURE.md L1–L4), and a threshold or phrasing change that flips which label a track earns counts too,
+  because it changes the output. A change that only alters how a result is laid out, coloured, or phrased
+  while every value and label stays identical does not advance it, and neither does an infrastructure change
+  (storage, catalog, guardrails, tooling, docs — L6–L8). The tool version (`TC_VERSION`) stays the build stamp
+  in the footer and takes no part in the verdict. Staleness concerns only the analysis, never the age of the
+  music.
+  **The seam.** Every built widget, in any mode, embeds `analysis_version` in its payload; deposit copies it
+  onto the index entry as `tc_analysis_version`; the catalog reads THAT one field to decide the chip — one
+  owner per hop.
+  **Back-compat.** A widget deposited before analysis-version stamping carries only its tool version; its row
+  is judged against `TC_ANALYSIS_BASELINE_TCV` — the tool version of the current analysis generation — so
+  every existing row keeps exactly the verdict it has today. A re-render restamps such a widget with the
+  current `analysis_version`, so the un-stamped pool only shrinks. A row whose version is unknown by every
+  path stays unflagged (don't cry wolf).
+  **UI clarity fix (Alexander 2026-06-30 — "I didn't get what stale is"):** the chip stays plain and
+  self-explaining, showing the widget's build stamp as the recognizable marker, e.g.
+  **"older analysis · v0.6.2 → re-analyse"**, so the meaning is visible without hovering. `INV-12`
 - **drop** = a `Drop`-named scene.
 - **empty stem** = a stem below the validity floor (near-silent; omitted from per-stem analysis).
 - **Demucs label vs identity** = the raw Demucs stem name (`vocals`/`guitar`/…) is NOT the real

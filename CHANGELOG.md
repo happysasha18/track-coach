@@ -5,6 +5,22 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.5.0] — 2026-07-12
+
+### Changed
+- **Staleness now tracks the analysis, not the build number.** A catalog row was "stale" whenever its
+  widget's tool version was older than the installed one, so any release — even one that only moved storage,
+  reworked the catalog, or changed the layout — marked the whole library out of date and demanded a full
+  re-render. Staleness now reads a separate `TC_ANALYSIS_VERSION` that advances only when a change alters what
+  the analysis outputs (a value or label shown for the same input audio). The tool version (`TC_VERSION`)
+  stays the footer build stamp and no longer decides staleness. This release is exactly such an
+  infrastructure change: the library stays current with no re-render (INV-12, INV-ANALYSIS-RERENDER).
+
+### Housekeeping
+- Historical analysis output that older versions wrote next to the source audio (inside Ableton project and
+  Downloads folders) was relocated into the tool's home; the two dev/eval scripts were repointed and guarded
+  against ever rooting analysis data inside a working folder again.
+
 ## [1.4.1] — 2026-07-05
 
 ### Changed

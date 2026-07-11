@@ -426,6 +426,34 @@ class StaleWidgetFlag(unittest.TestCase):
                src_widget=f"analysis_widget_v{cur}.html", tc_version="0.0.1")
         self.assertIn('class="stale"', catalog.render_catalog_html([e]))
 
+    def test_current_analysis_version_is_not_flagged_even_with_an_older_tool_version(self):
+        # The rework's whole point: an infra/render release bumps the tool version but NOT the analysis
+        # version, so a widget carrying the CURRENT analysis version is current — even though its tool
+        # version reads older than what's installed. (Pre-rework this row was wrongly flagged stale.)
+        cur_av = catalog.build_widget.TC_ANALYSIS_VERSION
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0], src_run_dir="/r",
+               src_widget="analysis_widget_v0.0.1.html", tc_version="0.0.1", tc_analysis_version=cur_av)
+        self.assertNotIn('class="stale"', catalog.render_catalog_html([e]),
+                         "a current analysis version is not stale, whatever the tool version reads")
+
+    def test_older_analysis_version_is_flagged_even_when_the_tool_version_looks_current(self):
+        # The analysis version alone drives staleness: a widget behind it is flagged even when its tool
+        # version equals the installed one (an analysis-changing release advanced the analysis version).
+        cur_tcv = catalog.build_widget.TC_VERSION
+        old_av = catalog.build_widget.TC_ANALYSIS_VERSION - 1
+        e = _e("T", "h", "2026-01-01_0900", 1, bpm=120, arc=[0.1, 1.0], src_run_dir="/r",
+               src_widget=f"analysis_widget_v{cur_tcv}.html", tc_version=cur_tcv, tc_analysis_version=old_av)
+        html = catalog.render_catalog_html([e])
+        self.assertIn('class="stale"', html,
+                      "a widget behind the current analysis version must be flagged, current tool version or not")
+        self.assertIn("older analysis", html)
+
+    def test_version_constants_stay_consistent(self):
+        # INV-ANALYSIS-RERENDER lockstep: the baseline is a past tool version, never ahead of the installed one.
+        bw = catalog.build_widget
+        self.assertLessEqual(catalog._ver_tuple(bw.TC_ANALYSIS_BASELINE_TCV), catalog._ver_tuple(bw.TC_VERSION),
+                             "TC_ANALYSIS_BASELINE_TCV must not be ahead of TC_VERSION")
+
 
 class FmtDate(unittest.TestCase):
     """INV-13. `_fmt_date` must format a normal `YYYY-MM-DD_HHMM` stamp AND never crash on a stamp

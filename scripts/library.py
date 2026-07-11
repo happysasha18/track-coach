@@ -93,6 +93,19 @@ def version_from_widget(widget_path) -> str | None:
     return m.group(1) if m else None
 
 
+def analysis_version_from_widget(widget_path) -> int | None:
+    """The TC_ANALYSIS_VERSION the widget was built on, read from its embedded payload
+    (`"analysis_version": N`). This is what the stale check (INV-12) compares. None when the file is
+    unreadable or carries no analysis version — a widget deposited before analysis-version stamping.
+    Touches the FS."""
+    try:
+        text = Path(widget_path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    m = re.search(r'"analysis_version"\s*:\s*(\d+)', text)
+    return int(m.group(1)) if m else None
+
+
 def _age_days(deposited_at: str, now: datetime) -> float:
     try:
         dt = datetime.fromisoformat(deposited_at)
@@ -277,7 +290,8 @@ def upsert(entries, entry):
 
 # ── operations ──────────────────────────────────────────────────────────────────────────
 def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version: str,
-            stamp: str, verdict=None, mode="full", extra: dict = None, tc_version: str = None) -> dict:
+            stamp: str, verdict=None, mode="full", extra: dict = None, tc_version: str = None,
+            tc_analysis_version: int = None) -> dict:
     """Copy a built widget into the library and record it. Best-effort; returns the entry.
 
     `extra` carries the catalog fields (metrics/arc/tags/audio_sha from `run_metrics`)."""
@@ -298,8 +312,10 @@ def deposit(root: Path, *, run_dir: Path, widget_path: Path, track: str, version
              # the ORIGINAL widget filename in the run dir. The catalog opens THIS (its stems
              # live next to it), not the stem-less library copy — otherwise the player is dead.
              "src_widget": widget_path.name}
-    if tc_version:  # the build's TC_VERSION, stored so the stale check (INV-12) is filename-independent
+    if tc_version:  # the build's TC_VERSION, kept as the recognizable build stamp on the row (INV-12)
         entry["tc_version"] = tc_version
+    if tc_analysis_version is not None:  # the build's analysis version — what the stale check compares (INV-12)
+        entry["tc_analysis_version"] = int(tc_analysis_version)
     if extra:
         entry.update(extra)
     idx = load_index(root)
@@ -324,12 +340,15 @@ def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
             core = {}
     extra = run_metrics(core, meta)
     tcv = meta.get("tc_version") or version_from_widget(widget_path)  # filename-independent (KI-7)
+    av = meta.get("tc_analysis_version")
+    if av is None:
+        av = analysis_version_from_widget(widget_path)  # read it from the built payload
     return deposit(library_root(), run_dir=run_dir, widget_path=Path(widget_path),
                    track=meta.get("track") or run_dir.parent.name,
                    version=meta.get("track_version") or "",
                    stamp=run_dir.name,  # the dated folder = a stable, sortable stamp
                    verdict=meta.get("verdict"), mode=meta.get("mode", "full"), extra=extra,
-                   tc_version=tcv)
+                   tc_version=tcv, tc_analysis_version=av)
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────────────────

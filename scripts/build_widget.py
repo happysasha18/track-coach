@@ -28,7 +28,18 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.4.1"  # Track Coach analyzer version — s62: a number wears its scale — swing/DR/tonal cards carry their reference (§B.16 INV-50)
+TC_VERSION = "1.5.0"  # Track Coach analyzer version — s64: staleness split from the build stamp; INV-12 now keys off TC_ANALYSIS_VERSION, so an infra/render release no longer stales the library
+
+# Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
+# change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
+# credibility-claims / reference (ARCHITECTURE.md L1–L4). A render-only change (L5) or an infrastructure
+# change (storage / catalog / guardrails / tooling / docs, L6–L8) leaves it untouched, so the library never
+# goes stale for a change that did not touch the numbers.
+TC_ANALYSIS_VERSION = 1
+# The tool version of the current analysis generation. A widget deposited before analysis-version stamping
+# carries only its tool version; its row is judged against THIS constant (INV-12 back-compat), which is
+# frozen at the last full library re-render point so a later TC_VERSION bump can no longer move the verdict.
+TC_ANALYSIS_BASELINE_TCV = "1.4.1"
 
 # ── Reference read (§D.10.3) — axis labels + styling constants ──────────────────────────
 _AXIS_LABELS = {
@@ -2281,6 +2292,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         "story": story,
         "mode": mode,
         "version": TC_VERSION,
+        "analysis_version": TC_ANALYSIS_VERSION,  # INV-12 keys staleness off THIS, not the tool version
         "meta": meta or {},
         "verdict": _verdict_text(verdict, narrative_md),
         "catalog": catalog or None,

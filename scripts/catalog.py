@@ -315,16 +315,48 @@ def _widget_version(e):
     return m.group(1) if m else None
 
 
+def _ver_tuple(s):
+    """(major, minor, patch) for an 'X.Y.Z' string — for an ORDERED version compare. () when malformed."""
+    try:
+        return tuple(int(p) for p in str(s).split("."))
+    except (ValueError, AttributeError):
+        return ()
+
+
+def _widget_analysis_version(e):
+    """The TC_ANALYSIS_VERSION the linked widget was built on, stored in the index entry at deposit
+    (`tc_analysis_version`). None for a widget deposited before analysis-version stamping. PURE.
+    This is what the stale check compares (INV-12)."""
+    av = e.get("tc_analysis_version")
+    if isinstance(av, bool):
+        return None
+    if isinstance(av, int):
+        return av
+    if isinstance(av, str) and av.isdigit():
+        return int(av)
+    return None
+
+
 def _stale_chip(e):
-    """A self-explaining 'older analysis' marker when the row's linked widget was built on an older
-    TC_VERSION than the current one (INV-12). Shows the version in the chip text so the meaning and
-    the fix are visible without hovering (Glossary 'stale' — UI clarity fix 2026-06-30). '' when
-    current or unknown (don't cry wolf)."""
-    wv = _widget_version(e)
-    if wv and wv != build_widget.TC_VERSION:
-        return (f'<span class="stale" title="analysed on v{wv}; current is '
-                f'v{build_widget.TC_VERSION} — re-analyse to refresh">'
-                f'older analysis · v{wv} → re-analyse</span>')
+    """A self-explaining 'older analysis' marker when the row's linked widget is behind the current
+    ANALYSIS version (INV-12). A widget that stored its analysis version is compared to it directly; a
+    legacy widget (none stored) is judged by its tool-version build stamp against TC_ANALYSIS_BASELINE_TCV,
+    which reproduces the pre-rework verdict for entries deposited before stamping. The chip shows the build
+    stamp as the recognizable marker so the meaning is visible without hovering (Glossary 'stale' — UI
+    clarity fix 2026-06-30). '' when current or unknown (don't cry wolf). A render-only or infrastructure
+    release never reaches here, because it leaves the analysis version untouched."""
+    wv = _widget_version(e)                  # tool-version build stamp: the display marker + legacy fallback
+    av = _widget_analysis_version(e)
+    if av is not None:
+        stale = av < build_widget.TC_ANALYSIS_VERSION
+    elif wv:
+        stale = _ver_tuple(wv) < _ver_tuple(build_widget.TC_ANALYSIS_BASELINE_TCV)
+    else:
+        stale = False
+    if stale:
+        marker = f"v{wv}" if wv else "an older run"
+        return (f'<span class="stale" title="older analysis than the current one — re-analyse to refresh">'
+                f'older analysis · {marker} → re-analyse</span>')
     return ""
 
 
