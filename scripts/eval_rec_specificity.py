@@ -73,7 +73,8 @@ def _eval(name, d):
 
 def main(argv):
     # default deposited library tracks (use the regenerated-with-spectrum masking for Lazy if present)
-    base = Path.home() / "Desktop" / "Projects"
+    # Relocated 2026-07-12 out of ~/Desktop/Projects into the tool's home (migration-2026-07-12 dump).
+    base = Path.home() / ".track-coach" / "migrated-2026-07-12" / "Desktop" / "Projects"
     defaults = [
         ("Lazy_Sparks", base / "Lazy_Sparks/Lazy_Sparks Project/track-coach-output/Total_Reboot_Lazy_Sparks_edit2026/2026-06-20_2100"),
         ("Shared_Memories", base / "Shared Memories Folders/Shared_Memories/Shared_Memories Project/track-coach-output/Shared_Memories_2026"),

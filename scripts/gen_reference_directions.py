@@ -72,8 +72,10 @@ def album_runs(root: str) -> dict:
     return out
 
 
-# ---- reference album roots (same as reference_explorer.py) ----
-DL = H("~/Downloads")
+# ---- reference album roots ----
+# Relocated 2026-07-12 out of ~/Downloads into the tool's home so the analysis
+# output no longer sits inside the download folders (migration-2026-07-12 dump).
+DL = H("~/.track-coach/migrated-2026-07-12/Downloads")
 DEEP = DL + "/DeepChord - Auratones [2017](Soma Quality Recordings SOMA CD117 UK)/split/reenc/track-coach-output"
 CUB  = DL + "/Venetian Snares - Cubist Reggae - (2011)/track-coach-output"
 SCSI = DL + "/SCSI-9 - The Line Of Nine (2006)/track-coach-output"
