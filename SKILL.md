@@ -97,7 +97,12 @@ python3 "$SKILL_DIR/scripts/library.py" clean [--older-than DAYS] \
     [--keep-per-track N] [--track T] [--missing]        # dry-run by default; add --apply to act
 python3 "$SKILL_DIR/scripts/library.py" dereference --album-path PATH [--album-path PATH2] \
     [--apply]                                           # drop refs deposited before --reference existed
+python3 "$SKILL_DIR/scripts/library.py" alias --merge SLUG --into CANON  # same song, two filenames → one row
+python3 "$SKILL_DIR/scripts/library.py" alias --list     # show same-song merges; --remove SLUG to undo
 ```
+`alias --merge` records that two tracks are the SAME song under different filenames (a rename, a
+differently-named bounce), so the catalog shows them as ONE row (their bounces stay as versions, G-INV-23).
+It is the user's call only — never merge on your own; reversible with `alias --remove SLUG`.
 The library archives the self-contained HTML only (never stems/audio). Every `build` also
 regenerates the **global Catalog** — a standalone `~/.track-coach/library/index.html`: a flat,
 sortable, searchable table with **one row per track — its newest version** (versions grouped by audio
@@ -263,6 +268,9 @@ like a lot. So there are two depths AND a calm default view:
 Independently of mode, the widget opens in a **calm "Simple" view** (vitals +
 power curve + repeats + top-3 recs); a **Detailed** toggle reveals the rest. That toggle
 is pure client-side JS — it never recomputes or calls anything, so it's free to flip.
+In Detailed, an **"Order" control** flips the advice cards between **by urgency** (the default —
+fix first) and **by time** (the order the moments occur in the track, matching the a/b/c cues on the
+timeline); it only reorders the existing cards and its choice is remembered (INV-26).
 
 ---
 
