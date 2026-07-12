@@ -144,5 +144,53 @@ class MetreChangesFromAls(unittest.TestCase):
             )
 
 
+_TEMPO_ALS = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "tempo_changes.als"
+
+
+@unittest.skipUnless(
+    _TEMPO_ALS.exists(),
+    "tempo_changes.als fixture missing — run tests/fixtures/synthetic/make_tempo_als.py",
+)
+class TempoChangesFromAls(unittest.TestCase):
+    """Parse the tempo-automation fixture and verify arrangement tempo changes.
+
+    Ground truth: the tempo automation steps 120 → 140 → 90 BPM at beats 0, 32, 64.
+    Seconds are piecewise-integrated across the varying tempo (a constant beat_to_s would
+    drift): beat 32 lands at 16.0 s (32 beats @ 120), beat 64 at 29.71 s (+32 beats @ 140).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = tempfile.mkdtemp()
+        out = str(Path(tmp) / "result_als.json")
+        parse_als.parse_als(str(_TEMPO_ALS), out)
+        with open(out, encoding="utf-8") as f:
+            cls.result = json.load(f)
+        cls.changes = cls.result.get("tempo_changes", [])
+
+    def test_three_changes(self):
+        self.assertEqual([c["bpm"] for c in self.changes], [120.0, 140.0, 90.0])
+
+    def test_beats_ascending(self):
+        beats = [c["beat"] for c in self.changes]
+        self.assertEqual(beats, sorted(beats))
+        self.assertEqual(beats, [0.0, 32.0, 64.0])
+
+    def test_seconds_piecewise_integrated(self):
+        secs = [c["time_s"] for c in self.changes]
+        self.assertAlmostEqual(secs[0], 0.0, delta=0.05)
+        self.assertAlmostEqual(secs[1], 16.0, delta=0.05)   # 32 beats @ 120 BPM
+        self.assertAlmostEqual(secs[2], 29.71, delta=0.1)   # + 32 beats @ 140 BPM
+
+    def test_constant_tempo_yields_no_changes(self):
+        """A project with no tempo automation reports an empty tempo_changes list."""
+        tmp = tempfile.mkdtemp()
+        out = str(Path(tmp) / "r.json")
+        metre_only = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "metre_changes.als"
+        parse_als.parse_als(str(metre_only), out)
+        with open(out, encoding="utf-8") as f:
+            self.assertEqual(json.load(f).get("tempo_changes", []), [])
+
+
 if __name__ == "__main__":
     unittest.main()

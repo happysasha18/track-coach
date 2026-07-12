@@ -207,5 +207,27 @@ class CatalogPlaqueCSSContract(unittest.TestCase):
                          "align-items:baseline must not appear in .catrun — it mis-aligns the right label")
 
 
+class DisplayTempoPrefersAls(unittest.TestCase):
+    """The tempo shown to the user prefers the .als project tempo when present.
+
+    The audio-detected tempo can lock onto a subharmonic — e.g. a 134 BPM breaks track
+    reads as 89 (134 × 2/3). The producer set the project tempo in the .als, so when an
+    .als tempo is present it is authoritative; audio-detection is the fallback only.
+    """
+
+    def test_als_tempo_wins_over_subharmonic_audio(self):
+        self.assertEqual(build_widget.display_tempo(89.1, 134.0), (134.0, "als"))
+
+    def test_audio_used_when_no_als(self):
+        self.assertEqual(build_widget.display_tempo(128.0, None), (128.0, "audio"))
+
+    def test_als_present_and_matching_still_als(self):
+        self.assertEqual(build_widget.display_tempo(134.0, 134.0), (134.0, "als"))
+
+    def test_zero_or_invalid_als_falls_back_to_audio(self):
+        self.assertEqual(build_widget.display_tempo(120.0, 0), (120.0, "audio"))
+        self.assertEqual(build_widget.display_tempo(120.0, "x"), (120.0, "audio"))
+
+
 if __name__ == "__main__":
     unittest.main()

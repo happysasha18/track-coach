@@ -295,6 +295,48 @@ def parse_als(als_path: str, out_path: str):
                 })
                 _last = _sig
 
+    # ── Tempo CHANGES across the arrangement ─────────────────────────────────
+    # Like the metre changes above, Ableton stores arrangement tempo automation as a FloatEvent
+    # envelope on the MainTrack's Tempo parameter.  Read it into [{beat, time_s, bpm}], deduping
+    # consecutive equal tempos.  Seconds are integrated PIECEWISE because the tempo itself varies
+    # between breakpoints (a constant beat_to_s would drift).  Empty when the tempo is constant.
+    tempo_changes = []
+    if _main_track is not None:
+        _tempo_at = _main_track.find(".//Tempo/AutomationTarget")
+        _tempo_env = None
+        if _tempo_at is not None:
+            _tempo_auto_id = _tempo_at.get("Id")
+            for _env in _main_track.findall(".//AutomationEnvelope"):
+                _pid = _env.find("EnvelopeTarget/PointeeId")
+                if _pid is not None and _pid.get("Value") == _tempo_auto_id:
+                    _tempo_env = _env
+                    break
+        if _tempo_env is not None:
+            _beat_to_bpm = {}
+            for _ev in _tempo_env.findall("Automation/Events/FloatEvent"):
+                try:
+                    _b = float(_ev.get("Time", 0))
+                    _v = float(_ev.get("Value", bpm))
+                except (ValueError, TypeError):
+                    continue
+                if _v <= 0:
+                    continue
+                _beat_to_bpm[round(max(0.0, _b), 3)] = round(_v, 2)
+            if _beat_to_bpm:
+                _beats = sorted(_beat_to_bpm)
+                if _beats[0] > 0:                       # anchor beat 0 with the base project tempo
+                    _beat_to_bpm[0.0] = round(bpm, 2)
+                    _beats = [0.0] + _beats
+                _sec, _last_bpm = 0.0, None
+                for _i, _b in enumerate(_beats):
+                    if _i > 0:                          # accrue seconds at the PRIOR segment's tempo
+                        _sec += (_b - _beats[_i - 1]) * (60.0 / _beat_to_bpm[_beats[_i - 1]])
+                    _bpm_here = _beat_to_bpm[_b]
+                    if _bpm_here != _last_bpm:
+                        tempo_changes.append({"beat": round(_b, 2),
+                                              "time_s": round(_sec, 2), "bpm": _bpm_here})
+                        _last_bpm = _bpm_here
+
     # ── Locators / Markers ───────────────────────────────────────────────────
     markers = []
     for loc in live_set.findall(".//Locators/Locators/Locator"):
@@ -435,6 +477,7 @@ def parse_als(als_path: str, out_path: str):
     out = {
         "als_file": path.name,
         "bpm": round(bpm, 2),
+        "tempo_changes": tempo_changes,
         "time_signature": f"{ts_num}/{ts_den}",
         "time_sig_changes": time_sig_changes,
         "markers": markers,

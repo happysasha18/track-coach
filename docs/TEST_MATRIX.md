@@ -604,6 +604,9 @@ Owned by `tests/test_parse_als.py`.
 | METRE-5 | Parsing the committed synthetic .als yields `time_sig_changes` with 9/16, then 13/8, then 4/4 as ordered subsequence | `test_parse_als::MetreChangesFromAls::test_order_9_16_then_13_8_then_4_4` |
 | METRE-6 | `time_sig_changes` beats are ascending | `test_parse_als::MetreChangesFromAls::test_beats_ascending` |
 | METRE-7 | `time_sig_changes[*].time_s` ≈ beat × 60/bpm | `test_parse_als::MetreChangesFromAls::test_time_s_consistent_with_beat` |
+| TEMPO-1 | The displayed tempo prefers the `.als` project tempo when present; audio-detection is the fallback (subharmonic-safe, e.g. 134 not 89) and also fills the vitals Tempo slot | `test_widget_contract::DisplayTempoPrefersAls` |
+| TEMPO-2 | Arrangement tempo automation is parsed into `tempo_changes` [{beat, time_s, bpm}], deduped, seconds piecewise-integrated across the varying tempo; empty when the tempo is constant | `test_parse_als::TempoChangesFromAls` |
+| TEMPO-3 | `tempo_changes` reach the widget vitals (so the timeline marks them) and the base tempo fills the Tempo slot | `test_widget_render::TempoChangesReachVitals` |
 
 ## §I — Visual design system (SPEC §I → DS-INV-1…14)
 

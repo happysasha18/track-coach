@@ -91,6 +91,23 @@ def _bar_color(offset_abs: float) -> str:
     return "#e0594f"        # red — far
 
 
+def display_tempo(audio_tempo, als_tempo):
+    """The tempo shown to the user, and where it came from.
+
+    The producer sets the project tempo in the .als, so when an .als tempo is present it is
+    authoritative. Audio-detection is the fallback and can lock onto a subharmonic — a 134 BPM
+    breaks track reads as 89 (134 × 2/3) — so it never overrides a real project tempo.
+    Returns (bpm, source) where source is "als" or "audio".
+    """
+    try:
+        a = float(als_tempo) if als_tempo is not None else 0.0
+    except (TypeError, ValueError):
+        a = 0.0
+    if a > 0:
+        return (a, "als")
+    return (audio_tempo, "audio")
+
+
 def _words(offset: float) -> str:
     """Plain-English words for a signed z-offset from the direction centroid."""
     a = abs(offset)
@@ -2263,13 +2280,18 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         if hit:
             player = {"srcs": [{"name": "mix", "src": hit}], "kind": "mix"}
 
+    # Displayed tempo: the .als project tempo is authoritative when present; audio-detection is the
+    # fallback (it can lock onto a subharmonic). This also fills the vitals Tempo slot when the core
+    # analysis left vitals.tempo_bpm empty.
+    _disp_tempo, _tempo_src = display_tempo(core.get("tempo"), als.get("bpm") if als else None)
     payload = {
-        "dur": dur, "tempo": core.get("tempo"), "bins": tb,
+        "dur": dur, "tempo": _disp_tempo, "tempo_src": _tempo_src, "bins": tb,
         "sections": core.get("section_bounds_s", []),
         "arc": [{"key": k, "label": l, "col": c, "vals": v, "max": m} for k, l, c, v, m in arc_lanes],
-        "vitals": {**core.get("vitals", {}),
+        "vitals": {**core.get("vitals", {}), "tempo_bpm": _disp_tempo,
                    **({"time_sig": als.get("time_signature"),
-                       "time_sig_changes": als.get("time_sig_changes", [])} if als else {})},
+                       "time_sig_changes": als.get("time_sig_changes", []),
+                       "tempo_changes": als.get("tempo_changes", [])} if als else {})},
         "selfsim": (selfsim or {}).get("segments", []),
         "tonal_balance": core.get("tonal_balance", []),
         "stem": stem_block,
@@ -3638,7 +3660,9 @@ document.getElementById("recLegend").innerHTML=
  const items=[];
  const push=(label,val,cls,tip)=>{if(val==null||val==="")return;items.push({label,val,cls:cls||"",tip:tip||""});};
  const fmtDur=s=>{s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
- push("Tempo",(V.tempo_bpm!=null?V.tempo_bpm+" <small>BPM</small>":null),"","Detected from the audio. May differ ±1–2 from the project tempo.");
+ const tpc=(V.tempo_changes||[]).length;
+ push("Tempo",(V.tempo_bpm!=null?V.tempo_bpm+" <small>BPM</small>"+(tpc>1?` <small>+${tpc-1} change${tpc>2?"s":""}</small>`:""):null),
+   "",(tpc>1?"Project tempo from the .als — it changes mid-track; see the marks on the timeline.":(D.tempo_src==="als"?"Project tempo from the .als.":"Detected from the audio. May differ ±1–2 from the project tempo.")));
  push("Key",V.key+(V.key_conf!=null&&V.key_conf<0.5?" <small>best guess</small>":""),"",`Estimated key/scale (Krumhansl-Schmuckler on chroma). Confidence: ${V.key_conf!=null?V.key_conf:"—"}. A confidence near 0 means ambiguous/atonal.`);
  push("Length",(V.duration_s!=null?fmtDur(V.duration_s):null),"","Track length.");
  const tsc=(V.time_sig_changes||[]).length;
@@ -3781,6 +3805,12 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   if(TSC.length>1)TSC.slice(1).forEach(c=>{const x=xOf(c.time_s);
    ctx.strokeStyle="#ffd166";ctx.lineWidth=1;ctx.setLineDash([2,2]);ctx.beginPath();ctx.moveTo(x,PADT);ctx.lineTo(x,famBot());ctx.stroke();ctx.setLineDash([]);
    ctx.fillStyle="#ffd166";ctx.font="700 9px sans-serif";ctx.textAlign="center";ctx.fillText(c.sig,x,famBot()+10);});
+  // tempo changes (from the .als) — teal marks where the tempo switches; label below the metre row.
+  // Skips the base tempo; nothing drawn when the tempo is constant.
+  const TPC=(D.vitals&&D.vitals.tempo_changes)||[];
+  if(TPC.length>1)TPC.slice(1).forEach(c=>{const x=xOf(c.time_s);
+   ctx.strokeStyle="#4ec3c3";ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(x,PADT);ctx.lineTo(x,famBot());ctx.stroke();ctx.setLineDash([]);
+   ctx.fillStyle="#4ec3c3";ctx.font="700 9px sans-serif";ctx.textAlign="center";ctx.fillText(c.bpm+" bpm",x,famBot()+20);});
   ctx.fillStyle=getCss("--muted");ctx.font="10px sans-serif";ctx.textAlign="center";for(let t=0;t<=ST.dur;t+=60)ctx.fillText(fmtT(t),xOf(t),H-7);
   if(hx!=null){ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,famBot());ctx.stroke();}}
  // find a callout cue near the cursor. The cue's click zone is its whole COLUMN on the

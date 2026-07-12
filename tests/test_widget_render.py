@@ -692,5 +692,36 @@ class CardScalePhrases(unittest.TestCase):
                           f"dev {dev:+.1f}: the measured dB must stay in the sentence")
 
 
+class TempoChangesReachVitals(unittest.TestCase):
+    """The .als tempo changes flow into the widget vitals (so the timeline can mark them),
+    and the displayed tempo prefers the .als project tempo over audio-detection."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_tempo_"))
+        out = tmp / "widget.html"
+        als = {"bpm": 120, "time_signature": "4/4", "time_sig_changes": [],
+               "tempo_changes": [{"beat": 0.0, "time_s": 0.0, "bpm": 120.0},
+                                 {"beat": 32.0, "time_s": 16.0, "bpm": 140.0},
+                                 {"beat": 64.0, "time_s": 29.71, "bpm": 90.0}],
+               "markers": [], "tracks": [], "track_count": 0}
+        build_widget.build_html(_synthetic_core(), {}, None, als, str(out), "Tempo Test",
+                                build_widget.STRINGS, mode="full",
+                                narrative_md="The mix reads clear.\n\nBass is forward early.")
+        cls.html = out.read_text(encoding="utf-8")
+        cls.payload, _ = json.JSONDecoder().raw_decode(cls.html.split("const D=", 1)[1])
+
+    def test_tempo_changes_in_vitals(self):
+        tpc = self.payload["vitals"]["tempo_changes"]
+        self.assertEqual([c["bpm"] for c in tpc], [120.0, 140.0, 90.0])
+
+    def test_displayed_tempo_prefers_als_base(self):
+        self.assertEqual(self.payload["tempo"], 120.0)   # .als base, not the 123 audio-detected
+        self.assertEqual(self.payload["tempo_src"], "als")
+
+    def test_vitals_tempo_slot_filled(self):
+        self.assertEqual(self.payload["vitals"]["tempo_bpm"], 120.0)
+
+
 if __name__ == "__main__":
     unittest.main()
