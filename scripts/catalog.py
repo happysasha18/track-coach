@@ -723,6 +723,10 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     root = Path(root) if root else library.library_root()
     idx = library.load_index(root)
     entries = idx.get("entries", [])
+    # Same-song merge (G-INV-23): fold any aliased track onto its canonical slug BEFORE grouping, so
+    # two filename identities of one song collapse to a single catalog row (their bounces stay as
+    # versions). Pure copy when no aliases are set — nothing else in the pipeline changes.
+    entries = library.canonicalize_entries(entries, library.load_aliases(root))
 
     # The output root for the purposes of G-INV-14 and G-INV-16:
     # library lives at <output_root>/library/; its parent is the output root.

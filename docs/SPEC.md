@@ -1455,6 +1455,18 @@ about which direction is nearest: one geometry, drawn three ways. `D-INV-21`
   analysis" (stale tool-version) chip (INV-12) is orthogonal and unchanged. The page **subtitle counts tracks**
   (the rows shown), so the stated count matches what is on screen — never a version total larger than the
   visible rows. `D-INV-35`
+- **Same-song merge — two filenames, one row.** The catalog keys a row on the track slug, which derives
+  from the source FILENAME. So one song saved under two different names (a rename, a differently-named
+  bounce) reads as two tracks — two rows — even though D-INV-35's version-collapse is working; the split is
+  the filename, not the version logic. A user records the two as the same song with an **alias**
+  (`aliases.json`: `{alias_slug → canonical_slug}`, written by `library.py alias --merge SLUG --into
+  CANON`, reversible with `--remove`). At catalog build the entries are **canonicalised before grouping**
+  (`library.canonicalize_entries`), so the aliased identity folds onto its canonical slug: the two collapse
+  to ONE row and their distinct bounces remain as separate **versions** under it (D-INV-35 then orders them
+  newest-first as usual). The map is pure additive metadata — resolution is cycle- and depth-safe, a merge
+  into self or that would form a cycle is refused, and with no aliases the pipeline is byte-for-byte
+  unchanged. This is a user DECISION (never auto-merged): only the producer knows two filenames are one
+  song. `G-INV-23`
 - **The catalog speaks product words, never dev internals (2026-07-01).**
   A row's label is the track's human title (humanised from the file name when no authored title exists); a raw
   run-folder slug never appears as visible text anywhere on the page. A run dir that broke the

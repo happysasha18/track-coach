@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.6.3] — 2026-07-12
+
+### Added
+- **Merge one song that lives under two filenames into a single catalog row.** The library keys a track
+  on its filename, so the same song saved under two names (a rename, a differently-named bounce) showed up
+  as two rows even though same-name versions already collapse correctly. You can now tell the tool they're
+  one song: `library.py alias --merge <this-name> --into <keep-this-name>`. The two fold into one row and
+  their bounces stay listed as versions; `alias --list` shows your merges and `alias --remove <name>` undoes
+  one. It's your call only — nothing is merged automatically, since only you know two filenames are the same
+  track. With no aliases set, the catalog is exactly as before.
+
 ## [1.6.2] — 2026-07-12
 
 ### Added

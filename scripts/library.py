@@ -278,6 +278,63 @@ def save_index(root: Path, idx: dict):
     (root / "index.json").write_text(json.dumps(idx, ensure_ascii=False, indent=2))
 
 
+ALIASES_FILE = "aliases.json"
+
+
+def load_aliases(root: Path) -> dict:
+    """Read the same-song alias map ``{alias_slug: canonical_slug}`` from ``<root>/aliases.json``.
+
+    A user records that two tracks are the SAME song under different filenames (so the catalog shows
+    them as one). Returns {} when the file is absent or unreadable — aliasing is purely additive."""
+    p = Path(root) / ALIASES_FILE
+    try:
+        data = json.loads(p.read_text())
+        m = data.get("aliases", data) if isinstance(data, dict) else {}
+        return {str(k): str(v) for k, v in m.items() if k and v and str(k) != str(v)}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_aliases(root: Path, aliases: dict):
+    Path(root).mkdir(parents=True, exist_ok=True)
+    (Path(root) / ALIASES_FILE).write_text(
+        json.dumps({"aliases": {str(k): str(v) for k, v in aliases.items()}},
+                   ensure_ascii=False, indent=2))
+
+
+def resolve_alias(slug: str, aliases: dict) -> str:
+    """Follow ``slug`` through the alias map to its canonical name. Cycle- and depth-safe: a loop or
+    a chain longer than the map returns the last slug reached rather than spinning."""
+    seen = set()
+    cur = slug
+    for _ in range(len(aliases) + 1):
+        nxt = aliases.get(cur)
+        if not nxt or nxt == cur or nxt in seen:
+            break
+        seen.add(cur)
+        cur = nxt
+    return cur
+
+
+def canonicalize_entries(entries: list, aliases: dict) -> list:
+    """Return a shallow-copied entry list with each ``track`` rewritten to its canonical slug
+    (RC/same-song merge). PURE — never mutates the input entries. With an empty map it is a copy.
+
+    Grouping (``group_versions``/``newest_reps``) keys off ``track``, so canonicalising BEFORE
+    grouping collapses two filename identities into one catalog row; their distinct bounces remain
+    separate versions under that one row."""
+    if not aliases:
+        return list(entries)
+    out = []
+    for e in entries:
+        if isinstance(e, dict) and e.get("track"):
+            can = resolve_alias(e["track"], aliases)
+            if can != e["track"]:
+                e = {**e, "track": can}
+        out.append(e)
+    return out
+
+
 def forget_run(root: Path, src_run_dir) -> int:
     """Drop every library entry deposited from ``src_run_dir`` (delete its widget file too) and
     rewrite the index. Returns the count removed.
@@ -1348,6 +1405,64 @@ def _cmd_dereference(args):
           f"{len(to_keep)} left. Run dirs on disk are untouched (use `gc` to reclaim).")
 
 
+def _known_tracks(root: Path) -> set:
+    return {e.get("track") for e in load_index(root).get("entries", [])
+            if isinstance(e, dict) and e.get("track")}
+
+
+def _cmd_alias(args):
+    """Record that two tracks are the SAME song under different filenames, so the catalog shows them
+    as ONE row (their bounces merge as versions). Stored in aliases.json; reversible with --remove.
+
+    `--merge SLUG --into CANON` aliases SLUG → CANON. `--list` prints the map. `--remove SLUG` drops
+    an alias. A merge rebuilds the catalog so the effect is immediate (turnkey)."""
+    root = library_root()
+    aliases = load_aliases(root)
+
+    if args.list:
+        if not aliases:
+            print("no aliases set — every track is its own catalog row.")
+            return
+        print(f"{len(aliases)} alias(es):")
+        for a, c in sorted(aliases.items()):
+            print(f"  {a}  →  {c}")
+        return
+
+    if args.remove:
+        if args.remove not in aliases:
+            print(f"alias: '{args.remove}' is not aliased — nothing to remove.")
+            return
+        target = aliases.pop(args.remove)
+        save_aliases(root, aliases)
+        print(f"alias: removed {args.remove} → {target}; it is its own catalog row again.")
+        import catalog
+        catalog.build_catalog()
+        return
+
+    # --merge SLUG --into CANON
+    slug, canon = args.merge, args.into
+    if not slug or not canon:
+        sys.exit("alias: --merge SLUG --into CANON (both required); or --list / --remove SLUG")
+    canon = resolve_alias(canon, aliases)  # if CANON is itself an alias, point at the true canonical
+    if slug == canon:
+        sys.exit(f"alias: '{slug}' and '{canon}' resolve to the same track — nothing to merge.")
+    known = _known_tracks(root)
+    for s in (slug, canon):
+        if s not in known:
+            print(f"alias: warning — '{s}' is not a track in the library index "
+                  f"(known: {', '.join(sorted(known)) or 'none'}).", file=sys.stderr)
+    # Guard a cycle: CANON must not resolve back through SLUG.
+    probe = dict(aliases); probe[slug] = canon
+    if resolve_alias(canon, probe) == slug:
+        sys.exit(f"alias: refusing to merge — {slug} → {canon} would form a cycle.")
+    aliases[slug] = canon
+    save_aliases(root, aliases)
+    print(f"alias: {slug} → {canon}; they now share ONE catalog row (bounces become versions). "
+          f"Undo with `alias --remove {slug}`.")
+    import catalog
+    catalog.build_catalog()
+
+
 def _cmd_catalog(args):
     """Delegate to catalog.py (the view layer) so `library.py catalog` just works."""
     import catalog
@@ -1454,6 +1569,16 @@ def main():
     dr.add_argument("--apply", action="store_true",
                     help="actually drop entries after backing up index.json (default: dry-run)")
     dr.set_defaults(func=_cmd_dereference)
+
+    al = sub.add_parser("alias",
+                        help="mark two tracks as the SAME song under different filenames → one catalog row")
+    al.add_argument("--merge", default=None, metavar="SLUG",
+                    help="the track slug to fold into another (its filename identity)")
+    al.add_argument("--into", default=None, metavar="CANON",
+                    help="the canonical track slug SLUG should merge into")
+    al.add_argument("--remove", default=None, metavar="SLUG", help="drop the alias for SLUG")
+    al.add_argument("--list", action="store_true", help="list the current same-song aliases")
+    al.set_defaults(func=_cmd_alias)
     args = p.parse_args()
     args.func(args)
 
