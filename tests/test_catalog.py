@@ -276,7 +276,7 @@ class LeanCellEmptyCopy(unittest.TestCase):
 class LinkPointsAtOriginal(unittest.TestCase):
     """Where a row links to: the ORIGINAL widget in its run dir — its stems sit next to it, so the
     player plays. The deposited library copy is stem-less, so opening THAT leaves a dead player
-    (the recurring 'плеер убился' regression). `_open_href` is the shared resolver. PURE."""
+    (the recurring 'dead player' regression). `_open_href` is the shared resolver. PURE."""
 
     def test_prefers_original_widget_in_run_dir(self):
         e = {"src_run_dir": "/runs/Shared Memories/2026-06-18_0748",
@@ -328,7 +328,7 @@ class CatalogIsLocalIndex(unittest.TestCase):
 
 
 class ClickableTitleNoOpenColumn(unittest.TestCase):
-    """Sasha 2026-06-20: 'кнопка опен не нужна если сделать само название кликабл'. The track TITLE is
+    """2026-06-20: the separate open button is unnecessary once the title itself is clickable. The track TITLE is
     the link into the widget; the separate 'open' column is gone; the whole row tints on hover so it
     reads as clickable. PURE — assert on the rendered output."""
 
@@ -348,7 +348,7 @@ class ClickableTitleNoOpenColumn(unittest.TestCase):
         self.assertNotIn("open ↗", self.html, "the old 'open ↗' label must be gone")
 
     def test_row_tints_on_hover(self):
-        # Sasha 'по наводке мышкой чуть фон меняется' — the hover must actually CHANGE the row
+        # on mouse hover the background shifts slightly — the hover must actually CHANGE the row
         # background, not just exist as an empty selector. Pin that a background is set.
         self.assertRegex(self.html, r"tbody tr:hover\{background:[^}]+\}",
                          "rows must visibly change background on hover (clickable affordance)")
@@ -361,7 +361,7 @@ class ClickableTitleNoOpenColumn(unittest.TestCase):
 
 
 class ResponsiveTable(unittest.TestCase):
-    """INV-10. Sasha 2026-06-20: 'если не на полный экран таблица странно показывается'. On a narrow
+    """INV-10. 2026-06-20: when the window is not fullscreen the table displays oddly. On a narrow
     window the 11-column table must shed its least-important columns (media queries) rather than clip,
     with an overflow-scroll fallback below the smallest breakpoint. We guard the BEHAVIOUR (several
     columns are actually hidden, the last/widest one first) not the exact px breakpoints — those are

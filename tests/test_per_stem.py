@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-stem measurements core (SPEC §B.11 / CR-11, matrix INV-23..27). Pure functions, numpy-free.
 
-The credibility design Sasha insisted on: a stem only speaks when it DIVERGES from the REST of the
+The credibility design the producer insisted on: a stem only speaks when it DIVERGES from the REST of the
 track (not the full mix, which contains it), and cards earn their slot by an OBJECTIVE importance
 score — no per-track human approval. These tests pin those rules before the UI wires them.
 """
@@ -45,7 +45,7 @@ class Divergence(unittest.TestCase):
 
 
 class CandidateScore(unittest.TestCase):
-    """Objective usefulness: big · persistent · specific · non-redundant. No human approval (Sasha)."""
+    """Objective usefulness: big · persistent · specific · non-redundant. No human approval."""
     def test_fully_redundant_scores_zero(self):  # restates the mix → ~0
         self.assertEqual(bw.candidate_score(divergence=0.9, persistence=0.9,
                                             specificity=0.9, redundancy=1.0), 0.0)
@@ -133,7 +133,7 @@ class Trend(unittest.TestCase):
 
 
 class CompositeCandidates(unittest.TestCase):
-    """Cross-signal cards: a stem moving against the whole track (Sasha's composite idea)."""
+    """Cross-signal cards: a stem moving against the whole track (the composite idea)."""
     def test_stem_thins_as_track_builds(self):
         mix = {"energy": [1, 2, 3, 4, 5, 6]}
         stems = {"drums": {"density": [6, 5, 4, 3, 2, 1]}}
@@ -259,7 +259,7 @@ class CompositeTrendCalibration(unittest.TestCase):
 
 
 class BrightnessIsNotPrescriptive(unittest.TestCase):
-    """SPEC §B.11.1 (Sasha 2026-06-22): a part being brighter/darker than the rest is NOT a defect —
+    """SPEC §B.11.1 (2026-06-22): a part being brighter/darker than the rest is NOT a defect —
     the coach can't know intent (a drum fill / synth stab may be wanted), so brightness must not produce
     a prescriptive 'worth a second listen' per-stem card. It's dropped from the default prescriptive
     measures; relative brightness is descriptive / a future viz, not a per-part nudge."""
@@ -289,7 +289,7 @@ def _fake_masking(levels_db):
 
 
 class Prominence(unittest.TestCase):
-    """Near-silent stems rank BELOW louder ones (Sasha 2026-06-22): a quiet part's card earns less budget,
+    """Near-silent stems rank BELOW louder ones (2026-06-22): a quiet part's card earns less budget,
     so it sorts lower — a soft down-rank, never a drop."""
     def test_lower_prominence_scores_lower(self):
         loud = bw.candidate_score(divergence=0.8, persistence=0.8, specificity=0.5,

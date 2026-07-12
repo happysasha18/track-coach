@@ -81,7 +81,7 @@ class RenderReferenceNotesUnit(unittest.TestCase):
         self.assertIn('class="tc-rn-note"', self.vs_html)
         self.assertIn("varies sharply", self.vs_html)
 
-    # -- glyph-led layout (variant A, Alexander 2026-07-04) ---------------------
+    # -- glyph-led layout (variant A, 2026-07-04) ---------------------
     def test_direct_glyph_and_confirmed_section(self):
         """direct traits render with ★ glyph inside .rn-trait-glyph span (variant A layout).
         No trailing per-row pill — confirmed rows use glyph-led format."""
@@ -325,7 +325,7 @@ class SidePageParity(unittest.TestCase):
 class TraitSortOrder(unittest.TestCase):
     """Traits must be sorted by evidence strength: direct first (★ glyph), then indirect
     (☆ glyph), then web-only and not-measurable (collapsed into ONE muted group).
-    Variant A layout (Alexander 2026-07-04): no per-row pills."""
+    Variant A layout (2026-07-04): no per-row pills."""
 
     @classmethod
     def setUpClass(cls):

@@ -9,7 +9,7 @@ Date: 2026-07-05
 
 Command:
 ```
-cd /Users/sashaabramovich/.claude/skills/track-coach && python3 -m pytest -q 2>&1 | tail -40
+cd <track-coach repo> && python3 -m pytest -q 2>&1 | tail -40
 ```
 
 Raw output (last 40 lines):

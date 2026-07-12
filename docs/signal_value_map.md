@@ -1,7 +1,7 @@
 # Why the analysis (the "starship" map) — signals × combinations → user value
 
-Sasha's challenge (2026-06-23): *"если там 5 сигналов и в результате 10 рекомендаций, то о чём это всё?
-зачем весь звездолёт? чтобы просто очевидные сигналы ко времени привязать?"*
+The user's challenge (2026-06-23): *if there are 5 signals and they yield 10 recommendations, what is it all
+for? Why the whole starship — just to pin the obvious signals to a timeline?*
 
 This maps every recommendation the tool actually produces back to the signal(s) behind it, and sorts them
 by **how much the combination adds** over reading one meter. Grounded in the real rec keys
@@ -26,7 +26,7 @@ This is where the "same recs across tracks" / "just timestamp the obvious" feeli
 | No overall rise & fall | energy trend | one curve's slope |
 | Groove swings X ms | swing | one number; sentence identical every track |
 | Modulation stays put | modulation-rate trend | one number |
-| A part is "more compressed" | that part's dynamic range | one number (the lone-number risk Sasha named) |
+| A part is "more compressed" | that part's dynamic range | one number (the lone-number risk the user named) |
 | Tonal resonance / a band sticks out | tonal balance | one band vs the rest |
 
 → **These don't justify the starship.** Keep them as a checklist, but they must be made RELATIVE
@@ -53,8 +53,8 @@ because it reads your actual Ableton project against the rendered sound.
 into "**which** part is the outlier." Specific, per-track — this is the work that made the 3 tracks read
 differently (verified: most distinct advice-types are these + Tier B, not Tier A).
 
-## The honest answer to "зачем звездолёт"
-- If the tool only shipped **Tier A**, Sasha would be right — it'd be a meter with sentences.
+## The honest answer to "why the starship"
+- If the tool only shipped **Tier A**, the user would be right — it'd be a meter with sentences.
 - The justification is **Tier B + C**: separation + character + structure + the .als let us say things a
   meter physically cannot ("bass buries the *lead* at 290 Hz at 4:50", "you drew it to stop but it doesn't").
 - **So the next investment isn't more lone-number cards — it's more COMBINATIONS**, especially anything
@@ -64,11 +64,11 @@ differently (verified: most distinct advice-types are these + Tier B, not Tier A
 This map also IS the source for the card-evidence feature: a card's "where it came from" line should name
 its tier-B fusion ("bass × lead × 290 Hz × 4:50"), not a lone "dynamics 30.7".
 
-## The split that matters most to Sasha (2026-06-23): TECHNICAL vs ARTISTIC
-Sasha: *"есть технические штуки 'бас перекрывает лид', а есть художественные… художественное мышление,
-понимаешь?"* The technical tier is mix engineering; the ARTISTIC tier is composition — and it's the soul.
+## The split that matters most to the user (2026-06-23): TECHNICAL vs ARTISTIC
+The user: *there are technical things ("bass covers the lead"), and there are artistic ones — artistic
+thinking, you know?* The technical tier is mix engineering; the ARTISTIC tier is composition — and it's the soul.
 
-**Artistic advice we ALREADY ship (credit where due — Sasha gave these):**
+**Artistic advice we ALREADY ship (credit where due — the user gave these):**
 - Development — *what carries it vs what loops* (`stem_evolves`), *where new ideas stop* (`plateau`),
   *develops only via brightness* (`brightness`).
 - Arc / journey — *climax timing* (`climax`), *ends like it starts* (`endpoint`), *no overall rise & fall*
@@ -77,13 +77,13 @@ Sasha: *"есть технические штуки 'бас перекрывае
 - Events — *a new element enters at the end* (`late_entry`).
 - Movement — *modulation stays put* (`wobble`).
 
-**Why some went stale (Sasha: "потом это стало шаблонно"):** they fire as FIXED-template sentences — e.g.
+**Why some went stale (the user: "then it became formulaic"):** they fire as FIXED-template sentences — e.g.
 breakdown always says "the only one in the whole track", swing always says the same line. The data differs
 per track, the FRAMING is canned, so it reads identical. Artistic cards need the same relative/contextual
 treatment as everything else — speak the shape of THIS track, contrast it, don't recite a template.
 
-**The artistic GAPS Sasha wants ("было бы прикольно") — mapped to what we can compute:**
-| Idea (Sasha's words) | Have it? | What it'd take |
+**The artistic GAPS the user wants ("would be cool") — mapped to what we can compute:**
+| Idea (the user's words) | Have it? | What it'd take |
 |---|---|---|
 | **Which FORM development takes** — by density / by opening the filter / by widening stereo / by frequency range | partial — `brightness` is ONE mode | generalize: we already track density, stereo, brightness, range over time → name the dominant mode(s) and the absent ones ("you grow by brightness, barely by stereo — try widening") |
 | **Contrast vs gradient between scenes** — hard cut or smooth morph at each boundary | ❌ no | self-similarity gives the boundaries; measure how FAST the signals jump across each → label sharp-cut vs gradient |
@@ -93,13 +93,13 @@ treatment as everything else — speak the shape of THIS track, contrast it, don
 | **Consonance / dissonance development** (harmonic tension) | ❌ no | needs note/chord analysis (basic-pitch exists) — ambitious, park it |
 
 → The richest, most uniquely-artistic next moves: **name the MODE of development**, and **contrast-vs-gradient
-between scenes**. Both reuse signals we already have; both are "художественное мышление", not a meter.
+between scenes**. Both reuse signals we already have; both are artistic thinking, beyond what a meter gives.
 
 ## First artistic probe, VALIDATED across 4 tracks (2026-06-23) — "effort × felt-movement"
-Sasha's example: *"смотришь что слышно, а там дофига автоматизаций, а на выходе ноль динамики."* We read each
+The user's example: *you look at what you hear, there's a ton of automation, and the output has zero dynamics.* We read each
 project's `.als` automations, split them MACRO (volume/filter/gain = the big arc) vs MICRO (sends/timbre/
 color/mod), and paired the split with the OUTPUT movement (energy/brightness/density/stereo trend). To check
-Sasha's templating worry, ran it on 4 of his tracks (Lazy, Shared, Wobble all full; **Heater** added cheaply
+the user's templating worry, ran it on 4 of his tracks (Lazy, Shared, Wobble all full; **Heater** added cheaply
 = parse_als + analyze_core only, no Demucs — quick run dir `…/Heater_Live12 Project/track-coach-output/
 _quick_effort`, audio v0.22 + Heater_Live12.1.als):
 
@@ -111,7 +111,7 @@ _quick_effort`, audio v0.22 + Heater_Live12.1.als):
 | Heater | 42 | 14% | loud +0.14, bright +0.18, stereo −0.24, **+1 meter change** | really opens up (loud+bright) while the image narrows hard |
 
 **Result = NOT templated** — four distinct stories. **Bonus cross-track fingerprint (a real observation about
-Sasha as a producer):** macro share 9–15% on ALL four — he automates DETAIL ≫ the big arc, consistently.
+the producer):** macro share 9–15% on ALL four — he automates DETAIL ≫ the big arc, consistently.
 **Design lesson:** the effort-split ALONE would template (it's his stable style); the non-templated value is
 the FUSION "where the effort goes × which FORM the output develops in", phrased per-track. That fusion is the
 shape of the first artistic card. (Heater also surfaced a real time-signature change → the "meter" dimension

@@ -8,7 +8,7 @@ Two modes:
     points at this folder via --audio-stems-rel.
   • --audio     : a QUICK run has no stems, but it still has the mix. Encode that ONE file to
     `<out>/mix.m4a` so the widget can offer a single-track player (transport + seek), pointed at via
-    --audio-mix-rel. (Sasha 2026-06-20: "плеер какая разница быстрый прогон?" — quick gets a player.)
+    --audio-mix-rel. (2026-06-20: quick mode still gets a player.)
 
 Usage:
   python make_web_stems.py --stems-dir stems_6s [--out-dir stems_web] [--bitrate 128k]

@@ -142,7 +142,7 @@ h1 {
   text-decoration: none;
 }
 .tc-rn-sources a:hover { text-decoration: underline; }
-/* Variant A readable layout (Alexander 2026-07-04) — glyph-led confirmed rows + muted web-only group */
+/* Variant A readable layout (2026-07-04) — glyph-led confirmed rows + muted web-only group */
 .rn-section-label {
   font-size: 10px;
   font-weight: 700;

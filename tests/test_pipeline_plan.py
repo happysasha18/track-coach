@@ -97,8 +97,8 @@ class QuickMode(unittest.TestCase):
                              f"quick mode must not run {s}")
 
     def test_encodes_a_web_mix_for_the_player(self):
-        # quick has no stems but DOES compress the mix → the single-track player (Sasha 2026-06-20:
-        # "плеер какая разница быстрый прогон?"). It reuses make_web_stems.py in --audio (mix) mode,
+        # quick has no stems but DOES compress the mix → the single-track player (2026-06-20:
+        # quick mode still gets a player). It reuses make_web_stems.py in --audio (mix) mode,
         # NOT --stems-dir (there are no stems).
         i = step_index(self.lines, "make_web_stems.py")
         self.assertGreaterEqual(i, 0, "quick must encode a web mix so the widget has a player")

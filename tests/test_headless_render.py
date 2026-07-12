@@ -1,8 +1,8 @@
 """Browser-level regression tests — assert the REAL shipped artifact RENDERED.
 
-WHY this file exists (s34, Alexander EMPHATIC): the other ~660 tests assert on the
+WHY this file exists (s34, emphatic): the other ~660 tests assert on the
 HTML *string* or a node-DOM stub with NO stylesheet. Two visible bugs still shipped
-to Alexander's eyes twice in one day — the recs grid collapsed to one crooked column,
+to the user's eyes twice in one day — the recs grid collapsed to one crooked column,
 and card `<b>` leaked as `&lt;b&gt;` — because `style.display=""` "passed" with no
 CSS and card TEXT was never read, only counted. A string test cannot see layout,
 computed visibility, or escaping. These tests render the widget in headless Chrome
@@ -236,17 +236,17 @@ class RecsGridReflow(unittest.TestCase):
 
     def test_two_columns_at_alexanders_window(self):
         # 720px is THE regression width: the old `@media(max-width:760px)` rule fired
-        # here and stacked every card in one column at Alexander's ~2/3-screen window.
+        # here and stacked every card in one column at the user's ~2/3-screen window.
         # The container query must now give two columns. A test at a wide (>760px)
         # window would NOT have caught the shipped bug.
         r = hc.probe(self.widget, _COLS_JS, width=720, height=3600)
         self.assertEqual(
             r["cols"], 2,
             f"recs grid must show 2 columns at a 720px window; saw {r['cols']} "
-            "(the crooked single-column regression Alexander saw)")
+            "(the crooked single-column regression the user saw)")
 
     def test_capped_at_two_columns_when_wide(self):
-        # Alexander 2026-07-02: at a wide window the recs must stay at 2 columns, never 3 —
+        # 2026-07-02: at a wide window the recs must stay at 2 columns, never 3 —
         # a rec card wants a readable line length. The grid caps at two (was ">=3" before).
         r = hc.probe(self.widget, _COLS_JS, width=1100, height=2800)
         self.assertEqual(
@@ -260,7 +260,7 @@ class RecsGridReflow(unittest.TestCase):
             f"recs grid must reflow to 1 column when narrow; saw {r['cols']}")
 
     def test_cards_have_vertical_breathing_room(self):
-        # Alexander: the plates felt glued together. Assert a real gap between
+        # the plates felt glued together. Assert a real gap between
         # stacked cards (single-column view) — never 0.
         r = hc.probe(
             self.widget,
@@ -462,7 +462,7 @@ def _build_omitted_widget():
 class OmittedStemsAcknowledged(unittest.TestCase):
     """SPEC CR-2 (docs/SPEC.md:75) + INV-42: when separation returns near-silent stems,
     the stem panel must ACKNOWLEDGE them by name, not silently drop them. Regression
-    guard (Alexander 2026-07-02): they used to render; 0.8.1 stripped them from the draw
+    guard (2026-07-02): they used to render; 0.8.1 stripped them from the draw
     grid and no caption replaced them, so vocals/piano vanished and every string test
     (and Fable) missed it — because the tests checked the disappearance, never the
     acknowledgment. This reads the REAL rendered stem-panel text in headless Chrome."""
@@ -502,7 +502,7 @@ class OmittedStemsAcknowledged(unittest.TestCase):
                          "raw 'piano' must not appear in the omitted-stems note")
 
     def test_omitted_stems_sink_below_the_significant_ones(self):
-        # Layout (Alexander s37): an empty lane in the MIDDLE reads as a gap; the near-silent stems
+        # Layout (s37): an empty lane in the MIDDLE reads as a gap; the near-silent stems
         # must be grouped at the BOTTOM, below every stem that carries real content.
         widget = _build_omitted_widget()
         res = hc.probe(widget, "(function(){"
@@ -662,7 +662,7 @@ class RefReadEvidenceMarksRendered(unittest.TestCase):
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class RefReadBarsRendered(unittest.TestCase):
-    """D-INV-19: the per-facet signed bars (ёлочка decomposition) must physically RENDER
+    """D-INV-19: the per-facet signed bars (fir-tree decomposition) must physically RENDER
     with non-zero pixel widths in a real browser. The string tests
     (test_reference_read::ReferenceReadBars, ::ReferenceReadMostSimilarFirst) verify HTML
     structure and sort order from source — they cannot confirm that CSS percentage widths
@@ -1054,14 +1054,14 @@ class WordingInvariants(unittest.TestCase):
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class WebPanelReadableLayout(unittest.TestCase):
-    """D-INV-29 approved layout (Alexander 2026-07-04, variant A + visible sources).
+    """D-INV-29 approved layout (2026-07-04, variant A + visible sources).
 
     The shipped #webPanel must:
     (a) render glyph-led confirmed rows (★/☆ as leading glyph, not a trailing pill) — asserted
         by checking the glyph appears BEFORE the trait text in the rendered HTML of a confirmed row;
     (b) NOT render per-row 'WEB SAYS' pills — the old repeated grey pills that D-INV-29 forbids;
         all web-only traits collapse into ONE muted group, not N pills;
-    (c) show the sources block with ≥1 <a href> link (Alexander 2026-07-04 amendment: keep visible);
+    (c) show the sources block with ≥1 <a href> link (2026-07-04 amendment: keep visible);
     (d) show one footnote legend line explaining ★/☆/·.
 
     Uses _build_ref_widget() which loads bundled reference_web_notes.json (DeepChord as nearest
@@ -1133,7 +1133,7 @@ class WebPanelReadableLayout(unittest.TestCase):
 
     def test_sources_block_has_links(self):
         """Sources block must be VISIBLE at the panel bottom with ≥1 <a href> link.
-        Alexander 2026-07-04 amendment: the v2 mockup dropped the sources block; his call: keep it."""
+        2026-07-04 amendment: the v2 mockup dropped the sources block; the call: keep it."""
         r = hc.probe(
             self.widget,
             self._open_webpanel_js(
@@ -1148,7 +1148,7 @@ class WebPanelReadableLayout(unittest.TestCase):
         )
         self.assertGreater(r["visible_link_count"], 0,
                            "#webPanel must have ≥1 visible <a href> source link "
-                           "(Alexander 2026-07-04 amendment: sources block stays visible)")
+                           "(2026-07-04 amendment: sources block stays visible)")
 
     def test_footnote_legend_present(self):
         """One footnote legend must appear in #webPanel explaining ★/☆/·.
@@ -1171,12 +1171,12 @@ class WebPanelReadableLayout(unittest.TestCase):
                       ".rn-footnote must contain '★' in its text; got: " + repr(r["text"][:200]))
 
     def test_s57_section_headings_not_dimmer_than_body_and_sources_are_links(self):
-        """s57 (Alexander 2026-07-05): (a) a section heading is NEVER dimmer than the body it
+        """s57 (2026-07-05): (a) a section heading is NEVER dimmer than the body it
         heads — the `.rn-section-label` / `.tc-rn-sources-label` computed luminance must be ≥ the
         body (`.tc-rn-blurb` / `.rn-trait-row`) luminance (was `--muted` under `--ink` body — a
         brightness inversion). (b) Each source reads as a LINK: `.tc-rn-sources a` carries an
         underline AND a leading chain-link icon (inline svg.tc-rn-link-ico, the conventional
-        link glyph — replaced the ↗ arrow per Alexander 2026-07-05)."""
+        link glyph — replaced the ↗ arrow per 2026-07-05)."""
         r = hc.probe(
             self.widget,
             self._open_webpanel_js(
@@ -1216,7 +1216,7 @@ class WebPanelReadableLayout(unittest.TestCase):
 
 @unittest.skipUnless(_HAVE_CHROME, "headless Chrome not installed")
 class PanelGapHierarchy(unittest.TestCase):
-    """DS-INV-9 panel-rhythm slice (Alexander 2026-07-05 review): the gap BETWEEN top-level
+    """DS-INV-9 panel-rhythm slice (2026-07-05 review): the gap BETWEEN top-level
     panels (--rhythm) must be strictly LARGER than the gap between the sub-panels nested inside
     #evidence (--gap). This fixes the earlier INVERSION (measured 24px inter < 30px intra — the
     reverse of correct hierarchy). Measured with real getBoundingClientRect, invisible to string
@@ -1400,7 +1400,7 @@ class CatalogSemanticColourRendered(unittest.TestCase):
                             "the sibling colour must not fall back to default anchor blue")
 
 
-# ── D-INV-36 — the merged reference panel (Q5, Alexander 2026-07-05) ──────────────────────
+# ── D-INV-36 — the merged reference panel (Q5, 2026-07-05) ──────────────────────
 
 def _merged_ref_page(directions, web_notes, tmp_prefix="tc_merged_", lead_px=0):
     """Render render_reference_read() output into a standalone page for the harness.
@@ -1454,7 +1454,7 @@ def _web_note(artist):
 class MergedReferencePanel(unittest.TestCase):
     """D-INV-36 — ONE reference panel: shared selector, two nested open disclosures,
     web notes follow the selector and exist for every shown direction (SPEC §D.10.1/.2,
-    the Q5 merge, Alexander 2026-07-05). Written RED against the pre-merge render
+    the Q5 merge, 2026-07-05). Written RED against the pre-merge render
     (two top-level panels; web stuck on the top match; the forbidden empty-state copy)."""
 
     @classmethod
@@ -1567,7 +1567,7 @@ class MergedReferencePanel(unittest.TestCase):
     def test_empty_state_says_no_close_direction_yet(self):
         """(e) Directions defined but none close ⇒ the NON-expandable stub plaque with the
         one-line 'no close direction yet' prose — never the §F siblings phrase 'No similar
-        tracks' (pre-merge bug), and never anything to open (Alexander 2026-07-05)."""
+        tracks' (pre-merge bug), and never anything to open (2026-07-05)."""
         import fingerprints as FP
         def z(**over):
             d = {ax: 0.0 for ax in FP.AXES}
@@ -1591,7 +1591,7 @@ class MergedReferencePanel(unittest.TestCase):
                          "vocabulary — the pre-merge bug)")
         self.assertEqual(r.get("tag"), "DIV",
                          "the empty state is a NON-expandable stub — a plain div, never a "
-                         "<details> (D-INV-36e, Alexander 2026-07-05)")
+                         "<details> (D-INV-36e, 2026-07-05)")
         self.assertEqual(r.get("summaries"), 0, "the stub has no summary — nothing to click open")
         self.assertEqual(r.get("tabs"), 0, "the empty state renders no tabs")
         self.assertEqual(r.get("nested"), 0, "the empty state renders no nested disclosures")
@@ -1599,7 +1599,7 @@ class MergedReferencePanel(unittest.TestCase):
     def test_missing_fingerprint_renders_no_comparison_data_stub(self):
         """(e) Directions defined but the run carries NO fingerprint (an old or partial full
         run) ⇒ the same NON-expandable stub with the 'no comparison data in this run' note —
-        never a silently absent panel (D-INV-36e, Alexander 2026-07-05: the vanished panel
+        never a silently absent panel (D-INV-36e, 2026-07-05: the vanished panel
         read as a hole in the page)."""
         data_dir = Path(build_widget.__file__).resolve().parent.parent / "data"
         if not (data_dir / "reference_directions.json").exists():

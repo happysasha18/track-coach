@@ -9,7 +9,7 @@ can call a single command.
 Checks (in order):
   1. Completeness gate — tests/test_completeness_gate.py (INV-GATE / INV-45 / INV-46).
      Every user-facing panel must be POPULATED in a full browser render. A failure here
-     means a surface silently emptied — Alexander would find it by eye on the next open.
+     means a surface silently emptied — the user would find it by eye on the next open.
 
   2. Traceability checks — tests/test_traceability.py.
      Spec / matrix / tests must stay in sync: no dangling citations, no duplicate IDs,

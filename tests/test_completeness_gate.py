@@ -2,7 +2,7 @@
 
 WHY this exists: the suite had ~660+ tests that asserted specific strings or DOM stubs
 with no real browser rendering. Two classes of failure kept slipping through:
-  (a) a panel silently empties (no data wired → self-hides → Alexander notices by eye),
+  (a) a panel silently empties (no data wired → self-hides → the user notices by eye),
   (b) a catalog backpointer is dead or missing.
 The suite stayed green because no test checked whether every user-facing panel was
 POPULATED in a full-widget render.
@@ -31,7 +31,7 @@ CONVERGENCE MECHANISM (INV-46): USER_SURFACES is the single source of truth.
 Net invariant: suite green ⟺ every rendered surface is registered AND gated.
 
 INV-GATE: every user-facing panel is POPULATED in a full widget render (browser level).
-INV-45: near-silent stems auto-start muted (CR-2 APPROVED behavior, Alexander 2026-07-03).
+INV-45: near-silent stems auto-start muted (CR-2 APPROVED behavior, 2026-07-03).
 INV-46: surface registry + DOM-scan convergence mechanism.
 """
 from __future__ import annotations
@@ -966,7 +966,7 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
                         f"EMPTY SURFACE: no date in #srcmeta; got: {repr(srcmeta)}")
 
     # ── 11. (removed 2026-07-03, s49) — the #verdict "In short" headline panel was
-    #        removed at Alexander's call (repeated the cards, weight on the calm-first
+    #        removed at the user's call (repeated the cards, weight on the calm-first
     #        screen). The verdict TEXT still lives in the catalog/library listing, which
     #        is gated elsewhere. No widget panel to assert here anymore. ──────────────
 
@@ -1231,7 +1231,7 @@ class WholeArtifactCompletenessGate(unittest.TestCase):
     # ── 21. Auto-mute approved behavior (INV-45) ─────────────────────────────
 
     def test_21_auto_mute_approved_behavior(self):
-        """CR-2 / INV-45 — APPROVED BEHAVIOR (Alexander 2026-07-03): a near-silent stem's
+        """CR-2 / INV-45 — APPROVED BEHAVIOR (2026-07-03): a near-silent stem's
         lane starts MUTED on first load (avoids surprise silence on play; M/S buttons still work).
 
         Uses a variant fixture where 'other' stem has levels at -80 dB per band (broadband

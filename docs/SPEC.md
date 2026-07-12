@@ -25,7 +25,7 @@ from it (`spec → prove → matrix → test → code`). Still-open decisions ar
 - [**A.** The building blocks](#a-the-building-blocks-what-track-coach-reasons-about)
 - [**B.** The credibility layer](#b-the-credibility-layer--never-say-more-than-the-numbers-support)
 - [**C.** (resolved) Increment-1 domain inputs](#c-resolved-increment-1-inputs-that-needed-a-domain-call)
-- [**D.** Reference & Compare](#d-reference--compare--хочу-как-aphex-twin)
+- [**D.** Reference & Compare](#d-reference--compare)
 - [**E.** Run completeness](#e-run-completeness--missing-measurements-cross-cutting--applies-to-a-b-the-catalog-incl-its-d10f-similarity-columns-d-and-f)
 - [**F.** Similar in your own library](#f-similar-in-your-own-library--the-dj-column)
 - [**G.** Where things live on disk](#g-where-things-live-on-disk--output-locations-the-library-and-cleanup)
@@ -876,7 +876,7 @@ brand-new user still meets the calm screen first.*
   time — the reason a producer couldn't find it. Remembering Detailed is what makes it reliably present.
   `tags: INV-41 · D-INV-30 · D-INV-36`
 
-### B.16 A number wears its scale — «много или мало? в апельсинах»
+### B.16 A number wears its scale
 A card that headlines a raw number without a reference scale makes the producer do the calibration
 himself — "192 ms: is that a lot?" The map (`docs/signal_value_map.md`) named exactly which Tier-A cards
 read as "a meter with a sentence" for this reason, and the de-templating steer says the cure is not a
@@ -917,7 +917,7 @@ stems count as significant for repetition — `significant_stems()` gate (§B.3,
 → product-prover → derive matrix/tests → fix code, bug → spec → test → code) is now the standing process,
 not a one-time setup. Remaining ⟨DECIDE⟩ points are per-feature tuning thresholds, flagged inline above.
 
-## D. Reference & Compare — «хочу как Aphex Twin»
+## D. Reference & Compare
 
 Point track-coach at someone else's music as a *direction* you're reaching toward, see where your track
 already sits relative to it and where it goes its own way, and let that gently re-flavour the coaching you
@@ -980,10 +980,10 @@ Every term used below, defined once.
   (your track within the cloud's per-facet spread = in-zone). It is read directly in full-dimensional
   fingerprint space, never off a projection (there is no map); a per-facet drop can still read "diverge"
   even when the overall fingerprint sits near (D-INV-19).
-- **«своё» (my own)** — a facet where your track diverges from *every* **cloud** direction it's aimed at —
+- **signature** — a facet where your track diverges from *every* **cloud** direction it's aimed at —
   read as a possible voice, not an error. Reduced directions (too few members for in-zone/diverge) do NOT
-  participate: «своё» needs a real zone to be outside of, so a track aimed only at reduced directions has
-  no «своё» computed (D-INV-16).
+  participate: signature needs a real zone to be outside of, so a track aimed only at reduced directions has
+  no signature computed (D-INV-16).
 - **reduced vs full** — comparing against a small reference (track-vs-track, no cloud) vs a real cloud.
 - **the switch** — one toggle that shows/hides the reference surfaces (the §D.10 column + the plaque chip).
 - **re-flavouring** — biasing your existing cards + read toward a direction ("in the style of X").
@@ -1080,7 +1080,7 @@ Where it's stored and how you edit it is open. ⟨DECIDE D-2⟩. `tags: D-INV-4`
 **The two surfaces — the «leans toward» line and the producer's read.** The «leans toward» line (§D.10) is the
 glanceable handle: a catalog column + a Detailed plaque chip naming the nearest reference direction with a
 colour closeness cue. The producer's read opens when you click your track: "leans toward Venetian Snares", the
-in-zone/diverge read, "своё", each backed by its evidence. The producer's read is a *read* (observation), it
+in-zone/diverge read, signature, each backed by its evidence. The producer's read is a *read* (observation), it
 never becomes an action card. Both draw from the SAME full-dimensional fingerprint, so they can never
 disagree about which direction is nearest (D-INV-11). ⟨DECIDE D-13⟩ the switch's default.
 
@@ -1096,8 +1096,8 @@ if you want to lean that way." Nothing is hidden; nothing is graded.
 
 **2 — A single reference track (reduced).** You only have one scsi-9 track, not the album. That's *reduced
 mode*: no cloud, no spread, no "in-zone". You still get a straight track-vs-track read ("your track is denser
-and warmer than this one") and both are catalogued, but there's no region to be inside, so "своё" isn't
-computed — **not because you only have one direction (one CLOUD is enough for «своё», D-INV-16), but because
+and warmer than this one") and both are catalogued, but there's no region to be inside, so signature isn't
+computed — **not because you only have one direction (one CLOUD is enough for signature, D-INV-16), but because
 a reduced direction has no zone to be outside of.**
 
 **3 — Several artists, the web, and deleting a direction.** You make a direction "scsi-9 + deepchord". The
@@ -1123,7 +1123,7 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   the track's widget. `D-INV-5`
 - **Reference / compare is a FULL-run-only feature — quick mode is never referenceable** (2026-06-25:
   quick mode is not for reference). The fingerprint is per-stem; a quick (mix-only, no Demucs) run has no
-  fingerprint to place or compare, so "хочу как X", the «leans toward» line, and re-flavouring are simply **not offered**
+  fingerprint to place or compare, so "like X", the «leans toward» line, and re-flavouring are simply **not offered**
   on a quick run — shown as "full analysis only", never a half-comparison on mix axes alone.
   This is the canonical missing-by-mode case (RC-INV-7): quick never promised reference, so its absence is
   silent, not an error (it is NOT a partial-run failure under RC-INV-10). `D-INV-20`
@@ -1149,7 +1149,7 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
 - **Adding AND removing a member are symmetric** (2026-06-24, recompute-on-change): both recompute the
   direction's cloud and every dependent read, and re-stamp them. If a **removal crosses the cloud below the
   member threshold** (D-1), the direction becomes *reduced* — its dependent reads drop their in-zone/diverge
-  and «своё» content (a reduced direction has no zone to be inside, D-INV-16) rather than keeping a stale
+  and signature content (a reduced direction has no zone to be inside, D-INV-16) rather than keeping a stale
   cloud-mode verdict; if an **addition crosses up**, the in-zone/diverge read appears. A read's stamp always
   matches the member count it was computed against. `D-INV-18`
 - Every placement read carries TWO things, written together with the read so a fresh verdict never carries a
@@ -1159,16 +1159,16 @@ each read is stamped "vs scsi-9 + deepchord · 7 tracks · <date>" so a verdict 
   `D-INV-14`
 - Re-flavouring only re-orders, re-words, and may add an "on-style" note — it never adds, removes, or
   suppresses a card versus the plain view, and never changes a card's "based-on". `D-INV-15`
-- «своё» and in-zone/diverge are computed only against **cloud** directions; a reduced direction (too few
-  members for a zone) never produces an in-zone/diverge/«своё» verdict, and a track aimed only at reduced
-  directions has no «своё». `D-INV-16`
+- signature and in-zone/diverge are computed only against **cloud** directions; a reduced direction (too few
+  members for a zone) never produces an in-zone/diverge/signature verdict, and a track aimed only at reduced
+  directions has no signature. `D-INV-16`
 - Re-flavouring over several aimed-at directions is **deterministic**: a card's order rank is its strongest
   divergence across all of them (largest divergence breaks ties), so the card list has one well-defined order
   even when directions pull opposite ways. The card SET is still identical to the plain view (D-INV-15).
   Re-flavouring re-orders **within the active §B.11 sort mode** as a SECONDARY key, never a third competing
   order: in urgency mode divergence sub-sorts within each tier; in strict chronological mode (no ties) the
   re-order lever is inert and only re-word/on-style act. `D-INV-17`
-- in-zone/diverge/«своё» is a **pure function of the full-dimensional fingerprint** (per-facet spread test).
+- in-zone/diverge/signature is a **pure function of the full-dimensional fingerprint** (per-facet spread test).
   There is no projection to disagree with it — the full-dimensional verdict is the only one, and it is
   authoritative (D-INV-11). `D-INV-19`
 
@@ -1804,9 +1804,9 @@ D-INV-29 · D-INV-36`
   axis), a small signed bar places the direction's centroid at zero and **your track as an offset** (more /
   less), z-normalised so axes are comparable. You read where you overlap and where you part — "denser, but
   darker and narrower than DeepChord" — dimension by dimension, never collapsed into one number. `D-INV-30`
-- **Ordered most-similar first — the "ёлочка".** The facets where you already match the direction (small,
-  centred, green bars) lead at the top, and divergence grows downward, so the list reads as a tapering tree:
-  what overlaps first, where you part last. `tags: most-similar-first`
+- **Ordered most-similar first.** The facets where you already match the direction (small,
+  centred, green bars) lead at the top, and divergence grows downward, so the bars taper into a triangle:
+  small matched deltas at the narrow top, divergence widening toward the bottom. `tags: most-similar-first, triangular`
 - **The overall closeness is the same level/colour as the catalog** (D-INV-21/26) — one geometry shown twice;
   a short honest summary names the extremes ("closest on groove, density · furthest on brightness, stereo").
   No raw distance number on the surface (D-INV-25).
@@ -2615,5 +2615,5 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
   Simple/Detailed are view toggles within a full stemmed run, while quick is the stemless run beneath them.
   So "quick" names one thing — the stemless run and the calm view it shows — not two. **Quick is not
   referenceable** — with no stems there is no fingerprint, so §D reference/compare is full-run-only (D-INV-20).
-- _(0.9 reference-layer terms — reference direction, aspiration mapping, in-zone/diverge, «своё», mood/style
+- _(0.9 reference-layer terms — reference direction, aspiration mapping, in-zone/diverge, signature, mood/style
   read, fingerprint, the «leans toward» line — are defined once in §D.1 Terminology, not duplicated here.)_

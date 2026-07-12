@@ -14,7 +14,7 @@ import math
 MISSING = None  # the value a fingerprint carries for an axis that wasn't measured (RC-INV-1)
 
 # ⟨E-2 settled⟩ below this many shared MEASURED axes, two fingerprints aren't comparable (RC-INV-5a) —
-# a quick mix-only run (~6 axes) vs a full fingerprint shares too few ("вальс на записи птичек в саду").
+# a quick mix-only run (~6 axes) vs a full fingerprint shares too few (like matching a waltz against a recording of garden birdsong).
 # This guards against missing DATA, never against dissimilar music (two fully-measured tracks always share
 # all axes and SHOULD be compared — big divergence is the useful answer).
 MIN_SHARED_AXES = 10
@@ -53,7 +53,7 @@ def incomplete_axes(present, expected):
 
 
 def is_partial_failure(present, expected):
-    """True when a run is genuinely incomplete (should-have-measured-but-didn't) → flag 'прогон неполный'."""
+    """True when a run is genuinely incomplete (should-have-measured-but-didn't) → flag 'run incomplete'."""
     return bool(incomplete_axes(present, expected))
 
 
@@ -65,7 +65,7 @@ def per_axis_distance(a, b, min_shared=1):
     shared (RC-INV-5a: "not comparable", never a fake 0)."""
     sh = shared_axes(a, b)
     if len(sh) < min_shared:
-        return None, len(sh)                       # not comparable — caller shows "слишком мало общих"
+        return None, len(sh)                       # not comparable — caller shows "too few shared axes"
     ss = sum((a[k] - b[k]) ** 2 for k in sh)
     return math.sqrt(ss / len(sh)), len(sh)        # per-axis RMS == axis-count-fair
 

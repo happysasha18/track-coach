@@ -24,7 +24,7 @@ catalog granularity (that run was the "In short" panel removal). Nothing outstan
 - **D-25 (Simple shows the plaque chip?)** — NOT touched by this change (plaque chip is per-track widget, not
   the catalog row). Left open, unchanged.
 - No new ⟨DECIDE⟩ introduced. The strict-newest choice (design A) is RESOLVED and recorded in D-INV-35
-  (Alexander approved newest-only; strict-newest is the natural reading, surfaced in the ship report).
+  (the owner approved newest-only; strict-newest is the natural reading, surfaced in the ship report).
 
 ## Must-fix folded: none new (design was authored with the seams in view).
 ## Reconcile items handed to step 3: #2 (scroll key), #3 (sibling target), #6 (reference catalog render path).

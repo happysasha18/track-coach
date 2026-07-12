@@ -4,7 +4,7 @@
 WHY this exists:
   Rendering a widget by hand requires passing 15+ flags to build_widget.py and it's easy
   to silently omit an input — the panel then renders empty and nobody notices until
-  Alexander looks at the artifact. This script takes ONE argument (a run-dir path),
+  the user looks at the artifact. This script takes ONE argument (a run-dir path),
   auto-discovers every input that exists in that dir, loudly warns about any user-facing
   input that is ABSENT, and refuses to call the result "full" when the most important
   panels (als, notes, narrative) are missing.

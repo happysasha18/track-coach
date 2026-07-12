@@ -132,7 +132,7 @@ class SharedAxisFloor(unittest.TestCase):
         self.assertFalse(C.comparable(ten, nine))               # 9 shared -> not comparable
 
     def test_quick_vs_full_not_comparable(self):
-        # a quick mix-only run (~6 axes) against a full fingerprint shares too few — "вальс на птичек"
+        # a quick mix-only run (~6 axes) against a full fingerprint shares too few — an apples-to-oranges comparison
         quick = {f"mix{i}": 0.0 for i in range(6)}
         full = {**{f"mix{i}": 0.0 for i in range(6)}, **{f"stem{i}": 0.0 for i in range(8)}}
         self.assertFalse(C.comparable(quick, full))

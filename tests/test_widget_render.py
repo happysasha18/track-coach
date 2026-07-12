@@ -5,7 +5,7 @@ The contract tests (test_widget_contract.py) assert on the static TEMPLATE: "thi
 "the Simple CSS gates a known set". They are necessary but NOT sufficient — a widget can satisfy
 every template check and still render WRONG once real data flows through `build_html` (a lane
 dropped from the payload, the player wired to nothing, the wrong lanes shown in a view). That gap
-is exactly the recurring "charts look broken but tests are green" incident (Sasha, 2026-06-19).
+is exactly the recurring "charts look broken but tests are green" incident (2026-06-19).
 
 So here we actually RENDER a widget from a tiny synthetic fixture and assert on the OUTPUT:
   • all five Track-Story curves (energy/brightness/density/modulation/stereo) reach the payload;
@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import build_widget  # noqa: E402
 
 # What Simple must show — SETTLED in session 0b5ab53e (supersedes the older 2-lane reading):
-#   L186 "стерео или плотность тоже оставить в симпл" + L7 "в симпл недостаёт линий" ⇒ Simple =
-#   energy + brightness + density + stereo (4). L402 "общая высота для их площади должна быть меньше"
+#   L186 "keep stereo or density in Simple too" + L7 "Simple is short on lines" ⇒ Simple =
+#   energy + brightness + density + stereo (4). L402 "the overall height for their area should be smaller"
 #   ⇒ area ∝ lane count (constant per-lane height), so Simple (4) < Detailed (5). Modulation is the
 #   ONLY Detailed-only lane. Single source of truth — drift fails loud.
 EXPECTED_SIMPLE = {"energy", "brightness", "density", "stereo"}
@@ -132,7 +132,7 @@ class PerViewLaneSets(unittest.TestCase):
         self.assertIn("modulation", self.comps, "modulation curve must still exist in Detailed")
 
     def test_simple_area_is_smaller_proportional_to_lane_count(self):
-        # Sasha L402: "в симпле вью общая высота для их площади должна быть меньше." Structural fix:
+        # L402: "in the Simple view the overall height for their area should be smaller." Structural fix:
         # compLaneH is a CONSTANT (no per-view branch), so area = #lanes × compLaneH ∝ count, and
         # Simple (4 lanes) is shorter than Detailed (5). Assert the height is a single constant AND
         # that Simple's total area < Detailed's.
@@ -147,7 +147,7 @@ class PerViewLaneSets(unittest.TestCase):
 
 class BackToLibraryButton(unittest.TestCase):
     """The ← Library button must be present and pointed at the catalog when built with a back_href —
-    the recurring 'пропала кнопка бэк' was the button hidden behind a history.length gate on direct
+    the recurring 'the back button disappeared' was the button hidden behind a history.length gate on direct
     open. With an embedded href it's always there."""
 
     def test_back_href_renders_a_visible_link(self):
@@ -187,7 +187,7 @@ class PlayerIsWired(unittest.TestCase):
                           "player must be absent (not an empty shell) when there's no audio")
 
     def test_seek_keeps_playback_running(self):  # INV-33/INV-38 — wiring half; behaviour in test_player_logic
-        # 0.8.28 bug (Sasha): clicking a rec card while the track plays jumped AND stopped playback.
+        # 0.8.28 bug: clicking a rec card while the track plays jumped AND stopped playback.
         # seekTo delegates to the pure seekResult (SPEC §B.14) and resumes iff it reports resume.
         # (The resume/clamp LOGIC is exercised in node by test_player_logic; here we pin the WIRING.)
         html, _ = _render(stems=("drums", "bass"))
@@ -207,7 +207,7 @@ class PlayerIsWired(unittest.TestCase):
 
 
 class QuickRunGivesAMixPlayer(unittest.TestCase):
-    """INV-7. Sasha 2026-06-20 ("плеер какая разница быстрый прогон?"): a quick run has no stems
+    """INV-7. 2026-06-20 (quick mode still gets a player): a quick run has no stems
     but still has the mix, so it MUST get a single-track player — and be clearly badged as a quick
     read, while keeping the full Track-Story graph + structure bar (only the stem-dependent panels
     drop out)."""
@@ -240,7 +240,7 @@ class QuickRunGivesAMixPlayer(unittest.TestCase):
 
 
 class SectionLeadsReachTheBar(unittest.TestCase):
-    """The structure-bar's per-section instrument labels ('lead: …') were the thing Sasha saw missing
+    """The structure-bar's per-section instrument labels ('lead: …') were the thing seen missing
     on Fragile. They flow from self-similarity segments onto the scenes. Pin that the leads reach the
     payload's scenes — the data path whose absence went unnoticed (no test covered it)."""
 
@@ -343,7 +343,7 @@ class CrossVersionPanelData(unittest.TestCase):
 class QuickHasNoToggleButAHint(unittest.TestCase):
     """INV-3, INV-4. Session 10 (B2): a quick read has no stems, so the Simple/Detailed toggle is
     meaningless. Quick renders a hint where the toggle was, and the toggle JS bails on quick so the
-    body never enters Simple. Quick is the LADDER FLOOR (Sasha, 2026-06-20): the Evidence drawer
+    body never enters Simple. Quick is the LADDER FLOOR (2026-06-20): the Evidence drawer
     stays visible (INV-18) but recs are BRIEF — timecoded only, like the calm view — gated by a
     `body.quick` CSS rule."""
 
@@ -360,7 +360,7 @@ class QuickHasNoToggleButAHint(unittest.TestCase):
                          "the toggle must bail on quick so it uses the calm 4-lane graph + keeps evidence")
 
     def test_quick_shows_brief_timecoded_recs_only(self):
-        # ladder floor (Sasha 2026-06-20): quick shows the SAME brief recs as the calm view — the
+        # ladder floor (2026-06-20): quick shows the SAME brief recs as the calm view — the
         # timecoded ones — via a body.quick rule, never all of them. The body must carry the class.
         html, _ = _render(stems=(), mix=True, mode="quick")
         self.assertRegex(html, r"<body[^>]*\bclass=\"[^\"]*\bquick\b",
@@ -439,9 +439,9 @@ class AlsPanelsGateOnData(unittest.TestCase):
 
 
 class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
-    """Mute and solo are mutually exclusive across the WHOLE player, not just per lane (Sasha,
-    2026-06-21: same lane can't be both, AND you can't mute one stem while soloing another — "это
-    неправильно"). Muting clears every solo; soloing clears every mute → the player is always in one
+    """Mute and solo are mutually exclusive across the WHOLE player, not just per lane
+    (2026-06-21: same lane can't be both, AND you can't mute one stem while soloing another — "this
+    is wrong"). Muting clears every solo; soloing clears every mute → the player is always in one
     coherent mode. The exclusivity LOGIC is now the pure `toggleStem` helper (SPEC §B.14), exhaustively
     exercised in node by test_player_logic::PlayerStateMachine::test_one_mode_at_a_time (INV-35); here we
     pin that the lane handler WIRES the toggle through it for both controls."""
@@ -463,7 +463,7 @@ class SoloAndMuteAreMutuallyExclusive(unittest.TestCase):
 
 
 class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
-    """Sasha 2026-06-22 (NOT critical, don't lose it): the header shows the AUDIO source — when an
+    """2026-06-22 (NOT critical, don't lose it): the header shows the AUDIO source — when an
     .als project is part of the run it must be shown TOO (symmetry), and a very long path must stay
     readable (wrap / middle-ellipsis + full value on hover), not overflow ugly on one line.
     PROPOSED — TEST_MATRIX INV-29 (symmetry) + INV-30 (readability). The display already wires both

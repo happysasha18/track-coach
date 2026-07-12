@@ -1,7 +1,7 @@
 # Rec specificity eval — template vs per-stem (NEXT_STEPS #2)
 
 **Date:** 2026-06-22 (session 15). **Tool:** `scripts/eval_rec_specificity.py` (reproducible).
-**Hypothesis (Sasha, NEXT_STEPS #2):** per-stem-derived recommendations are more INDIVIDUAL than the old
+**Hypothesis (the user, NEXT_STEPS #2):** per-stem-derived recommendations are more INDIVIDUAL than the old
 fixed-template catalogue — fewer generic cards, more cards that name a specific part / time / frequency.
 
 **Method.** On each track's REAL analysis, build the recommendations twice on the *same* data:

@@ -104,7 +104,7 @@ sortable, searchable table with **one row per track — its newest version** (ve
 sha256; D-INV-35); per-row **signature** = spectral ribbon over a 9-band tonal strip, fully visible by tap +
 mood/style tags + BPM/key/length/LUFS + the delta vs the prior version; "open →" into each widget. Older
 versions are NOT separate catalog rows — they live in the per-widget **Library** panel below. Show it to
-Sasha with `library.py catalog --open` (opens a new window). This is separate from the in-widget
+the user with `library.py catalog --open` (opens a new window). This is separate from the in-widget
 **Library** panel (the per-widget cross-version catalog rendered at the bottom of each widget, which lists
 every version).
 

@@ -108,7 +108,7 @@ class ReferenceReadHeader(unittest.TestCase):
 
     def test_header_direction_name_uses_neutral_colour(self):
         """'Leans toward <Name>' must use the neutral accent (var(--wob)), NOT the green/amber level hex.
-        Alexander 2026-07-02: level colour on the header confused when chip and bar colours already
+        2026-07-02: level colour on the header confused when chip and bar colours already
         carry the per-facet signal; the header just names which direction, order carries rank."""
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES},
@@ -127,7 +127,7 @@ class ReferenceReadHeader(unittest.TestCase):
 
     def test_header_direction_name_not_amber_for_mid(self):
         """'Leans toward <Name>' must not use amber (#d8932a) even when the nearest lean is MID.
-        Alexander 2026-07-02: header uses neutral var(--wob) regardless of closeness level."""
+        2026-07-02: header uses neutral var(--wob) regardless of closeness level."""
         dirs = {"Near": _zfp(tempo=0.5), "Mid": _zfp(tempo=4.0), "Far": _zfp(tempo=9.9)}
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES},
@@ -159,14 +159,14 @@ class ReferenceReadHeader(unittest.TestCase):
                              "(D-INV-22 vocabulary — the pre-merge bug)")
             self.assertNotIn("<details", html,
                              "the empty state is a NON-expandable stub — a plain div, never "
-                             "a <details> (D-INV-36e, Alexander 2026-07-05)")
+                             "a <details> (D-INV-36e, 2026-07-05)")
             self.assertIn('id="refPanel"', html,
                           "the stub keeps the #refPanel id (Simple-hide + entry-JS inertness)")
 
     def test_missing_fingerprint_with_directions_shows_stub(self):
         """D-INV-36e — directions defined but the run has NO fingerprint (an old or partial
         full run): the panel's place gets the non-expandable 'no comparison data' stub, never
-        silence (Alexander 2026-07-05: the vanished panel read as a hole)."""
+        silence (2026-07-05: the vanished panel read as a hole)."""
         data_dir = Path(build_widget.__file__).resolve().parent.parent / "data"
         if not (data_dir / "reference_directions.json").exists():
             self.skipTest("reference_directions.json absent — reference feature not set up")
@@ -228,7 +228,7 @@ class ReferenceReadBars(unittest.TestCase):
 
     def test_header_uses_domain_language_not_direction_jargon(self):
         """The #refRead header speaks in producer terms, never the internal 'direction'
-        centroid jargon (domain-language rule, Alexander 2026-07-03; reword s47). Both the
+        centroid jargon (domain-language rule, 2026-07-03; reword s47). Both the
         populated and empty summaries share ONE name (one surface = one name)."""
         self.assertIn("You vs your closest match", self.html,
                       "the #refRead summary must use the domain header")
@@ -305,8 +305,8 @@ class ReferenceReadSummaryLine(unittest.TestCase):
 
 
 class ReferenceReadMostSimilarFirst(unittest.TestCase):
-    """Rows are ordered most-SIMILAR first — the 'ёлочка': matched/green rows lead, divergence
-    grows downward (Alexander 2026-07-02, reverses the old most-divergent-first order)."""
+    """Rows are ordered most-SIMILAR first — the 'fir-tree': matched/green rows lead, divergence
+    grows downward (2026-07-02, reverses the old most-divergent-first order)."""
 
     def test_divergence_grows_downward_most_divergent_is_last(self):
         # Two divergent axes: brightness (biggest) and tempo (second); every other axis is matched
@@ -320,13 +320,13 @@ class ReferenceReadMostSimilarFirst(unittest.TestCase):
         # (split on the panel div, NOT bare data-didx which the tab buttons also carry)
         first_panel = html.split('class="refpanel" data-didx="1"')[0]
         labels = re.findall(r'class="refread-label">([^<]+)<', first_panel)
-        self.assertTrue(len(labels) >= 3, "need ≥3 axes to test the ёлочка ordering")
+        self.assertTrue(len(labels) >= 3, "need >=3 axes to test the triangular ordering")
         self.assertEqual(labels[-1], "Brightness",
                          f"most-divergent axis (Brightness) must sit LAST; got {labels[-1]}")
         self.assertEqual(labels[-2], "Tempo",
                          f"second-most-divergent (Tempo) must sit just above it; got {labels[-2]}")
         self.assertNotIn(labels[0], ("Brightness", "Tempo"),
-                         "a matched (green) axis must LEAD the ёлочка, not a divergent one")
+                         "a matched (green) axis must LEAD the triangular order (small deltas at the top)")
 
 
 class ReferenceReadTabSelector(unittest.TestCase):
@@ -380,7 +380,7 @@ class ReferenceReadTabSelector(unittest.TestCase):
 
     def test_nearest_tab_not_level_coloured(self):
         """Direction chips/tabs must NOT carry the green/amber/red level colour.
-        Similarity is not normalizable to a meaningful scale (Alexander 2026-07-02):
+        Similarity is not normalizable to a meaningful scale (2026-07-02):
         order (nearest-first) carries the rank; only the active chip is highlighted
         via .reftab.active CSS — no per-chip level colour hex in the button markup."""
         dirs = {"Near": _zfp(tempo=0.1), "FarDir": _zfp(tempo=9.0)}
@@ -952,7 +952,7 @@ class WebPanelRichRendering(unittest.TestCase):
 
     def test_nosay_row_appears_for_none_tier(self):
         """A none-tier trait must appear in the muted web-only group — never silently dropped (⟨D-30⟩).
-        Variant A (Alexander 2026-07-04): web-only traits collapse into ONE muted group with
+        Variant A (2026-07-04): web-only traits collapse into ONE muted group with
         a 'Web describes these' heading, not individual per-row pills."""
         html = self._rich_html()
         self.assertIn("odd time signatures", html,
@@ -965,7 +965,7 @@ class WebPanelRichRendering(unittest.TestCase):
         the static `tier` field from the JSON entry — no centroid-Z dynamic re-sorting.
         A trait with tier='direct' always renders in the confirmed section (★ glyph row),
         regardless of whether the current track's centroid agrees.
-        Variant A (Alexander 2026-07-04): direct traits use glyph-led rows, not pills."""
+        Variant A (2026-07-04): direct traits use glyph-led rows, not pills."""
         html = self._rich_html()
         self.assertIn("bright highs", html,
                       "contradicted direct phrase must still appear in the panel")

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Widget STRUCTURE / CSS-gating contract — asserted on the RENDERED OUTPUT, not the template.
 
-Why this file exists, and why it changed (Sasha, 2026-06-20): we kept breaking the suite because
+Why this file exists, and why it changed (2026-06-20): we kept breaking the suite because
 these checks used to scrape the module-level `build_widget.TEMPLATE` string and pin exact CSS/JS
 tokens (`a.open{…border…}`, `compLaneH=\\d+`, the `SIMPLE_LANES` array). That made cosmetic edits
-fail tests even when the rendered widget was perfect ("проверил в темплейте, но не в HTML"). The fix:
+fail tests even when the rendered widget was perfect ("checked in the template, while the HTML went unchecked"). The fix:
 assert on the HTML this skill actually SHIPS — render one widget and inspect its output.
 
 Division of labour (no more duplication):
@@ -106,7 +106,7 @@ class SimpleViewGating(unittest.TestCase):
     incident was panels (player, read) silently CSS-hidden in Simple while their data still shipped."""
 
     def test_gated_set_is_exactly_the_known_four(self):
-        # INV-18 (Sasha, 2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
+        # INV-18 (2026-06-20): the Evidence drawer is ALWAYS visible — Simple no longer hides it.
         # Simple hides ONLY: the demux stem viz (#stemlanes + #seqKey), the recs panel filtered to
         # non-timecoded cards (#recs), and the merged reference panel (#refPanel — §D.10/D-INV-36,
         # ONE container rule since the s58 merge; nested #refRead/#webPanel hide with it).
@@ -164,7 +164,7 @@ class ModeLabel(unittest.TestCase):
 
 
 class ModeBadge(unittest.TestCase):
-    """Sasha 2026-06-20: the run mode must be unmistakable ON THE PAGE — a badge near the brand, and
+    """2026-06-20: the run mode must be unmistakable ON THE PAGE — a badge near the brand, and
     on a quick read a one-line explainer of what a full run adds. (The catalog carries it too, via the
     MODE column.) HTML above is a FULL render; render a quick one here for the quick case."""
 

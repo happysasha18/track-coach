@@ -1,6 +1,6 @@
 # Wish addendum: the made-with line carries the pack version
 
-Source: Alexander's word, 2026-07-10 (~17:53 prompt), carried from the live-spec window.
+Source: the owner's word, 2026-07-10 (~17:53 prompt), carried from the live-spec window.
 Follow-up to the earlier attribution wish (swept from this inbox already).
 
 His addition: the attribution line names the version — it doubles as the adoption tracker.

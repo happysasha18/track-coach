@@ -5,11 +5,12 @@ Two groups:
   FragileMeterChanges — disk-gated integration test; skipped when the .als is absent
                         (CI-safe, mirrors the Lazy Sparks pattern in test_reference_read.py).
 
-Ground truth (from Alexander's Ableton screenshot):
+Ground truth (from the producer's Ableton screenshot):
   Fragile_Live12.1.1_minimal.als metre changes around bars 369-392:
   9/16 → 13/8 → 13/8 → 4/4
 """
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -18,11 +19,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import parse_als  # noqa: E402
 
-# Disk path — skipped in CI/other machines where the file is absent
-FRAGILE_MINIMAL = (
-    Path.home()
-    / "Desktop/Projects/Fragile_Live12.1.1 Project/Fragile_Live12.1.1_minimal.als"
-)
+# Disk-gated integration fixture: point TC_TEST_ALS at a real .als to run the metre-change test.
+# Absent (the default on CI and any other machine) → the FragileMeterChanges test is skipped.
+FRAGILE_MINIMAL = Path(os.environ.get("TC_TEST_ALS") or "/nonexistent/fragile.als")
 
 
 class TimeSigDecoder(unittest.TestCase):
@@ -82,7 +81,7 @@ class TimeSigDecoder(unittest.TestCase):
 class FragileMeterChanges(unittest.TestCase):
     """Disk-gated: parse the minimal .als and verify metre changes.
 
-    Ground truth (Alexander's Ableton screenshot, bars 369-392):
+    Ground truth (the producer's Ableton screenshot, bars 369-392):
         9/16 → 13/8 → (13/8) → 4/4
     The assertions check that 9/16, 13/8, 4/4 appear IN THAT ORDER as a
     subsequence of time_sig_changes[*].sig — dedup of consecutive identical

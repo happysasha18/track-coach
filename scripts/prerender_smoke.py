@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Standing pre-render smoke — the last gate before a widget is shown to Alexander.
+"""Standing pre-render smoke — the last gate before a widget is shown to the user.
 
 WHY this exists (s36): PART 1 of the test overhaul added a browser harness + first
-render tests; the two bugs that shipped to Alexander's eyes twice in one day (a
+render tests; the two bugs that shipped to the user's eyes twice in one day (a
 crooked one-column recs grid, card `<b>` leaking as `&lt;b&gt;`) are exactly the
 class a string test cannot see. This smoke renders a REAL widget in headless Chrome
 and asserts the four things a human notices FIRST when a render is broken:
@@ -18,7 +18,7 @@ called both by the suite (tests/test_headless_render.py::PreRenderSmoke) and by 
 Ship-checklist use:
   python scripts/prerender_smoke.py <freshly-built-widget.html>
   # exit 0 = clean; exit 1 = one or more failures printed. Run it on a REAL render
-  # before showing Alexander (per the "show real, batched, verified" rule).
+  # before showing the user (per the "show real, batched, verified" rule).
 Run with no path to smoke a synthetic rich widget (self-test of the render path).
 """
 from __future__ import annotations

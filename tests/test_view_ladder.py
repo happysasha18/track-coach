@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """View-ladder monotonicity (INV-19) + the CSS gating contract that realises it (INV-22).
 
-Why this file exists (Sasha, session 12, 2026-06-20): the recurring Simple/Detailed regression
+Why this file exists (session 12, 2026-06-20): the recurring Simple/Detailed regression
 (memory track-coach-graph-regression) was fixed element-by-element (INV-3 recs, INV-4 lanes, INV-18
 evidence), but the LADDER ITSELF — `quick ⊆ full-Simple ⊆ full-Detailed`, each tier adds — was never
 pinned as one property. So a NEW element added to Simple but forgotten in Detailed, or shown in quick

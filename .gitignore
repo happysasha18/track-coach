@@ -52,3 +52,5 @@ data/reference_album_roots.json
 
 # harness worktree/isolation state — never commit
 .claude/
+# live-spec pack state (personal profile + checkpoints) — local harness config, not product; never commit
+.live-spec/

@@ -5,6 +5,16 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.5.1] — 2026-07-12
+
+### Housekeeping
+- **The whole repository reads for all users now.** The spec, skill card, changelog, tests, and code
+  comments used to carry one person's name and Russian process-notes; they now state each requirement and
+  reason impersonally, in English. The two dev/eval scripts and one integration test no longer hardcode a
+  personal path — inputs come from a config or an env var (`TC_TEST_ALS` gates the Ableton metre-change
+  test, skipped when unset). Personal working notes stay in the local-only diaries. The analyzer is
+  unchanged, so nothing goes stale and the library needs no re-render.
+
 ## [1.5.0] — 2026-07-12
 
 ### Changed
@@ -24,7 +34,7 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newe
 ## [1.4.1] — 2026-07-05
 
 ### Changed
-- **Three advice cards now say whether their number is a lot — «в апельсинах».** A raw figure without
+- **Three advice cards now say whether their number is a lot — in relatable terms.** A raw figure without
   a reference made the producer do the calibration himself. The swing card now frames the measured
   offset as a feel — a gentle human push / a hard, unmistakably human swing / loose to the point of
   broken-beat — while naming the machine-tight window (~25–30 ms); the dynamic-range card puts the
@@ -68,7 +78,7 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newe
   was close. Both cases now show one non-expandable stub plaque in the panel's place — the panel
   title plus a short muted note naming the reason: "no close direction yet", "no comparison data
   in this run — re-run the analysis…", or "can't compare yet". A silently missing panel read as a
-  hole in the page (Alexander 2026-07-05). Spec: D-INV-36e; browser + unit tested.
+  hole in the page (2026-07-05). Spec: D-INV-36e; browser + unit tested.
 
 ## [1.2.0] — 2026-07-05
 
@@ -86,7 +96,7 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newe
 ### Added
 - **One reference panel.** "You vs your closest match" and "What the web says about ⟨artist⟩" merged into a
   single panel: the direction selector on top, then two open sub-sections — the measured facet-by-facet read
-  ("What the numbers show") and the web notes — built like the Evidence drawer (Alexander's screenshot
+  ("What the numbers show") and the web notes — built like the Evidence drawer (from the screenshot
   annotation, 2026-07-05).
 - **The web notes follow the selector.** Switching direction now switches BOTH the measured bars and the web
   notes (before, the web panel stayed stuck on the top match — bars could say DeepChord while the web notes
@@ -105,7 +115,7 @@ The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newe
 ### Improved
 - **Source links use the conventional chain-link icon.** The web-panel "Sources" list — and the catalog's
   "Open" links — now lead with the standard link glyph (an inline SVG) instead of a `↗` arrow, and are
-  underlined, so they read unmistakably as clickable links. (Alexander's review: the arrow read as the
+  underlined, so they read unmistakably as clickable links. (Review feedback: the arrow read as the
   wrong, ugly icon.)
 - **Panel spacing hierarchy fixed.** The gap between separate top-level panels is now clearly larger than
   the gap between sub-panels nested inside the Evidence drawer — a two-role spacing split (`--gap` within a
@@ -300,7 +310,7 @@ place, so the product ships whole and every user-facing surface is guarded again
 ## [0.9.17] — 2026-07-02
 
 ### Changed
-- **Design system, part 1 — one colour source, consistent text greys.** Started vivifying Alexander's
+- **Design system, part 1 — one colour source, consistent text greys.** Started vivifying the
   design-session decisions into the code. The catalog palette had quietly drifted from the widget on two
   colours; it's now re-synced to one source. The tangle of near-identical off-white text colours is
   collapsed to a clean 3-step ladder (`--ink` / `--ink-dim` / `--muted`), and a couple of stray hardcoded
@@ -1002,9 +1012,9 @@ disappears in a heavier one.
 
 ### Changed
 - **Callout cards under the graph**: Simple shows the first 3 (calm), Detailed shows all
-  (Sasha: "more in Detailed"). CSS cap on `#storyCues` in Simple only.
+  (the user asked for more in Detailed). CSS cap on `#storyCues` in Simple only.
 - **Tonal balance moved OUT of the Evidence drawer** into a standalone panel, placed last before
-  the collapsible — always visible in both views (Sasha: "it's neat"). The Evidence drawer is
+  the collapsible — always visible in both views (the user's call — it reads neat). The Evidence drawer is
   now arrangement + automation + stem↔track map + rhythm + transcribed notes (no tonal).
 - Default view confirmed Simple. Tests 60 → 61.
 
@@ -1026,7 +1036,7 @@ disappears in a heavier one.
 ## [0.6.8] — 2026-06-19
 
 ### Changed
-- **View toggle, corrected to what Sasha actually asked for** (see JOURNAL): the **demux/per-stem
+- **View toggle, corrected to what the user actually asked for** (see JOURNAL): the **demux/per-stem
   visualisation** (`#stemlanes` + its key) is now **Detailed-only** — hidden in Simple — while the
   play/seek transport stays usable in both. The Track-Story component lanes: **Simple = 2 full-size
   (Energy + Brightness), Detailed = all 5**. (0.6.7 had set 3/5 on a wrong reading of the history.)

@@ -17,10 +17,10 @@
 #   f. tests-present   → code touched ⇒ a test touched (scripts/guardrails.py check 3).
 #
 # Emergency escape (documented, loud): TC_PUSH_SKIP_GATE=1 git push
-#   — prints a red banner; use only when Alexander explicitly says to ship around the gate.
+#   — prints a red banner; use only when the owner explicitly says to ship around the gate.
 #
 # NOTE the human gate is NOT automated here on purpose: track-coach never pushes without
-# Alexander's explicit OK. A hook can't verify a conversation — the rule lives in
+# the owner's explicit OK. A hook can't verify a conversation — the rule lives in
 # .live-spec/profile.md and NEXT_STEPS; this hook guards the MACHINE-checkable part.
 
 set -uo pipefail
@@ -31,7 +31,7 @@ cd "$REPO_ROOT"
 if [ "${TC_PUSH_SKIP_GATE:-0}" = "1" ]; then
   echo "!!=============================================================!!"
   echo "!!  TC_PUSH_SKIP_GATE=1 — PUSH GATE BYPASSED. This must have   !!"
-  echo "!!  been Alexander's explicit call. Log it in JOURNAL.md.      !!"
+  echo "!!  been the owner's explicit call. Log it in JOURNAL.md.      !!"
   echo "!!=============================================================!!"
   exit 0
 fi
@@ -100,8 +100,8 @@ fi
 
 echo ""
 if [ "$fail" -ne 0 ]; then
-  echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, Alexander's word only.)"
+  echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, the owner's word only.)"
   exit 1
 fi
-echo "All blocking gates green — push allowed. (The HUMAN gate still applies: Alexander's OK.)"
+echo "All blocking gates green — push allowed. (The HUMAN gate still applies: the owner's OK.)"
 exit 0

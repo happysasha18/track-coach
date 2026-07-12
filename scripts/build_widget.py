@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.5.0"  # Track Coach analyzer version — s64: staleness split from the build stamp; INV-12 now keys off TC_ANALYSIS_VERSION, so an infra/render release no longer stales the library
+TC_VERSION = "1.5.1"  # Track Coach analyzer version — s64: repo made product-fit for all users (impersonal English docs/comments, no personal paths); analyzer unchanged, so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -429,7 +429,7 @@ REC_CLASS = {
     "bass_groupstem": "do", "squashed": "do", "tonal_resonance": "do",
 }
 
-# Card evidence (SPEC §B.13 / INV-31, Sasha 2026-06-23) — the plain "where this came from" line per rec key.
+# Card evidence (SPEC §B.13 / INV-31, 2026-06-23) — the plain "where this came from" line per rec key.
 # Names the SIGNAL in words (Tier-A: one number) or the COMBINATION (Tier-B/C: a fusion), NEVER a bare metric
 # tag. Format fields are a subset of each rec's add(**kw). EVERY key that produces a `D.recs` card must have an
 # entry (the invariant: every card carries a non-empty based-on). Per-stem cards build theirs in per_stem_cards.
@@ -518,7 +518,7 @@ def fmt_hz(hz):
     return f"≈{int(round(hz / 10.0) * 10)} Hz"
 
 
-# ── PRECISE masking frequency (Sasha s14, idea a). The coarse masking band ("250–600 Hz") only flags
+# ── PRECISE masking frequency (s14, idea a). The coarse masking band ("250–600 Hz") only flags
 # THAT the bass buries a part; the per-stem spectra (already in the masking JSON: `spectrum` /
 # `spectrum_freqs`) say WHERE inside the band they actually fight, so the rec can name a cut frequency
 # ("≈380 Hz") instead of the whole band. The collision sits where the OVERLAP of the two peak-normalised
@@ -596,7 +596,7 @@ def loud_level(arr):
 # score (big · persistent · specific · non-redundant), so the system self-judges usefulness
 # with no per-track human approval. Pure / numpy-free → unit-testable.
 
-# A near-silent stem ranks BELOW the louder ones (Sasha 2026-06-22): a quiet part diverging matters less
+# A near-silent stem ranks BELOW the louder ones (2026-06-22): a quiet part diverging matters less
 # than a loud one diverging, so its card score is scaled by how loud it is RELATIVE to the loudest stem.
 PROMINENCE_SPAN_DB = 24.0       # provisional (A3, validated on Lazy 2026-06-23): dB below the loudest stem
                                 # at which a part's weight hits the floor. On Lazy → drums 1.0 / bass 0.70 /
@@ -663,7 +663,7 @@ def candidate_score(*, divergence, persistence, specificity, redundancy, promine
     """Objective usefulness of a candidate card, 0..1 (SPEC §B.11 CR-11): a weighted blend of
     big · persistent · specific, KILLED by redundancy — a card that restates the mix scores ~0 — and
     SCALED by prominence (0..1) so a near-silent stem's card ranks below a loud one's at equal
-    divergence (Sasha 2026-06-22). prominence defaults to 1.0 → unweighted (back-compat)."""
+    divergence (2026-06-22). prominence defaults to 1.0 → unweighted (back-compat)."""
     base = (SCORE_W["divergence"] * divergence
             + SCORE_W["persistence"] * persistence
             + SCORE_W["specificity"] * specificity)
@@ -686,7 +686,7 @@ DIVERGENCE_MIN = 0.35            # provisional τ (A3, validated on Lazy 2026-06
                                 # other 0.40–0.55 (diverge, admitted) — so 0.35 sits mid-gap, robust. SPEC §B.11
 # PRESCRIPTIVE per-stem measures — axes where a divergence from the rest reads as an actionable
 # observation (a part fighting the energy arc / dropping out as everything lifts). BRIGHTNESS was
-# REMOVED here (SPEC §B.11.1, Sasha 2026-06-22): a part being brighter/darker than the rest is not a
+# REMOVED here (SPEC §B.11.1, 2026-06-22): a part being brighter/darker than the rest is not a
 # defect — the coach can't know intent (a drum/synth burst may be wanted), so a prescriptive brightness
 # card asserts a problem it can't justify. Relative brightness is descriptive / a future viz, not a card.
 PER_STEM_MEASURES = ("energy", "density", "stereo_width")  # curves present in result_core_<stem>.json
@@ -755,7 +755,7 @@ COMPOSITE_TREND_MIN = 0.3        # FROZEN (Phase B, 2026-06-23) — principled f
 
 
 def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=None):
-    """Cross-signal cards — a stem moving AGAINST the whole track (SPEC §B.11, Sasha's composite idea,
+    """Cross-signal cards — a stem moving AGAINST the whole track (SPEC §B.11, a composite idea,
     e.g. "energy rises but the drums thin out"). Today's rule pairs the mix's energy direction with a
     stem's density direction; opposite + both past `tau` → a scored candidate. `levels`: optional
     {stem: prominence 0..1} so a near-silent stem's composite card ranks below louder parts. Pure. Extend
@@ -782,7 +782,7 @@ def composite_candidates(mix_core, stem_cores, tau=COMPOSITE_TREND_MIN, levels=N
 
 def collapse_correlated(candidates, measure_order=CORRELATED_MEASURES):
     """Per PART, collapse the CORRELATED activity candidates so each part yields at most ONE activity card
-    (SPEC §B.11 "Correlated measures collapse — SMART", Sasha 2026-06-22). Energy and density
+    (SPEC §B.11 "Correlated measures collapse — SMART", 2026-06-22). Energy and density
     (`CORRELATED_MEASURES`) restate one another, so a part firing on both reads as a pile-up ("the mid —
     quieter" + "the mid — sparser"). Rule per stem, WITHIN that pair: SAME direction → keep the STRONGEST
     only; OPPOSITE directions (louder BUT sparser — a genuine contrast) → MERGE into ONE richer card
@@ -1125,7 +1125,7 @@ def stem_repetition(per_stem_selfsim, masking):
     return out
 
 
-# ── "Where does it get boring?" (Sasha, 2026-06-22): for an EVOLVING track, the point after which it stops
+# ── "Where does it get boring?" (2026-06-22): for an EVOLVING track, the point after which it stops
 # introducing new material and only recombines sections you've already heard. Honest + measured from the
 # self-sim segment letters (same letter = a section that returns); NOT a value judgement — the rec frames it
 # as "no new material from here", with the action left to the producer. Gated so it never fires on a track
@@ -1158,10 +1158,10 @@ def development_plateau(selfsim, dur):
 
 ONSET_PERCUSSIVE = 3.0   # onsets/sec at/above which a stem reads as percussive (transient-driven), else sustained
 
-# ── G13: split the honest "tonal" umbrella → melody / lead / chord / pad / noise (Sasha, 2026-06-21) ──
+# ── G13: split the honest "tonal" umbrella → melody / lead / chord / pad / noise (2026-06-21) ──
 # All four are ⟨DECIDE⟩ defaults to tune on the 3 library tracks (see docs/SPEC.md §B.4); every one is a
 # threshold on a MEASURED quantity (polyphony, loudness, note length, spectral flatness) — no vocabulary,
-# no ML prompts (Sasha rejected those). Each resulting label is `approx`.
+# no ML prompts (these were rejected). Each resulting label is `approx`.
 POLY_FRAC_MONO_MAX = 0.20  # poly_frac (share of sounding-time with ≥2 notes) below this ⇒ MONOPHONIC
 FLATNESS_NOISE_MIN = 0.30  # energy-weighted spectral flatness at/above this ⇒ broadband NOISE, no clear pitch.
                            # INERT on real harmonic stems (their flatness is ~0.000–0.003) — the `noise`
@@ -1220,11 +1220,11 @@ def polyphony(notes):
 
 def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     """A DETERMINISTIC, honest CHARACTER label per SIGNIFICANT stem, from measured features only — so the
-    same track always yields the same labels (Sasha's hard requirement: no per-run renaming). We describe
+    same track always yields the same labels (a hard requirement: no per-run renaming). We describe
     what the SOUND is, never assert which instrument/synth made it (Demucs labels are approximations;
     [[track-coach-stem-labels]]). Measured axes:
       • frequency role — low / mid / high. Percussive stems: which third (by loud-level) carries the energy.
-        Sustained stems (G14, Sasha's idea): "low/bass" ONLY if HIGH-PASSING (dropping sub+low) strips
+        Sustained stems (G14): "low/bass" ONLY if HIGH-PASSING (dropping sub+low) strips
         ≥ HP_DROP_DB of loudness — so a bass collapses but a mid stem with bled-in low (guitar) keeps its
         real mid content and is NOT mislabeled 'bass'. Sidesteps the bleed question, so CR-4 stays UI-only.
       • temporal character — percussive (onset_rate ≥ ONSET_PERCUSSIVE) vs sustained.
@@ -1232,7 +1232,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         pad/noise from polyphony (basic-pitch notes, `per_stem_notes`), per-stem spectral flatness
         (`masking.spectral_flatness`), relative loudness and mean note length. See docs/SPEC.md §B.4.
     Returns {stem: {label, role, percussive, confidence}}. confidence 'clear' for the trusted low end
-    (bass/drums), 'approx' otherwise. confidence is no longer shown as a "≈" in the UI (Sasha s14): one
+    (bass/drums), 'approx' otherwise. confidence is no longer shown as a "≈" in the UI (s14): one
     plain label per stem, and the uncertain mid umbrella shows its base role ("mid"/"high"), never "tonal"."""
     if not masking:
         return {}
@@ -1246,9 +1246,9 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         ("mid", True): ("perc", "approx"), ("mid", False): ("mid", "approx"),
         ("high", True): ("hats", "approx"), ("high", False): ("high", "approx"),
     }
-    # Sasha's call (2026-06-21 s14, docs/SPEC.md §B.7): TRUST the stem for the reliable low-end families
+    # A design call (2026-06-21 s14, docs/SPEC.md §B.7): TRUST the stem for the reliable low-end families
     # instead of re-deriving (and sometimes DEMOTING) them. Demucs separates bass & drums cleanly and
-    # Sasha confirmed we read the low end reliably — so a `bass` stem is "bass" (we do NOT run it through
+    # We read the low end reliably — so a `bass` stem is "bass" (we do NOT run it through
     # the G14 high-pass, which on a synth bass with mid harmonics wrongly fell to "tonal"), and a `drums`
     # stem is "drums" (NOT reduced to "kick"). Only these two exact families are trusted by name; every
     # other (electronic) stem name stays untrusted and is read by measurement ([[track-coach-stem-labels]]).
@@ -1281,7 +1281,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
         else:
             cen = (masking.get("spectral_centroid") or {}).get(st)
             if cen is not None:
-                # G18 (s14, Sasha's per-stem frequency analyzer): the spectral CENTROID — where the stem's
+                # G18 (s14, the per-stem frequency analyzer): the spectral CENTROID — where the stem's
                 # energy actually sits — is a robust freq-role signal that replaces the crude 6-band high-pass
                 # (which mislabeled a synth bass). Bass sits low (~120 Hz), pads/leads mid (~1 kHz), air/
                 # cymbals high (> HIGH_CENTROID_HZ). Verified by deed: bass 117 Hz, guitar 1007 Hz.
@@ -1319,7 +1319,7 @@ def stem_character(masking, rhythm, leakage=None, per_stem_notes=None):
     return out
 
 
-# ── Development-mode read (SPEC §B.12, Sasha 2026-06-23) — which FORM the track develops in. Feeds the
+# ── Development-mode read (SPEC §B.12, 2026-06-23) — which FORM the track develops in. Feeds the
 # Producer's READ (an OBSERVATION, not a card): "grows by loud + bright; stereo & density sit idle". The four
 # trends are all `_common.trend` = Pearson corr of the curve with its time index, in [−1,1], SAME unit
 # (direction/monotonicity, not magnitude) — so one threshold is valid across all four (prover F4, 2026-06-23).
@@ -1434,7 +1434,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
     if et is not None and abs(et) < 0.12 and energy:
         add("energy_flat", peak=fmt_t(tb[peak_idx(energy)]), valley=fmt_t(tb[valley_idx(energy)]))
 
-    # "Where does it get boring?" (Sasha) — for an evolving track, the onset after which no new section is
+    # "Where does it get boring?" — for an evolving track, the onset after which no new section is
     # introduced. Measured from the self-sim letters; gated so it only fires when the track actually develops.
     plat = development_plateau(selfsim, dur)
     if plat:
@@ -1580,7 +1580,7 @@ def build_recommendations(core, detail, masking, S, als_overlay=None, stemmap=No
 
         def _and_join(labels):
             # DEDUPE by label, preserving order: two stems can share a character label ("mid"), and
-            # "the mid, the mid and the drums" is the salad Sasha killed in §B.7 — collapse to "the mid".
+            # "the mid, the mid and the drums" is the salad removed in §B.7 — collapse to "the mid".
             seen, xs = set(), []
             for l in labels:
                 if l not in seen:
@@ -1907,7 +1907,7 @@ def build_story(core, als_overlay, seg_bounds=None):
     sigs = {}          # signature → letter, for pattern detection (A/B/A)
     letters = "ABCDEFGH"
     LIFT = 0.12        # how much LOWER the preceding section must sit (in tier) for a high section
-                       # to count as a Drop — the required "яма перед поднятием" (CR-5).
+                       # to count as a Drop — the required "a dip before the lift" (CR-5).
     for i, (a, b2) in enumerate(segs):
         ti = seg_t[i]
         tier = ti / mx if mx > 0 else 0.0
@@ -2236,7 +2236,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
         analysed = (masking.get("stems_analysed") if masking else None) or []
         in_disk = [n for n in analysed if n in disk]
         # Lane / player order: real content on top, near-silent (omitted) stems sink to the BOTTOM
-        # (Alexander s37) — an empty lane in the middle reads as a gap; grouped at the end it reads as
+        # (s37) — an empty lane in the middle reads as a gap; grouped at the end it reads as
         # "these are the empty ones". Stable within each group; falls back to analysed order with no masking.
         if masking:
             sig = set(significant_stems(masking))
@@ -2251,7 +2251,7 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             player = {"srcs": srcs}
     # Quick runs have no Demucs stems, but they DO have the mix — give them a single-track player
     # (transport + seek, no per-stem mute/solo). The widget reads player.kind=="mix" and skips the
-    # player lane grid. (Sasha 2026-06-20: "плеер какая разница быстрый прогон?")
+    # player lane grid. (2026-06-20: quick mode still gets a player.)
     if player is None and audio_mix_rel:
         rel = audio_mix_rel.rstrip("/")
         adir = Path(out_path).parent / rel
@@ -2301,11 +2301,11 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     }
     # A track's name comes from the caller (track_analyzer derives it from the audio file).
     # NEVER invent a name from tempo/duration — those live in the vitals strip + subtitle and
-    # read as a broken title here (Sasha 2026-06-22: "это БПМ а не имя трека!!").
+    # read as a broken title here (2026-06-22: that's the BPM appearing where the track name belongs).
     title = title or "Untitled track"
     # Run-mode badge + (quick-only) explainer, rendered SERVER-SIDE from `mode` so it's deterministic
     # in the HTML (testable, no JS needed): quick = amber "Quick read" + a line on what full adds;
-    # full = green "Full analysis". (Sasha 2026-06-20: метка должна быть видна на странице.)
+    # full = green "Full analysis". (2026-06-20: the badge must be visible on the page.)
     _ui = S.get("ui", {})
     _q = (mode == "quick")
     _badge_txt = _ui.get("mode_badge_quick", "Quick read") if _q else _ui.get("mode_badge_full", "Full analysis")
@@ -2439,8 +2439,8 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
     if not offsets:
         return "", ""
 
-    # Most-SIMILAR first (smallest |offset| at top) — the "ёлочка": matched/green rows lead and
-    # divergence grows downward (Alexander 2026-07-02, reverses the old most-divergent-first order).
+    # Most-SIMILAR first (smallest |offset| at top) — the bars taper into a triangle: matched/green rows
+    # lead and divergence grows downward (2026-07-02, reverses the old most-divergent-first order).
     offsets.sort(key=lambda t: abs(t[1]))
 
     # Summary: closest = the leading (smallest-|offset|) rows; furthest = the trailing (largest).
@@ -2510,7 +2510,7 @@ def _refread_bars_html(track_z, centroid_z, conf_entries=None, confirm_z=0.4):
 def render_reference_notes(artist_entry):
     """§D.10.2 one-source shared renderer — emits semantic HTML for one artist entry.
 
-    Approved layout (Alexander 2026-07-04, variant A):
+    Approved layout (2026-07-04, variant A):
       1. Artist header (name + real name)
       2. Genre / era line
       3. Prose blurb (context first, before measurement verdicts)
@@ -2519,7 +2519,7 @@ def render_reference_notes(artist_entry):
          Each row: <span class="rn-trait-glyph">★</span> phrase  (no trailing pill)
       6. "Web describes these — your tracks don't bear them out" — ONE muted group,
          web-only and not-measurable traits as a dot-separated inline run (not N pills)
-      7. Sources list — visible <a href> links (Alexander 2026-07-04 amendment: keep visible)
+      7. Sources list — visible <a href> links (2026-07-04 amendment: keep visible)
       8. Footnote legend (.rn-footnote) explaining ★/☆/·
 
     Tiers from reference_web_notes.json:
@@ -2601,11 +2601,11 @@ def render_reference_notes(artist_entry):
             f'<p class="rn-webonly-group">{group_text}</p>'
         )
 
-    # 7. Sources list (visible at panel bottom — Alexander 2026-07-04 amendment)
+    # 7. Sources list (visible at panel bottom — 2026-07-04 amendment)
     sources_html = ""
     if sources:
         # Conventional chain-link glyph (inline SVG, currentColor) — reads unmistakably as a link.
-        # Alexander 2026-07-05: replaced the earlier ↗ arrow, which read as the wrong/ugly icon.
+        # 2026-07-05: replaced the earlier ↗ arrow, which read as the wrong/ugly icon.
         link_ico = ('<svg class="tc-rn-link-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
                     'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
                     '<path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/>'
@@ -2708,7 +2708,7 @@ def _web_body_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_
 def _ref_stub_html(note):
     """D-INV-36e — the reference panel's NON-expandable empty-state stub. When there is nothing
     to compare (no close direction, or the run carries no comparison data), the plaque keeps its
-    place and title but is a plain div — no arrow, nothing to open (Alexander 2026-07-05: a
+    place and title but is a plain div — no arrow, nothing to open (2026-07-05: a
     silently absent panel read as a hole; a one-line expandable panel read as broken). Keeps the
     #refPanel id so Simple hides it (INV-18/22) and the D-INV-37 entry reader stays inert
     (no .refpanel inside)."""
@@ -3023,7 +3023,7 @@ TEMPLATE = r"""<!DOCTYPE html>
  --line:#262c3c;--good:#46d39a;--warn:#ffb454;--bad:#ff6b6b;--bright:#ffd166;--wob:#a78bfa;--accent:var(--wob);
  --radius:10px;--radius-lg:14px;--radius-xl:18px;--radius-pill:20px;
  --dur-fast:120ms;--dur-base:180ms;--ease:ease-out;
- /* DS-INV-9 minimal slice (s57, Alexander's design-system values): --gap WITHIN a group,
+ /* DS-INV-9 minimal slice (s57, the design-system values): --gap WITHIN a group,
     --rhythm BETWEEN top-level sections — so inter-panel > intra-panel (fixes the 24<30 inversion) */
  --gap:16px;--rhythm:28px}
 *{box-sizing:border-box}
@@ -3032,7 +3032,7 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
 .wrap{max-width:1120px;margin:0 auto}
 .brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--wob);font-weight:700;margin:0 0 3px}
 /* Run-mode badge: a pill next to the brand so it's obvious whether this is a full or quick read
-   (Sasha 2026-06-20: метка должна быть и на странице, и в каталоге). Quick = amber, full = green. */
+   (2026-06-20: the badge must be visible both on the page and in the catalog). Quick = amber, full = green. */
 .modebadge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:20px;font-size:9.5px;
  font-weight:700;letter-spacing:.06em;vertical-align:middle}
 .modebadge[hidden]{display:none}
@@ -3063,18 +3063,18 @@ h1{font-size:20px;margin:0 0 2px;font-weight:700}
  transition:color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
 .seg>button:not(.on):not(.active):hover{color:var(--ink)}
 /* selected = calm: the old subtle panel2 lift, SAME weight, no contrast inversion
-   (Alexander 2026-07-02: the bold --wob fill read too loud and the invert/bold jarred). */
+   (2026-07-02: the bold --wob fill read too loud and the invert/bold jarred). */
 .seg>button.on,.seg>button.active{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
 /* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
 .viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
-/* (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call) */
+/* (the calm verdict headline panel was removed 2026-07-03, s49) */
 /* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, the EVIDENCE
    drawer, and the timecoded recs all stay visible in BOTH views (hiding them just read as "things
-   vanished"). The Evidence drawer is ALWAYS shown now (Sasha 2026-06-20, INV-18) — it used to be
+   vanished"). The Evidence drawer is ALWAYS shown now (2026-06-20, INV-18) — it used to be
    Simple-hidden, which meant full-Simple uniquely buried it while quick + full-Detailed showed it.
    Detailed adds only the DEEP stem layer on top: the #stemlanes canvas + its #seqKey. */
-/* Demux / per-stem visualisation (#stemlanes + its #seqKey) shows in DETAILED ONLY — Sasha,
-   repeatedly + confirmed 2026-06-20 ("демуксы мы договорились показывать только в детальном виде").
+/* Demux / per-stem visualisation (#stemlanes + its #seqKey) shows in DETAILED ONLY —
+   confirmed 2026-06-20 (the demux stems are shown only in the detailed view).
    The transport (play/seek/time) stays usable in BOTH views; only the stem-lane canvas + key hide. */
 body.simple #stemlanes,body.simple #seqKey{display:none!important}
 /* The merged reference panel (§D.10.1/D-INV-36): ONE container #refPanel — shared selector +
@@ -3128,11 +3128,11 @@ body.simple #refPanel{display:none!important}
  letter-spacing:.04em;vertical-align:middle;margin-left:3px}
 #webPanel .web-note{font-size:11px;color:var(--muted);opacity:.65;margin:6px 0 0;font-style:italic}
 /* Rich web panel (§D.10.2) — tc-rn-* semantic markup, dark theme (in-widget). */
-/* Approved readable layout (Alexander 2026-07-04, variant A): blurb first, glyph-led confirmed  */
+/* Approved readable layout (2026-07-04, variant A): blurb first, glyph-led confirmed  */
 /* rows, one muted web-only group, visible sources, one footnote legend. No per-row pills.        */
 /* Light theme for the same classes lives in build_reference_notes.py (side page).                */
 #webPanel .tc-rn-head{margin:0 0 3px}
-/* s57 (Alexander 2026-07-05): fonts snapped UP to the widget's whole-number scale (was scattered
+/* s57 (2026-07-05): fonts snapped UP to the widget's whole-number scale (was scattered
    10/10.5/11.5/12.5 — the audit's "fractional" set); section headings lifted --muted→--ink so a heading is
    never dimmer than its own body (brightness hierarchy); sources given a chain-link icon + underline. */
 #webPanel .tc-rn-artist{font-size:13px;font-weight:700;color:var(--ink)}
@@ -3170,9 +3170,9 @@ body.simple #refPanel{display:none!important}
 /* Recommendation cards now sit directly under the graph (the cards the timeline triangles
    point to). Simple shows ONLY the timecoded recs — the ones with a triangle on the graph;
    Detailed shows all (global/whole-track recs included). The 2-vs-5 split is per-track: it's
-   just however many recs are timecoded. (Sasha 2026-06-19.) */
+   just however many recs are timecoded. (2026-06-19.) */
 body.simple #recs .rec:not([data-t]){display:none!important}
-/* Quick is the view-ladder FLOOR (Sasha 2026-06-20): it shows the SAME brief recs as the calm view —
+/* Quick is the view-ladder FLOOR (2026-06-20): it shows the SAME brief recs as the calm view —
    the timecoded ones — so quick ⊆ Simple ⊆ Detailed holds. Quick has no toggle, so it gets its own
    body.quick gate (it never enters .simple). Evidence stays visible (INV-18); only the recs are brief. */
 body.quick #recs .rec:not([data-t]){display:none!important}
@@ -3233,7 +3233,7 @@ details.tc-panel>summary::-webkit-details-marker{display:none}
 details.tc-panel>summary::before{content:"▸ ";color:var(--wob)}
 details.tc-panel[open]>summary::before{content:"▾ "}
 /* collapsed: symmetric padding so the title sits VERTICALLY CENTRED, not top-heavy
-   (Alexander 2026-07-02). Open keeps the larger bottom padding for the content below. */
+   (2026-07-02). Open keeps the larger bottom padding for the content below. */
 details.tc-panel:not([open]){padding-bottom:14px}
 details.tc-panel:not([open])>summary{padding-bottom:4px}
 /* D-INV-36e — the reference panel's empty-state stub: the same plaque look as a COLLAPSED
@@ -3253,13 +3253,13 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .mcard{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-lg);padding:12px 14px}
 .mcard .z{font-size:12px;color:var(--muted)}.mcard .pct{font-size:20px;font-weight:600;margin-top:3px}
 /* Container-relative reflow (s34): the old `1fr 1fr` + `@media(max-width:760px)`
-   collapsed to ONE column by VIEWPORT width — on Alexander's ~2/3-screen window
+   collapsed to ONE column by VIEWPORT width — on a ~2/3-screen window
    (or a browser zoom) the viewport fell under 760px and every rec stacked in one
    crooked column. `auto-fit` sizes the column count from the GRID's OWN width
    (i.e. the #recsPanel it sits in), never the raw window: 1 column when narrow,
    2 on a ~2/3 window, 3 when there's room. Wider vertical gap so the plates
    breathe. Regression-tested in a real browser: tests/test_headless_render.py. */
-/* recs grid: reflow by the panel's OWN width, capped at 2 columns (Alexander: never 3 —
+/* recs grid: reflow by the panel's OWN width, capped at 2 columns (never 3 —
    a rec card wants a readable line length). max(300px, half-minus-gap) forces at most two
    columns and drops to one when cramped; no media/container query. */
 .recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(300px,(100% - 18px)/2),1fr));gap:18px}
@@ -3344,7 +3344,7 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
 .catrun a.copen{margin-left:auto;color:var(--wob);font-size:11.5px;font-weight:600;
  text-decoration:underline;text-underline-offset:2px;
  white-space:nowrap;border:1px solid var(--wob);border-radius:var(--radius);padding:3px 10px;transition:background var(--dur-fast)}
-/* same chain-link glyph as the web-panel sources, + underline (Alexander 2026-07-05: "такой же и подчёркнутый") */
+/* same chain-link glyph as the web-panel sources, + underline (2026-07-05: the same one, underlined) */
 .catrun a.copen .tc-rn-link-ico{width:11px;height:11px;vertical-align:-1px;margin-right:5px}
 .catrun a.copen:hover{background:rgba(167,139,250,.16);text-decoration:underline}
 .catrun .cnow{margin-left:auto;color:var(--wob);font-size:11px;font-weight:700;white-space:nowrap}
@@ -3368,14 +3368,14 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
  __VIEWTOGGLE__
 </div>
 <div class="srcmeta" id="srcmeta"></div>
-<!-- Run-mode note: only on a quick read, spell out what a full run would add (Sasha 2026-06-20). -->
+<!-- Run-mode note: only on a quick read, spell out what a full run would add (2026-06-20). -->
 __MODENOTE__
 
 <!-- VITALS — the credible spec-sheet, read in one glance, builds trust.
      Single authoritative numbers about the finished mix (no time axis). -->
 <div class="vitals" id="vitals"></div>
 
-<!-- (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call.
+<!-- (the calm verdict headline panel was removed 2026-07-03, s49.
      The verdict text still feeds the catalog self-row below; only the top panel is gone.) -->
 
 <!-- 1. VISUAL FIRST: Track Story + player/sequencer is the centrepiece & the proof. -->
@@ -3525,7 +3525,7 @@ const META=D.meta||{};
   bits.push(`${T.src_analyzed||"Analyzed"}: <b>${META.analyzed_at}</b>`+
    (diffDate?`<span style="opacity:.6"> · report built: ${bdate}</span>`:""));}
  el.innerHTML=bits.join('<span style="opacity:.4">·</span>');})();
-// (the calm verdict headline panel was removed 2026-07-03, s49 — Alexander's call;
+// (the calm verdict headline panel was removed 2026-07-03, s49;
 //  D.verdict still feeds the catalog self-row render below.)
 // ── Simple⇄Detailed toggle. PURE presentation: flips a body class that hides/shows
 // already-embedded panels and re-filters the story lanes. No network, no recompute.
@@ -3715,15 +3715,15 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  // colour for a callout cue/triangle by its rec class (crit/do/concept)
  const cueCol=cls=>cls==="crit"?getCss("--bad"):cls==="do"?getCss("--good"):cls==="concept"?getCss("--bright"):getCss("--wob");
  const fams=ST.families||[],nf=fams.length,bins=ST.bins,iv=ST.intensity,nb=bins.length;
- // The Track-story graph REACTS to the view toggle (Sasha's call, 2026-06-19; restores the
+ // The Track-story graph REACTS to the view toggle (2026-06-19; restores the
  // 0.5.13 behaviour that 0.5.19 wrongly removed — see JOURNAL.md). Simple = the 3 power-driving
  // lanes only (energy/brightness/density = in_power); Detailed = all lanes (+modulation, +stereo
  // width). apply() dispatches a resize on toggle, so resize()→pickComps() relayouts live.
  const ALLCOMPS=ST.components||[];const compLaneH=20;  // CONSTANT per lane in both views, so the
  // total curve-area height = (#lanes × compLaneH) is PROPORTIONAL TO THE LANE COUNT. That makes
- // Simple (4 lanes) shorter than Detailed (5) automatically. Sasha, session 0b5ab53e:
- //   L186 "стерео или плотность тоже оставить в симпл" → Simple = energy+brightness+density+stereo;
- //   L402 "в симпле вью общая высота для их площади должна быть МЕНЬШЕ" → area ∝ count (4<5).
+ // Simple (4 lanes) shorter than Detailed (5) automatically. Session 0b5ab53e:
+ //   L186 keep stereo or density in Simple too → Simple = energy+brightness+density+stereo;
+ //   L402 in the Simple view the total height for their area must be SMALLER → area ∝ count (4<5).
  // (Supersedes the older 2-full-size reading from L542 of a prior session. DON'T revert to that.)
  const SIMPLE_LANES=["energy","brightness","density","stereo"];
  let comps=ALLCOMPS,ncomp=comps.length;
@@ -4138,9 +4138,9 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const SM=D.stem,MAP=D.stemmap&&D.stemmap.stems;
  function bridge(name){const sm=MAP&&MAP[name];if(!sm)return{txt:"",col:null};
   // Empty verdict: the main label already carries the identified "(near-silent)" word via disp() —
-  // returning "near-silent" here would duplicate it in the sub-line (Sasha s14 double-label bug class).
+  // returning "near-silent" here would duplicate it in the sub-line (s14 double-label bug class).
   if(sm.verdict==="empty")return{txt:"",col:null};
-  // Sasha s14: the tiny sub-line shows the REAL PROJECT TRACK when the map is confident (e.g. "Guitar"),
+  // s14: the tiny sub-line shows the REAL PROJECT TRACK when the map is confident (e.g. "Guitar"),
   // never the raw Demucs name/family ("guitar · → other" was a salad of two Demucs words). Only when the
   // verdict is genuinely `clear` — otherwise nothing, no guessing.
   if(sm.verdict==="clear"){const t=(sm.track_matches&&sm.track_matches[0]&&sm.track_matches[0].track);
@@ -4246,10 +4246,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   lanes.forEach(L=>{const active=anySolo?L.s.solo:!L.s.mute;
    lx.fillStyle="rgba(255,255,255,.02)";lx.fillRect(PADL,L.y,LW-PADL-PADR,L.h);
    box(3,L.y+3,L.s.mute,"#ff6b6b","M");box(3,L.y+L.h-15,L.s.solo,"#46d39a","S");
-   // (g) lane label: ONE plain label per stem (Sasha s14, docs/SPEC.md §B.7). Always through disp()
+   // (g) lane label: ONE plain label per stem (s14, docs/SPEC.md §B.7). Always through disp()
    // (D.stem_display) — the ONE resolved name. For a significant stem this is the character label
    // ("bass", "lead", "mid"); for a near-silent stem it is the identified label ("mid (near-silent)")
-   // — NEVER the bare "near-silent" (that erased which stem it was, the s45 regression, Alexander).
+   // — NEVER the bare "near-silent" (that erased which stem it was, the s45 regression).
    // NEVER the raw Demucs family word. The raw stem name still shows tiny below when the stemmap is
    // clear (G8 — so you know which file it is). Sub-line is suppressed when it would repeat the main label.
    const mainLbl=disp(L.name);
@@ -4258,10 +4258,10 @@ function drawLocators(ctx,xOf,top,bot,labelY){
    if(L.drum){drawDrum(L,active);}
    else if(L.env){drawWave(L,active);}
    else{ // near-silent / omitted stem (no envelope data, SPEC CR-2): a flat faint line on the baseline so
-    // the lane reads as PRESENT-but-empty, not missing — the "фиолетовая линия" restore (regression from 0.8.1).
+    // the lane reads as PRESENT-but-empty, not missing — the "purple line" restore (regression from 0.8.1).
     const base=L.y+L.h-2;lx.globalAlpha=active?.55:.28;lx.strokeStyle=L.col||"#a78bfa";lx.lineWidth=1.5;
     lx.beginPath();lx.moveTo(PADL,base);lx.lineTo(LW-PADR,base);lx.stroke();lx.globalAlpha=1;}
-   // tiny sub-line: ONLY the real project track (map clear) — NEVER the raw Demucs name (Sasha s14:
+   // tiny sub-line: ONLY the real project track (map clear) — NEVER the raw Demucs name (s14:
    // "guitar · → other" was salad). Skip when it would repeat the main label to avoid a double-label.
    if(!L.drum&&L.br.txt&&L.br.txt!==mainLbl){lx.globalAlpha=active?.7:.35;
     lx.fillStyle=L.br.col||getCss("--muted");lx.font="8px sans-serif";lx.textAlign="left";lx.fillText(L.br.txt,PADL+4,L.y+9);lx.globalAlpha=1;}});
@@ -4275,7 +4275,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   for(let i=0;i<lanes.length;i++){const L=lanes[i];
    // M and S are mutually exclusive — and across the WHOLE player: muting puts you in "mute mode"
    // (clears every solo), soloing puts you in "solo mode" (clears every mute). So you can never have a
-   // mute on one stem AND a solo on another at the same time (Sasha, 2026-06-21: "это неправильно").
+   // mute on one stem AND a solo on another at the same time (2026-06-21: this is wrong).
    if(x>=3&&x<=15){const si=auds.indexOf(L.s),apply=k=>{const ns=toggleStem(auds,si,k);auds.forEach((a,j)=>{a.mute=ns[j].mute;a.solo=ns[j].solo;});gains();};
     if(y>=L.y+3&&y<=L.y+15){apply("mute");return;}        // SPEC §B.14: toggleStem keeps one mode at a time
     if(y>=L.y+L.h-15&&y<=L.y+L.h-3){apply("solo");return;}}}

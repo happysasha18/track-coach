@@ -1,7 +1,7 @@
 # Audit of the s63 doc re-layout — APPROVE-with-fixes (four findings)
 
-Source: read-only audit from the live-spec window, 2026-07-10 ~15:00, on Alexander's word
-(«спеки готовы, проаудируй»). Auditor: a fresh opus reviewer under the product-prover method,
+Source: read-only audit from the live-spec window, 2026-07-10 ~15:00, on the owner's word
+(the specs are ready, audit them). Auditor: a fresh opus reviewer under the product-prover method,
 over SPEC.md + ARCHITECTURE.md + TEST_MATRIX.md at commit c858766.
 
 Both fixes from the previous audit LANDED and are verified: the four D.10.x heading tails are

@@ -26,7 +26,7 @@ import statistics as _st
 
 import completeness as C
 
-# Relative-lean thresholds (reference column) — the sketch values Alexander approved by eye 2026-06-25.
+# Relative-lean thresholds (reference column) — the sketch values approved by eye 2026-06-25.
 SEP_CLOSE = 0.60     # nearest stands clearly apart from the pack -> "close"
 SEP_MID = 0.25       # a mild lean -> "mid"; below -> "far" (no real lean)
 

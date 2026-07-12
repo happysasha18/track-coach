@@ -14,8 +14,8 @@ track") is the case this baseline suppresses. **Fix:** compare each stem to the 
 
 **F2 — validation measures divergence, but the goal is usefulness.** Divergence is a proxy; a stem can
 diverge in a way that's true but uninteresting ("hat stereo wobbles 3%"). A divergence-share eval can
-report "supported" while the cards are still noise — exactly what Sasha asked to rule out. **Fix:** one
-human pass first — render the per-stem cards on the 3 library tracks, Sasha marks each useful/noise, set
+report "supported" while the cards are still noise — exactly what the user asked to rule out. **Fix:** one
+human pass first — render the per-stem cards on the 3 library tracks, the user marks each useful/noise, set
 an acceptance bar (⟨DECIDE⟩, e.g. ≥70% useful) BEFORE shipping. The automated divergence-share is the
 cheap proxy tracked afterward, calibrated to that pass. `postcondition`.
 
@@ -49,6 +49,6 @@ to the band range). `precondition`.
   break ties by urgency.
 - A missing `result_core_<stem>.json` yields no per-stem cards and no error.
 
-## Open question for Sasha
-The acceptance bar for F2: what share of per-stem cards must read as genuinely useful (Sasha's eye, 3
+## Open question for the user
+The acceptance bar for F2: what share of per-stem cards must read as genuinely useful (the user's eye, 3
 tracks) to call the hypothesis supported and keep the feature?

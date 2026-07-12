@@ -266,8 +266,8 @@ def cmd_analyze(args):
         rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
     elif args.mode == "quick":
         # Quick has no Demucs stems, but it DOES have the mix — encode a compressed copy so the widget
-        # still gets a single-track player (transport + seek; no per-stem mute/solo). Sasha 2026-06-20:
-        # "плеер какая разница быстрый прогон?". No separation, so still fast.
+        # still gets a single-track player (transport + seek; no per-stem mute/solo). 2026-06-20:
+        # quick mode still gets a player. No separation, so still fast.
         rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
 
     # MEASURING DONE — no render here. The widget is rendered ONCE, by `build`, AFTER the read.

@@ -94,7 +94,7 @@ They PASS. The coverage exists; the tests just never run.
 data on this machine" — false by deed. The gate list blesses the 4 skips as "the exact expected set". Two
 of the four are a bug, not an expectation. The playbook rule is "green = zero failures AND the skip-set is
 exactly the expected list" — a skip-set that contains a stale-path skip is not the expected list, it only
-looks like it. This is precisely the "silent breakage" class Alexander fears: the catalog displays
+looks like it. This is precisely the "silent breakage" class the owner fears: the catalog displays
 "Venetian Snares" for Lazy Sparks today, and the two tests that pin that exact user-visible fact to real
 data have been off since the run dir was re-analysed.
 
@@ -185,7 +185,7 @@ approach is right; note it is design-only, nothing built yet, so 1.0 still gates
 - No empty cells / dead links found on the catalog page (probe returned `emptyCells: []`, `deadLinks: []`).
 - Widget completeness on the real FULL render: all 12 panels populated in both Simple and Detailed (probe:
   no zero-height visible canvases, no visible sub-30-char non-canvas panels except refRead per Finding 3),
-  backlink live (`file:///Users/sashaabramovich/.track-coach/library/index.html`).
+  backlink live (`file://~/.track-coach/library/index.html`).
 
 ---
 

@@ -2,7 +2,7 @@
 
 _Session 12, 2026-06-20. Stress-tests the SPEC draft (not the matrix). Output = holes in the
 credibility spec + the DERIVED guardrail-test list for Phase 3 (bug→spec→test→code). This is the flip
-Sasha asked for: spec-first → prover → derive tests._
+the user asked for: spec-first → prover → derive tests._
 
 TRIAGE: PROCEED — a genuine spec with entities, an invariant (CR-1), and consequences (CR-2…7).
 
@@ -50,8 +50,8 @@ drop (the Lazy_Sparks case: C returns 4×, each after D/E). Otherwise an impleme
 peak. `should-clarify · undefined-path (transitions)`
 
 P6 — Golden fixtures (§D layer 2) are a hard dependency that doesn't exist yet
-> "Expert-labeled golden fixtures … a handful of Sasha's real tracks where HE marks the truth" — §D
-Layer-2 (precision/recall on the judgment) can't run until Sasha labels tracks. So Phase 3 ships **layer-1
+> "Expert-labeled golden fixtures … a handful of the user's real tracks where HE marks the truth" — §D
+Layer-2 (precision/recall on the judgment) can't run until the user labels tracks. So Phase 3 ships **layer-1
 guardrails now**; layer-2 is blocked on fixtures. Make that explicit so the judgment quality isn't
 assumed-tested by the guardrails alone. `acknowledged · stuck-state (liveness)`
 
@@ -73,12 +73,12 @@ Necessary conditions; they don't pin the musical verdict, only what can NEVER be
 - **G4 (CR-5a):** scene boundaries derive from the self-sim segmentation (align to its segments), not the
   coarse `section_bounds_s`; on the Lazy_Sparks fixture the middle is NOT one 167 s blob.
 - **G5 (CR-5):** every scene named "Drop" is immediately preceded by a lower-intensity scene; and not
-  more than ~⅓ of scenes are Drops (catches "весь из дропов").
+  more than ~⅓ of scenes are Drops (catches "all made of drops").
 - **G6 (CR-5):** scene names ∈ the allowed vocabulary; Drop numbering is contiguous (no gap like
   "Drop, Drop 3").
 - **G7 (CR-6):** per-stem self-similarity runs only on significant stems.
 
-Layer-2 (later, needs Sasha's labels): precision/recall of drops/breakdowns vs his marks, with tolerance.
+Layer-2 (later, needs the user's labels): precision/recall of drops/breakdowns vs his marks, with tolerance.
 
 ## Closing
 Top 3 to resolve before coding: **P2** (mix survives all-insignificant stems), **P1** (per-section

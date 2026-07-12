@@ -3,7 +3,7 @@
 
 WHY this exists: the whole test suite (665 funcs, s33) asserted against the raw
 HTML *string* or a node-DOM stub with no stylesheet. Two visibility/escaping bugs
-shipped to Alexander's eyes twice in one day because `style.display=""` "passed"
+shipped to the user's eyes twice in one day because `style.display=""` "passed"
 with no CSS and card `<b>` was never read, only counted. This harness renders the
 REAL shipped artifact with its REAL CSS + JS in a REAL browser and reads back
 what the eye actually sees: computed style, layout geometry, visible text,

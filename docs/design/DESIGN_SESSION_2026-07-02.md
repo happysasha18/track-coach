@@ -1,12 +1,12 @@
 # Design-system session — decisions to vivify into code (2026-07-02, v3)
 
-Source: Alexander's design session on claude.ai/design (project `track-coach`,
+Source: the owner's design session on claude.ai/design (project `track-coach`,
 aae67990-57e7-472c-877b-5a1570411df3). Four workspace artifacts hold the reasoning
-(`Ревизия токенов` = colour, `Layout и сетка` = layout, `Движение и состояния` = motion+states,
-`Дрейф к системе` = radii+segmented control). Those artifacts are a SPEC, not edits to the
+(`Token revision` = colour, `Layout and grid` = layout, `Motion and states` = motion+states,
+`Drift toward a system` = radii+segmented control). Those artifacts are a SPEC, not edits to the
 design-system source files, so `/design-sync` does NOT pull them — they are applied here in code.
 
-STATUS: **SETTLED (v3, 2026-07-02).** Alexander pasted the full 4-artifact changelog; ALL taste
+STATUS: **SETTLED (v3, 2026-07-02).** The owner pasted the full 4-artifact changelog; ALL taste
 calls are decided by him (--bright kept · tc-panel animates · reftabs→segment · radii snap 6/12 ·
 no --radius-xs · near-whites→ink/ink-dim/muted · reds→--bad + magma stays · stems stay categorical).
 The ONE remaining open item is §8 typography (weights/sizes) — he explicitly returns the taste there
@@ -39,13 +39,13 @@ Neutrals (`--bg --panel --panel2 --line --ink --muted`) and `--wob` — UNCHANGE
 
 States:
 - `--good #46d39a`, `--warn #ffb454`, `--bad #ff6b6b` — the base triple.
-- `--bright (#ffd166)`: **RESOLVED 2026-07-02 — Alexander's call (v3 paste): KEEP as its own token,
+- `--bright (#ffd166)`: **RESOLVED 2026-07-02 — the owner's call (v3 paste): KEEP as its own token,
   role = "highlight/attention" (yellow ≠ amber). Do NOT merge into `--warn`.**
   Implementation reconciliation (grepped all 14 `#ffd166` by deed): the hex serves TWO roles that
   coincide by value — keep them separate at vivify time:
   · **UI `--bright` (the "attention" role → `var(--bright)`):** the ★ climax marker (`build_widget.py:3393`),
     the meter-change marker lines + labels (:3416-17), the reference-overlay dashes (:3550), favicon bars.
-  · **Data-viz literals (STAY as raw hex — his "дедуп НЕ трогает стемы" rule):** the `lead` stem colour
+  · **Data-viz literals (STAY as raw hex — the "dedup does NOT touch the stems" rule):** the `lead` stem colour
     (:1582, :3481, :3577, :3722), Demucs `other` (:3614), the Brightness data series (:1835, :1905),
     the drum `snare` (:3777). These coincide with #ffd166 but are categorical/series — leaving them raw
     is correct (tokenising them would falsely couple stems to a UI role).
@@ -173,7 +173,7 @@ but components drift. Run the same code-audit as for hex:
   or add a heading token.
 - **Fractional sizes:** `13.5 / 12.5 / 11.5` scattered — fold into `--fs-1..4`.
 - Action: grep `font-size` / `font-weight`, count frequencies (like hex), snap to the clean scale;
-  **the taste calls (which weight where) return to Alexander** — audit + safe snaps here, ASK on weights.
+  **the taste calls (which weight where) return to the owner** — audit + safe snaps here, ASK on weights.
 
 ## Sequencing for the eventual pipeline (spec settled; --bright kept)
 
@@ -181,12 +181,12 @@ Order §0 → §1 → §5 → §3 → §4 → §6 → §2, because §0 gives the
 references, §1 fixes the token set, and §6/§4 depend on the motion (§3) + radius (§5) tokens.
 This is a big multi-surface visual change → build-pipeline (spec-author into SPEC.md, product-prover
 whole-spec, TEST_MATRIX with ≥ browser-rendered rows for every colour/layout fact, then code).
-New "no raw hex that duplicates a token" guard test. Commit when green; PUSH HELD (Alexander's rule)
+New "no raw hex that duplicates a token" guard test. Commit when green; PUSH HELD (the owner's rule)
 until he reviews the before/after render. Version: PATCH bump per delivered build.
 
-## Open items awaiting Alexander
+## Open items awaiting the owner
 1. **§8 typography weights** — the ONLY open taste call. Do the audit + safe mechanical snaps in
-   code, but the "which weight goes where" decision returns to him (his v3 instruction). ASK before
+   code, but the "which weight goes where" decision returns to the owner (the owner's v3 instruction). ASK before
    finalising the weight placement.
    (RESOLVED and folded above: --bright kept · data swatches re-pulled 2026-07-02, colormap + stems
    left untouched · all §7 component taste calls decided.)

@@ -84,10 +84,10 @@ def load_stem(path: str) -> tuple:
     return y, sr, len(y) / sr
 
 
-# ── per-stem FREQUENCY ANALYZER (Sasha's idea, s14): a real spectral profile per stem, like the mix
+# ── per-stem FREQUENCY ANALYZER (idea from s14): a real spectral profile per stem, like the mix
 # gets, but per stem. Finer than the 6 coarse bands → feeds a future per-stem spectrum viz + firmer
 # role detection (the crude 6-band high-pass mislabeled a synth bass). Additive: does NOT change labels.
-# 64 bins (~6.6/octave), bumped from 32 in 0.8.20 (Sasha s14 idea a, the finer-частотник). Verified by
+# 64 bins (~6.6/octave), bumped from 32 in 0.8.20 (s14 idea a, the finer frequency analyzer). Verified by
 # deed: at 32 bins (~3.3/oct) two different low-mid clashes (bass↔other, bass↔guitar) both snapped to ≈270
 # Hz — the grid was too coarse to tell them apart; at ≥48 bins they separate (other ≈290, guitar ≈260) and
 # stay STABLE through 96. 64 = clearly better discrimination, stable, not so fine it chases spectral spikes.
@@ -151,7 +151,7 @@ def analyse(stems: dict, out_path: str, dur_hint: float = None):
     for role, y in loaded.items():
         print(f"  Band analysis: {role}...")
         band_data[role] = {}
-        cen, spec = stem_spectrum(y)                 # per-stem frequency analyzer (Sasha s14)
+        cen, spec = stem_spectrum(y)                 # per-stem frequency analyzer (s14)
         centroid[role] = cen
         spectrum[role] = spec
         # Spectral flatness per stem (G13): feeds the melody/chord vs noise split in stem_character. We

@@ -228,7 +228,7 @@ def signature_svg(e, uid=0, playable=False):
 
     `playable` (a web mix exists for this row) overlays a click-to-seek area + a playhead line on
     the TIME axis (the ribbon, top) only — never the frequency strip — so the row doubles as a
-    one-button preview scrubber (Sasha 2026-06-20: 'ползунок вдоль графика но не вдоль частотной')."""
+    one-button preview scrubber (2026-06-20: the scrubber runs along the time graph, staying off the frequency axis)."""
     energy = e.get("energy") or []
     rib = _ribbon(energy, e.get("brightness") or [], e.get("density") or [], uid)
     if not rib:
@@ -384,8 +384,8 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
     href = _open_href(e, widgets_rel)
-    # The track TITLE is the link into the widget (no separate "open" column any more — Sasha
-    # 2026-06-20: "кнопка опен не нужна если сделать само название кликабл"). Whole row tints on
+    # The track TITLE is the link into the widget (no separate "open" column any more —
+    # 2026-06-20: the open button is unneeded once the title itself is clickable). Whole row tints on
     # hover (CSS) so it reads as clickable; falls back to a plain span when there's no widget.
     ttl = html.escape(str(title))
     title_cell = (f'<a class="ttl" href="{html.escape(href)}">{ttl}</a>' if href
@@ -418,8 +418,8 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
 </tr>"""
 
 
-# The one-line "verdict" was dropped from the catalog (Sasha 2026-06-20: "колонка вердикт реально
-# нужна? она там всё ломает") — it was the widest, most variable column and forced the table off the
+# The one-line "verdict" was dropped from the catalog (2026-06-20: the verdict column broke the layout
+# and wasn't worth keeping) — it was the widest, most variable column and forced the table off the
 # screen. The verdict still lives inside each track's widget; the catalog stays scannable.
 _HEADERS = [
     ("track", "Track"), ("version", "Version"), ("date", "Date"), (None, "Signature"),

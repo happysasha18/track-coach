@@ -1,8 +1,8 @@
 # Wish: carry the "made with live-spec" attribution line
 
-Source: Alexander's word, 2026-07-10 ~16:27 («надо во все скиллы написать "made with
-live-spec" с отсылками — в гитхабе и везде»), carried from the live-spec window; softened by
-his own correction ~16:47 — an OFFER, never an obligation. The pack landed the standard on
+Source: the owner's word, 2026-07-10 ~16:27 (add a "made with live-spec" line, with references,
+to every skill — on GitHub and everywhere), carried from the live-spec window; softened by
+the owner's own correction ~16:47 — an OFFER, never an obligation. The pack landed the standard on
 its side (spec INV-96): a built-with artifact is offered one attribution line on its landing
 surface; the owner's word decides.
 

@@ -7,7 +7,7 @@ analysis data end-of-pipeline. We render a widget straight from a real `result_c
 (Shared Memories), and assert the session-10 invariants on the SHIPPED output. Pure stdlib (build_widget
 has no deps), so it runs anywhere `python3 -m unittest` does.
 
-Decided with Sasha (session 10): commit light artifacts (JSON + read) + one tiny synthetic clip; never
+Decided with the producer (session 10): commit light artifacts (JSON + read) + one tiny synthetic clip; never
 the audio. See docs/TEST_MATRIX.md.
 """
 import json
@@ -97,7 +97,7 @@ class GoldenRenderFromRealData(unittest.TestCase):
                 self.assertIn(r.get("ev"), allowed,
                               f"{label}: card {r['h']!r} carries no evidence target (ev={r.get('ev')!r})")
 
-    def test_based_on_avoids_technical_method_jargon(self):  # INV-31 / §B.13 — Alexander 2026-07-02
+    def test_based_on_avoids_technical_method_jargon(self):  # INV-31 / §B.13 — 2026-07-02
         # Keep the RESULT + a simple unit (dB); drop technical METHOD jargon (oversampling,
         # peak-to-RMS, self-similarity, dBTP) from the user-facing based-on copy — those describe
         # HOW it was measured, not WHAT was found.

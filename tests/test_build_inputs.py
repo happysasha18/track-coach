@@ -47,7 +47,7 @@ class TitleVerdict(unittest.TestCase):
 class TrackNameFromAudio(unittest.TestCase):
     """The header must show the track NAME, never the BPM. Shared_Memories had no title/track
     in run_meta, so the title fell through to None and the widget invented '123 BPM · 5:38' as
-    the heading (Sasha 2026-06-22: "это БПМ а не имя трека!!"). Fix: derive the name from the
+    the heading (2026-06-22: the heading showed the BPM where the track name belongs). Fix: derive the name from the
     source audio filename."""
     def test_humanize_audio_filename(self):
         self.assertEqual(

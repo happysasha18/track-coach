@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Development-mode read (SPEC §B.12 / matrix INV-32, Sasha 2026-06-23).
+"""Development-mode read (SPEC §B.12 / matrix INV-32, 2026-06-23).
 
 `development_mode(core)` is the OBSERVATION behind the Producer's read line "grows by loud + bright;
 stereo & density sit idle". It must (a) name each dominant axis WITH its direction (any axis can be

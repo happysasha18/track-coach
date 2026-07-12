@@ -2,7 +2,7 @@
 """CREDIBILITY guardrail tests — G1…G7, derived from docs/SPEC.md (the credibility layer) via
 product-prover (docs/prover_runs/spec_credibility_2026-06-20.md). Phase 3 of NEXT_STEPS #4.
 
-These are LAYER-1 necessary-condition tests: they do NOT pin the musical verdict (that needs Sasha's
+These are LAYER-1 necessary-condition tests: they do NOT pin the musical verdict (that needs the producer's
 golden labels — layer 2, blocked). They only assert what can NEVER be true if the credibility invariant
 CR-1 holds: "track-coach never presents, as fact, a number derived from invalid or insufficient input."
 "Don't cry wolf, and don't paint silence."
@@ -219,7 +219,7 @@ class G4_ScenesFollowSelfSimNotCoarseBounds(unittest.TestCase):
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 # G5 — CR-5: every scene named "Drop" is immediately preceded by a LOWER-intensity scene (the
-# required яма/build), and not more than ~⅓ of scenes are Drops (catches "весь из дропов").
+# required dip/build), and not more than ~⅓ of scenes are Drops (catches "all drops").
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 class G5_DropRequiresPrecedingDipAndIsCapped(unittest.TestCase):
     def setUp(self):
@@ -245,7 +245,7 @@ class G5_DropRequiresPrecedingDipAndIsCapped(unittest.TestCase):
                                 f"scene {i} '{sc['name']}' is a Drop but its predecessor is not lower (CR-5)")
 
     def test_continuously_loud_track_is_not_all_drops(self):
-        # the "весь из дропов" case: this fixture is loud throughout with NO dips. Old code (≥0.8 of peak
+        # the "all drops" case: this fixture is loud throughout with NO dips. Old code (≥0.8 of peak
         # ⇒ Drop) labelled all 6 segments Drop; the credible reading is zero drops (no lift), at most a
         # few. The structural cap: every Drop needs a strictly-lower non-Drop predecessor ⇒ Drops can
         # never be more than ~half the scenes. A continuously-loud track must fall well under that.
@@ -339,8 +339,8 @@ class G7_PerStemRepetitionOnlyOnSignificantStems(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G8 — KNOW WHAT YOU'RE LOOKING AT (Sasha, 2026-06-21). A credibility tool must announce its SOURCE:
-# you cannot trust a number if you don't know which track it came from. Sasha opened a widget and
+# G8 — KNOW WHAT YOU'RE LOOKING AT (2026-06-21). A credibility tool must announce its SOURCE:
+# you cannot trust a number if you don't know which track it came from. The producer opened a widget and
 # couldn't tell what it was — because it was hand-rendered WITHOUT --src-audio, so the header showed
 # only a free-text title. Guard: when the source filename is provided, the rendered header carries it.
 # (The complementary defence is process — always build via the orchestrator, which always passes
@@ -433,7 +433,7 @@ class G9_BledEnergyIsCaveatedNotAttributed(unittest.TestCase):
 # project family (“matches X”) ONLY for a "clear" verdict; "mixed"/"nomatch"/"empty"/"weak" must not
 # name a family at all. This is structurally guaranteed: only the map_clear string carries the {fam}
 # slot. Locking it here so a future edit can't start asserting a family for an uncertain match (which
-# would be exactly the wrong-label problem [[track-coach-stem-labels]] — Sasha makes electronic, so a
+# would be exactly the wrong-label problem [[track-coach-stem-labels]] — the producer makes electronic, so a
 # Demucs "vocals"/"guitar" label is an approximation, never an identity).
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 class G10_StemProjectMatchStatedOnlyWhenClear(unittest.TestCase):
@@ -495,7 +495,7 @@ class G11_PerStemRepetitionGatedToSignificant(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G12 — (g) stem CHARACTER labels (Sasha, 2026-06-21). Raw Demucs labels (vocals/guitar/…) are wrong
+# G12 — (g) stem CHARACTER labels (2026-06-21). Raw Demucs labels (vocals/guitar/…) are wrong
 # for electronic music, so we describe what the SOUND is from MEASURED features: frequency role (which
 # third of the spectrum carries the energy, EXCLUDING bled bands) × percussive-vs-sustained (onset rate).
 # Hard requirements: DETERMINISTIC (same track → same label every run) and gated to significant stems.
@@ -522,7 +522,7 @@ class G12_StemCharacterLabels(unittest.TestCase):
 
     def test_drums_stem_is_drums_not_kick(self):
         # s14 (§B.7): the whole `drums` stem is TRUSTED by identity → "drums", not reduced to "kick"
-        # (kick lives in the drum breakdown). Sasha: "kick вместо всего кита" was wrong.
+        # (kick lives in the drum breakdown). Reducing it to "kick instead of the whole kit" was wrong.
         self.assertEqual(self.ch["drums"]["label"], "drums")
         self.assertEqual(self.ch["drums"]["confidence"], "clear")
 
@@ -546,7 +546,7 @@ class G12_StemCharacterLabels(unittest.TestCase):
         self.assertNotIn("piano", self.ch, "a silent stem must not get a character label")
 
     def test_deterministic_same_input_same_label(self):
-        # Sasha's hard requirement: the same track must never be relabelled on a re-run.
+        # a hard requirement: the same track must never be relabelled on a re-run.
         a = bw.stem_character(self.mask, self.rh, bw.leakage_caveats(self.mask, self.rh))
         m2, r2 = self._setup()
         b = bw.stem_character(m2, r2, bw.leakage_caveats(m2, r2))
@@ -558,8 +558,8 @@ class G12_StemCharacterLabels(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G13 — split the honest mid·sustained "tonal" umbrella (Sasha, 2026-06-21: "аккорд или мелодия — я
-# думал это просто", and it IS: polyphony). MEASURED buckets only, no vocabulary: monophonic → lead
+# G13 — split the honest mid·sustained "tonal" umbrella (2026-06-21: "a chord or a melody — I
+# thought that was simple", and it IS: polyphony). MEASURED buckets only, no vocabulary: monophonic → lead
 # (loudest) / melody (quieter); polyphonic → pad (held) / chord (stabs); high spectral flatness → noise.
 # Every G13 label is `approx`; with NO transcribed notes we keep the honest "tonal" (CR-1). SPEC §B.4.
 # ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -635,7 +635,7 @@ class G13_TonalSplit(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G14 — robust freq-ROLE via a HIGH-PASS drop (Sasha's idea, 2026-06-21). Decide "is this a low/bass
+# G14 — robust freq-ROLE via a HIGH-PASS drop (2026-06-21). Decide "is this a low/bass
 # stem?" by how much loudness it LOSES when high-passed (sub+low dropped), not by which band is loudest.
 # Fixes two real-data failures found by deed: an intermittent bass read as ~silence at the median →
 # mislabeled mid; and a guitar's bled-in (loud) low → mislabeled bass. Relative drop, leakage-free.
@@ -729,7 +729,7 @@ class G15_PercussiveByContent(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G18 — freq-role from the per-stem FREQUENCY ANALYZER's spectral CENTROID (Sasha s14). When the masking
+# G18 — freq-role from the per-stem FREQUENCY ANALYZER's spectral CENTROID (s14). When the masking
 # carries spectral_centroid, a sustained stem's role follows where its energy sits (low/mid/high) — a
 # robust signal that replaces the crude 6-band high-pass. Falls back to the high-pass when no centroid.
 # An UNTRUSTED stem name is used (bass/drums are trusted by identity and never reach this path).
@@ -758,7 +758,7 @@ class G18_CentroidFreqRole(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G16 — INDIVIDUAL masking recs (Sasha's #2): name the masked part by its measured character + band +
+# G16 — INDIVIDUAL masking recs (request #2): name the masked part by its measured character + band +
 # worst time, not a generic template line with the raw Demucs name. Gated to significant stems.
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 class G16_IndividualMaskingRecs(unittest.TestCase):
@@ -801,7 +801,7 @@ class G16_IndividualMaskingRecs(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G17 — the late_entry rec names the PART, never the raw Demucs name (SPEC §B.6, Sasha's #2 cont.).
+# G17 — the late_entry rec names the PART, never the raw Demucs name (SPEC §B.6, request #2 cont.).
 # late_entry is by definition about a near-silent stem, so a G16 character label is usually ABSENT —
 # the honest naming hierarchy is: character label → stemmap real-track name (only verdict 'clear') →
 # neutral "a new element". The raw Demucs family name ('vocals'/'guitar') must NEVER reach the card.
@@ -867,7 +867,7 @@ class G17_LateEntryNamesThePart(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G19 — PRECISE masking frequency (Sasha s14, idea a): the coarse band only says THAT the bass buries a
+# G19 — PRECISE masking frequency (s14, idea a): the coarse band only says THAT the bass buries a
 # part; the per-stem spectra say WHERE inside the band they fight, so the rec names a cut frequency
 # ("≈380 Hz") instead of the whole "250–600 Hz". Defensible: the spot = worst spectral OVERLAP, and we
 # only name it when the buried part actually has energy there; otherwise None → keep the band range.
@@ -1011,7 +1011,7 @@ class G20_RepetitionSurfacing(unittest.TestCase):
 
     def test_dedupes_shared_loop_labels_no_salad(self):
         # two loopers share the 'mid' label (real on Lazy_Sparks: other+guitar) → "the mid, the mid" is the
-        # salad Sasha killed; must collapse to one "the mid".
+        # salad we killed; must collapse to one "the mid".
         m = _masking({"bass": -20, "other": -22, "guitar": -24, "drums": -23})
         ch = {"bass": {"label": "bass"}, "other": {"label": "mid"},
               "guitar": {"label": "mid"}, "drums": {"label": "drums"}}
@@ -1025,7 +1025,7 @@ class G20_RepetitionSurfacing(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────
-# G21 — "Where does it get boring?" (Sasha, 2026-06-22). For an EVOLVING track, the onset after which no
+# G21 — "Where does it get boring?" (2026-06-22). For an EVOLVING track, the onset after which no
 # NEW section is introduced (everything after only recombines earlier material). Measured from the self-sim
 # segment letters; gated so it never fires on a track that doesn't develop, nor when new ideas keep arriving.
 # ──────────────────────────────────────────────────────────────────────────────────────────────
