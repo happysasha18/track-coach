@@ -392,6 +392,19 @@ state hides the reference column but leaves the DJ column visible; owning test l
 
 ## §8 — Coverage status
 
+**▶ Pre-promotion coverage walk (s65, 2026-07-12).** Re-walked the checklist at the current suite after the
+s65 closing batch (1.5.2–1.5.4). Mechanical cross-referencing is green and continuous — `test_traceability`
+(7 checks) holds every anchor→row, row→test, and the SPEC↔matrix reverse map on every commit. This session's
+new invariants all carry their rows and tests: **G-INV-21** (a synthetic/smoke run never deposits) +
+**G-INV-22** (the migrate banner tells a track to move from a source that is gone), **RC-INV-12** (the
+"Measured N of M signals" completeness line, retiring its "not built" tombstone), and **INV-29/INV-30** (the
+header source line — symmetry + long-name readability), the latter two now LIVE (their PROPOSED skips
+removed, SPEC anchors written in §B.13). Suite **832 passed / 0 skipped** on a machine with headless Chrome +
+Node present; the only conditional skips left are the browser/runtime-gated `test_headless_render` /
+Node rows, which skip only where that runtime is absent (machine-dependent, not a coverage hole). The four
+rework-questions below (s56) still hold; no new node was added this batch (the changes landed in the existing
+library (N21), catalog (N20), and widget-render nodes).
+
 **▶ 1.0-gate coverage walk (s56, 2026-07-05 — pass 2 of the pre-1.0 audit; the block below this is the older
 s12 status, kept as history).** Walked against the CURRENT invariant set (through the 24 `ARCHITECTURE.md`
 nodes), answering the four rework-questions:
@@ -410,7 +423,8 @@ nodes), answering the four rework-questions:
   INV-47 proven red-on-bug on the quick fixture).
 - **Matrix→test existence:** every named owning-test resolves (s56 worker cross-ref of all 20 cited files;
   one stale label `MissingIsNotZero::manifest` → `::test_manifest_lists_only_measured_axes` fixed). Suite
-  763/2, skip-set = {INV-29, INV-30} exactly.
+  763/2 at that walk, skip-set then = {INV-29, INV-30} exactly (both LANDED s65 — see the s65 walk above; the
+  suite now runs them, 832/0 on a Chrome+Node machine).
 - **Two-family reminder still holds:** this INV grid does NOT enumerate the credibility G-guards (CR-*/G1–G21,
   `test_credibility`, SPEC §B.2–B.10) — a full "what's uncovered?" sweep reads BOTH.
 
