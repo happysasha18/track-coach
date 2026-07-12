@@ -140,12 +140,12 @@ worse than a question.
   `Backup/`), then **SHOW the list and ASK which one is THIS track** — don't assume the base
   `.als` reflects the arrangement (Live keeps the default 4/4 in `RemoteableTimeSignature`
   while the real meter changes live in the time-signature AUTOMATION; the wrong file reads as
-  a flat 4/4). *(Alexander 2026-07-02: "не тот алс, там их несколько — умей спросить на что смотреть.")*
+  a flat 4/4). *(2026-07-02)*
 - **The audio may be many BLOCKS with silence between them** (multiple takes/sections on one
   timeline, long gaps in the middle). Don't analyse one flat span blind: detect the non-silent
   blocks first, and if there's more than one substantial block, **SHOW where they are and ASK
   which block is the track** (or whether to treat the whole thing as one). Don't read silence
-  as content. *(Alexander 2026-07-02: "умей смотреть на какой блок если там много тишины в середине.")*
+  as content. *(2026-07-02)*
 - If the audio is a render of a *section*, you still need the render offset — ask which
   locator it starts from (see Step 2).
 Tell the user which files/blocks you picked before running, so a wrong guess is caught early.
@@ -805,7 +805,7 @@ Forbidden in this section:
 - [ ] Demucs wait filled with substantive text (not silence)
 - [ ] All dependency versions pinned
 - [ ] No monetisation language
-- [ ] **Pre-render smoke passed on the REAL widget before showing Alexander** — `uv run --python 3.11 python scripts/prerender_smoke.py <widget.html>` (exit 0). Catches a broken render — JS console error, an escaped-tag leak, an empty recs panel, a missing core surface — that a string test cannot see, so a human never spots it first.
+- [ ] **Pre-render smoke passed on the REAL widget before showing the user** — `uv run --python 3.11 python scripts/prerender_smoke.py <widget.html>` (exit 0). Catches a broken render — JS console error, an escaped-tag leak, an empty recs panel, a missing core surface — that a string test cannot see, so a human never spots it first.
 
 
 ## Library management — cleanup verbs
