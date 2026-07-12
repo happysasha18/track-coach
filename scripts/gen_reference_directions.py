@@ -72,25 +72,31 @@ def album_runs(root: str) -> dict:
     return out
 
 
-# ---- reference album roots ----
-# Relocated 2026-07-12 out of ~/Downloads into the tool's home so the analysis
-# output no longer sits inside the download folders (migration-2026-07-12 dump).
-DL = H("~/.track-coach/migrated-2026-07-12/Downloads")
-DEEP = DL + "/DeepChord - Auratones [2017](Soma Quality Recordings SOMA CD117 UK)/split/reenc/track-coach-output"
-CUB  = DL + "/Venetian Snares - Cubist Reggae - (2011)/track-coach-output"
-SCSI = DL + "/SCSI-9 - The Line Of Nine (2006)/track-coach-output"
-
 # Display names for each direction (used as JSON keys)
 DIR_DISPLAY = {
     "DeepChord": "DeepChord",
     "Venetian":  "Venetian Snares",
     "SCSI-9":    "SCSI-9",
 }
-DIR_ROOTS = {
-    "DeepChord": DEEP,
-    "Venetian":  CUB,
-    "SCSI-9":    SCSI,
-}
+
+
+def load_dir_roots():
+    """Reference-album roots for REGENERATING the shipped data/reference_directions.json — read from a
+    machine-local config `data/reference_album_roots.json` ({group: path}), so this generator is bound to
+    no one's machine. The config is gitignored; the committed `data/reference_album_roots.json.template`
+    shows its shape. Returns {} with a plain note when it is absent — the shipped directions JSON already
+    exists, so a fresh checkout needs this only to regenerate."""
+    cfg = SCRIPTS.parent / "data" / "reference_album_roots.json"
+    if not cfg.is_file():
+        print(f"note: {cfg.name} not found — copy data/reference_album_roots.json.template and fill in "
+              f"your reference-album roots to regenerate; proceeding with own library tracks only.")
+        return {}
+    try:
+        return {g: os.path.expanduser(p) for g, p in json.loads(cfg.read_text()).items()
+                if not g.startswith("_")}
+    except (ValueError, OSError) as exc:
+        print(f"WARNING: could not read {cfg.name}: {exc}")
+        return {}
 
 
 def main():
@@ -111,7 +117,7 @@ def main():
             print(f"  [HIS SKIP]  {e.get('track', '?')[:40]} — no masking/core JSON")
 
     # Reference tracks
-    for group, root in DIR_ROOTS.items():
+    for group, root in load_dir_roots().items():
         if not os.path.isdir(root):
             print(f"  WARNING: {group} root not found: {root}")
             continue

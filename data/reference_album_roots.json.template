@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to reference_album_roots.json (gitignored) to regenerate data/reference_directions.json. Each value is the track-coach output root for that reference album — the folder holding <track>/<run>/ analysis dirs. Keys are the direction group names used by gen_reference_directions.py.",
+  "DeepChord": "/absolute/path/to/your/DeepChord reference album/track-coach-output",
+  "Venetian": "/absolute/path/to/your/Venetian Snares reference album/track-coach-output",
+  "SCSI-9": "/absolute/path/to/your/SCSI-9 reference album/track-coach-output"
+}

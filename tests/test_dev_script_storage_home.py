@@ -23,6 +23,7 @@ FORBIDDEN_ROOTS = [
     r'H\(\s*["\']~/Desktop',
     r'Path\.home\(\)\s*/\s*["\']Desktop["\']',
     r'Path\.home\(\)\s*/\s*["\']Downloads["\']',
+    r'migrated-\d{4}-\d{2}-\d{2}',  # a dated migration dump is a personal-machine path, never a data root
 ]
 
 

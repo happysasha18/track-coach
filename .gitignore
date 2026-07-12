@@ -45,6 +45,8 @@ JOURNAL.md
 # Session scratch / working notes under data/ — resume trail, kept on disk, not committed.
 # (Real data under data/ is JSON: reference_*.json, facet_confirmation.json — those stay tracked.)
 data/*.md
+# machine-local reference-album roots (personal paths) — regeneration input, never shipped; template is tracked
+data/reference_album_roots.json
 /catalog.json
 
 # harness worktree/isolation state — never commit

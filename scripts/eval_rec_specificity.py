@@ -71,29 +71,32 @@ def _eval(name, d):
     return name, _metrics(tmpl), _metrics(perstem)
 
 
+def _library_runs():
+    """(label, run_dir) for the newest run of every track in the library output root that exists on disk.
+    Product-fit: works on whatever the user has analysed, binds to no one's machine."""
+    proj = Path.home() / ".track-coach" / "projects"
+    out = []
+    if not proj.is_dir():
+        return out
+    for td in sorted(proj.iterdir()):
+        if not td.is_dir():
+            continue
+        rd = [p for p in td.iterdir() if p.is_dir() and p.name != "latest"]
+        if rd:
+            out.append((td.name, str(max(rd, key=lambda p: p.stat().st_mtime))))
+    return out
+
+
 def main(argv):
-    # default deposited library tracks (use the regenerated-with-spectrum masking for Lazy if present)
-    # Relocated 2026-07-12 out of ~/Desktop/Projects into the tool's home (migration-2026-07-12 dump).
-    base = Path.home() / ".track-coach" / "migrated-2026-07-12" / "Desktop" / "Projects"
-    defaults = [
-        ("Lazy_Sparks", base / "Lazy_Sparks/Lazy_Sparks Project/track-coach-output/Total_Reboot_Lazy_Sparks_edit2026/2026-06-20_2100"),
-        ("Shared_Memories", base / "Shared Memories Folders/Shared_Memories/Shared_Memories Project/track-coach-output/Shared_Memories_2026"),
-        ("Wobble_Drift", base / "Fragile_Live12.1.1 Project/track-coach-output/Total_Reboot_Wobble_Drift_v0.6.2"),
-    ]
-    runs = [(Path(a).name, a) for a in argv] + [(lbl, str(p)) for lbl, p in defaults]
+    # Explicit run dirs win; with none, scan the library output root for the newest run per track that
+    # carries per-stem data. No personal defaults — this eval binds to no one's machine.
+    runs = [(Path(a).name, a) for a in argv] if argv else _library_runs()
 
     rows = []
     for label, run in runs:
         d = _discover(run)
         if not d:
             continue
-        # prefer a regenerated masking carrying `spectrum` (for the G19 freq metric) when one exists —
-        # older deposited maskings predate the per-stem spectrum (0.8.14), so the freq metric needs it.
-        for needle, tmp in (("Lazy_Sparks", "/tmp/tc_g19_mask.json"),
-                            ("Shared_Memories", "/tmp/tc_eval_shared_mask.json"),
-                            ("Wobble_Drift", "/tmp/tc_eval_wobble_mask.json")):
-            if needle in run and os.path.isfile(tmp):
-                d["masking"] = json.load(open(tmp))
         rows.append(_eval(label, d))
 
     if not rows:
