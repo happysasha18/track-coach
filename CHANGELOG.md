@@ -5,6 +5,25 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.6.1] — 2026-07-12
+
+### Fixed
+- **`revalidate --apply` now actually completes a run — or tells you it couldn't.** Completing an older run
+  silently did nothing: it looked for the source file under the wrong field, so a run recorded before that
+  field existed (like *Wobble Drift*) was skipped while the command still reported success. Now it finds the
+  source correctly, and if the source file is missing or unrecorded it says so and exits with an error instead
+  of pretending the run is done. After a pass it re-checks every run and fails loudly if any stayed incomplete —
+  a run is complete or the tool tells you it failed, never a quiet half-finish.
+- **Re-measuring a track no longer leaves a duplicate in your library.** When a completed run's short name had
+  changed since the original (a naming rule that shifted between versions), the fresh complete run was added
+  *next to* the old incomplete one instead of replacing it — a doubled catalog row. The old, superseded run is
+  now removed once the fresh one lands, so the redone track shows once.
+
+### Added
+- **Reference tracks are validity-checked before they shape a direction.** A reference album never enters your
+  library, so it skipped the completeness check; an incomplete reference run could quietly skew a nearest-artist
+  direction. Now each reference run is checked where it's used, and an incomplete one is left out.
+
 ## [1.6.0] — 2026-07-12
 
 ### Added

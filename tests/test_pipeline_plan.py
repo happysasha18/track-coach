@@ -13,7 +13,7 @@ lived in the orchestration seams, so this is exactly where a regression test pay
 
 Pure stdlib unittest, so it runs with plain `python3 -m unittest` — no pytest needed.
 """
-import json, re, subprocess, sys, tempfile, unittest
+import json, os, re, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "track_analyzer.py"
@@ -251,9 +251,17 @@ class RunValidityOrchestration(unittest.TestCase):
     def _bands(self, db):
         return {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
 
-    def _run(self, base, name, *, sustain, audio="/music/x.wav"):
+    def _run(self, base, name, *, sustain, audio="/music/x.wav", audio_path=None):
         run = Path(base) / name; run.mkdir(parents=True)
-        (run / "run_meta.json").write_text(json.dumps({"audio": audio, "mode": "full"}))
+        meta = {"mode": "full", "track": name}
+        # Real runs store the FULL source path under 'audio_path'; the 'audio' key is a bare
+        # basename (new runs) or absent (old v0.6.x runs). Mirror that so the resolver is tested
+        # against the shape on disk, not a convenient full-path-under-'audio' fixture.
+        if audio is not None:
+            meta["audio"] = audio
+        if audio_path is not None:
+            meta["audio_path"] = audio_path
+        (run / "run_meta.json").write_text(json.dumps(meta))
         (run / "result_core.json").write_text(json.dumps({
             "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
             "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
@@ -291,6 +299,51 @@ class RunValidityOrchestration(unittest.TestCase):
             self.assertIn("analyze", cmds[0])
             self.assertIn("/music/track.wav", cmds[0])
             self.assertIn("--only-this", cmds[0], "the re-measure must not re-trigger the backfill")
+
+    def test_complete_run_resolves_audio_path_key(self):
+        """A run that stored its source only under 'audio_path' (old v0.6.x shape, and the key
+        every real run writes) must still be completable — the resolver reads audio_path, not just
+        the bare 'audio' basename. Regression: Wobble Drift no-oped silently. RC-INV-13a."""
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            partial = self._run(d, "partial", sustain=False, audio=None,
+                                 audio_path="/music/track.wav")
+            cmds = ta._complete_run(partial, dry=True)
+            self.assertIsNotNone(cmds, "a run with only audio_path must still be completable")
+            self.assertIn("/music/track.wav", cmds[0])
+            self.assertIn("--only-this", cmds[0])
+
+    def test_revalidate_apply_fails_loud_when_source_gone(self):
+        """`revalidate --apply` must never report success while a run stays incomplete. When the
+        source audio is unrecorded/gone it cannot complete the run, so it exits non-zero and says
+        so — a run is complete or the tool tells you it failed, never a silent partial. RC-INV-13."""
+        with tempfile.TemporaryDirectory() as d:
+            partial = self._run(d, "partial", sustain=False, audio=None,
+                                 audio_path="/does/not/exist.wav")
+            lib = Path(d) / "lib"; (lib / "widgets").mkdir(parents=True)
+            index = {"entries": [
+                {"track": "Partial", "mode": "full", "src_run_dir": partial, "widget": "p.html"}]}
+            (lib / "index.json").write_text(json.dumps(index))
+            env = dict(os.environ, TRACK_COACH_LIBRARY=str(lib))
+            out = subprocess.run([sys.executable, str(SCRIPT), "revalidate", "--apply"],
+                                 text=True, capture_output=True, env=env)
+            self.assertNotEqual(out.returncode, 0,
+                                "must exit non-zero when a run could not be completed")
+            self.assertIn("could not", (out.stdout + out.stderr).lower())
+
+    def test_reference_run_validity_guard(self):
+        """RC-INV-13e: a reference run about to feed a direction centroid is judged for validity at
+        the point of use (reference runs never deposit, so the library gate never reaches them). An
+        incomplete one is reported invalid with its unmeasured reads; a complete one passes."""
+        import gen_reference_directions as g
+        with tempfile.TemporaryDirectory() as d:
+            partial = self._run(d, "partial", sustain=False)  # other significant, sustain missing
+            whole = self._run(d, "whole", sustain=True)
+            ok_p, un_p = g._run_valid(partial)
+            ok_w, un_w = g._run_valid(whole)
+            self.assertFalse(ok_p, "an incomplete reference run must be judged invalid")
+            self.assertIn("pad sustain", un_p)
+            self.assertTrue(ok_w, "a complete reference run must pass the guard")
 
     def test_flags_exposed(self):
         for cmd, flag in (("analyze", "--only-this"), ("build", "--only-this"),

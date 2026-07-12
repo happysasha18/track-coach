@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.6.0"  # Track Coach analyzer version — s65: run validity (RC-INV-13) — a run is complete or it does not exist; an incomplete run never enters the library and is completed (revalidate); the completeness line reads "absent in this track"; analysis OUTPUT unchanged (validity is a new gate, not a value change), so nothing stales
+TC_VERSION = "1.6.1"  # Track Coach analyzer version — s66: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /

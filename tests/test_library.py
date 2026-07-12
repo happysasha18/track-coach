@@ -475,6 +475,28 @@ class IncompleteRunNotDeposited(unittest.TestCase):
             finally:
                 del os.environ["TRACK_COACH_LIBRARY"]
 
+    def test_forget_run_supersedes_old_deposit(self):
+        """When a run is redone, its old deposit must cease to exist — forget_run drops the entry
+        (and its widget file) by src_run_dir, matching even a slug that drifted. RC-INV-13."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = self._run(d, sustain=True)
+                w = run / "analysis_widget.html"
+                entry = library.deposit_from_run(run, w, {"track": "Wobble", "mode": "full"})
+                root = library.library_root()
+                self.assertTrue((root / "widgets" / entry["widget"]).exists())
+                gone = library.forget_run(root, run)
+                self.assertEqual(gone, 1, "the deposit for this run dir is forgotten")
+                self.assertEqual(library.load_index(root)["entries"], [],
+                                 "no lingering incomplete entry after a redo")
+                self.assertFalse((root / "widgets" / entry["widget"]).exists(),
+                                 "the old widget file is removed too")
+                self.assertEqual(library.forget_run(root, run), 0,
+                                 "forgetting an already-gone run is a no-op")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
 
 class ReferenceCleanup(unittest.TestCase):
     """G-INV-20: dereference command drops reference entries by album-path substring."""

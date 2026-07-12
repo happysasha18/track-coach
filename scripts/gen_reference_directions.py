@@ -30,6 +30,16 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 from fingerprints import fingerprint_from_run_dir, AXES
 import completeness as C
+import validity as V
+
+
+def _run_valid(run_dir: str):
+    """RC-INV-13e: (is_valid, unmeasured_reads) for a run about to feed a direction centroid.
+    Reference runs never deposit, so the library's validity gate never reaches them — a partial
+    reference run would silently pollute the averaged centroid. Judge it here, at the point of use,
+    with the run's own recorded mode."""
+    mode = (_jload(os.path.join(run_dir, "run_meta.json")) or {}).get("mode", "full")
+    return V.validity(run_dir, mode)
 
 
 H = os.path.expanduser
@@ -109,6 +119,11 @@ def main():
         src = e.get("src_run_dir", "")
         if not src:
             continue
+        ok, unmeasured = _run_valid(src)
+        if not ok:
+            print(f"  [HIS SKIP]  {e.get('track', '?')[:40]} — incomplete run "
+                  f"(unmeasured {', '.join(unmeasured)}); excluded from the centroid (RC-INV-13e)")
+            continue
         fp = fingerprint_from_run_dir(src)
         if fp:
             tracks.append(("HIS", fp))
@@ -123,6 +138,11 @@ def main():
             continue
         runs = album_runs(root)
         for name, rd in runs.items():
+            ok, unmeasured = _run_valid(rd)
+            if not ok:
+                print(f"  [SKIP] {group} / {name} — incomplete run "
+                      f"(unmeasured {', '.join(unmeasured)}); excluded from the centroid (RC-INV-13e)")
+                continue
             fp = fingerprint_from_run_dir(rd)
             if fp:
                 tracks.append((group, fp))

@@ -583,10 +583,18 @@ def _complete_run(run_dir, *, dry=False):
     Re-analyses the stored audio (`--only-this`, so it never re-triggers the backfill), carries the
     existing read forward, then rebuilds — the fresh complete run deposits and supersedes the old
     entry by track slug. `dry` returns the planned commands without running Demucs."""
-    audio = _run_meta(run_dir).get("audio")
-    if not audio:
+    meta = _run_meta(run_dir)
+    # The source path lives under 'audio_path' (every real run writes it); the 'audio' key is only
+    # a bare basename on new runs and is absent on old v0.6.x runs — reading it alone silently
+    # no-ops the completion (the Wobble Drift regression). Prefer the real path; require it to
+    # exist before spending Demucs (RC-INV-13a).
+    audio = meta.get("audio_path") or meta.get("audio")
+    if not audio or (not dry and not Path(audio).exists()):
+        print(f"  · could not complete {meta.get('track') or run_dir}: its source audio is "
+              f"unrecorded or gone ({audio or 'no path stored'}) — re-analyse it from the file "
+              f"by hand.", file=sys.stderr)
         return None
-    mode = _run_meta(run_dir).get("mode", "full")
+    mode = meta.get("mode", "full")
     py, script = sys.executable, str(Path(__file__).resolve())
     analyze_cmd = [py, script, "analyze", audio, "--mode", mode, "--only-this"]
     if dry:
@@ -608,6 +616,18 @@ def _complete_run(run_dir, *, dry=False):
         shutil.copy2(old_nar, Path(new_dir) / "narrative.md")  # carry the read forward
     build_cmd = [py, script, "build", "--run-dir", new_dir, "--only-this"]
     subprocess.run(build_cmd)
+    # The fresh complete run has deposited; the old invalid run must now cease to exist (RC-INV-13),
+    # else it lingers in the library/catalog and keeps failing the validity gate. Superseding by slug
+    # alone misses a run whose slug drifted between analysis versions (the folder name changed), so
+    # forget the OLD deposit explicitly by its run dir. Guarded so a same-folder re-analysis (slug
+    # stable, unlikely — analyze writes a fresh dated folder) never forgets the run just deposited.
+    if Path(new_dir).resolve() != Path(run_dir).resolve():
+        import library as _lib
+        gone = _lib.forget_run(_lib.library_root(), run_dir)
+        if gone:
+            print(f"  · superseded the old incomplete deposit ({gone} entr"
+                  f"{'y' if gone == 1 else 'ies'}) — the run has been redone (RC-INV-13).",
+                  file=sys.stderr)
     return [analyze_cmd, build_cmd]
 
 
@@ -635,11 +655,21 @@ def cmd_revalidate(args):
     if not args.apply:
         print("re-run with `revalidate --apply` to complete them (re-measures each — Demucs).")
         return
-    for e, sd, unmeasured in inc:
-        if args.only and args.only.lower() not in (e.get("track") or "").lower():
-            continue
+    targeted = [(e, sd, un) for e, sd, un in inc
+                if not args.only or args.only.lower() in (e.get("track") or "").lower()]
+    for e, sd, unmeasured in targeted:
         print(f"  · completing {e.get('track')} …", file=sys.stderr)
         _complete_run(sd)
+    # RC-INV-13: a run is complete or the tool says it failed — verify by deed after the pass, so a
+    # completion that silently no-oped (missing source, failed detector) is never reported as done.
+    still = [(e, sd, un) for e, sd, un in _incomplete_deposits()
+             if not args.only or args.only.lower() in (e.get("track") or "").lower()]
+    if still:
+        print(f"could not complete {len(still)} run(s):", file=sys.stderr)
+        for e, sd, un in still:
+            print(f"  {e.get('track')}: still unmeasured {', '.join(un)}", file=sys.stderr)
+        sys.exit(1)
+    print(f"completed {len(targeted)} run(s); all targeted runs are now valid (RC-INV-13).")
 
 
 # ── cli ───────────────────────────────────────────────────────────────────────────────

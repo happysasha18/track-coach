@@ -278,6 +278,33 @@ def save_index(root: Path, idx: dict):
     (root / "index.json").write_text(json.dumps(idx, ensure_ascii=False, indent=2))
 
 
+def forget_run(root: Path, src_run_dir) -> int:
+    """Drop every library entry deposited from ``src_run_dir`` (delete its widget file too) and
+    rewrite the index. Returns the count removed.
+
+    Used when a run is superseded: an invalid run that has just been re-measured and re-deposited
+    as a fresh complete run must cease to exist (RC-INV-13) — otherwise the old, incomplete deposit
+    lingers in the catalog and the validity gate keeps flagging it. Matches by resolved path so a
+    slug that drifted between analysis versions (the folder name changed) is still forgotten."""
+    src = str(Path(src_run_dir).resolve())
+    idx = load_index(root)
+    wdir = root / "widgets"
+    keep, removed = [], 0
+    for e in idx.get("entries", []):
+        sd = e.get("src_run_dir", "")
+        if sd and str(Path(sd).resolve()) == src:
+            f = wdir / e.get("widget", "")
+            if e.get("widget") and f.exists():
+                f.unlink()
+            removed += 1
+        else:
+            keep.append(e)
+    if removed:
+        idx["entries"] = keep
+        save_index(root, idx)
+    return removed
+
+
 def upsert(entries, entry):
     """Replace an entry with the same widget filename, else append. Returns the list.
 
