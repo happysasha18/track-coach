@@ -335,6 +335,12 @@ def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
             "refusing to deposit: run is synthetic/smoke (G-INV-21) — "
             "fixture runs never enter the library")
     run_dir = Path(run_dir)
+    import validity as _validity  # lazy: avoids a load-order cycle (validity → build_widget → …)
+    _ok, _unmeasured = _validity.validity(run_dir, meta.get("mode", "full"))
+    if not _ok:
+        raise DepositError(
+            "refusing to deposit: run is incomplete (RC-INV-13) — unmeasured signals: "
+            f"{', '.join(_unmeasured)}; complete the run (revalidate --apply) before it enters the library")
     core = {}
     cp = run_dir / "result_core.json"
     if cp.exists():

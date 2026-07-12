@@ -106,8 +106,8 @@ class CompletenessLineShipped(unittest.TestCase):
                       "the widget must ship the RC-INV-12 completeness line")
         self.assertIn("of 14 signals", html, "a full run promises all 14 signals")
         self.assertIn("Measured", html)
-        # a core-only full run measured only the 5 mix signals → 9 stem reads disclosed as skipped
-        self.assertIn("skipped:", html)
+        # a core-only full run has no stems, so the nine stem signals read as absent in this track
+        self.assertIn("absent in this track:", html)
         self.assertIn("bass sustain", html)
 
     def test_quick_counts_mix_signals_only(self):

@@ -28,7 +28,7 @@ to `tc_uv.sh <profile> <script>` so dependency profiles (core/fast/deep/bp) stay
 and the run is shell-agnostic. A single `$STEMS` var feeds every deep step — the path-class
 bug cannot recur. `--dry-run` prints the plan without running anything.
 """
-import argparse, hashlib, json, os, re, shlex, subprocess, sys
+import argparse, hashlib, json, os, re, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -546,6 +546,100 @@ def cmd_build(args):
         except Exception as e:  # noqa: BLE001 — catalog is a convenience, not a hard dep
             print(f"  · catalog skipped: {e}", file=sys.stderr)
     print(str(widget))
+    # RC-INV-13c: by default, running the tool also completes any incomplete prior runs, so no
+    # partial data is left lying around. `--only-this` opts out (run exactly this track, nothing else).
+    if not args.dry_run and not getattr(args, "only_this", False):
+        _backfill_incomplete()
+
+
+# ── RC-INV-13: run validity — complete or it does not exist ────────────────────────────
+
+def _run_meta(run_dir) -> dict:
+    try:
+        return json.loads((Path(run_dir) / "run_meta.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _incomplete_deposits(root=None):
+    """Deposited library runs judged invalid (RC-INV-13): [(entry, run_dir, unmeasured_reads)].
+    A run whose source is gone, or that carries no analysis to judge, is not listed here."""
+    import library
+    import validity
+    idx = library.load_index(root if root is not None else library.library_root())
+    out = []
+    for e in idx.get("entries", []):
+        sd = e.get("src_run_dir")
+        if not sd or not Path(sd).exists():
+            continue
+        ok, unmeasured = validity.validity(sd, e.get("mode", "full"))
+        if not ok:
+            out.append((e, sd, unmeasured))
+    return out
+
+
+def _complete_run(run_dir, *, dry=False):
+    """Re-measure + re-render one run so its unmeasured-but-present signals get filled (RC-INV-13a).
+    Re-analyses the stored audio (`--only-this`, so it never re-triggers the backfill), carries the
+    existing read forward, then rebuilds — the fresh complete run deposits and supersedes the old
+    entry by track slug. `dry` returns the planned commands without running Demucs."""
+    audio = _run_meta(run_dir).get("audio")
+    if not audio:
+        return None
+    mode = _run_meta(run_dir).get("mode", "full")
+    py, script = sys.executable, str(Path(__file__).resolve())
+    analyze_cmd = [py, script, "analyze", audio, "--mode", mode, "--only-this"]
+    if dry:
+        return [analyze_cmd]
+    res = subprocess.run(analyze_cmd, capture_output=True, text=True)
+    new_dir = None
+    for line in res.stdout.splitlines():
+        try:
+            new_dir = json.loads(line).get("run_dir")
+            if new_dir:
+                break
+        except ValueError:
+            continue
+    if not new_dir:
+        print(f"  · could not locate the re-measured run for {run_dir}", file=sys.stderr)
+        return [analyze_cmd]
+    old_nar = Path(run_dir) / "narrative.md"
+    if old_nar.exists():
+        shutil.copy2(old_nar, Path(new_dir) / "narrative.md")  # carry the read forward
+    build_cmd = [py, script, "build", "--run-dir", new_dir, "--only-this"]
+    subprocess.run(build_cmd)
+    return [analyze_cmd, build_cmd]
+
+
+def _backfill_incomplete():
+    """Announce and complete every incomplete deposited run (RC-INV-13c). Never silent."""
+    inc = _incomplete_deposits()
+    if not inc:
+        return
+    print(f"  · completing {len(inc)} incomplete run(s) so no partial data is left "
+          f"(pass --only-this to skip):", file=sys.stderr)
+    for e, sd, unmeasured in inc:
+        print(f"    – {e.get('track')}: needs {', '.join(unmeasured)}", file=sys.stderr)
+        _complete_run(sd)
+
+
+def cmd_revalidate(args):
+    """Report the library's incomplete runs (RC-INV-13); `--apply` re-measures + re-renders each."""
+    inc = _incomplete_deposits()
+    if not inc:
+        print("all library runs are complete (RC-INV-13).")
+        return
+    print(f"{len(inc)} incomplete run(s):")
+    for e, sd, unmeasured in inc:
+        print(f"  {e.get('track')}: unmeasured {', '.join(unmeasured)}")
+    if not args.apply:
+        print("re-run with `revalidate --apply` to complete them (re-measures each — Demucs).")
+        return
+    for e, sd, unmeasured in inc:
+        if args.only and args.only.lower() not in (e.get("track") or "").lower():
+            continue
+        print(f"  · completing {e.get('track')} …", file=sys.stderr)
+        _complete_run(sd)
 
 
 # ── cli ───────────────────────────────────────────────────────────────────────────────
@@ -602,6 +696,8 @@ def main():
                    help="artist name for the reference track (stored in run_meta.json)")
     a.add_argument("--synthetic", action="store_true",
                    help="analyse as a synthetic/smoke run (kept OUT of your library, G-INV-21)")
+    a.add_argument("--only-this", action="store_true",
+                   help="run exactly this track; do NOT also complete incomplete prior runs (RC-INV-13c)")
     a.set_defaults(func=cmd_analyze)
     # NOTE: render-only flags (--title/--verdict/--src-audio/--strings) live on `build`, not here —
     # analyze only measures; the widget (and the read it carries) is rendered by `build`.
@@ -622,6 +718,8 @@ def main():
     b.add_argument("--strings", default=None)
     b.add_argument("--no-catalog", action="store_true", help="skip the cross-version catalog")
     b.add_argument("--no-deposit", action="store_true", help="don't copy the widget into the global library")
+    b.add_argument("--only-this", action="store_true",
+                   help="build exactly this run; do NOT also complete incomplete prior runs (RC-INV-13c)")
     b.add_argument("--dry-run", action="store_true")
     b.set_defaults(func=cmd_build)
 
@@ -633,6 +731,14 @@ def main():
     m.add_argument("--base", default=None,
                    help="output root (default: ~/.track-coach/); migrate into <base>/projects/<slug>/")
     m.set_defaults(func=cmd_migrate)
+
+    rv = sub.add_parser(
+        "revalidate",
+        help="report library runs that are incomplete (RC-INV-13); --apply re-measures + rebuilds each")
+    rv.add_argument("--apply", action="store_true",
+                    help="complete each incomplete run (re-measures — Demucs); dry-run report by default")
+    rv.add_argument("--only", default=None, help="limit --apply to tracks whose name contains this")
+    rv.set_defaults(func=cmd_revalidate)
 
     args = p.parse_args()
     args.func(args)

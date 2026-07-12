@@ -73,7 +73,13 @@ def validity(run_dir, mode: str = "full"):
 
     Invalid iff any promised-and-present signal was left unmeasured (a broken measurement). The
     returned reads are the plain producer names of those unmeasured present signals — what a redo
-    must recover. A run whose only gaps are gate-absent parts is valid (unmeasured_reads empty)."""
+    must recover. A run whose only gaps are gate-absent parts is valid (unmeasured_reads empty).
+
+    A run with no `result_core.json` carries no analysis to judge (an empty fixture, a run that never
+    measured anything) — this gate leaves it alone and reports valid; that is a different failure,
+    not an incomplete measurement."""
+    if not FP._jload(str(run_dir) + "/result_core.json"):
+        return True, []
     present = present_axes(run_dir, mode)
     measured = FP.measured_axes(run_dir)
     unmeasured = present - measured

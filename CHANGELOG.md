@@ -5,6 +5,28 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.6.0] — 2026-07-12
+
+### Added
+- **A run is now either complete or it doesn't count — no more half-measured analyses shown as finished.**
+  If the tool measures a track but one of the parts that IS in the music didn't get read (an old run that
+  never computed sustain, a stem that wasn't transcribed), that run no longer lands in your library as if it
+  were whole. A new `revalidate` command lists any incomplete runs and what each is missing — e.g. *"1
+  incomplete run: Wobble Drift — unmeasured bass sustain, harmonic brightness, pad sustain"* — and
+  `revalidate --apply` re-measures them. By default, running the tool also finishes any incomplete runs it
+  finds so nothing is left half-done (pass `--only-this` to work on just one track). A part that genuinely
+  isn't in the music (a track with no pad) still counts as complete — it's a real reading of "not there,"
+  not a gap.
+- **The "Measured N of M signals" line now names what's genuinely absent, not what broke.** Because only
+  complete runs are shown, the line reads, for example, *"Measured 11 of 14 signals; absent in this track:
+  pad sustain, harmonic brightness"* — meaning your track simply has no pad there, rather than "the tool
+  failed to measure it." A fully-measured track reads *"Measured 14 of 14 signals."*
+
+### Fixed
+- **A failed measurement no longer reads as a real zero.** When a detector (tempo, loudness, stereo) produced
+  nothing, the analysis used to store a `0`, which looked like a genuine measurement. It now stays empty and
+  visibly missing, so a broken read is caught instead of quietly skewing comparisons.
+
 ## [1.5.4] — 2026-07-12
 
 ### Fixed

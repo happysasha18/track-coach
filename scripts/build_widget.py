@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.5.4"  # Track Coach analyzer version — s65: a long source filename in the widget header now ellipsis-truncates with the full value on hover instead of blowing the line out (INV-30); analysis output unchanged, so nothing stales
+TC_VERSION = "1.6.0"  # Track Coach analyzer version — s65: run validity (RC-INV-13) — a run is complete or it does not exist; an incomplete run never enters the library and is completed (revalidate); the completeness line reads "absent in this track"; analysis OUTPUT unchanged (validity is a new gate, not a value change), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -2376,12 +2376,19 @@ def _completeness_line_html(run_dir, mode):
         return ""
     try:
         import fingerprints as FP
-        n, m, skipped = FP.run_completeness(run_dir, mode)
+        import validity as V
+        promised = FP.PROMISED_BY_MODE.get(mode, FP.PROMISED_BY_MODE["full"])
+        present = V.present_axes(run_dir, mode)
+        measured = FP.measured_axes(run_dir)
+        m = len(promised)
+        n = len(present & measured)
+        absent = sorted(promised - present)  # signals genuinely not in this track (RC-INV-13b)
+        reads = [FP.AXIS_READS.get(a, a.replace("_", " ")) for a in absent]
     except Exception:  # noqa: BLE001 — the disclosure line is best-effort, never blocks the render
         return ""
     if m <= 0:
         return ""
-    tail = f"; skipped: {_esc(_join_and(skipped))}" if skipped else ""
+    tail = f"; absent in this track: {_esc(_join_and(reads))}" if reads else ""
     return (f'<p class="completeness" id="completeness">'
             f'<span class="complab">Measured</span> {n} of {m} signals{tail}.</p>')
 

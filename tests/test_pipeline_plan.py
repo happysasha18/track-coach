@@ -244,5 +244,62 @@ class SyntheticFixtureSourceGuarded(unittest.TestCase):
                       "analyze must expose --synthetic (keeps a smoke run out of the library, G-INV-21)")
 
 
+class RunValidityOrchestration(unittest.TestCase):
+    """RC-INV-13/13a/13c: the library's incomplete runs are found; a completion re-measures the
+    stored audio with --only-this (no re-trigger); the flags are exposed."""
+
+    def _bands(self, db):
+        return {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+
+    def _run(self, base, name, *, sustain, audio="/music/x.wav"):
+        run = Path(base) / name; run.mkdir(parents=True)
+        (run / "run_meta.json").write_text(json.dumps({"audio": audio, "mode": "full"}))
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        mk = {"band_rms_db": {"drums": self._bands(-30.0), "bass": self._bands(-30.0),
+                              "other": self._bands(-30.0)},
+              "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+              "total_windows": 8, "spectral_centroid": {"other": 800.0}}
+        if sustain:
+            mk["sustain"] = {"bass": 0.5, "other": 0.4}
+        (run / "result_masking.json").write_text(json.dumps(mk))
+        (run / "result_notes_other.json").write_text(json.dumps({"n_notes": 42}))
+        return str(run)
+
+    def test_incomplete_deposits_found(self):
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            whole = self._run(d, "whole", sustain=True)
+            partial = self._run(d, "partial", sustain=False)  # other significant, sustain missing
+            lib = Path(d) / "lib"; (lib / "widgets").mkdir(parents=True)
+            index = {"entries": [
+                {"track": "Whole", "mode": "full", "src_run_dir": whole, "widget": "w.html"},
+                {"track": "Partial", "mode": "full", "src_run_dir": partial, "widget": "p.html"}]}
+            (lib / "index.json").write_text(json.dumps(index))
+            inc = ta._incomplete_deposits(root=lib)
+            names = [e.get("track") for e, sd, un in inc]
+            self.assertEqual(names, ["Partial"], "only the incomplete run is listed")
+            self.assertIn("pad sustain", inc[0][2])
+
+    def test_complete_run_dry_plans_reanalyse_only_this(self):
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            partial = self._run(d, "partial", sustain=False, audio="/music/track.wav")
+            cmds = ta._complete_run(partial, dry=True)
+            self.assertEqual(len(cmds), 1)
+            self.assertIn("analyze", cmds[0])
+            self.assertIn("/music/track.wav", cmds[0])
+            self.assertIn("--only-this", cmds[0], "the re-measure must not re-trigger the backfill")
+
+    def test_flags_exposed(self):
+        for cmd, flag in (("analyze", "--only-this"), ("build", "--only-this"),
+                          ("revalidate", "--apply")):
+            out = subprocess.run([sys.executable, str(SCRIPT), cmd, "--help"],
+                                 text=True, capture_output=True)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertIn(flag, out.stdout + out.stderr, f"{cmd} must expose {flag}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

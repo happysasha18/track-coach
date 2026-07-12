@@ -428,6 +428,54 @@ class SyntheticNotDeposited(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class IncompleteRunNotDeposited(unittest.TestCase):
+    """RC-INV-13: a run with analysis data but a broken measurement (a present stem whose sustain
+    was never computed) is refused at deposit; a complete run deposits normally."""
+
+    def _bands(self, db):
+        return {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+
+    def _run(self, d, *, sustain):
+        run = Path(d) / "run"; run.mkdir()
+        (run / "analysis_widget.html").write_text("<html>w</html>")
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        mk = {"band_rms_db": {"drums": self._bands(-30.0), "bass": self._bands(-30.0),
+                              "other": self._bands(-30.0)},
+              "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+              "total_windows": 8, "spectral_centroid": {"other": 800.0}}
+        if sustain:
+            mk["sustain"] = {"bass": 0.5, "other": 0.4}
+        (run / "result_masking.json").write_text(json.dumps(mk))
+        (run / "result_notes_other.json").write_text(json.dumps({"n_notes": 42}))
+        return run
+
+    def test_incomplete_run_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = self._run(d, sustain=False)  # other significant, sustain never computed → invalid
+                w = run / "analysis_widget.html"
+                with self.assertRaises(library.DepositError):
+                    library.deposit_from_run(run, w, {"track": "Partial", "mode": "full"})
+                self.assertFalse((library.library_root() / "index.json").exists(),
+                                 "no index written on an incomplete deposit refusal (RC-INV-13)")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_complete_run_deposits(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = self._run(d, sustain=True)  # all present signals measured → valid
+                w = run / "analysis_widget.html"
+                entry = library.deposit_from_run(run, w, {"track": "Whole", "mode": "full"})
+                self.assertEqual(entry["track"], "Whole")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 class ReferenceCleanup(unittest.TestCase):
     """G-INV-20: dereference command drops reference entries by album-path substring."""
 
