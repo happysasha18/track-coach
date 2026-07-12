@@ -5,6 +5,22 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.5.2] — 2026-07-12
+
+### Fixed
+- **A test or smoke clip can no longer sneak into your library.** When the tool is exercised on a fixture
+  clip (anything under its `tests/fixtures/` folder, or a run you mark `--synthetic`), that run is now kept
+  out of the catalog automatically — the way a reference track already is. Previously a smoke clip run to
+  check the pipeline could land beside your real tracks; one such entry (a bare 220 Hz sine) had shown up
+  in the catalog and had to be removed by hand.
+
+### Changed
+- **The "consolidate your analysis data" banner now tells apart a track to move from one whose files are
+  gone.** A catalog member whose source folder still exists is offered for consolidation (run `migrate`);
+  a member whose source folder has been deleted is shown separately — there is nothing left to move, so it
+  invites you to delete the stale entry or re-analyse the track, instead of pointing at a folder that no
+  longer exists.
+
 ## [1.5.1] — 2026-07-12
 
 ### Housekeeping

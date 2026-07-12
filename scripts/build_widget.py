@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.5.1"  # Track Coach analyzer version — s64: repo made product-fit for all users (impersonal English docs/comments, no personal paths); analyzer unchanged, so nothing stales
+TC_VERSION = "1.5.2"  # Track Coach analyzer version — s65: a synthetic/smoke run never deposits into the library (G-INV-21); the catalog migrate banner tells a track to move from a missing source to delete (G-INV-22); analysis output unchanged, so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /

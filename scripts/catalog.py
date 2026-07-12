@@ -431,7 +431,7 @@ _NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the hea
 
 
 def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library",
-                        migrate_banner: int = 0) -> str:
+                        migrate_banner: int = 0, missing_banner: int = 0) -> str:
     """Render the whole catalog page from index entries. PURE (no filesystem).
 
     Sim data (`_lean`, `_siblings`) is expected pre-injected into each entry dict by
@@ -471,7 +471,8 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
          if k else f'<th>{html.escape(label)}</th>')
         for k, label in _HEADERS)
     p = PALETTE
-    # G-INV-16 passive migrate warning: emit when members still live in Ableton folders
+    # G-INV-16/22 passive banners: a member still on disk can be consolidated (migrate); a member
+    # whose source is gone can only be deleted or re-analysed — never shown as consolidatable.
     n_outside = migrate_banner
     migrate_html = ""
     if n_outside > 0:
@@ -480,6 +481,13 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
         migrate_html = (
             f'<div class="migrate-banner">{n_word} {has_have} analysis data in project folders'
             f' — run <code>migrate</code> to consolidate.</div>'
+        )
+    if missing_banner > 0:
+        m_word = f"{missing_banner} track{'s' if missing_banner != 1 else ''}"
+        has_have = "have" if missing_banner != 1 else "has"
+        migrate_html += (
+            f'<div class="missing-banner">{m_word} {has_have} a missing source folder'
+            f' — nothing left to consolidate; delete the entry or re-analyse the track.</div>'
         )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -571,6 +579,8 @@ tr.hide{{display:none}}
  border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--bright)}}
 .migrate-banner code{{background:rgba(255,209,102,.15);border-radius:4px;padding:1px 5px;
  font-family:monospace;font-size:12px}}
+.missing-banner{{background:rgba(255,107,107,.09);border:1px solid rgba(255,107,107,.32);
+ border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--bad)}}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute"><defs>
  <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
@@ -731,15 +741,21 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
             if lib_copy.exists():
                 e["_lib_href"] = lib_copy.as_uri()
 
-    # G-INV-16 passive banner: count members whose src_run_dir is outside the output root.
+    # G-INV-16/22 passive banner: members whose src_run_dir is outside the output root split into
+    # two — a source still on disk can be MOVED (consolidate via migrate); a source that is GONE
+    # can only be deleted or re-analysed (nothing left to move), so it is never shown as migratable.
     migrate_banner = 0
+    missing_banner = 0
     for e in entries:
         sd = e.get("src_run_dir")
         if sd:
             try:
                 Path(sd).relative_to(output_root)
             except ValueError:
-                migrate_banner += 1
+                if Path(sd).exists():
+                    migrate_banner += 1
+                else:
+                    missing_banner += 1
 
     # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here,
     # pure renderer reads the pre-computed fields via e["_lean"] / e["_siblings"]).
@@ -754,7 +770,8 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
             e["_leans"] = []
             e["_siblings"] = []
 
-    html_str = render_catalog_html(entries, migrate_banner=migrate_banner)
+    html_str = render_catalog_html(entries, migrate_banner=migrate_banner,
+                                   missing_banner=missing_banner)
     out = root / "index.html"
     root.mkdir(parents=True, exist_ok=True)
     out.write_text(html_str, encoding="utf-8")

@@ -330,6 +330,10 @@ def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
         raise DepositError(
             "refusing to deposit: run is a reference (G-INV-18) — "
             "references never enter the library")
+    if meta.get("synthetic"):
+        raise DepositError(
+            "refusing to deposit: run is synthetic/smoke (G-INV-21) — "
+            "fixture runs never enter the library")
     run_dir = Path(run_dir)
     core = {}
     cp = run_dir / "result_core.json"

@@ -387,7 +387,7 @@ class MigrateWarning(unittest.TestCase):
             inside_dir.mkdir(parents=True)
 
             outside_dir = Path(td_ableton) / "track-coach-output" / "TrackB" / "v1__2026-01-01_1000"
-            # Not created on disk (doesn't matter for the banner check)
+            outside_dir.mkdir(parents=True)  # G-INV-22: a source ON DISK is a genuine "to move" case
 
             w1 = "TrackA__v1__2026-01-01_1000.html"
             w2 = "TrackB__v1__2026-01-01_1000.html"
@@ -435,6 +435,78 @@ class MigrateWarning(unittest.TestCase):
             # (the CSS class .migrate-banner is always emitted; only the banner DIV is conditional)
             self.assertNotIn('<div class="migrate-banner">', html_text,
                             "Banner div should NOT appear when all src_run_dirs are inside root")
+
+
+class MigrateBannerMoveVsJunk(unittest.TestCase):
+    """G-INV-22: the migrate banner separates a member to MOVE (source still on disk → consolidate)
+    from a member whose source is GONE (nothing to move → delete or re-analyse). A vanished source
+    is never folded into the "run migrate to consolidate" count."""
+
+    def _lib_with(self, td_lib, td_outside, *, existing: bool):
+        """Build a library with one own inside member + one outside member whose source dir either
+        exists on disk (existing=True → to-move) or does not (existing=False → junk)."""
+        lib_root = Path(td_lib) / "library"
+        widgets_dir = lib_root / "widgets"
+        widgets_dir.mkdir(parents=True)
+        inside_dir = Path(td_lib) / "projects" / "TrackA" / "v1__2026-01-01_1000"
+        inside_dir.mkdir(parents=True)
+        outside_dir = Path(td_outside) / "track-coach-output" / "TrackB" / "v1__2026-01-01_1000"
+        if existing:
+            outside_dir.mkdir(parents=True)
+        wA = "TrackA__v1__2026-01-01_1000.html"
+        wB = "TrackB__v1__2026-01-01_1000.html"
+        (widgets_dir / wA).write_text("<html>a</html>")
+        (widgets_dir / wB).write_text("<html>b</html>")
+        entries = [
+            {"track": "TrackA", "version": "v1", "stamp": "2026-01-01_1000",
+             "widget": wA, "mode": "full", "src_run_dir": str(inside_dir),
+             "deposited_at": "2026-01-01T10:00:00+00:00"},
+            {"track": "TrackB", "version": "v1", "stamp": "2026-01-01_1000",
+             "widget": wB, "mode": "full", "src_run_dir": str(outside_dir),
+             "deposited_at": "2026-01-01T10:00:00+00:00"},
+        ]
+        (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+        return lib_root
+
+    def test_existing_source_counts_to_move(self):
+        """An outside source that EXISTS on disk shows the consolidate (migrate) banner, not junk."""
+        with tempfile.TemporaryDirectory() as td_lib, tempfile.TemporaryDirectory() as td_out:
+            lib_root = self._lib_with(td_lib, td_out, existing=True)
+            html_text = catalog.build_catalog(root=lib_root).read_text()
+            self.assertIn('<div class="migrate-banner">', html_text,
+                          "an on-disk outside source must show the consolidate banner (G-INV-22)")
+            self.assertNotIn('class="missing-banner"', html_text,
+                             "an on-disk outside source is NOT a missing-source (junk) member")
+
+    def test_missing_source_counts_as_junk(self):
+        """An outside source that is GONE shows the missing-source banner, NOT the consolidate one."""
+        with tempfile.TemporaryDirectory() as td_lib, tempfile.TemporaryDirectory() as td_out:
+            lib_root = self._lib_with(td_lib, td_out, existing=False)
+            html_text = catalog.build_catalog(root=lib_root).read_text()
+            self.assertIn('class="missing-banner"', html_text,
+                          "a vanished source must show the missing-source banner (G-INV-22)")
+            self.assertNotIn('<div class="migrate-banner">', html_text,
+                             "a vanished source must NOT be shown as consolidatable (G-INV-22)")
+
+    def test_render_shows_both_lines(self):
+        """With one existing-outside and one gone-outside member, BOTH banners appear."""
+        with tempfile.TemporaryDirectory() as td_lib, tempfile.TemporaryDirectory() as td_out:
+            lib_root = Path(td_lib) / "library"
+            widgets_dir = lib_root / "widgets"
+            widgets_dir.mkdir(parents=True)
+            move_dir = Path(td_out) / "proj_move" / "TrackM" / "v1__2026-01-01_1000"
+            move_dir.mkdir(parents=True)                      # exists → to move
+            junk_dir = Path(td_out) / "proj_gone" / "TrackJ" / "v1__2026-01-01_1000"  # never created → junk
+            entries = []
+            for track, wd, sd in (("TrackM", "M.html", move_dir), ("TrackJ", "J.html", junk_dir)):
+                (widgets_dir / wd).write_text("<html>x</html>")
+                entries.append({"track": track, "version": "v1", "stamp": "2026-01-01_1000",
+                                "widget": wd, "mode": "full", "src_run_dir": str(sd),
+                                "deposited_at": "2026-01-01T10:00:00+00:00"})
+            (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+            html_text = catalog.build_catalog(root=lib_root).read_text()
+            self.assertIn('<div class="migrate-banner">', html_text)
+            self.assertIn('class="missing-banner"', html_text)
 
 
 # ─── Item 6: RC-INV-9 disk-presence check (G-INV-11) ────────────────────────

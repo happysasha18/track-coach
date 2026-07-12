@@ -216,5 +216,33 @@ class AutoDepositIsDefault(unittest.TestCase):
                           "there must be no opt-in --deposit flag; deposit is the default ingest")
 
 
+class SyntheticFixtureSourceGuarded(unittest.TestCase):
+    """G-INV-21: a source living under a test-fixtures tree is auto-detected as synthetic, so a
+    smoke/fixture run can never deposit into the real library even without the `--synthetic` flag.
+    A normal source path is never mistaken for a fixture."""
+
+    def test_fixture_source_marks_synthetic(self):
+        import track_analyzer as ta
+        self.assertTrue(ta.is_synthetic_source("/repo/tests/fixtures/synthetic/sine_220hz_1s.wav"),
+                        "a source under tests/fixtures/ must be flagged synthetic (G-INV-21)")
+        self.assertTrue(ta.is_synthetic_source(Path("tests/fixtures/synthetic/sine_220hz_1s.wav")),
+                        "a relative fixtures path must be flagged synthetic too")
+
+    def test_normal_source_not_marked(self):
+        import track_analyzer as ta
+        self.assertFalse(ta.is_synthetic_source("/Users/me/Music/Ableton/My Track/bounce.wav"),
+                         "a real project source must not be flagged synthetic (G-INV-21)")
+        self.assertFalse(ta.is_synthetic_source("/Users/me/testfixtures_album/song.wav"),
+                         "a path merely containing the word must not trip the fixtures guard")
+
+    def test_synthetic_flag_on_analyze(self):
+        """`analyze --help` exposes the `--synthetic` opt-in for an intentional smoke run."""
+        out = subprocess.run([sys.executable, str(SCRIPT), "analyze", "--help"],
+                             text=True, capture_output=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("--synthetic", out.stdout + out.stderr,
+                      "analyze must expose --synthetic (keeps a smoke run out of the library, G-INV-21)")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

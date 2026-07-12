@@ -392,6 +392,42 @@ class ReferenceNotDeposited(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class SyntheticNotDeposited(unittest.TestCase):
+    """G-INV-21: a run with synthetic:true in run_meta is refused by deposit_from_run — a
+    fixture/smoke run never enters the library, exactly as a reference is refused (G-INV-18)."""
+
+    def test_synthetic_run_refused(self):
+        """deposit_from_run raises DepositError for a synthetic run; index unchanged. G-INV-21."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                meta = {"synthetic": True, "track": "sine_220hz_1s", "mode": "quick"}
+                with self.assertRaises(library.DepositError):
+                    library.deposit_from_run(run, w, meta)
+                root = library.library_root()
+                self.assertFalse((root / "index.json").exists(),
+                                 "no index written on a synthetic deposit refusal (G-INV-21)")
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+    def test_own_run_still_deposits(self):
+        """A run without synthetic:true deposits normally. G-INV-21."""
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["TRACK_COACH_LIBRARY"] = str(Path(d) / "lib")
+            try:
+                run = Path(d) / "run"; run.mkdir()
+                w = run / "analysis_widget.html"; w.write_text("<html>widget</html>")
+                entry = library.deposit_from_run(run, w, {"track": "OwnTrack", "mode": "full"})
+                self.assertEqual(entry["track"], "OwnTrack")
+                root = library.library_root()
+                idx = json.loads((root / "index.json").read_text())
+                self.assertEqual(len(idx["entries"]), 1)
+            finally:
+                del os.environ["TRACK_COACH_LIBRARY"]
+
+
 class ReferenceCleanup(unittest.TestCase):
     """G-INV-20: dereference command drops reference entries by album-path substring."""
 

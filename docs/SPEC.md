@@ -2071,9 +2071,24 @@ reads to rebuild the direction centroids, so the next time you re-run the albums
 collapses. Therefore the reference marker makes a run dir **gc-exempt**, exactly as being library-referenced
 does: gc keeps it, never lists it as orphan. Your references are as safe as your library. `G-INV-19`
 
+**A synthetic or smoke run never enters the library.** A run whose `run_meta.json` carries the synthetic
+marker is kept out of the library exactly as a reference is (G-INV-18): auto-deposit at the end of a `build`
+is skipped, and an explicit `deposit` of it is refused rather than silently written. The marker is set two
+ways — the `--synthetic` flag on `build`, and automatically when the analysed source lives under the test
+fixtures tree (a path containing `tests/fixtures/`), so a smoke clip run to exercise the pipeline can never
+surface in the real catalog. This is the enforcement, at the deposit boundary, of the rule that a fixture
+used to test the tool is not one of the user's tracks. `G-INV-21`
+
 **The migrate banner counts library members only.** A reference run is never a member (G-INV-18), so it is
 never counted — the "N tracks have analysis data in project folders" number always means *your* tracks whose
 data lives outside `$HOME`, never someone else's reference album. `G-INV-16b`
+
+**The migrate banner separates a track to move from a source that is gone.** A counted member whose
+`src_run_dir` still exists on disk is offered for consolidation — run `migrate` to move its data under
+`$HOME`. A member whose `src_run_dir` no longer exists cannot be migrated, because there is nothing left to
+move; it is reported separately as a missing source to delete or re-analyse, never folded into the "run
+migrate to consolidate" count. This keeps the banner honest once a scratch or temporary source is cleared
+away — the case where a removed smoke run once still showed as consolidatable. `G-INV-22`
 
 ### G.1 Output never lands in the user's project folder
 

@@ -131,6 +131,14 @@ def add_catalog(rn: Runner, out_dir: Path) -> str:
 
 # ── analyze: the deterministic pipeline (Steps 0c-4) ──────────────────────────────────
 
+def is_synthetic_source(path) -> bool:
+    """G-INV-21: a source living under a test-fixtures tree is a synthetic/smoke run, never one of
+    the user's tracks — so it must never deposit into the library. Detected by the `tests/fixtures/`
+    path segment (the home of every committed synthetic clip), matched on the normalised path."""
+    p = str(path).replace(os.sep, "/")
+    return "/tests/fixtures/" in p or p.startswith("tests/fixtures/")
+
+
 def cmd_analyze(args):
     rn = Runner(args.dry_run)
     audio = Path(args.audio).expanduser().resolve()
@@ -197,6 +205,9 @@ def cmd_analyze(args):
         # G-INV-18: mark run as a reference so deposit_from_run refuses it later
         if getattr(args, "reference", False):
             _update_meta(out_dir, {"reference": True, "artist": getattr(args, "artist", None)})
+        # G-INV-21: mark run synthetic (explicit flag OR a fixtures-tree source) so deposit refuses it
+        if getattr(args, "synthetic", False) or is_synthetic_source(audio):
+            _update_meta(out_dir, {"synthetic": True})
 
     # STRUCTURE — repeats/form (full mix; no stems/als needed; cheap, always run)
     rn.step("fast", "self_similarity.py", audio, "--out", j("result_selfsim.json"))
@@ -589,6 +600,8 @@ def main():
                    help="analyse as a reference track (kept OUT of your library, G-INV-18)")
     a.add_argument("--artist", default=None,
                    help="artist name for the reference track (stored in run_meta.json)")
+    a.add_argument("--synthetic", action="store_true",
+                   help="analyse as a synthetic/smoke run (kept OUT of your library, G-INV-21)")
     a.set_defaults(func=cmd_analyze)
     # NOTE: render-only flags (--title/--verdict/--src-audio/--strings) live on `build`, not here —
     # analyze only measures; the widget (and the read it carries) is rendered by `build`.
