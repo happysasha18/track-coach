@@ -105,7 +105,7 @@
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
 | **N18** | Render pipeline — resolve inputs, run analysis, assemble the widget, register the run | `track_analyzer.py` (Runner/cmd_analyze), `render_run.py`, `render_spec.py`, `prerender_smoke.py` | pipeline, §E.4 | test_build_inputs, test_pipeline_plan, test_development_mode |
-| **N19** | Run completeness — every measurement carries a state; a missing one is shown honestly, never faked | `completeness.py` | §E (RC-INV-1..12) | test_completeness |
+| **N19** | Run completeness & validity — every measurement carries a state; a missing one is shown honestly, never faked; a run is complete or it does not exist (validity read from the significance gate, no 0.0 imputation) | `completeness.py`, `validity.py`, `fingerprints.py` (gate-aware extraction) | §E (RC-INV-1..13) | test_completeness, test_validity |
 
 *Level expectation:* N18 L0-DATA; N19 L0 for the state model, **L3-BROWSER** for "the widget shows the gap honestly."
 

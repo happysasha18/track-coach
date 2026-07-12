@@ -122,12 +122,15 @@ def fingerprint_from_run_dir(run_dir) -> dict | None:
     lead_e = sum(en.get(s, 0.0) for s in ("guitar", "vocals", "piano"))
 
     return {
-        "tempo":       v.get("tempo_bpm") or 0.0,
-        "dynamics":    v.get("dynamic_range_db", 0.0),
-        "stereo":      core.get("stereo_width_mean", v.get("stereo_width", 0.0)) or 0.0,
+        # RC-INV-13d / RC-INV-3: a failed mix detector carries missing (None), never an imputed 0.0 —
+        # so run validity can see the failure instead of reading it as a real "tempo 0". A missing mix
+        # axis is dropped from comparison (RC-INV-5) exactly like any other missing axis.
+        "tempo":       v.get("tempo_bpm"),
+        "dynamics":    v.get("dynamic_range_db"),
+        "stereo":      core.get("stereo_width_mean", v.get("stereo_width")),
         "brightness":  _band_brightness(brdb, stems),
-        "density":     core.get("density_lv", 0.0) or 0.0,
-        "energy_build": core.get("energy_trend", 0.0),
+        "density":     core.get("density_lv"),
+        "energy_build": core.get("energy_trend"),
         "drums_share": 100.0 * en.get("drums", 0.0) / tot,
         "bass_share":  100.0 * en.get("bass", 0.0) / tot,
         "other_share": 100.0 * en.get("other", 0.0) / tot,

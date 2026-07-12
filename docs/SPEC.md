@@ -1992,11 +1992,15 @@ redo. `RC-INV-13d`
   gate-present signal unmeasured is surfaced plainly as "incomplete run", held out of every surface above,
   and left for the user (re-run with different inputs, or accept the tool cannot read that part). It is never
   hidden silently and never re-looped on its own. `RC-INV-13a`
-- **Already-deposited partial runs are found, marked, and offered for redo, never swept silently.**
-  (Alexander's word 2026-07-12.) The library already holds runs deposited before this bar (an old run with no
-  sustain block; a one-stem transcription). A one-off re-validate pass lists every deposit now judged
-  invalid, marks it, and offers a redo — mirroring the pre-1.0 `migrate` pass (decision G-2). Those runs keep
-  rendering, marked, until redone, so the standing library never blinks out at once. `RC-INV-13c`
+- **By default, running the tool completes any incomplete prior runs — partial data is not left lying
+  around.** (Alexander's word 2026-07-12: "by default I would not want to leave data partial.") When a build
+  runs and the library holds a run judged invalid (a gate-present signal unmeasured — an old run with no
+  sustain block, a one-stem transcription), the tool tops those runs up in the same pass and shows the
+  result. It announces what it is completing ("completing 3 incomplete runs…") so a long Demucs pass is never
+  a silent hang, and it touches only genuinely-broken runs — a run whose only gaps are gate-absent parts (a
+  track with no pad) is already complete and is left alone, never re-looped. A `--only-this` flag (or a
+  dedicated single-run command) opts out for when the user wants exactly one track and nothing else. Until a
+  run is completed it keeps rendering, marked, so the standing library never blinks out at once. `RC-INV-13c`
 - *Composition with the completeness line.* Because an invalid run never reaches the screen, a shown run's
   completeness line (RC-INV-12) counts only signals genuinely present, so its "measured N of M" discloses
   **what the music contains**, and its tail names signals **absent in this track**, never a measurement that
@@ -2027,8 +2031,9 @@ redo. `RC-INV-13d`
   held and redone automatically at most once (RC-INV-13/13a), then, if still invalid, surfaced as an honest
   "incomplete" state. Completeness is judged **gate-aware**, with no 0.0 imputation, so a genuinely-absent
   part (the significance gate reads it as not there) stays a valid "not present" reading (RC-INV-11/13d), not
-  an invalidating gap. Already-deposited partial runs are found, marked, and offered for redo, never swept
-  (RC-INV-13c). E-3 chose auto-redo and mark-and-offer migration over E-1's original manual-only stance.
+  an invalidating gap. By default, running the tool completes any incomplete prior runs in the same pass so
+  partial data is not left lying around (RC-INV-13c), announcing what it tops up, with a `--only-this` opt-out
+  for a single track. E-3 chose auto-redo and default-backfill over E-1's original manual-only stance.
 
 ## F. Similar in your own library — the DJ column
 
