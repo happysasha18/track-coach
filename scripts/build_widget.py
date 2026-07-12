@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.5.3"  # Track Coach analyzer version — s65: the widget now shows a run-completeness line ("Measured N of M signals; skipped: …") so a clean-looking widget isn't misread as all-clear (RC-INV-12); analysis output unchanged, so nothing stales
+TC_VERSION = "1.5.4"  # Track Coach analyzer version — s65: a long source filename in the widget header now ellipsis-truncates with the full value on hover instead of blowing the line out (INV-30); analysis output unchanged, so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -3093,7 +3093,10 @@ h1{font-size:20px;margin:0 0 2px;font-weight:700}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 /* srcmeta — what file was analysed & when. Lives just under the title (and in footer). */
 .srcmeta{color:var(--muted);font-size:12px;margin:2px 0 20px;display:flex;flex-wrap:wrap;gap:4px 16px}
-.srcmeta b{color:var(--ink);font-weight:600}
+/* INV-30: a long unbroken filename ellipsis-truncates instead of blowing the line out; the full
+   value stays on hover (the title attr set in JS). Each bit still flex-wraps at the row level. */
+.srcmeta b{color:var(--ink);font-weight:600;max-width:min(46ch,100%);overflow:hidden;
+ text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
 .srcmeta:empty{display:none}
 /* ── segmented control (DS-INV-13): ONE component for the Simple⇄Detailed view-toggle
    AND the reference-direction tabs (#refRead .reftabs). Selected = bold --wob fill
@@ -3561,8 +3564,8 @@ document.getElementById("sub").textContent=`${fmtT(D.dur)} · ${D.tempo} BPM`+(s
 // ── Source files + date: what was analysed and when (header line + folded into footer)
 const META=D.meta||{};
 (function(){const el=document.getElementById("srcmeta");if(!el)return;const bits=[];
- if(META.audio)bits.push(`${T.src_audio||"Audio"}: <b>${META.audio}</b>`);
- if(META.als)bits.push(`${T.src_project||"Project"}: <b>${META.als}</b>`);
+ if(META.audio)bits.push(`${T.src_audio||"Audio"}: <b title="${META.audio}">${META.audio}</b>`);
+ if(META.als)bits.push(`${T.src_project||"Project"}: <b title="${META.als}">${META.als}</b>`);
  if(META.track_version)bits.push(`<b>${META.track_version}</b>`);
  if(META.analyzed_at){const adate=(META.analyzed_at||"").split(" ")[0];
   const bdate=META.built_at||"";const diffDate=bdate&&bdate!==adate;

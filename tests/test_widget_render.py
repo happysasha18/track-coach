@@ -501,23 +501,27 @@ class SourceFileHeaderSymmetryAndReadability(unittest.TestCase):
     """2026-06-22 (NOT critical, don't lose it): the header shows the AUDIO source — when an
     .als project is part of the run it must be shown TOO (symmetry), and a very long path must stay
     readable (wrap / middle-ellipsis + full value on hover), not overflow ugly on one line.
-    PROPOSED — TEST_MATRIX INV-29 (symmetry) + INV-30 (readability). The display already wires both
-    (`build_widget.py:2276-2281`); these are tripwires. INV-30 (nice long-path truncation) is the
-    open work, so both are skipped until the readability fix lands `bug→matrix→test→code`."""
+    TEST_MATRIX INV-29 (symmetry) + INV-30 (readability). The readability fix (ellipsis truncation +
+    title hover) landed s65, so both are live."""
 
-    @unittest.skip("PROPOSED INV-29: formalize source-file symmetry (audio shown ⇒ .als shown too)")
     def test_source_file_symmetry(self):
         # When meta carries BOTH audio and als, the header must push BOTH bits.
         html, payload = _render()
         self.assertIn('if(META.audio)bits.push(`${T.src_audio||"Audio"}:', html)
         self.assertIn('if(META.als)bits.push(`${T.src_project||"Project"}:', html)
 
-    @unittest.skip("PROPOSED INV-30: long source path must wrap / middle-ellipsis + title-hover, not overflow")
     def test_long_source_path_readable(self):
-        # The open work: a single very-long path token should truncate with the full value on hover
-        # (title attr) rather than blow the line out. .srcmeta currently flex-wraps but does not
-        # truncate a long unbroken token — implement, then un-skip.
-        self.fail("not yet implemented — see TEST_MATRIX INV-30")
+        # INV-30: a single very-long unbroken token ellipsis-truncates instead of blowing the line
+        # out, and the full value stays reachable on hover (title attr).
+        html, _ = _render()
+        srcmeta_b = html.split(".srcmeta b{", 1)[1].split("}", 1)[0]
+        self.assertIn("text-overflow:ellipsis", srcmeta_b,
+                      ".srcmeta b must ellipsis-truncate a long token (INV-30)")
+        self.assertIn("overflow:hidden", srcmeta_b)
+        self.assertIn('<b title="${META.audio}">', html,
+                      "the audio filename must carry a title hover with the full value (INV-30)")
+        self.assertIn('<b title="${META.als}">', html,
+                      "the project filename must carry a title hover with the full value (INV-30)")
 
 
 class ReadOrderTonalBeforeRefRead(unittest.TestCase):

@@ -135,8 +135,8 @@ Not critical. The display path already wires both audio + .als (`build_widget.py
 
 | INV | Claim | Owning test (skipped — planned) |
 |---|---|---|
-| INV-29 | **Source-file symmetry: if the audio source is shown, the .als source is shown too.** The header `srcmeta` line lists what was analysed. Whenever an audio source is present and shown (`Audio: …`), and an `.als` project was part of the run, it MUST be shown alongside (`Project: …`) with the same treatment — never audio-only when a project exists. (`.als` absent ⇒ no Project bit, by INV-16 gating; this is about NOT dropping it when present.) | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_source_file_symmetry` (skipped) |
-| INV-30 | **Long source paths stay readable.** A long audio/`.als` path/filename must not overflow the line ugly: it wraps or middle-ellipsis-truncates with the full value available on hover (`title`), and the `srcmeta` row degrades gracefully on narrow widths. The current `.srcmeta{flex-wrap:wrap}` (`build_widget.py:1951`) wraps but does not truncate a single very-long token — the open work is the nice truncation/hover. | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_long_source_path_readable` (skipped) |
+| INV-29 | **Source-file symmetry: if the audio source is shown, the .als source is shown too.** The header `srcmeta` line lists what was analysed. Whenever an audio source is present and shown (`Audio: …`), and an `.als` project was part of the run, it MUST be shown alongside (`Project: …`) with the same treatment — never audio-only when a project exists. (`.als` absent ⇒ no Project bit, by INV-16 gating; this is about NOT dropping it when present.) | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_source_file_symmetry` |
+| INV-30 | **Long source paths stay readable.** A long audio/`.als` path/filename must not overflow the line ugly: it ellipsis-truncates with the full value available on hover (`title`), and the `srcmeta` row still flex-wraps between bits on narrow widths. The `.srcmeta b` cell caps at `min(46ch,100%)` with `overflow:hidden;text-overflow:ellipsis;white-space:nowrap` and each filename carries a `title` hover (`build_widget.py`). | `test_widget_render::SourceFileHeaderSymmetryAndReadability::test_long_source_path_readable` |
 
 ### Card evidence, artistic read & player invariants   [SPEC §B.12–§B.13]
 
@@ -436,7 +436,8 @@ nodes), answering the four rework-questions:
   `tests/test_per_stem.py` classes; INV-31 → `test_fixtures::GoldenRenderFromRealData` +
   `test_per_stem::PerStemCards`; INV-32 → `test_development_mode`; INV-33/INV-34 → `test_widget_render::PlayerIsWired`.
   Genuinely UNCOVERED / not built: **INV-25** (Simple-promotion), **INV-26** (sort toggle), the
-  `eval_per_stem_usefulness` regression guard, and **INV-29/INV-30** (source-file symmetry, skipped tests).
+  `eval_per_stem_usefulness` regression guard. (**INV-29/INV-30** — source-file symmetry + long-path
+  readability — LANDED s65, 2026-07-12: `.srcmeta b` ellipsis-truncates with a `title` hover; both tests live.)
 - **Two test families, only one indexed here (by design).** This matrix indexes the UI-ladder / catalog /
   per-stem / artistic layers (INV-*). The credibility + character + masking + plateau work (CR-*/G1–G21,
   SPEC §B.2–B.10) is guarded by `tests/test_credibility.py`, which this INV grid does NOT enumerate — so a

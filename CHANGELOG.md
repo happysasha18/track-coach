@@ -5,6 +5,15 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.5.4] — 2026-07-12
+
+### Fixed
+- **A long file name no longer stretches the widget header off the screen.** When the analysed audio or
+  Ableton project had a long, unbroken name, the header line under the title used to run past the edge and
+  push the whole page sideways. The name now cuts off with an ellipsis (…) and shows in full when you hover
+  over it; the line still wraps neatly on a narrow window. Verified in a browser with a 140-character name:
+  the page no longer scrolls sideways.
+
 ## [1.5.3] — 2026-07-12
 
 ### Added

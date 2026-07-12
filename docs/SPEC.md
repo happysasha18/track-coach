@@ -675,6 +675,15 @@ in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_
 **result and a simple unit** (a dB figure, a percentage, a time) but **not the measurement METHOD** — the
 technical *how* (`4× oversampled`, `peak-to-RMS`, `self-similarity`) is a signal-processing detail, not the
 finding, so it stays out of the user-facing line (2026-07-02). `tags: result-not-method`
+
+**Run-level provenance — the header names what was analysed.** The source-file line under the title states
+the audio that was analysed, and whenever an `.als` project was part of the same run it is shown beside the
+audio with equal treatment, so the header never reads audio-only when a project was there too (an absent
+`.als` simply drops its part, by the project-panel gating). `INV-29`
+
+**A long source name stays readable.** A long unbroken audio or project filename truncates with an ellipsis
+and carries its full value on hover, and the source line still wraps between its parts on a narrow window, so
+one long path never blows the header out. `INV-30`
 - **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
   advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
   project panel (export, model, leakage) are an evidence SURFACE, out of scope this increment.
