@@ -29,7 +29,7 @@ def _decode_ts_enum(value: int) -> str:
         value = log2(den) * 99 + (num - 1)
     so den_idx = value // 99, num = (value % 99) + 1, den = 2**den_idx.
 
-    Verified against Fragile_Live12.1.1_minimal.als ground truth:
+    Verified against real-project ground truth:
         201 → 4/4,  309 → 13/8,  404 → 9/16.
     """
     den_idx = value // 99

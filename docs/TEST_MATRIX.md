@@ -601,9 +601,9 @@ Owned by `tests/test_parse_als.py`.
 | METRE-2 | `_decode_ts_enum(309)` returns "13/8" | `test_parse_als::TimeSigDecoder::test_13_8` |
 | METRE-3 | `_decode_ts_enum(404)` returns "9/16" | `test_parse_als::TimeSigDecoder::test_9_16` |
 | METRE-4 | Decode/encode round-trip for 4/4, 3/4, 7/8, 9/16, 13/8, 6/8, 5/4, 11/16 | `test_parse_als::TimeSigDecoder::test_roundtrip_various` |
-| METRE-5 | Parsing Fragile_minimal.als yields `time_sig_changes` with 9/16, then 13/8, then 4/4 as ordered subsequence [disk-gated] | `test_parse_als::FragileMeterChanges::test_order_9_16_then_13_8_then_4_4` |
-| METRE-6 | `time_sig_changes` beats are ascending [disk-gated] | `test_parse_als::FragileMeterChanges::test_beats_ascending` |
-| METRE-7 | `time_sig_changes[*].time_s` ≈ beat × 60/bpm [disk-gated] | `test_parse_als::FragileMeterChanges::test_time_s_consistent_with_beat` |
+| METRE-5 | Parsing the committed synthetic .als yields `time_sig_changes` with 9/16, then 13/8, then 4/4 as ordered subsequence | `test_parse_als::MetreChangesFromAls::test_order_9_16_then_13_8_then_4_4` |
+| METRE-6 | `time_sig_changes` beats are ascending | `test_parse_als::MetreChangesFromAls::test_beats_ascending` |
+| METRE-7 | `time_sig_changes[*].time_s` ≈ beat × 60/bpm | `test_parse_als::MetreChangesFromAls::test_time_s_consistent_with_beat` |
 
 ## §I — Visual design system (SPEC §I → DS-INV-1…14)
 

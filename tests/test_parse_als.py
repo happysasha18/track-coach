@@ -1,13 +1,15 @@
 """Tests for parse_als.py — time-signature automation decoding.
 
 Two groups:
-  TimeSigDecoder   — unit tests for _decode_ts_enum; fast, no file I/O.
-  FragileMeterChanges — disk-gated integration test; skipped when the .als is absent
-                        (CI-safe, mirrors the Lazy Sparks pattern in test_reference_read.py).
+  TimeSigDecoder      — unit tests for _decode_ts_enum; fast, no file I/O.
+  MetreChangesFromAls — integration test over a committed synthetic .als fixture
+                        (tests/fixtures/synthetic/metre_changes.als). It ships in the
+                        repo, so this test runs on every machine with no private project
+                        on disk. Set TC_TEST_ALS to point it at a real full .als instead.
 
-Ground truth (from the producer's Ableton screenshot):
-  Fragile_Live12.1.1_minimal.als metre changes around bars 369-392:
-  9/16 → 13/8 → 13/8 → 4/4
+Ground truth (the enum encoding value = log2(den)*99 + (num-1)):
+  the fixture's MainTrack metre automation steps 9/16 → 13/8 → 4/4
+  (404 → 309 → 201). Regenerate the fixture with make_metre_als.py beside it.
 """
 import json
 import os
@@ -19,9 +21,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import parse_als  # noqa: E402
 
-# Disk-gated integration fixture: point TC_TEST_ALS at a real .als to run the metre-change test.
-# Absent (the default on CI and any other machine) → the FragileMeterChanges test is skipped.
-FRAGILE_MINIMAL = Path(os.environ.get("TC_TEST_ALS") or "/nonexistent/fragile.als")
+# Integration fixture: a tiny committed synthetic .als ships in the repo, so this test always runs.
+# TC_TEST_ALS optionally overrides it with a real full project on the developer's own machine.
+_DEFAULT_ALS = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "metre_changes.als"
+FIXTURE_ALS = Path(os.environ.get("TC_TEST_ALS") or _DEFAULT_ALS)
 
 
 class TimeSigDecoder(unittest.TestCase):
@@ -75,24 +78,23 @@ class TimeSigDecoder(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    FRAGILE_MINIMAL.exists(),
-    "Fragile_Live12.1.1_minimal.als not on this machine — disk-gated test skipped",
+    FIXTURE_ALS.exists(),
+    "metre_changes.als fixture missing — run tests/fixtures/synthetic/make_metre_als.py",
 )
-class FragileMeterChanges(unittest.TestCase):
-    """Disk-gated: parse the minimal .als and verify metre changes.
+class MetreChangesFromAls(unittest.TestCase):
+    """Parse the .als fixture and verify arrangement metre changes.
 
-    Ground truth (the producer's Ableton screenshot, bars 369-392):
-        9/16 → 13/8 → (13/8) → 4/4
+    Ground truth: the metre automation steps 9/16 → 13/8 → 4/4.
     The assertions check that 9/16, 13/8, 4/4 appear IN THAT ORDER as a
     subsequence of time_sig_changes[*].sig — dedup of consecutive identical
-    sigs means the two 13/8 events collapse to one.
+    sigs collapses any repeated metre to one entry.
     """
 
     @classmethod
     def setUpClass(cls):
         tmp = tempfile.mkdtemp()
         out = str(Path(tmp) / "result_als.json")
-        parse_als.parse_als(str(FRAGILE_MINIMAL), out)
+        parse_als.parse_als(str(FIXTURE_ALS), out)
         with open(out, encoding="utf-8") as f:
             cls.result = json.load(f)
         cls.sigs = [c["sig"] for c in cls.result.get("time_sig_changes", [])]
