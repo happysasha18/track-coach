@@ -604,11 +604,15 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   threshold) — *"if there's something really important there, why not put it in Simple too."* Respects the view ladder
   (`quick ⊆ Simple ⊆ Detailed`, the view ladder — INV-19 in `docs/TEST_MATRIX.md`): a card promoted to
   Simple is therefore also in Detailed.
-- **SORT TOGGLE (2026-06-22) — Detailed only.** Today the advice cards are ordered by **urgency**
-  (`build_widget.py:1493` `_rank crit<do<concept`) while the lettered cues a/b/c on the timeline are ordered
-  **chronologically** (`build_widget.py:1999`) — a deliberate-but-confusing split. Add a Detailed-only toggle
-  to switch the CARD list between **by urgency** (default, unchanged) and **chronological** (matching the
-  letters). Pure presentation reorder; never adds/removes a card. ⟨DECIDE⟩ default = urgency (current).
+- **SORT TOGGLE — Detailed only (SHIPPED).** The advice cards are ordered by **urgency** (`_rank
+  crit<do<concept`) while the lettered cues a/b/c on the timeline are ordered **chronologically** — a
+  deliberate split that could read as arbitrary. A Detailed-only control flips the CARD list between **by
+  urgency** (the default) and **chronological** (by timecode, matching the letters). It is a pure presentation
+  reorder — never adds, removes, or rewrites a card — and it reorders the EXISTING card nodes (so a card keeps
+  its click-to-evidence navigation, INV-48). A whole-track card (no timecode) sorts last in chronological mode;
+  equal timecodes keep their urgency order (stable). The control hides itself when there is nothing to reorder
+  (fewer than two cards, or none timecoded) and in Simple/Quick (those show only the timecoded subset, no
+  toggle). The choice persists per reader. `INV-26`
 
 #### B.11.1 Resolution — BRIGHTNESS is descriptive, not a prescriptive per-stem card
 When A1 (per-measure validity) reached brightness, the *premise* was rejected, not just the threshold:
@@ -2635,7 +2639,8 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 ### I.10 Composition across the axes
 - **× view (Simple/Detailed/quick):** the tokens are view-independent, but the components they style
   are gated (e.g. `#stemlanes`/`#seqKey` Detailed-only, `#refPanel` Detailed-only — its nested
-  `#refRead`/`#webPanel` hidden with it, D-INV-36 — the view-toggle hidden on quick → `.viewhint`). The refactor must not change any view-VISIBILITY rule — the existing
+  `#refRead`/`#webPanel` hidden with it, D-INV-36 — `#recSort` the card-order toggle Detailed-only
+  (INV-26) — the view-toggle hidden on quick → `.viewhint`). The refactor must not change any view-VISIBILITY rule — the existing
   view-ladder visibility browser tests pass UNCHANGED. (Distinct from the recs COLUMN-COUNT tests,
   which DO change per DS-INV-8 — visibility is held, layout counts are updated.)
 - **× persistence/reopen:** the `.tc-panel` open/closed state and the remembered global view survive a

@@ -86,16 +86,17 @@ class CssGatingContract(unittest.TestCase):
         self.assertNotRegex(FULL, r"\.detailed\b[^{]*\{[^}]*display\s*:\s*none",
                             "INV-22: no .detailed display:none rule may exist")
 
-    def test_simple_hide_set_is_exactly_the_known_four(self):
-        # INV-22 + INV-18: Simple hides ONLY the deep stem viz, the non-timecoded recs, and the
-        # merged reference panel (§D.10, D-INV-36 — ONE container rule; nested #refRead/#webPanel
-        # hide with it).
-        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refPanel"},
+    def test_simple_hide_set_is_exactly_the_known_five(self):
+        # INV-22 + INV-18: Simple hides ONLY the deep stem viz, the non-timecoded recs, the merged
+        # reference panel (§D.10, D-INV-36 — ONE container rule; nested #refRead/#webPanel hide with
+        # it), and the Detailed-only card-order toggle (#recSort, INV-26 — a Detailed affordance).
+        self.assertEqual(HIDE_SIMPLE, {"stemlanes", "seqKey", "recs", "refPanel", "recSort"},
                          f"INV-22: Simple hide-set drifted: {sorted(HIDE_SIMPLE)}")
 
-    def test_quick_hide_set_is_only_recs(self):
-        # INV-22: quick CSS-hides only the non-timecoded recs; stem viz is withheld by DATA absence.
-        self.assertEqual(HIDE_QUICK, {"recs"},
+    def test_quick_hide_set_is_recs_and_the_card_order_toggle(self):
+        # INV-22: quick CSS-hides the non-timecoded recs and the Detailed-only card-order toggle
+        # (#recSort, INV-26); the stem viz is withheld by DATA absence, not a CSS rule.
+        self.assertEqual(HIDE_QUICK, {"recs", "recSort"},
                          f"INV-22: quick hide-set drifted: {sorted(HIDE_QUICK)}")
 
     def test_quick_body_class_set_server_side(self):
@@ -147,6 +148,7 @@ class LadderIsMonotonic(unittest.TestCase):
             "recs(non-timecoded)":     (0, 0, 1),   # quick+Simple show timecoded only; Detailed adds
             "recs(timecoded)":         (1, 1, 1),
             "readPanel":               (1, 1, 1),
+            "recSort(card-order)":     (0, 0, 1),   # INV-26 card-order toggle — Detailed-only affordance
             "refPanel":                (0, 0, 1),   # §D.10 merged panel (D-INV-36) — Detailed-only;
                                                     # absent in quick (no fp); nested refRead/webPanel ride it
             "tonalPanel":              (1, 1, 1),

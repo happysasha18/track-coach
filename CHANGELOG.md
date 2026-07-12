@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.6.2] — 2026-07-12
+
+### Added
+- **Order the advice cards by when they happen, not just by urgency.** In the Detailed view a small
+  "Order" control now flips the recommendation cards between **By urgency** (the default — fix first, then
+  do, then creative choices) and **By time** (the order the moments occur in the track, matching the a/b/c
+  letters on the timeline). It only reorders the cards you already see — nothing is added, dropped, or
+  reworded — and a card keeps its click-to-evidence link. Whole-track notes sit at the end in time order.
+  The control appears only when there's something to reorder, and only in Detailed (Simple and Quick already
+  show just the timed cards). Your choice is remembered.
+
 ## [1.6.1] — 2026-07-12
 
 ### Fixed

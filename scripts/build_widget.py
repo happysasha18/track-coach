@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.6.1"  # Track Coach analyzer version — s66: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
+TC_VERSION = "1.6.2"  # Track Coach analyzer version — s66: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -3230,6 +3230,18 @@ body.simple #recs .rec:not([data-t]){display:none!important}
    the timecoded ones — so quick ⊆ Simple ⊆ Detailed holds. Quick has no toggle, so it gets its own
    body.quick gate (it never enters .simple). Evidence stays visible (INV-18); only the recs are brief. */
 body.quick #recs .rec:not([data-t]){display:none!important}
+/* Card ORDER control (INV-26) — Detailed only. The cards default to urgency order (fix → do →
+   concept); this flips them to the order they occur in the track (by timecode). Simple/Quick show
+   only the timecoded subset with no toggle, so the control is hidden there. It also hides itself
+   when there is nothing to reorder (set inline by JS). */
+#recSort{display:inline-flex;align-items:center;gap:6px;margin:0 0 14px;font-size:11px}
+#recSort .rslab{color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+#recSort .rsbtns{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#recSort button{appearance:none;border:0;background:transparent;color:var(--muted);cursor:pointer;
+ padding:4px 10px;font:inherit;font-size:11px;line-height:1.4}
+#recSort button+button{border-left:1px solid var(--line)}
+#recSort button.on{background:var(--panel2,var(--panel));color:var(--ink);font-weight:600}
+body.simple #recSort,body.quick #recSort{display:none}
 /* VITALS strip — one scannable row of measured spec numbers. */
 .vitals{display:flex;flex-wrap:wrap;gap:0;background:var(--panel);border:1px solid var(--line);
  border-radius:14px;padding:4px 6px;margin-bottom:22px;align-items:stretch}
@@ -3457,6 +3469,7 @@ __MODENOTE__
 <details class="tc-panel" id="recsPanel" open>
  <summary><span id="recsTitle"></span></summary>
  <p class="hint" id="recsHint"></p>
+ <div id="recSort" role="group" aria-label="Card order" style="display:none"></div>
  <div class="legend" id="recLegend" style="margin-bottom:14px"></div>
  <div class="recs" id="recs"></div>
 </details>
@@ -3725,6 +3738,44 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>{
  const chip=tb?`<span class="when tbound">⏱ ${r.when}</span>`:`<span class="when glob">whole track</span>`;
  const dl=cue?` data-let="${cue.letter}"`:"";
  return `<div class="rec ${r.cls}${tb?' tb':''}"${dl}${jump}${dev}>${tag}${chip}<h3>${r.h}</h3><p>${r.p}</p>${fix}${based}</div>`;}).join("")||"<p class='hint'>—</p>";
+
+/* RECSORT_LOGIC_START — pure, DOM-free card-order helper (SPEC §B.11 / INV-26); node-tested. */
+function recSortOrder(ts,mode){
+ // ts[i] = the i-th card's timecode in seconds, or null for a whole-track card. Cards arrive in
+ // urgency order (server-sorted fix → do → concept). 'urgency' keeps it; 'time' re-orders by
+ // timecode ascending, whole-track cards last, ties stable (they keep their urgency order).
+ var idx=ts.map(function(_,i){return i;});
+ if(mode!=="time")return idx;
+ return idx.slice().sort(function(a,b){
+  var ta=ts[a]==null?Infinity:ts[a],tb=ts[b]==null?Infinity:ts[b];
+  return ta!==tb?ta-tb:a-b;
+ });
+}
+/* RECSORT_LOGIC_END */
+// Detailed-only card-order toggle. Reorders the EXISTING card nodes (appendChild moves a node,
+// keeping its click/flash listeners), never rebuilds them — so INV-48 card navigation survives.
+/* RECSORT_WIRE_START */
+(function(){
+ var host=document.getElementById("recSort"),box=document.getElementById("recs");
+ if(!host||!box)return;
+ var cards=[].slice.call(box.querySelectorAll(".rec"));
+ var ts=cards.map(function(el){var v=el.getAttribute("data-t");return v==null?null:parseFloat(v);});
+ var timed=ts.filter(function(t){return t!=null;}).length;
+ if(cards.length<2||timed<1)return;   // nothing to reorder → leave it hidden
+ host.innerHTML='<span class="rslab">'+((T&&T.recsort_label)||"Order")+'</span>'+
+  '<span class="rsbtns"><button data-s="urgency">'+((T&&T.recsort_urgency)||"By urgency")+
+  '</button><button data-s="time">'+((T&&T.recsort_time)||"By time")+'</button></span>';
+ host.style.display="";                // CSS still hides the control in Simple/Quick
+ function apply(mode){
+  recSortOrder(ts,mode).forEach(function(i){box.appendChild(cards[i]);});
+  host.querySelectorAll("button").forEach(function(b){b.classList.toggle("on",b.dataset.s===mode);});
+  try{localStorage.setItem("tc_recsort",mode);}catch(e){}
+ }
+ host.querySelectorAll("button").forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.s);});});
+ var saved="urgency";try{if(localStorage.getItem("tc_recsort")==="time")saved="time";}catch(e){}
+ apply(saved);
+})();
+/* RECSORT_WIRE_END */
 // The card CLICK wiring (INV-48) lives AFTER the panel-gating IIFEs below — a card's target must be
 // judged present/hidden only once every panel has decided whether it renders on this run's data.
 
