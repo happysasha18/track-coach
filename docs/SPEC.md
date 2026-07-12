@@ -1955,12 +1955,80 @@ genuinely-incomplete run is re-run, its missing axes stay *missing* under the ru
 comparison, shown as "not measured"). E-1 (resolved) **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
 (a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
 
+**A run reaches a surface only when it is complete; an incomplete run is held back and redone automatically,
+and it is never shown as a result.** (2026-07-12, Alexander's word: a run either exists or it does not; an
+invalid run is redone.) RC-INV-10 made a partial run a technical error and left the re-run to the user, so a
+partial run could still render, deposit, and feed similarity while it waited. This closes that gap. A run is
+**complete** when every signal its mode promises for the material the track actually contains carries a real
+value: for each promised axis, the significance gate (RC-INV-11, §A) is read on that axis's source part; a
+part the gate reads as PRESENT must carry a measured value, and a part the gate reads as ABSENT is a real
+"not present" reading (RC-INV-4/11), never a gap. A run that leaves a gate-present signal unmeasured — a
+present stem left unread, a sustain or transcription pass that did not run — is **invalid**, and an invalid
+run is never rendered as a widget, never deposited or listed in the catalog, and never used for a fingerprint,
+a nearest-direction, or a sibling distance. Only a complete run reaches those surfaces. `RC-INV-13`
+
+**Completeness reads the significance gate, and a failed measurement stays missing.** The old value-based
+manifest could not tell a broken measurement from an absent part, because the fingerprint extraction imputed
+`0.0` for a failed detector (a latent RC-INV-3 violation) — a failed tempo read as `tempo=0`, an
+un-transcribed pad read as "no notes". So completeness is now **gate-aware**, and no axis is imputed: a
+detector that produced nothing carries missing (None/NaN), so failure is visible. Each axis maps to a source
+part and a require-rule; a signal whose source the gate reads as absent is dropped from the promised set
+BEFORE validity is judged, so a track that genuinely lacks a part stays complete and is never bricked into a
+redo. `RC-INV-13d`
+
+| Axis | Source part | Required when |
+|---|---|---|
+| tempo · dynamics · stereo · density · energy_build | the whole mix | always — the mix is always present, so a missing value is a failed detector (invalid, never 0.0) |
+| brightness | the significant stems' bands | ≥1 stem is significant (a full run always has one) |
+| drums_share | drums stem | the drums stem is significant |
+| bass_share · bass_sustain | bass stem | the bass stem is significant |
+| other_share · pad_sustain · pad_notes · pad_bright | other stem | the other stem is significant |
+| lead_share | guitar, vocals, piano | ≥1 of the three is significant `[default]` |
+
+- **An invalid run is redone once, automatically; a run that still cannot measure a gate-present signal is an
+  honest failure, held out and not re-looped.** (E-1 reversed 2026-07-12: the redo is automatic. E-1's cost
+  concern is met by the bound — the auto-redo fires only on a genuinely-invalid run, never on missing-by-mode
+  or a gate-absent part, and runs at most once.) After the automatic redo, a run that still leaves a
+  gate-present signal unmeasured is surfaced plainly as "incomplete run", held out of every surface above,
+  and left for the user (re-run with different inputs, or accept the tool cannot read that part). It is never
+  hidden silently and never re-looped on its own. `RC-INV-13a`
+- **Already-deposited partial runs are found, marked, and offered for redo, never swept silently.**
+  (Alexander's word 2026-07-12.) The library already holds runs deposited before this bar (an old run with no
+  sustain block; a one-stem transcription). A one-off re-validate pass lists every deposit now judged
+  invalid, marks it, and offers a redo — mirroring the pre-1.0 `migrate` pass (decision G-2). Those runs keep
+  rendering, marked, until redone, so the standing library never blinks out at once. `RC-INV-13c`
+- *Composition with the completeness line.* Because an invalid run never reaches the screen, a shown run's
+  completeness line (RC-INV-12) counts only signals genuinely present, so its "measured N of M" discloses
+  **what the music contains**, and its tail names signals **absent in this track**, never a measurement that
+  broke — the line reads "absent in this track", not "skipped". `RC-INV-13b`
+- *Reference runs.* A reference run never deposits (G-INV-18), so its validity is checked at
+  direction-generation time instead — an invalid reference stem is kept out of a direction's centroid, the
+  same bar applied where reference runs actually enter the math. `RC-INV-13e`
+- *Validity is stable per run.* The promised-set version is stamped into the run at analysis time, so a run's
+  validity never silently flips when the axis list grows later; an axis addition routes through the
+  re-validate pass (RC-INV-13c), never a silent re-invalidation of the standing library.
+- *Fences.* Missing-by-mode stays silent and valid — a quick run is complete for the five signals it promises
+  (RC-INV-7). The best-run choice (RC-INV-9) prefers the most-complete run, now under the floor that a run
+  below the bar is not a candidate. The gate's three states (RC-INV-11) are unchanged. *Non-goals:* no
+  imputation or silent degrade, no change to what any single signal measures. *Success measure:* no widget,
+  catalog row, or similarity number is ever built from a run carrying an unmeasured gate-present signal,
+  enforced at the deposit and render boundary and red in the suite when violated.
+
 ### E.5 Decisions
 
-- **E-1 — SETTLED:** a partial run is a technical error → flag "incomplete run — re-run", manual re-run,
-  no auto-trigger, no imputation (RC-INV-10). Missing-by-mode (quick has no stems) is not an error.
+- **E-1 — SETTLED, then REVISED 2026-07-12:** a partial run is a technical error, no imputation (RC-INV-10).
+  The original settlement kept the re-run manual (auto-trigger rejected as expensive/surprising); Alexander
+  reversed that 2026-07-12 — the redo is now **automatic and bounded** (fires only on a genuinely-invalid run,
+  at most once, then falls back to an honest "incomplete" state, RC-INV-13a). Missing-by-mode is not an error.
 - **E-2 — SETTLED:** `MIN_SHARED_AXES` = **10**. Below 10 shared measured axes a pair is not comparable
   (RC-INV-5a) — guards against too little DATA (quick vs full), not against dissimilar music.
+- **E-3 — SETTLED (2026-07-12, Alexander's word):** a run is complete or it is not a run. An invalid run —
+  one missing a gate-present signal its mode promises — never renders, deposits, or feeds similarity; it is
+  held and redone automatically at most once (RC-INV-13/13a), then, if still invalid, surfaced as an honest
+  "incomplete" state. Completeness is judged **gate-aware**, with no 0.0 imputation, so a genuinely-absent
+  part (the significance gate reads it as not there) stays a valid "not present" reading (RC-INV-11/13d), not
+  an invalidating gap. Already-deposited partial runs are found, marked, and offered for redo, never swept
+  (RC-INV-13c). E-3 chose auto-redo and mark-and-offer migration over E-1's original manual-only stance.
 
 ## F. Similar in your own library — the DJ column
 
@@ -2061,7 +2129,8 @@ place that says where things live, so the analyzer, the library, and the catalog
 - **`src_run_dir`** — the absolute path to the run a library member was built from, stored in the library
   index at deposit, and read back to open the original widget, play its preview audio, and compute similarity.
 - **Deposit** — copying a finished run's widget HTML into the library. It happens **automatically** at the end
-  of every successful `build`, unless `--no-deposit` is passed; it is not a separate manual step. `G-INV-17`
+  of every successful `build`, unless `--no-deposit` is passed; it is not a separate manual step. "Successful"
+  now includes **complete** — a build whose run is invalid (RC-INV-13) does not deposit; it redoes first. `G-INV-17`
 
 **Reference runs are never deposited into the library.** A run whose `run_meta.json` carries the reference
 marker (§D.3, an explicit `reference` flag) is kept out of the library index (`~/.track-coach/library/index.json`)
