@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.5.2"  # Track Coach analyzer version — s65: a synthetic/smoke run never deposits into the library (G-INV-21); the catalog migrate banner tells a track to move from a missing source to delete (G-INV-22); analysis output unchanged, so nothing stales
+TC_VERSION = "1.5.3"  # Track Coach analyzer version — s65: the widget now shows a run-completeness line ("Measured N of M signals; skipped: …") so a clean-looking widget isn't misread as all-clear (RC-INV-12); analysis output unchanged, so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -2332,7 +2332,8 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     _q = (mode == "quick")
     _badge_txt = _ui.get("mode_badge_quick", "Quick read") if _q else _ui.get("mode_badge_full", "Full analysis")
     badge_html = f'<span class="modebadge {"quick" if _q else "full"}" id="modeBadge">{_esc(_badge_txt)}</span>'
-    note_html = f'<p class="modenote" id="modeNote">{_esc(_ui.get("quick_explainer", ""))}</p>' if _q else ""
+    quick_note = f'<p class="modenote" id="modeNote">{_esc(_ui.get("quick_explainer", ""))}</p>' if _q else ""
+    note_html = quick_note + _completeness_line_html(run_dir, mode)  # RC-INV-12, both modes
     # Producer's read — rendered to HTML here (server-side) so it ships in the markup, not built by JS.
     read_body = _read_html(narrative_md)
     # SPEC §B.12 — lead the read with the computed "how it develops" observation. It's a standalone
@@ -2364,6 +2365,25 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
 
 def _esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _completeness_line_html(run_dir, mode):
+    """RC-INV-12: one run-level line — "Measured N of M signals; skipped: …" — so a widget with few
+    cards isn't misread as all-clear. It reads the shared fingerprint manifest (RC-INV-8) over the
+    axes the run's rung promises (fingerprints.PROMISED_BY_MODE), in the muted based-on register.
+    Missing-by-mode axes aren't promised, so they never show as skipped (RC-INV-7)."""
+    if not run_dir:
+        return ""
+    try:
+        import fingerprints as FP
+        n, m, skipped = FP.run_completeness(run_dir, mode)
+    except Exception:  # noqa: BLE001 — the disclosure line is best-effort, never blocks the render
+        return ""
+    if m <= 0:
+        return ""
+    tail = f"; skipped: {_esc(_join_and(skipped))}" if skipped else ""
+    return (f'<p class="completeness" id="completeness">'
+            f'<span class="complab">Measured</span> {n} of {m} signals{tail}.</p>')
 
 
 def _verdict_text(verdict, narrative_md):
@@ -3062,6 +3082,8 @@ body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#161b2b,var(--
 .modebadge.quick{background:rgba(255,209,102,.16);color:var(--bright)}
 .modenote{color:var(--muted);font-size:12px;margin:-12px 0 20px;max-width:760px;line-height:1.5}
 .modenote[hidden]{display:none}
+.completeness{color:var(--muted);font-size:12px;margin:-8px 0 20px;max-width:760px;line-height:1.5}
+.complab{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#7c8398;margin-right:6px;text-transform:uppercase}
 .backlink{display:inline-block;margin:0 0 8px;padding:4px 11px;border:1px solid var(--line);border-radius:20px;
  color:var(--muted);text-decoration:none;font-size:12px;font-weight:600}
 .backlink:hover{color:var(--ink);border-color:var(--wob)}

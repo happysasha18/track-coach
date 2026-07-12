@@ -10,13 +10,16 @@ shared logic (scripts/completeness.py) never lets a missing value masquerade as 
 Fixtures are SYNTHETIC + deterministic (tests = made-up data, never real music). NEVER loosen one of these
 to make code pass — change the SPEC first with a fresh citation.
 """
+import json
 import math
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import completeness as C  # noqa: E402
+import fingerprints as FP  # noqa: E402
 
 
 class MissingIsNotZero(unittest.TestCase):
@@ -169,6 +172,62 @@ class PartialRunIsAnError(unittest.TestCase):
         present = {"tempo", "stereo"}
         expected_quick = {"tempo", "stereo"}
         self.assertFalse(C.is_partial_failure(present, expected_quick))
+
+
+class RunCompleteness(unittest.TestCase):
+    """RC-INV-12: "measured N of M signals; skipped: ⟨reads⟩" over the axes the run's rung promises
+    (fingerprints.PROMISED_BY_MODE, split from the one AXES list). Missing-by-mode axes (per-stem on
+    quick) are not promised, so they never count as skipped (RC-INV-7)."""
+
+    def _core_only(self, tmp):
+        """A run with only result_core.json — the five mix-level signals, no stems (no masking)."""
+        run = Path(tmp) / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        return str(run)
+
+    def _full(self, tmp):
+        """A run with core + masking so fingerprint_from_run_dir places all 14 axes."""
+        run = Path(tmp) / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {
+                "drums": {"sub": [-30]*8, "low": [-25]*8, "low_mid": [-28]*8,
+                          "mid": [-35]*8, "hi_mid": [-40]*8, "air": [-60]*8},
+                "bass":  {"sub": [-20]*8, "low": [-18]*8, "low_mid": [-30]*8,
+                          "mid": [-45]*8, "hi_mid": [-60]*8, "air": [-80]*8},
+                "other": {"sub": [-50]*8, "low": [-45]*8, "low_mid": [-30]*8,
+                          "mid": [-25]*8, "hi_mid": [-20]*8, "air": [-25]*8}},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+            "sustain": {"bass": 0.5, "other": 0.4},
+            "spectral_centroid": {"other": 800.0}, "total_windows": 8}))
+        return str(run)
+
+    def test_full_complete_measures_all(self):
+        """A full run with core + masking measures all 14 promised signals, nothing skipped."""
+        with tempfile.TemporaryDirectory() as td:
+            n, m, skipped = FP.run_completeness(self._full(td), "full")
+            self.assertEqual((n, m), (14, 14))
+            self.assertEqual(skipped, [])
+
+    def test_full_partial_lists_skipped_reads(self):
+        """A full run that only measured the mix (no stems) discloses the 9 stem reads as skipped."""
+        with tempfile.TemporaryDirectory() as td:
+            n, m, skipped = FP.run_completeness(self._core_only(td), "full")
+            self.assertEqual((n, m), (5, 14))
+            self.assertEqual(len(skipped), 9)
+            self.assertIn("bass sustain", skipped)   # a promised stem read, disclosed by plain name
+
+    def test_quick_promises_only_mix_axes(self):
+        """Quick promises only the five mix-level signals — its stemless per-stem axes are
+        missing-by-mode, never counted as skipped (RC-INV-7)."""
+        with tempfile.TemporaryDirectory() as td:
+            n, m, skipped = FP.run_completeness(self._core_only(td), "quick")
+            self.assertEqual((n, m), (5, 5))
+            self.assertEqual(skipped, [])
 
 
 class SignificanceHasUnknown(unittest.TestCase):

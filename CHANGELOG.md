@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.5.3] — 2026-07-12
+
+### Added
+- **The widget now tells you how much it actually measured, so a clean read isn't mistaken for a perfect
+  one.** A short line near the top of the Producer's read says "Measured N of M signals" and, when some
+  came back empty, names them — e.g. on a run analysed without stems: *"Measured 5 of 14 signals; skipped:
+  bass balance, bass sustain, brightness, drum balance, lead balance, harmonic balance, harmonic
+  brightness, harmonic density and pad sustain."* A full run that measured everything simply reads
+  *"Measured 14 of 14 signals."* This keeps a widget with few flags honest — no flags because nothing was
+  wrong reads differently from no flags because a signal was never measured. A quick read counts only the
+  five whole-mix signals it promises, so its stem signals are never listed as missing.
+
 ## [1.5.2] — 2026-07-12
 
 ### Fixed

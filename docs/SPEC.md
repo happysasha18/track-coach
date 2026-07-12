@@ -1915,7 +1915,10 @@ Simple. `RC-INV-7a`
 **Absence-of-card from missing data is disclosed once per run, so a clean widget isn't misread as all-clear.**
 A coach read omitted for a missing input (RC-INV-4) looks identical to "nothing to flag here"; to keep that
 honest the run shows a single completeness line — "measured N of M signals; skipped: ⟨reads⟩" — in the same
-register as the §B.13 based-on line, not one note per suppressed card. `RC-INV-12`
+register as the §B.13 based-on line, not one note per suppressed card. It reads the shared fingerprint
+manifest (RC-INV-8) over the axes the run's rung promises, and that promised set is derived from the one
+axis list (`fingerprints.AXES`) split by mode — quick promises the mix-level axes a stemless run measures,
+full promises every axis — so it never disagrees with the ladder (RC-INV-7a). `RC-INV-12`
 
 ### E.4 Choosing the run, and closing the gap
 

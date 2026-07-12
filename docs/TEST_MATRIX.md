@@ -279,7 +279,7 @@ pure-logic invariants are unit-tested NOW, the surface-rendering ones land with 
 | RC-INV-9 | pick most-complete run; run-id in content-hash (D-INV-14) | not built — lands with run selection + §D placement |
 | RC-INV-10 | gap → re-measure, never impute; ⟨DECIDE E-1⟩ auto vs flag | partial-run logic **built+tested** — `test_completeness::PartialRunIsAnError`; UI re-measure command not built (backlog) |
 | RC-INV-11 | significance has a third `unknown (not measured)` state | `test_completeness::SignificanceHasUnknown` ✓ |
-| RC-INV-12 | one per-run completeness line so absence≠all-clear | not built — lands with the coach render |
+| RC-INV-12 | one per-run completeness line "Measured N of M signals; skipped: ⟨reads⟩" so absence≠all-clear; reads the shared fingerprint manifest (RC-INV-8) over the rung's promised axes (`fingerprints.PROMISED_BY_MODE`, split from the one `AXES` list — quick=mix-level, full=all). NEG: a missing-by-mode axis (a per-stem axis on quick) is never counted as skipped; the line is in the muted based-on register, once per run, never one note per card. Level: L0-DATA (pure `run_completeness`) + L1-DOM (the line ships in the widget markup). | `test_completeness::RunCompleteness::test_full_complete_measures_all`, `::test_full_partial_lists_skipped_reads`, `::test_quick_promises_only_mix_axes`, `test_widget_render::CompletenessLineShipped::test_line_in_markup` |
 
 **Settled 2026-06-25:** E-1 = partial run is a technical error → flag "run incomplete, re-run"
 (manual, no auto, no imputation; `is_partial_failure`/`incomplete_axes`). E-2 = `MIN_SHARED_AXES` = **10**

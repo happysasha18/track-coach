@@ -27,6 +27,23 @@ AXES = [
     "bass_sustain", "pad_sustain", "pad_notes", "pad_bright",
 ]
 
+# RC-INV-12 / RC-INV-7a: which axes each rung PROMISES, derived from AXES (the one axis authority)
+# so the completeness line can never disagree with the ladder. quick is the stemless run — it carries
+# only the mix-level axes a run measures without Demucs stems; full promises every axis. The five
+# mix-level axes come straight from result_core.json (no masking needed), so a quick run reports them.
+MIX_AXES = ("tempo", "dynamics", "stereo", "density", "energy_build")
+PROMISED_BY_MODE = {"quick": set(MIX_AXES), "full": set(AXES)}
+
+# Axis key → the plain producer read it stands for, for the "skipped: …" tail of the completeness line.
+AXIS_READS = {
+    "tempo": "tempo", "dynamics": "dynamics", "stereo": "stereo width",
+    "brightness": "brightness", "density": "density", "energy_build": "energy arc",
+    "drums_share": "drum balance", "bass_share": "bass balance",
+    "other_share": "harmonic balance", "lead_share": "lead balance",
+    "bass_sustain": "bass sustain", "pad_sustain": "pad sustain",
+    "pad_notes": "harmonic density", "pad_bright": "harmonic brightness",
+}
+
 # Frequency-band names and representative Hz, used for brightness calculation.
 _BANDS = ["sub", "low", "low_mid", "mid", "hi_mid", "air"]
 _BAND_HZ = {"sub": 40, "low": 110, "low_mid": 300, "mid": 800, "hi_mid": 3000, "air": 9000}
@@ -120,6 +137,44 @@ def fingerprint_from_run_dir(run_dir) -> dict | None:
         "pad_notes":    _notes_n(rd, "other") / dur,
         "pad_bright":   _centroid_log(mk, "other"),
     }
+
+
+def measured_axes(run_dir) -> set:
+    """Axis names carrying a real measurement for this run — the single manifest RC-INV-8 shares.
+
+    On a full run (core + masking) this is the full fingerprint's manifest. On a quick run there is
+    no fingerprint (no masking), so only the mix-level axes are measurable; they are read straight
+    from result_core.json. Returns an empty set when the run has no readable core."""
+    import completeness as CP  # lazy: same scripts/ dir, avoids a load-order cycle
+    fp = fingerprint_from_run_dir(run_dir)
+    if fp is not None:
+        return CP.manifest(fp)
+    core = _jload(str(run_dir) + "/result_core.json")
+    if not core:
+        return set()
+    v = core.get("vitals", {})
+    mix = {
+        "tempo": v.get("tempo_bpm"),
+        "dynamics": v.get("dynamic_range_db"),
+        "stereo": core.get("stereo_width_mean", v.get("stereo_width")),
+        "density": core.get("density_lv"),
+        "energy_build": core.get("energy_trend"),
+    }
+    return {k for k, val in mix.items() if not CP.is_missing(val)}
+
+
+def run_completeness(run_dir, mode: str = "full"):
+    """RC-INV-12: (n_measured, n_promised, skipped_reads) for this run's rung.
+
+    ``skipped_reads`` are the plain read names (AXIS_READS) of promised axes that came back missing —
+    the missing-within-a-promised-surface case (RC-INV-7). Axes a rung never promised (missing-by-mode)
+    are not in ``promised``, so they never count as skipped."""
+    import completeness as CP  # lazy
+    promised = PROMISED_BY_MODE.get(mode, PROMISED_BY_MODE["full"])
+    present = measured_axes(run_dir) & promised
+    skipped = CP.incomplete_axes(present, promised)
+    reads = [AXIS_READS.get(a, a.replace("_", " ")) for a in sorted(skipped)]
+    return len(present), len(promised), reads
 
 
 def normalize_fingerprint(fp: dict, norm: dict) -> dict:

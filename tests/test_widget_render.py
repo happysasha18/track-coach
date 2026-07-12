@@ -82,6 +82,41 @@ def _render(stems=("drums", "bass", "vocals"), *, mix=False, mode="full", selfsi
     return html, payload
 
 
+class CompletenessLineShipped(unittest.TestCase):
+    """RC-INV-12: the widget ships one run-level completeness line ("Measured N of M signals;
+    skipped: …") so a clean-looking widget isn't misread as all-clear. Server-rendered → the line
+    lives in the shipped markup and is asserted directly, no browser needed."""
+
+    def _render_with_run_dir(self, mode):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_comp_"))
+        run = tmp / "run"; run.mkdir()
+        # core only → the five mix signals measured; no masking → the nine stem signals absent
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Comp Test",
+                                build_widget.STRINGS, mode=mode, run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        return out.read_text(encoding="utf-8")
+
+    def test_line_in_markup(self):
+        html = self._render_with_run_dir("full")
+        self.assertIn('class="completeness"', html,
+                      "the widget must ship the RC-INV-12 completeness line")
+        self.assertIn("of 14 signals", html, "a full run promises all 14 signals")
+        self.assertIn("Measured", html)
+        # a core-only full run measured only the 5 mix signals → 9 stem reads disclosed as skipped
+        self.assertIn("skipped:", html)
+        self.assertIn("bass sustain", html)
+
+    def test_quick_counts_mix_signals_only(self):
+        html = self._render_with_run_dir("quick")
+        self.assertIn('class="completeness"', html)
+        self.assertIn("5 of 5 signals", html,
+                      "quick promises only the mix-level signals, all measured from core")
+
+
 class StoryCurvesReachThePayload(unittest.TestCase):
     """Every curve the graph can draw must actually be in the rendered data."""
 
