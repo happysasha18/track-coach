@@ -220,6 +220,104 @@ class IncompleteRunRendersStatusPlaceholder(unittest.TestCase):
                          "a crashed-Demucs run must not present a partial completeness line as final")
 
 
+class FailedRunRendersHonestPlaceholder(unittest.TestCase):
+    """RC-INV-13f: an invalid run splits by CAUSE. A run merely interrupted or awaiting its top-up
+    keeps the recoverable "Analysing — reload when it's ready." (RC-INV-13c). A run the analyzer
+    caught actively BREAKING — a terminal step failure it cannot proceed past — carries
+    `analysis_state:"failed"` in run_meta.json and must render the honest "Analysis couldn't
+    complete for this track." message instead, so a run that will never finish on its own never
+    promises a reload. The render guard (`_read_analysis_state`) is the ONLY thing that decides
+    which of the two messages an invalid run shows; validity itself is unchanged (E-4)."""
+
+    def _incomplete_run(self, extra_meta=None):
+        # same shape as IncompleteRunRendersStatusPlaceholder._incomplete_run: an `other` stem that
+        # IS significant (loud) but whose sustain/spectral_centroid were never measured → INVALID.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_failed_"))
+        run = tmp / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-30.0), "bass": bands(-30.0), "other": bands(-30.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+            "total_windows": 8}))  # no sustain, no spectral_centroid → present signals unmeasured
+        if extra_meta is not None:
+            (run / "run_meta.json").write_text(json.dumps(extra_meta))
+        return tmp, run
+
+    def _complete_run(self, extra_meta=None):
+        # same shape as the "complete run" fixture elsewhere in this file: every stem near-silent
+        # (below the significance floor) → the mode's promised gate is fully measured → VALID.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_failedvalid_"))
+        run = tmp / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-85.0), "bass": bands(-85.0), "other": bands(-85.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0, "total_windows": 8}))
+        if extra_meta is not None:
+            (run / "run_meta.json").write_text(json.dumps(extra_meta))
+        return tmp, run
+
+    def test_failed_marker_renders_honest_message(self):
+        import validity as V
+        tmp, run = self._incomplete_run({"analysis_state": "failed",
+                                         "analysis_error": "audio not found: /gone.wav"})
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Broken Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn(build_widget._FAILED_STATUS, html,
+                      "a terminally-failed run must render the honest failure message")
+        self.assertIn(build_widget._FAILED_HINT, html,
+                      "a terminally-failed run must render the plain next-step hint")
+        self.assertNotIn(build_widget._INCOMPLETE_STATUS, html,
+                         "a terminally-failed run must NOT show the recoverable reload wording")
+        self.assertIn("Broken Track", html, "the placeholder must keep the track title")
+
+    def test_no_marker_still_shows_reload_placeholder(self):
+        # regression fence for RC-INV-13c: an invalid run with NO failed marker (interrupted /
+        # awaiting its top-up, or still mid-analysis with analysis_state:"running") keeps the
+        # recoverable placeholder — the failure message is reserved for an actual terminal break.
+        import validity as V
+        for meta in (None, {"analysis_state": "running", "analysis_error": None}):
+            tmp, run = self._incomplete_run(meta)
+            self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+            out = tmp / "widget.html"
+            build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Partial Track",
+                                    build_widget.STRINGS, mode="full", run_dir=str(run),
+                                    narrative_md="The mix reads clear.")
+            html = out.read_text(encoding="utf-8")
+            self.assertIn(build_widget._INCOMPLETE_STATUS, html,
+                          f"meta={meta!r}: an invalid run without a failed marker must show the "
+                          f"recoverable reload placeholder")
+            self.assertNotIn(build_widget._FAILED_STATUS, html,
+                             f"meta={meta!r}: must NOT show the failure message without the marker")
+
+    def test_valid_run_ignores_stale_failed_marker(self):
+        # fence: the marker is INERT once a run is valid — a stale analysis_state:"failed" left
+        # over from a prior attempt on the same run dir must never suppress the full widget.
+        import validity as V
+        tmp, run = self._complete_run({"analysis_state": "failed",
+                                       "analysis_error": "a stale reason from a prior attempt"})
+        self.assertTrue(V.is_valid(str(run), "full"), "fixture must be a genuinely VALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Whole Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertNotIn(build_widget._FAILED_STATUS, html,
+                         "a valid run must NOT show the failure placeholder, marker or not")
+        self.assertNotIn(build_widget._INCOMPLETE_STATUS, html,
+                         "a valid run must NOT show the incomplete placeholder either")
+        self.assertIn('class="completeness"', html, "a valid run keeps its completeness line")
+
+
 class StoryCurvesReachThePayload(unittest.TestCase):
     """Every curve the graph can draw must actually be in the rendered data."""
 

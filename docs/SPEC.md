@@ -2062,6 +2062,23 @@ reopens. `tags: RC-INV-13d · known-limitation`
 - *Reference runs.* A reference run never deposits (G-INV-18), so its validity is checked at
   direction-generation time instead — an invalid reference stem is kept out of a direction's centroid, the
   same bar applied where reference runs actually enter the math. `RC-INV-13e`
+- *Failure is distinct from interruption.* An invalid run splits by cause. A run merely interrupted or
+  awaiting its top-up keeps the recoverable status "Analysing — reload when it's ready." (RC-INV-13c) — the
+  data is coming, a re-run finishes it. A run whose analysis actively BROKE after its core was measured — the
+  analyzer caught a terminal step failure it cannot proceed past (a stem-separation pass that died, a later
+  required step that failed) — carries `analysis_state: "failed"` with a short `analysis_error` reason in
+  `run_meta.json`, stamped by the analyzer at the failure before it exits. When a widget is built for such a
+  run its surface reads the honest "Analysis couldn't complete for this track." with a plain next step ("The
+  source may be unreadable — check the file and re-run."), so a run that will never complete on its own never
+  shows a promise that it will. The render guard reads the marker: an invalid run carrying the failed marker
+  takes the honest-failure message, an invalid run without it keeps the reload placeholder, and a valid run
+  renders unchanged. The analyzer only LABELS the failure it already hits — it adds no new recovery attempt,
+  and no change to what makes a run invalid. *Boundary:* a failure so early that nothing was measured (an
+  unreadable source, before `result_core.json` exists) exits loud with a non-zero code and builds no widget,
+  so it presents no surface to mislead; giving that no-core failed run its own honest widget is a queued
+  follow-up. A hard kill (`kill -9`, out of memory) the analyzer cannot catch
+  leaves the run at "running" and it keeps the recoverable placeholder, since a killed run would complete on
+  re-run. The two message strings are `[default]`. `RC-INV-13f`
 - *Validity is stable per run.* The promised-set version is stamped into the run at analysis time, so a run's
   validity never silently flips when the axis list grows later; an axis addition routes through the
   re-validate pass (RC-INV-13c), never a silent re-invalidation of the standing library.
@@ -2088,6 +2105,14 @@ reopens. `tags: RC-INV-13d · known-limitation`
   an invalidating gap. By default, running the tool completes any incomplete prior runs in the same pass so
   partial data is not left lying around (RC-INV-13c), announcing what it tops up, with a `--only-this` opt-out
   for a single track. E-3 chose auto-redo and default-backfill over E-1's original manual-only stance.
+- **E-4 — SETTLED 2026-07-14 (Alexander's word, close-out of the 1.7.0 audit follow-up):** an invalid run
+  distinguishes interruption from terminal failure. The recoverable placeholder (RC-INV-13c) promised
+  "reload when it's ready" for every invalid run, including one whose analysis had died and would never
+  complete on its own — a false promise. A run the analyzer catches failing terminally is now marked
+  `analysis_state:"failed"` (with an `analysis_error` reason) in `run_meta.json` and renders a distinct
+  honest "Analysis couldn't complete for this track." message (RC-INV-13f). The analyzer only LABELS the
+  failure it already hits; it adds no new recovery attempt and no change to what makes a run invalid. The two
+  message strings are `[default]` — one word changes either.
 
 ## F. Similar in your own library — the DJ column
 

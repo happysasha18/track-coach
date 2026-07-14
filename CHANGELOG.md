@@ -5,6 +5,18 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.7.1] — 2026-07-14
+
+### Fixed
+- **A track whose analysis can't complete now says so honestly, instead of asking you to reload for
+  data that will never arrive.** Say the source file for a track has gone missing, or Ableton stem
+  separation dies partway through — before, the page just showed *Analysing — reload when it's
+  ready.*, the same message a track mid-analysis shows, so you'd wait for a result that was never
+  coming. Now a track whose analysis genuinely broke shows *Analysis couldn't complete for this
+  track.* with a plain next step — *The source may be unreadable — check the file and re-run.* A
+  track that's simply still being analysed, or waiting on its next automatic top-up, keeps the
+  original reload message unchanged.
+
 ## [1.7.0] — 2026-07-14
 
 ### Fixed

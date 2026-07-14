@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.7.0"  # Track Coach analyzer version — s68 MILESTONE: the live-spec prover (v1.1.4), a new design-review pass, and a Fable adversarial audit all ran over the spec; every finding folded here. Render-boundary validity guard (RC-INV-13c): an INCOMPLETE run no longer renders its partial "Measured N of M signals" line as a finished read — `build_html` shows the in-progress status placeholder ("Analysing — reload when it's ready.") instead. The guard now also catches a run that crashed during Demucs — an absent masking file in a stem-promising rung reads as UNMEASURED, not "no significant stems", closing the widest partial-run window. Both catalog similarity columns carry the greyscale closeness mark (●●● / ●●○ / ●○○) plus a worded closeness label (hover title + screen-reader text). Near-silent labels documented as always-distinct (INV-44); the card-order sort is one global preference (INV-26); the absence-acknowledgment rule named once (INV-51); a legibility floor stated honestly (§I.10a). Test harness hardened against headless-Chrome crash flakes (retry-on-crash). A COMPLETE run renders exactly as before. Prior 1.6.3: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
+TC_VERSION = "1.7.1"  # Track Coach analyzer version — s69: RC-INV-13f — a terminally-FAILED run ("analysis_state":"failed" in run_meta.json) renders a distinct honest "Analysis couldn't complete for this track." message instead of the recoverable "reload when it's ready." placeholder; the analyzer stamps the marker at a terminal step failure and clears it on a fresh attempt. Analysis OUTPUT of valid runs unchanged (failed runs never deposit), so nothing stales. Prior 1.7.0 s68 MILESTONE: the live-spec prover (v1.1.4), a new design-review pass, and a Fable adversarial audit all ran over the spec; every finding folded here. Render-boundary validity guard (RC-INV-13c): an INCOMPLETE run no longer renders its partial "Measured N of M signals" line as a finished read — `build_html` shows the in-progress status placeholder ("Analysing — reload when it's ready.") instead. The guard now also catches a run that crashed during Demucs — an absent masking file in a stem-promising rung reads as UNMEASURED, not "no significant stems", closing the widest partial-run window. Both catalog similarity columns carry the greyscale closeness mark (●●● / ●●○ / ●○○) plus a worded closeness label (hover title + screen-reader text). Near-silent labels documented as always-distinct (INV-44); the card-order sort is one global preference (INV-26); the absence-acknowledgment rule named once (INV-51); a legibility floor stated honestly (§I.10a). Test harness hardened against headless-Chrome crash flakes (retry-on-crash). A COMPLETE run renders exactly as before. Prior 1.6.3: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -2062,7 +2062,13 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
     if run_dir is not None:
         import validity as V  # lazy: validity imports build_widget, so import here to avoid a cycle
         if not V.is_valid(run_dir, mode):
-            _render_incomplete_placeholder(out_path, title or "Untitled track")
+            # RC-INV-13f: split interruption from terminal failure. A run the analyzer caught
+            # actively BROKE (analysis_state:"failed" in run_meta.json) gets the honest
+            # can't-complete message; every other invalid run keeps the recoverable reload wording.
+            if _read_analysis_state(run_dir) == "failed":
+                _render_failed_placeholder(out_path, title or "Untitled track")
+            else:
+                _render_incomplete_placeholder(out_path, title or "Untitled track")
             return
     dur = core["duration_s"]
     tb = core["time_bins"]
@@ -2380,6 +2386,57 @@ def _esc(s):
 # RC-INV-13c: the in-progress status shown in place of a finished read. Verbatim, both the string
 # and the render — a partial run never presents its partial numbers as final (E-3).
 _INCOMPLETE_STATUS = "Analysing — reload when it's ready."
+
+# RC-INV-13f: an invalid run whose analysis actively BROKE (the analyzer caught a terminal step
+# failure it cannot proceed past) gets this honest message instead of the recoverable
+# _INCOMPLETE_STATUS above — the data is never coming on its own, so promising a reload is a false
+# promise (E-4). Verbatim, both the string and the render.
+_FAILED_STATUS = "Analysis couldn't complete for this track."
+_FAILED_HINT = "The source may be unreadable — check the file and re-run."
+
+
+def _read_analysis_state(run_dir):
+    """RC-INV-13f: the run's terminal-failure marker from run_meta.json, or None. Stamped by the
+    analyzer (track_analyzer.cmd_analyze) at a terminal step failure, before it exits; cleared to
+    "running"/"ok" at the start/end of a fresh analysis attempt. Absence (old runs, a build-only
+    run_dir with no analyzer stamp) means "not failed" — the render guard falls back to the
+    recoverable incomplete placeholder, never to the honest-failure one."""
+    try:
+        import json
+        m = json.loads((Path(run_dir) / "run_meta.json").read_text())
+        return m.get("analysis_state")
+    except Exception:  # noqa: BLE001 — best-effort; absence means 'not failed'
+        return None
+
+
+def _render_failed_placeholder(out_path, title):
+    """RC-INV-13f: render the status placeholder for a run whose analysis TERMINALLY FAILED — the
+    title/shell plus the honest failure line and a plain next step, NEVER the recoverable "reload
+    when it's ready" wording (that promises data that will never arrive on its own). Mirrors
+    _render_incomplete_placeholder's shell/CSS exactly, plus one muted hint line."""
+    html = (
+        '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f'<title>Track Coach · {_esc(title)}</title>\n'
+        '<style>\n'
+        'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;\n'
+        ' background:radial-gradient(1200px 600px at 70% -10%,#161b2b,#0c0e14 60%);color:#e8ecf5;\n'
+        ' font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}\n'
+        '.card{max-width:560px;text-align:center}\n'
+        '.brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#a78bfa;\n'
+        ' font-weight:700;margin:0 0 6px}\n'
+        'h1{font-size:22px;margin:0 0 18px;font-weight:650}\n'
+        '.status{font-size:16px;color:#ffb454;font-weight:600}\n'
+        '.hint{font-size:13px;color:#9aa3b5;margin-top:8px}\n'
+        '</style></head><body><div class="card">\n'
+        '<div class="brandkick">Track Coach</div>\n'
+        f'<h1 id="title">{_esc(title)}</h1>\n'
+        f'<p class="status" id="failedStatus">{_esc(_FAILED_STATUS)}</p>\n'
+        f'<p class="hint" id="failedHint">{_esc(_FAILED_HINT)}</p>\n'
+        '</div></body></html>\n'
+    )
+    Path(out_path).write_text(html, encoding="utf-8")
+    print(f"Widget saved (failed-run placeholder): {out_path}  (Track Coach v{TC_VERSION})")
 
 
 def _render_incomplete_placeholder(out_path, title):

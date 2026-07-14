@@ -158,128 +158,153 @@ def cmd_analyze(args):
     else:
         out_dir = Path(rn.plain(*init, capture=True).strip().splitlines()[-1])
     print(f"\n▶ run dir: {out_dir}", file=sys.stderr)
-    # Carry a prior hand-written Producer's read forward so re-analysing a track never silently
-    # drops it (you can still overwrite narrative.md before `build`).
+    # RC-INV-13f: mark the run RUNNING (and clear any stale error/failed marker) the instant out_dir
+    # is resolved, before any pipeline step runs — so a widget opened mid-analysis (or a run dir
+    # that happens to carry a leftover analysis_state from an earlier attempt) reads the recoverable
+    # placeholder, never a stale "failed" message that predates THIS attempt. Analyze-path only —
+    # `build` never touches this key (render-only, no re-measure).
     if not args.dry_run:
-        src = inherit_prior_read(out_dir)
-        if src is not None:
-            print(f"  · inherited narrative.md / title / verdict from {Path(src).name} "
-                  f"(edit {out_dir/'narrative.md'} to update)", file=sys.stderr)
+        _update_meta(out_dir, {"analysis_state": "running", "analysis_error": None})
 
     def j(name): return out_dir / name
 
-    # Step 1 — fast analysis (audio only)
-    rn.step("core", "analyze_core.py", audio, "--out", j("result_core.json"))
-    rn.step("fast", "analyze_detail.py", audio, "--out", j("result_detail.json"))
-    # Step 2 — .als (if given)
-    if als:
-        rn.step("fast", "parse_als.py", als, "--out", j("result_als.json"))
-        # Render offset = where (in project seconds) the audio starts. DEFAULT to the first
-        # locator — that's the common case (e.g. Shared Memories starts at locator 1). Override
-        # with --als-offset-s when the render starts elsewhere (e.g. Fragile started at locator 13).
-        offset_source = "explicit" if offset is not None else None
-        if offset is None and not args.dry_run:
-            off, offset_source = default_render_offset(j("result_als.json"))
-            if off is not None:
-                offset = str(off)
-                print(f"  · --als-offset-s not given → using the .als start ({off}s, via "
-                      f"{offset_source}); pass --als-offset-s to override.", file=sys.stderr)
-        # record the offset AND how it was found, so the run is self-documenting
-        if offset is not None and not args.dry_run:
-            _update_meta(out_dir, {"als_offset_s": float(offset), "als_offset_source": offset_source})
-    # VERSION IDENTITY + DRAFT TAGS — content hash keys the catalog's "versions" (same audio = same
-    # version, even across re-analyses); heuristic mood/style tags seed the catalog so a track is
-    # never tagless. Both are best-effort and never block the measure. The agent overrides the tags
-    # later via `build --mood-tags/--style-tags` (tags_source flips heuristic→agent).
-    if not args.dry_run:
-        _update_meta(out_dir, _audio_fingerprint(audio))
-        try:
-            import tags as _tags
-            draft = _tags.derive_tags(json.loads(j("result_core.json").read_text()))
-            _update_meta(out_dir, {"energy_level": draft["energy_level"],
-                                   "mood_tags": draft["mood_tags"],
-                                   "style_tags": draft["style_tags"],
-                                   "tags_source": "heuristic"})
-        except Exception as e:  # noqa: BLE001 — draft tags are a convenience, not a hard dep
-            print(f"  · draft tags skipped: {e}", file=sys.stderr)
-        # G-INV-18: mark run as a reference so deposit_from_run refuses it later
-        if getattr(args, "reference", False):
-            _update_meta(out_dir, {"reference": True, "artist": getattr(args, "artist", None)})
-        # G-INV-21: mark run synthetic (explicit flag OR a fixtures-tree source) so deposit refuses it
-        if getattr(args, "synthetic", False) or is_synthetic_source(audio):
-            _update_meta(out_dir, {"synthetic": True})
+    # RC-INV-13f: the whole measure pipeline runs under one guard — ANY terminal exit (a step's
+    # sys.exit via Runner._run, or any other terminal error) stamps analysis_state:"failed" with a
+    # short reason BEFORE re-raising, so the tool still exits non-zero exactly as before. A normal
+    # completion stamps "ok". The analyzer only LABELS the failure it already hits — no new recovery
+    # attempt, no change to any step's behaviour, message, or exit code.
+    try:
+        # Carry a prior hand-written Producer's read forward so re-analysing a track never silently
+        # drops it (you can still overwrite narrative.md before `build`).
+        if not args.dry_run:
+            src = inherit_prior_read(out_dir)
+            if src is not None:
+                print(f"  · inherited narrative.md / title / verdict from {Path(src).name} "
+                      f"(edit {out_dir/'narrative.md'} to update)", file=sys.stderr)
 
-    # STRUCTURE — repeats/form (full mix; no stems/als needed; cheap, always run)
-    rn.step("fast", "self_similarity.py", audio, "--out", j("result_selfsim.json"))
-
-    if args.mode == "full":
-        # Step 3 — Demucs. ONE stems dir feeds every later step (kills the path-class bug).
-        stems = out_dir / ("stems_6s" if args.model.endswith("6s") else "stems")
-        rn.step("deep", "separate.py", audio, "--model", args.model, "--out-dir", stems)
-        manifest = stems / "stems_manifest.json"
-        rn.step("fast", "masking.py", "--manifest", manifest, "--out", j("result_masking.json"))
-        # CR-6 — per-stem self-similarity, ONLY for SIGNIFICANT stems (don't waste compute reading a
-        # near-silent stem for repetition; build_widget.stem_repetition re-checks the gate). Written as
-        # result_selfsim_<stem>.json beside the mix self-sim, where build_widget auto-discovers them.
-        if not args.dry_run and j("result_masking.json").exists():
+        # Step 1 — fast analysis (audio only)
+        rn.step("core", "analyze_core.py", audio, "--out", j("result_core.json"))
+        rn.step("fast", "analyze_detail.py", audio, "--out", j("result_detail.json"))
+        # Step 2 — .als (if given)
+        if als:
+            rn.step("fast", "parse_als.py", als, "--out", j("result_als.json"))
+            # Render offset = where (in project seconds) the audio starts. DEFAULT to the first
+            # locator — that's the common case (e.g. Shared Memories starts at locator 1). Override
+            # with --als-offset-s when the render starts elsewhere (e.g. Fragile started at locator 13).
+            offset_source = "explicit" if offset is not None else None
+            if offset is None and not args.dry_run:
+                off, offset_source = default_render_offset(j("result_als.json"))
+                if off is not None:
+                    offset = str(off)
+                    print(f"  · --als-offset-s not given → using the .als start ({off}s, via "
+                          f"{offset_source}); pass --als-offset-s to override.", file=sys.stderr)
+            # record the offset AND how it was found, so the run is self-documenting
+            if offset is not None and not args.dry_run:
+                _update_meta(out_dir, {"als_offset_s": float(offset), "als_offset_source": offset_source})
+        # VERSION IDENTITY + DRAFT TAGS — content hash keys the catalog's "versions" (same audio = same
+        # version, even across re-analyses); heuristic mood/style tags seed the catalog so a track is
+        # never tagless. Both are best-effort and never block the measure. The agent overrides the tags
+        # later via `build --mood-tags/--style-tags` (tags_source flips heuristic→agent).
+        if not args.dry_run:
+            _update_meta(out_dir, _audio_fingerprint(audio))
             try:
-                import build_widget as _bw
-                _msk = json.loads(j("result_masking.json").read_text())
-                for _st in _bw.significant_stems(_msk):
-                    _wav = stems / f"{_st}.wav"
-                    if _wav.exists():
-                        rn.step("fast", "self_similarity.py", _wav, "--out", j(f"result_selfsim_{_st}.json"))
-                        rn.step("fast", "analyze_core.py", _wav, "--out", j(f"result_core_{_st}.json"))
-            except Exception as e:  # noqa: BLE001 — per-stem repetition is an enrichment, never a hard dep
-                print(f"  · per-stem self-sim skipped: {e}", file=sys.stderr)
-        # B — stem<->project map: needs the .als AND the render offset (defaulted above)
-        if als and offset is not None:
-            rn.step("fast", "map_stems.py", "--stems-dir", stems, "--als", j("result_als.json"),
-                    "--als-offset-s", offset, "--out", j("result_stemmap.json"))
-        elif als and not args.dry_run:
-            print("  · stem↔track map skipped: no locator to align the .als to the audio",
-                  file=sys.stderr)
-        # C — rhythm/separation quality (tempo from core unless overridden)
-        bpm = args.bpm or _core_tempo(out_dir, args.dry_run)
-        rhythm = ["--manifest", manifest, "--out", j("result_rhythm.json")]
-        if bpm:
-            rhythm += ["--tempo", str(bpm)]
-        rn.step("fast", "rhythm_quality.py", *rhythm)
-        # D — drum hits + (optional) note transcription
-        rn.step("fast", "drum_breakdown.py", "--drums", stems / "drums.wav",
-                "--out", j("result_drums.json"))
-        if not args.skip_transcribe:
-            # `other` is always transcribed (the note panel + the plan all expect result_notes_other.json).
-            rn.step("bp", "transcribe.py", "--stem", stems / "other.wav", "--label", "other",
-                    "--out", j("result_notes_other.json"))
-            # G13: ALSO transcribe every OTHER significant non-drum stem → build_widget reads the per-stem
-            # notes to measure POLYPHONY and split the honest "tonal" umbrella into melody/lead/chord/pad.
-            # Drums skipped (basic-pitch on percussion is meaningless). Gated through significant_stems()
-            # so we never waste basic-pitch on a near-silent stem (CR-2). Each → result_notes_<stem>.json,
-            # auto-discovered by build_widget. Real runs only (needs masking + the actual wavs on disk).
+                import tags as _tags
+                draft = _tags.derive_tags(json.loads(j("result_core.json").read_text()))
+                _update_meta(out_dir, {"energy_level": draft["energy_level"],
+                                       "mood_tags": draft["mood_tags"],
+                                       "style_tags": draft["style_tags"],
+                                       "tags_source": "heuristic"})
+            except Exception as e:  # noqa: BLE001 — draft tags are a convenience, not a hard dep
+                print(f"  · draft tags skipped: {e}", file=sys.stderr)
+            # G-INV-18: mark run as a reference so deposit_from_run refuses it later
+            if getattr(args, "reference", False):
+                _update_meta(out_dir, {"reference": True, "artist": getattr(args, "artist", None)})
+            # G-INV-21: mark run synthetic (explicit flag OR a fixtures-tree source) so deposit refuses it
+            if getattr(args, "synthetic", False) or is_synthetic_source(audio):
+                _update_meta(out_dir, {"synthetic": True})
+
+        # STRUCTURE — repeats/form (full mix; no stems/als needed; cheap, always run)
+        rn.step("fast", "self_similarity.py", audio, "--out", j("result_selfsim.json"))
+
+        if args.mode == "full":
+            # Step 3 — Demucs. ONE stems dir feeds every later step (kills the path-class bug).
+            stems = out_dir / ("stems_6s" if args.model.endswith("6s") else "stems")
+            rn.step("deep", "separate.py", audio, "--model", args.model, "--out-dir", stems)
+            manifest = stems / "stems_manifest.json"
+            rn.step("fast", "masking.py", "--manifest", manifest, "--out", j("result_masking.json"))
+            # CR-6 — per-stem self-similarity, ONLY for SIGNIFICANT stems (don't waste compute reading a
+            # near-silent stem for repetition; build_widget.stem_repetition re-checks the gate). Written as
+            # result_selfsim_<stem>.json beside the mix self-sim, where build_widget auto-discovers them.
             if not args.dry_run and j("result_masking.json").exists():
                 try:
                     import build_widget as _bw
                     _msk = json.loads(j("result_masking.json").read_text())
                     for _st in _bw.significant_stems(_msk):
-                        if _st in ("drums", "other"):
-                            continue
                         _wav = stems / f"{_st}.wav"
                         if _wav.exists():
-                            rn.step("bp", "transcribe.py", "--stem", _wav, "--label", _st,
-                                    "--out", j(f"result_notes_{_st}.json"))
-                except Exception as e:  # noqa: BLE001 — per-stem transcription is enrichment, never a hard dep
-                    print(f"  · per-stem transcribe (G13) skipped: {e}", file=sys.stderr)
-        # E — web stems: MANDATORY, makes the player + player lanes appear
-        rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
-        # …and the mix too → mix_web/mix.m4a, so the catalog's one-button preview player works on FULL
-        # runs as well (the widget itself still uses the per-stem player; this is just for the catalog).
-        rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
-    elif args.mode == "quick":
-        # Quick has no Demucs stems, but it DOES have the mix — encode a compressed copy so the widget
-        # still gets a single-track player (transport + seek; no per-stem mute/solo). 2026-06-20:
-        # quick mode still gets a player. No separation, so still fast.
-        rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
+                            rn.step("fast", "self_similarity.py", _wav, "--out", j(f"result_selfsim_{_st}.json"))
+                            rn.step("fast", "analyze_core.py", _wav, "--out", j(f"result_core_{_st}.json"))
+                except Exception as e:  # noqa: BLE001 — per-stem repetition is an enrichment, never a hard dep
+                    print(f"  · per-stem self-sim skipped: {e}", file=sys.stderr)
+            # B — stem<->project map: needs the .als AND the render offset (defaulted above)
+            if als and offset is not None:
+                rn.step("fast", "map_stems.py", "--stems-dir", stems, "--als", j("result_als.json"),
+                        "--als-offset-s", offset, "--out", j("result_stemmap.json"))
+            elif als and not args.dry_run:
+                print("  · stem↔track map skipped: no locator to align the .als to the audio",
+                      file=sys.stderr)
+            # C — rhythm/separation quality (tempo from core unless overridden)
+            bpm = args.bpm or _core_tempo(out_dir, args.dry_run)
+            rhythm = ["--manifest", manifest, "--out", j("result_rhythm.json")]
+            if bpm:
+                rhythm += ["--tempo", str(bpm)]
+            rn.step("fast", "rhythm_quality.py", *rhythm)
+            # D — drum hits + (optional) note transcription
+            rn.step("fast", "drum_breakdown.py", "--drums", stems / "drums.wav",
+                    "--out", j("result_drums.json"))
+            if not args.skip_transcribe:
+                # `other` is always transcribed (the note panel + the plan all expect result_notes_other.json).
+                rn.step("bp", "transcribe.py", "--stem", stems / "other.wav", "--label", "other",
+                        "--out", j("result_notes_other.json"))
+                # G13: ALSO transcribe every OTHER significant non-drum stem → build_widget reads the per-stem
+                # notes to measure POLYPHONY and split the honest "tonal" umbrella into melody/lead/chord/pad.
+                # Drums skipped (basic-pitch on percussion is meaningless). Gated through significant_stems()
+                # so we never waste basic-pitch on a near-silent stem (CR-2). Each → result_notes_<stem>.json,
+                # auto-discovered by build_widget. Real runs only (needs masking + the actual wavs on disk).
+                if not args.dry_run and j("result_masking.json").exists():
+                    try:
+                        import build_widget as _bw
+                        _msk = json.loads(j("result_masking.json").read_text())
+                        for _st in _bw.significant_stems(_msk):
+                            if _st in ("drums", "other"):
+                                continue
+                            _wav = stems / f"{_st}.wav"
+                            if _wav.exists():
+                                rn.step("bp", "transcribe.py", "--stem", _wav, "--label", _st,
+                                        "--out", j(f"result_notes_{_st}.json"))
+                    except Exception as e:  # noqa: BLE001 — per-stem transcription is enrichment, never a hard dep
+                        print(f"  · per-stem transcribe (G13) skipped: {e}", file=sys.stderr)
+            # E — web stems: MANDATORY, makes the player + player lanes appear
+            rn.step("fast", "make_web_stems.py", "--stems-dir", stems, "--out-dir", out_dir / "stems_web")
+            # …and the mix too → mix_web/mix.m4a, so the catalog's one-button preview player works on FULL
+            # runs as well (the widget itself still uses the per-stem player; this is just for the catalog).
+            rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
+        elif args.mode == "quick":
+            # Quick has no Demucs stems, but it DOES have the mix — encode a compressed copy so the widget
+            # still gets a single-track player (transport + seek; no per-stem mute/solo). 2026-06-20:
+            # quick mode still gets a player. No separation, so still fast.
+            rn.step("fast", "make_web_stems.py", "--audio", audio, "--out-dir", out_dir / "mix_web")
+
+        # RC-INV-13f: reached the end of the pipeline with no terminal exit → stamp success.
+        if not args.dry_run:
+            _update_meta(out_dir, {"analysis_state": "ok", "analysis_error": None})
+    except BaseException as e:  # SystemExit from Runner._run's sys.exit + any terminal error
+        if not args.dry_run:
+            try:
+                _update_meta(out_dir, {"analysis_state": "failed", "analysis_error": str(e)[:200]})
+            except Exception:
+                pass
+        raise
 
     # MEASURING DONE — no render here. The widget is rendered ONCE, by `build`, AFTER the read.
     # Order is forced by the anti-hallucination design: measure → interpret → render. Building a

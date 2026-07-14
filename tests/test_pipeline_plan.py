@@ -354,5 +354,104 @@ class RunValidityOrchestration(unittest.TestCase):
             self.assertIn(flag, out.stdout + out.stderr, f"{cmd} must expose {flag}")
 
 
+class AnalysisStateStamp(unittest.TestCase):
+    """RC-INV-13f: `analyze` (the ANALYZE path only — never `build`) stamps run_meta.json's
+    `analysis_state` so the render guard (build_widget._read_analysis_state) can tell interruption
+    from terminal failure. Contract: "running" (+ analysis_error cleared) the instant out_dir is
+    resolved, before any pipeline step runs; "ok" (+ analysis_error cleared) on a normal completion;
+    "failed" + a short `analysis_error` reason on ANY terminal exit (SystemExit from Runner._run's
+    sys.exit, or any other terminal error), stamped BEFORE the exception propagates so the tool still
+    exits non-zero exactly as before.
+
+    Driving the real Demucs/librosa pipeline is too heavy for a unit test, so `Runner.step` (the
+    shell-out for every heavy script) is monkeypatched to a no-op/raising stub — `Runner.plain`
+    (used only for `run_dir.py init`, stdlib-only) stays REAL, so `out_dir` and its run_meta.json
+    are the genuine artifact the analyzer writes, not a mock. Every assertion reads that real file."""
+
+    def _args(self, audio, base, **over):
+        import argparse
+        kw = dict(audio=str(audio), als=None, als_offset_s=None, mode="full",
+                  model="htdemucs_6s", track_version=None, bpm=None, base=str(base),
+                  skip_transcribe=True, dry_run=False, reference=False, artist=None,
+                  synthetic=False, only_this=False)
+        kw.update(over)
+        return argparse.Namespace(**kw)
+
+    def _one_run_meta(self, base):
+        runs = list(Path(base).rglob("run_meta.json"))
+        self.assertEqual(len(runs), 1, f"expected exactly one run dir under {base}, found {runs}")
+        return json.loads(runs[0].read_text())
+
+    def test_terminal_failure_stamps_failed_with_reason(self):
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            audio = Path(d) / "src.wav"; audio.write_bytes(b"\x00")
+            base = Path(d) / "out"; base.mkdir()
+
+            def fake_step(self, profile, script, *args):
+                if script == "separate.py":
+                    sys.exit("✗ track-coach: step failed — separate.py (deep) (exit 1).")
+                return ""
+            real_step = ta.Runner.step
+            ta.Runner.step = fake_step
+            try:
+                args = self._args(audio, base)
+                with self.assertRaises(SystemExit):
+                    ta.cmd_analyze(args)
+            finally:
+                ta.Runner.step = real_step
+            meta = self._one_run_meta(base)
+            self.assertEqual(meta.get("analysis_state"), "failed")
+            self.assertIn("step failed", meta.get("analysis_error", ""))
+
+    def test_normal_completion_stamps_ok(self):
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            audio = Path(d) / "src.wav"; audio.write_bytes(b"\x00")
+            base = Path(d) / "out"; base.mkdir()
+            real_step = ta.Runner.step
+            ta.Runner.step = lambda self, profile, script, *args: ""
+            try:
+                args = self._args(audio, base)
+                ta.cmd_analyze(args)  # must not raise
+            finally:
+                ta.Runner.step = real_step
+            meta = self._one_run_meta(base)
+            self.assertEqual(meta.get("analysis_state"), "ok")
+            self.assertIsNone(meta.get("analysis_error"))
+
+    def test_stale_failed_marker_cleared_by_fresh_success(self):
+        # a run dir that already carried analysis_state:"failed" the instant analysis started
+        # (injected right after `run_dir.py init`, mirroring a leftover/copied meta) must NOT
+        # stay "failed" once this fresh attempt completes cleanly — a fresh success overwrites it.
+        import track_analyzer as ta
+        with tempfile.TemporaryDirectory() as d:
+            audio = Path(d) / "src.wav"; audio.write_bytes(b"\x00")
+            base = Path(d) / "out"; base.mkdir()
+            real_plain = ta.Runner.plain
+            real_step = ta.Runner.step
+
+            def spy_plain(self, *args, capture=False):
+                out = real_plain(self, *args, capture=capture)
+                if capture and args and str(args[0]).endswith("run_dir.py"):
+                    out_dir = Path(out.strip().splitlines()[-1])
+                    ta._update_meta(out_dir, {"analysis_state": "failed",
+                                              "analysis_error": "a stale reason from a prior attempt"})
+                return out
+
+            ta.Runner.plain = spy_plain
+            ta.Runner.step = lambda self, profile, script, *args: ""
+            try:
+                args = self._args(audio, base)
+                ta.cmd_analyze(args)  # must not raise
+            finally:
+                ta.Runner.plain = real_plain
+                ta.Runner.step = real_step
+            meta = self._one_run_meta(base)
+            self.assertEqual(meta.get("analysis_state"), "ok",
+                             "a fresh successful attempt must overwrite a stale failed marker")
+            self.assertIsNone(meta.get("analysis_error"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
