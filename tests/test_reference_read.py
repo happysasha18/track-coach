@@ -178,6 +178,24 @@ class ReferenceReadHeader(unittest.TestCase):
         self.assertNotIn("No similar tracks", html,
                          "the §F siblings phrase must never appear on this surface (D-INV-22)")
 
+    def test_no_shared_facets_stub_names_missing_signals(self):
+        """D-INV-36e / D-INV-22 — when a fingerprint is too incomplete to place (the directions
+        are comparable over some data but this track shares NO measured facet the per-facet read
+        can use), the 'can't compare' stub NAMES the missing signals, matching the plaque chip —
+        never a bare 'can't compare yet'."""
+        # Directions comparable over ≥MIN_SHARED axes that live OUTSIDE the per-facet AXES set, so a
+        # lean forms but the per-facet bars find no shared AXES → the degenerate no-facets stub.
+        extra = {f"x{i}": 0.0 for i in range(12)}
+        track = dict(extra)                      # carries none of the 14 fingerprint AXES
+        dirs = {"Near": dict(extra), "Far": {f"x{i}": 9.0 for i in range(12)}}
+        html = build_widget.render_reference_read(track, dirs, {"mu": {}, "sd": {}})
+        self.assertIn('id="refPanel"', html, "the no-facets case still renders the stub")
+        self.assertIn("can't compare", html, "the stub says it can't compare")
+        # names the absent signals in the completeness chip's plain read vocabulary (AXIS_READS)
+        self.assertIn("tempo", html, "the stub must NAME the missing signals (e.g. tempo)")
+        self.assertIn("brightness", html, "the stub must NAME the missing signals (e.g. brightness)")
+        self.assertNotIn("<details", html, "the stub never expands")
+
     def test_empty_directions_returns_empty_string(self):
         html = build_widget.render_reference_read(
             {ax: 0.0 for ax in FP.AXES}, {}, _norm_identity()
@@ -1087,6 +1105,28 @@ class CharLegend(unittest.TestCase):
         self.assertIsNotNone(chip_with_title,
                              "per-row char chips must have a title tooltip explaining 'without "
                              "loudness weighting' so hover gives the explanation inline")
+
+
+class NoSharedAxesNoteWording(unittest.TestCase):
+    """D-INV-36 — the reference-stub 'can't compare' fallback (a defensive/edge state, unreachable in
+    production). Its wording must stay honest: name the track's missing signals when it has some;
+    when the missing-set is EMPTY (the track is fully measured but the directions share no basis), it
+    must NOT read 'this track is missing …' — that would blame the track for a deficiency in the
+    shared basis."""
+
+    def test_missing_signals_named_when_present(self):
+        note = build_widget._no_shared_axes_note(["harmonic brightness", "pad sustain"])
+        self.assertIn("this track is missing", note)
+        self.assertIn("harmonic brightness", note)
+        self.assertIn("pad sustain", note)
+
+    def test_empty_missing_set_does_not_blame_the_track(self):
+        note = build_widget._no_shared_axes_note([])
+        self.assertNotIn("this track is missing", note,
+                         "an empty missing-set must not read as the track missing something")
+        self.assertIn("can't compare", note)
+        self.assertIn("shares a measured facet", note,
+                      "the note must state the shared basis is absent, not blame the track")
 
 
 if __name__ == "__main__":

@@ -79,6 +79,19 @@ class RunValidity(unittest.TestCase):
             self.assertFalse(valid, "a run whose tempo detector produced nothing is invalid")
             self.assertIn("tempo", reads)
 
+    def test_core_only_full_run_is_invalid(self):
+        """The widest partial shape: a FULL run that crashed during Demucs has result_core.json but
+        NO result_masking.json (core is written before Demucs runs). The masking-gated stem axes are
+        UNMEASURED, not absent — the run must read INCOMPLETE, never a fabricated 'no drums/bass' read."""
+        with tempfile.TemporaryDirectory() as td:
+            run = Path(td) / "run"; run.mkdir()
+            (run / "result_core.json").write_text(json.dumps({
+                "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+                "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+            valid, reads = V.validity(str(run), "full")
+            self.assertFalse(valid, "a full run with no masking (Demucs never ran) must be invalid")
+            self.assertIn("bass sustain", reads, "the unmeasured stem signals must be named for the redo")
+
     def test_quick_run_valid_on_its_five_signals(self):
         with tempfile.TemporaryDirectory() as td:
             run = Path(td) / "run"; run.mkdir()

@@ -34,9 +34,35 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+# Substrings that mark an INFRASTRUCTURE crash of headless Chrome (NOT a test failure).
+# Under system load the headless browser dies mid-render with this signature and a
+# DIFFERENT random subset of tests fails every full-suite run — each passing cleanly on
+# a re-run in isolation. When a render fails AND Chrome's stderr carries any of these,
+# the render is retried (see _probe_render). A genuine JS error, a real assertion-shaped
+# result, or a malformed probe expression never carries these markers and is NEVER retried
+# — the retry stays narrow to the crash so it can never mask a real failure.
+_CRASH_MARKERS = (
+    "NOTREACHED hit",
+    "browser_context_impl.cc",
+    "ProcessHeadlessCommands",
+    "mach_vm_read",
+    "crashpad",
+    "invalid address",
+)
+
+# How many times a crashed render is attempted in total (1 original + 2 retries).
+_RENDER_ATTEMPTS = 3
+
+
+def _looks_like_crash(stderr: str) -> bool:
+    """True when Chrome's stderr shows the headless-crash signature (see _CRASH_MARKERS)."""
+    s = stderr or ""
+    return any(marker in s for marker in _CRASH_MARKERS)
 
 # Standard probe helpers a test can compose into its `js` expression. Kept as a
 # JS prelude so tests read declaratively (see docstring of probe()).
@@ -97,6 +123,45 @@ def _run_chrome(args: list[str], timeout: int = 60) -> subprocess.CompletedProce
     )
 
 
+_PROBE_RE = re.compile(r'<script id="__tc_probe"[^>]*>(.*?)</script>', re.S)
+
+
+def _probe_render(chrome_args: list[str]) -> str:
+    """Render with Chrome and return the raw JSON text of the injected __tc_probe node.
+
+    The ONE place probe-style renders run + parse, so the crash-retry lives here alone and
+    every caller (probe, and run_smoke through it) inherits it. Retries ONLY the
+    infrastructure crash: the probe node is absent AND Chrome's stderr shows the crash
+    signature. A probe node that is simply absent with no crash markers (a malformed `js`
+    expression, a page that genuinely never produced the node) FAILS IMMEDIATELY, exactly
+    as before — the retry can never mask a real test failure. A genuine JS error or a real
+    assertion result comes back INSIDE the probe node, so it parses on the first attempt and
+    never reaches the retry path at all."""
+    for attempt in range(1, _RENDER_ATTEMPTS + 1):
+        cp = _run_chrome(chrome_args)
+        m = _PROBE_RE.search(cp.stdout)
+        if m:
+            return m.group(1)
+        crashed = _looks_like_crash(cp.stderr)
+        if crashed and attempt < _RENDER_ATTEMPTS:
+            sys.stderr.write(
+                f"headless render crashed (Chrome NOTREACHED), "
+                f"retrying {attempt}/{_RENDER_ATTEMPTS - 1}…\n")
+            sys.stderr.flush()
+            try:
+                time.sleep(0.5)  # brief backoff; harmless if it no-ops
+            except Exception:
+                pass
+            continue
+        # Either a non-crash miss (fail now, never retried) or the crash outlived every
+        # attempt (fail after exhausting retries) — same visible error as before.
+        raise RuntimeError(
+            "probe result not found in dumped DOM (page may not have loaded). "
+            f"stderr tail: {cp.stderr[-400:]}")
+    # Unreachable: the loop always returns or raises.
+    raise RuntimeError("probe render exhausted without a result")
+
+
 def probe(html_path: str, js: str, width: int = 1200, height: int = 2400,
           settle_ms: int = 250, virtual_time: int = 6000,
           url_suffix: str = "") -> dict:
@@ -132,34 +197,47 @@ def probe(html_path: str, js: str, width: int = 1200, height: int = 2400,
         tmp = Path(f.name)
         f.write(src)
     try:
-        cp = _run_chrome([
+        # Render + parse is centralised in _probe_render, which retries ONLY the
+        # headless-Chrome infrastructure crash (never a real test failure). The tmp file
+        # persists across attempts (unlinked in finally), so a retry re-renders the same page.
+        result_json = _probe_render([
             f"--window-size={width},{height}",
             f"--virtual-time-budget={virtual_time}",
             "--run-all-compositor-stages-before-draw",
             "--dump-dom", tmp.as_uri() + url_suffix,
         ])
-        m = re.search(
-            r'<script id="__tc_probe"[^>]*>(.*?)</script>', cp.stdout, re.S)
-        if not m:
-            raise RuntimeError(
-                "probe result not found in dumped DOM (page may not have loaded). "
-                f"stderr tail: {cp.stderr[-400:]}")
-        return json.loads(m.group(1))
+        return json.loads(result_json)
     finally:
         tmp.unlink(missing_ok=True)
 
 
 def screenshot(html_path: str, out_png: str, width: int = 1200,
                height: int = 2400, virtual_time: int = 6000) -> str:
-    _run_chrome([
+    args = [
         f"--window-size={width},{height}",
         f"--virtual-time-budget={virtual_time}",
         "--run-all-compositor-stages-before-draw",
         f"--screenshot={out_png}", Path(html_path).resolve().as_uri(),
-    ])
-    if not Path(out_png).exists():
+    ]
+    # Same infrastructure-crash retry as _probe_render: if the PNG is missing AND Chrome's
+    # stderr shows the crash signature, re-render (up to _RENDER_ATTEMPTS). A missing PNG
+    # with no crash markers is a genuine failure and raises immediately, as before.
+    for attempt in range(1, _RENDER_ATTEMPTS + 1):
+        cp = _run_chrome(args)
+        if Path(out_png).exists():
+            return out_png
+        if _looks_like_crash(cp.stderr) and attempt < _RENDER_ATTEMPTS:
+            sys.stderr.write(
+                f"headless screenshot crashed (Chrome NOTREACHED), "
+                f"retrying {attempt}/{_RENDER_ATTEMPTS - 1}…\n")
+            sys.stderr.flush()
+            try:
+                time.sleep(0.5)
+            except Exception:
+                pass
+            continue
         raise RuntimeError(f"screenshot not produced at {out_png}")
-    return out_png
+    raise RuntimeError(f"screenshot not produced at {out_png}")
 
 
 def _main() -> int:

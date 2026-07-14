@@ -5,6 +5,37 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.7.0] — 2026-07-14
+
+### Fixed
+- **A half-finished analysis no longer shows partial numbers as if they were the final read.** When the
+  tool builds the analysis page from a run that didn't get to measure everything it should have (a part
+  the track clearly contains was left unmeasured), the page used to show its incomplete "Measured N of M
+  signals" tally as though the read were done. It now shows an in-progress status instead — *Analysing —
+  reload when it's ready.* — so a partial run is never mistaken for a finished one. A fully-measured run is
+  unchanged. (This matches the existing rule that a partial run is never saved to your library.)
+
+### Improved
+- **The "similar in your library" column now shows a closeness mark beside each track.** Every listed
+  neighbour carries a small three-dot mark — ●●● close · ●●○ medium · ●○○ far — next to its colour, the
+  same mark the reference column ("leans toward") already uses. The closeness reading now survives
+  greyscale, printing, and colour-blind viewing on both columns, rather than leaning on colour alone.
+- **Hardened an edge message in the reference panel.** A defensive branch that would fire only if a
+  reference direction and a track shared no comparable signal — a state real analyses don't reach, since
+  a listed "leans toward" already guarantees a shared basis — carried wording that could have blamed the
+  track for a missing set that was actually empty. It now names the track's missing signals when it has
+  some, and otherwise says plainly that no reference direction shares a measured facet. No analysis ever
+  showed the old wording; this is a correctness fix to the fallback, not a change you would have seen.
+- **The card-order choice is one setting shared across every track.** The Detailed "Order" toggle
+  (by urgency / by time, added in 1.6.2) is remembered as a single preference for the whole library, exactly
+  like the Simple/Detailed view choice — set it on one track and it carries to the rest.
+
+### Internal
+- Written down the rule every absence follows: a signal a view never promises stays silent, while a signal
+  it promises but a track leaves empty gets a short spoken acknowledgment in its place — so the near-silent
+  stem lane, the reference stub, and the self-hiding evidence drawer are one consistent behaviour, and a
+  future surface inherits it. (Documentation only; no change to what the tool does.)
+
 ## [1.6.3] — 2026-07-12
 
 ### Added

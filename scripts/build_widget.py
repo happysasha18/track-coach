@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.6.3"  # Track Coach analyzer version — s66: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
+TC_VERSION = "1.7.0"  # Track Coach analyzer version — s68 MILESTONE: the live-spec prover (v1.1.4), a new design-review pass, and a Fable adversarial audit all ran over the spec; every finding folded here. Render-boundary validity guard (RC-INV-13c): an INCOMPLETE run no longer renders its partial "Measured N of M signals" line as a finished read — `build_html` shows the in-progress status placeholder ("Analysing — reload when it's ready.") instead. The guard now also catches a run that crashed during Demucs — an absent masking file in a stem-promising rung reads as UNMEASURED, not "no significant stems", closing the widest partial-run window. Both catalog similarity columns carry the greyscale closeness mark (●●● / ●●○ / ●○○) plus a worded closeness label (hover title + screen-reader text). Near-silent labels documented as always-distinct (INV-44); the card-order sort is one global preference (INV-26); the absence-acknowledgment rule named once (INV-51); a legibility floor stated honestly (§I.10a). Test harness hardened against headless-Chrome crash flakes (retry-on-crash). A COMPLETE run renders exactly as before. Prior 1.6.3: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -2054,6 +2054,16 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
                back_href=None, audio_mix_rel=None, per_stem_selfsim=None, per_stem_notes=None,
                per_stem_core=None, run_dir=None):
+    # RC-INV-13/13c: the RENDER boundary refuses an incomplete run. When `run_dir` is present and
+    # `validity` judges the run INCOMPLETE for its mode (a significance-gate-PRESENT signal left
+    # unmeasured), we render the status placeholder — the title/shell plus the in-progress line —
+    # instead of presenting partial "Measured N of M signals" numbers as a finished read. A complete
+    # run (or a caller with no run_dir to judge) renders exactly as before.
+    if run_dir is not None:
+        import validity as V  # lazy: validity imports build_widget, so import here to avoid a cycle
+        if not V.is_valid(run_dir, mode):
+            _render_incomplete_placeholder(out_path, title or "Untitled track")
+            return
     dur = core["duration_s"]
     tb = core["time_bins"]
 
@@ -2367,6 +2377,47 @@ def _esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# RC-INV-13c: the in-progress status shown in place of a finished read. Verbatim, both the string
+# and the render — a partial run never presents its partial numbers as final (E-3).
+_INCOMPLETE_STATUS = "Analysing — reload when it's ready."
+
+
+def _render_incomplete_placeholder(out_path, title):
+    """RC-INV-13c: render the status placeholder for an INCOMPLETE run — the title/shell plus the
+    in-progress status line, NEVER the partial "Measured N of M signals" completeness claim. The
+    deposit boundary already refuses an incomplete run (library.py); this is the render-boundary
+    twin so a standalone widget built from a partial run can't read as a finished analysis either."""
+    html = (
+        '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f'<title>Track Coach · {_esc(title)}</title>\n'
+        '<style>\n'
+        'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;\n'
+        ' background:radial-gradient(1200px 600px at 70% -10%,#161b2b,#0c0e14 60%);color:#e8ecf5;\n'
+        ' font:14px/1.5 -apple-system,"SF Pro Display",Inter,Segoe UI,sans-serif;padding:28px}\n'
+        '.card{max-width:560px;text-align:center}\n'
+        '.brandkick{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#a78bfa;\n'
+        ' font-weight:700;margin:0 0 6px}\n'
+        'h1{font-size:22px;margin:0 0 18px;font-weight:650}\n'
+        '.status{font-size:16px;color:#ffb454;font-weight:600}\n'
+        '</style></head><body><div class="card">\n'
+        '<div class="brandkick">Track Coach</div>\n'
+        f'<h1 id="title">{_esc(title)}</h1>\n'
+        f'<p class="status" id="analysingStatus">{_esc(_INCOMPLETE_STATUS)}</p>\n'
+        '</div></body></html>\n'
+    )
+    Path(out_path).write_text(html, encoding="utf-8")
+    print(f"Widget saved (in-progress placeholder): {out_path}  (Track Coach v{TC_VERSION})")
+
+
+def _axis_reads(axes):
+    """Plain producer read-names for fingerprint axes (RC-INV-12 / D-INV-22) — the ONE humaniser
+    shared by the completeness chip and the reference-panel 'can't compare' stub, so both name a
+    missing signal the same way (e.g. `pad_bright` → "harmonic brightness")."""
+    import fingerprints as FP
+    return [FP.AXIS_READS.get(a, a.replace("_", " ")) for a in sorted(axes)]
+
+
 def _completeness_line_html(run_dir, mode):
     """RC-INV-12: one run-level line — "Measured N of M signals; skipped: …" — so a widget with few
     cards isn't misread as all-clear. It reads the shared fingerprint manifest (RC-INV-8) over the
@@ -2383,7 +2434,7 @@ def _completeness_line_html(run_dir, mode):
         m = len(promised)
         n = len(present & measured)
         absent = sorted(promised - present)  # signals genuinely not in this track (RC-INV-13b)
-        reads = [FP.AXIS_READS.get(a, a.replace("_", " ")) for a in absent]
+        reads = _axis_reads(absent)
     except Exception:  # noqa: BLE001 — the disclosure line is best-effort, never blocks the render
         return ""
     if m <= 0:
@@ -2754,6 +2805,21 @@ def _web_body_html(direction_name, conf_entries, centroid_z, confirm_z=0.4, web_
     )
 
 
+def _no_shared_axes_note(reads):
+    """D-INV-36 — the reference-stub note when no direction shares a measured facet with the track.
+
+    This is a defensive/edge state: a lean already requires the track and a direction to share at
+    least MIN_SHARED_AXES measured axes (completeness), and the per-facet read spans those same axes,
+    so in production a shown lean always yields at least one bar — this branch is never reached with
+    real fingerprints (all 14 axes). When it is reachable (a future rung with fewer axes, or a test),
+    the wording must stay honest: name the track's missing signals when it HAS some; otherwise state
+    that no direction shares a measured facet, rather than blaming the track for a missing set that is
+    empty. `reads` = the plain read-names of the track's missing axes (may be empty)."""
+    if reads:
+        return f"can't compare — this track is missing {_join_and(reads)}"
+    return "can't compare — no reference direction shares a measured facet with this track"
+
+
 def _ref_stub_html(note):
     """D-INV-36e — the reference panel's NON-expandable empty-state stub. When there is nothing
     to compare (no close direction, or the run carries no comparison data), the plaque keeps its
@@ -2837,9 +2903,14 @@ def render_reference_read(track_raw_fp, directions, norm, confirmation=None, con
         shown.append((lean, rows_html, summary))
 
     if not shown:
-        # All directions had no shared measured axes (degenerate) — still say so (D-INV-36e).
-        return _ref_stub_html("can't compare yet — this run and your reference artists "
-                              "share no measured facets")
+        # A defensive/edge state — a shown lean requires ≥ MIN_SHARED_AXES shared measured axes and
+        # the per-facet read spans those same axes, so production fingerprints never reach here (see
+        # _no_shared_axes_note). When they do, name the track's missing signals in the same plain
+        # reads the completeness chip uses (D-INV-36 / D-INV-22); if the track is fully measured, say
+        # the shared basis is absent instead of blaming the track for an empty missing-set.
+        import completeness as CP
+        missing = [a for a in FP.AXES if CP.is_missing(track_z.get(a))]
+        return _ref_stub_html(_no_shared_axes_note(_axis_reads(missing)))
 
     panels_html = []
     for i, (lean, rows_html, summary) in enumerate(shown):
@@ -4558,10 +4629,21 @@ def main():
                per_stem_core=per_stem_core or None, run_dir=run_dir)
     # Record this run's verdict back into run_meta.json + index.json so FUTURE catalogs
     # can show this version's verdict alongside the others. Best-effort, never fatal.
-    try:
-        _record_history(Path(args.out), _verdict_text(args.verdict, narrative_md))
-    except Exception as e:
-        print(f"(history update skipped: {e})")
+    # An INCOMPLETE run rendered only the in-progress placeholder (build_html returned early), so it
+    # is NOT a finished read — skip the history record so a placeholder never deposits a verdict +
+    # widget into run_meta/index (which would read as a finished deposit). RC-INV-13c.
+    _rendered_placeholder = False
+    if run_dir is not None:
+        try:
+            import validity as V
+            _rendered_placeholder = not V.is_valid(run_dir, args.mode)
+        except Exception:  # noqa: BLE001 — a validity read failure must not block the normal record
+            _rendered_placeholder = False
+    if not _rendered_placeholder:
+        try:
+            _record_history(Path(args.out), _verdict_text(args.verdict, narrative_md))
+        except Exception as e:
+            print(f"(history update skipped: {e})")
 
 
 def _record_history(out_path, verdict):

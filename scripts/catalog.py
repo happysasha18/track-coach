@@ -39,6 +39,29 @@ _REF_FILE = _DATA_DIR / "reference_directions.json"
 # Sibling column:   close=green, mid=amber, far=red (allowed as last-resort per F-INV-1).
 _SIM_COL = {"close": "#2e9e5b", "mid": "#d8932a", "far": "#c2503d"}
 
+# Greyscale-safe closeness glyph (D-INV-26): ●●● close / ●●○ mid / ●○○ far. ONE scheme, shared by
+# BOTH similarity columns (§D reference + §F own-library) so the cue reads uniformly and survives
+# greyscale, print, and colour-blind reading — the filled-vs-hollow SHAPE carries it, not the colour.
+_CLOSENESS_DOTS = {"close": "●●●", "mid": "●●○", "far": "●○○"}
+# The closeness level named in plain words — the non-colour, non-shape cue (D-INV-26). An unknown
+# level falls back to "far" so the helper never raises and reads consistently across both columns.
+_CLOSENESS_WORD = {"close": "close", "mid": "mild", "far": "far"}
+
+
+def _closeness_word(level: str) -> str:
+    return _CLOSENESS_WORD.get(level, "far")
+
+
+def _closeness_dots(level: str) -> str:
+    """The 3-tier greyscale-safe closeness glyph for a level (D-INV-26), carried alongside the plain
+    closeness WORD. The dots span is aria-hidden (the colour-independent visual redundancy); a
+    screen-reader-only span names the closeness in words so assistive tech and colour-blind readers
+    get the level without the colour or the dot shape. The `title` surfaces the same word on hover."""
+    word = _closeness_word(level)
+    return (f'<span class="dot-tier" aria-hidden="true" title="closeness: {word}">'
+            f'{_CLOSENESS_DOTS.get(level, "●○○")}</span>'
+            f'<span class="sr-only"> ({word} closeness)</span>')
+
 PALETTE = {  # slim copy of the build_widget dark theme so the catalog feels like the widgets
     # SPEC §I.0 DS-INV-1/2: canon = the WIDGET values; these MUST stay byte-equal on shared roles
     # (test_design_tokens.py guards it). `line`/`ink` drifted here historically and were re-synced.
@@ -272,7 +295,9 @@ def _lean_cell(leans, widget_href=None, mode=None) -> str:
         dn = html.escape(lean.direction)
         dir_href = (html.escape(f"{widget_href}?direction={quote(lean.direction)}#detailed")
                     if widget_href else "#refRead")
-        chips += f'<a class="sim-dir" href="{dir_href}" style="color:{col}">{dn}</a>'
+        chips += (f'<a class="sim-dir" href="{dir_href}" style="color:{col}" '
+                  f'title="closeness: {_closeness_word(lean.level)}">'
+                  f'{_closeness_dots(lean.level)}{dn}</a>')
     return f'<td class="c-sim c-lean">{chips}</td>'
 
 
@@ -284,11 +309,12 @@ def _siblings_cell(siblings, title_map: dict, href_map: dict) -> str:
         return '<td class="c-sim c-sibs"><span class="sim-none">—</span></td>'
     chips = ""
     for sib in siblings:
-        col = _SIM_COL[sib.level]
+        col = _SIM_COL.get(sib.level, "#8b94a8")  # unknown level → neutral grey, never a KeyError
         label = html.escape(title_map.get(sib.track) or sib.track.replace("_", " "))
         href = html.escape(href_map.get(sib.track) or "#")
         chips += (f'<a class="sib-chip" href="{href}" '
-                  f'style="border-color:{col}66;color:{col}">{label}</a>')
+                  f'title="closeness: {_closeness_word(sib.level)}" '
+                  f'style="border-color:{col}66;color:{col}">{_closeness_dots(sib.level)}{label}</a>')
     return f'<td class="c-sim c-sibs">{chips}</td>'
 
 
@@ -561,6 +587,11 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .sib-chip{{display:inline-block;background:var(--panel2);border:1px solid;border-radius:6px;
  padding:1px 7px;margin:0 3px 3px 0;font-size:10.5px;text-decoration:none;white-space:nowrap}}
 .sib-chip:hover{{opacity:.85}}
+/* Greyscale-safe closeness glyph — filled vs hollow dots carry the cue (D-INV-26). The word rides a
+   screen-reader-only span + a title, so the glyph is a redundancy, not the sole carrier (I.10a). */
+.dot-tier{{font-size:.82em;letter-spacing:.5px;margin-right:5px;vertical-align:middle}}
+.sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+ clip:rect(0,0,0,0);white-space:nowrap;border:0}}
 /* Responsive columns: the full 12-col table only fits on a wide/maximised window. Drop the LEAST
    important columns FIRST and keep the reference columns (Leans toward / Similar) visible longest —
    they were the ones clipping off-screen at 1400 (Fable pre-1.0 V1). Priority: mood/style + mode go

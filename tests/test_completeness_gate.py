@@ -112,6 +112,8 @@ def _core() -> dict:
         "density":      [round(0.3 + 0.4 * (i % 5) / 5, 3) for i in range(N)],
         "wobble_rate":  [round(1.0 + (i % 4), 3) for i in range(N)],
         "stereo_width": [round(0.4 + 0.3 * (i % 3) / 3, 3) for i in range(N)],
+        "density_lv": 0.2,   # the density mix-axis measurement (RC-INV-13: a complete run measures it;
+                             # 0.2 keeps the synthetic fingerprint's calibrated 3-direction lean, s54)
         "energy_trend": 0.5, "brightness_trend": 0.6, "density_trend": 0.05,
         "stereo_width_trend": 0.1,
         "wobble_rate_start_hz": 3.0, "wobble_rate_end_hz": 3.2,

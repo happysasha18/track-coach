@@ -156,6 +156,91 @@ class SiblingCellRendering(unittest.TestCase):
         self.assertEqual(html.count('<a class="sib-chip"'), 3, "up to 3 siblings, no more")
 
 
+class ClosenessGlyphTier(unittest.TestCase):
+    """D-INV-26 / F-INV-3: BOTH similarity columns carry the 3-tier greyscale-safe closeness
+    glyph beside each name (●●● close / ●●○ mid / ●○○ far). One shared scheme, so the cue reads
+    the same in the reference column and the own-library column and survives greyscale, print,
+    and colour-blind reading — the SHAPE (filled vs hollow) carries it, not the colour."""
+
+    def _render(self, *entries):
+        return catalog.render_catalog_html(list(entries))
+
+    # ── §F own-library column (the fix's primary target) ──
+    def test_close_sibling_carries_three_filled_dots(self):
+        sib = S.Sibling(track="B_Track", level=S.CLOSE, n_shared=12)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn("●●●", html, "close sibling must carry the ●●● glyph (D-INV-26)")
+        self.assertIn("dot-tier", html, "sibling chip must carry the .dot-tier glyph span")
+
+    def test_mid_sibling_carries_two_filled_one_hollow(self):
+        sib = S.Sibling(track="B_Track", level=S.MID, n_shared=11)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn("●●○", html, "mid sibling must carry the ●●○ glyph (D-INV-26)")
+
+    def test_far_sibling_carries_one_filled_two_hollow(self):
+        sib = S.Sibling(track="B_Track", level=S.FAR, n_shared=10)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn("●○○", html, "far sibling must carry the ●○○ glyph (D-INV-26)")
+
+    def test_every_sibling_entry_carries_a_dot_tier(self):
+        """Each own-library column entry — not just the first — carries the glyph."""
+        sibs = [S.Sibling(track="T0", level=S.CLOSE, n_shared=12),
+                S.Sibling(track="T1", level=S.MID, n_shared=11),
+                S.Sibling(track="T2", level=S.MID, n_shared=10)]
+        entries = [_e("A_Track", _siblings=sibs), _e("T0"), _e("T1"), _e("T2")]
+        html = self._render(*entries)
+        self.assertEqual(html.count('<a class="sib-chip"'), 3, "three sibling chips expected")
+        # one dot-tier glyph per chip (three chips → at least three dot-tier spans on this row)
+        self.assertGreaterEqual(html.count("dot-tier"), 3,
+                                "every own-library entry must carry its own dot-tier glyph")
+
+    # ── §D reference column (uniform: same shared scheme) ──
+    def test_close_lean_carries_three_filled_dots(self):
+        lean = S.Lean(direction="DeepChord", level=S.CLOSE, runner=None, n_shared=12)
+        html = self._render(_e("T", _leans=[lean]))
+        self.assertIn("●●●", html, "close lean must carry the ●●● glyph, uniform with §F (D-INV-26)")
+
+    def test_mid_lean_carries_two_filled_one_hollow(self):
+        lean = S.Lean(direction="SCSI-9", level=S.MID, runner=None, n_shared=11)
+        html = self._render(_e("T", _leans=[lean]))
+        self.assertIn("●●○", html, "mid lean must carry the ●●○ glyph, uniform with §F (D-INV-26)")
+
+
+class ClosenessCarriesAccessibleWord(unittest.TestCase):
+    """D-INV-26 / I.10a: each closeness mark names its level in WORDS as a non-colour, non-shape cue,
+    so assistive tech and colour-blind readers get the closeness without the tint or the dot shape.
+    The word rides a `title` (hover) AND screen-reader-only text on BOTH the reference (Leans toward)
+    and own-library (Similar) columns; the dots stay aria-hidden as the visual redundancy."""
+
+    def _render(self, *entries):
+        return catalog.render_catalog_html(list(entries))
+
+    def test_close_sibling_names_close_in_words(self):
+        sib = S.Sibling(track="B_Track", level=S.CLOSE, n_shared=12)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn("closeness: close", html, "sibling chip must carry a title naming the closeness word")
+        self.assertIn("close closeness", html, "sibling chip must carry screen-reader text naming the level")
+        self.assertIn("sr-only", html, "the closeness word must ride a screen-reader-only span")
+
+    def test_far_sibling_names_far_in_words(self):
+        sib = S.Sibling(track="B_Track", level=S.FAR, n_shared=10)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn("far closeness", html, "a far sibling must state 'far' in words, not lean on the red")
+        self.assertIn("closeness: far", html)
+
+    def test_lean_names_closeness_in_words(self):
+        lean = S.Lean(direction="DeepChord", level=S.MID, runner=None, n_shared=12)
+        html = self._render(_e("T", _leans=[lean]))
+        self.assertIn("mild closeness", html, "reference chip must name its closeness word too (uniform)")
+        self.assertIn("closeness: mild", html)
+
+    def test_dots_stay_aria_hidden(self):
+        sib = S.Sibling(track="B_Track", level=S.CLOSE, n_shared=12)
+        html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
+        self.assertIn('class="dot-tier" aria-hidden="true"', html,
+                      "the dot glyph must stay aria-hidden — the word is the accessible carrier")
+
+
 class Ncols(unittest.TestCase):
     """_NCOLS stays in sync with _HEADERS and is used in responsive shedding."""
 

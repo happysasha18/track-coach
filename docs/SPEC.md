@@ -399,7 +399,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
   lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
   (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
-  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (a standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (= `INV-44`; s46): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
+  - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (a standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (= `INV-44`; s46): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". Two near-silent stems always carry distinct labels: when two same-band stems resolve to the same base word, the collision is broken by a trailing number suffix (`⟨word⟩ 1 (near-silent)`, `⟨word⟩ 2 (near-silent)`, …, with the space before the number as shown), assigned deterministically over the stems sorted in order, so the shipped code never emits the same near-silent label twice. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
   - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
     6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
     (`play_note`, `map_hint`, `note_hint`, `note_hint_other`) AND prose from `map_stems.py`
@@ -612,7 +612,10 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   its click-to-evidence navigation, INV-48). A whole-track card (no timecode) sorts last in chronological mode;
   equal timecodes keep their urgency order (stable). The control hides itself when there is nothing to reorder
   (fewer than two cards, or none timecoded) and in Simple/Quick (those show only the timecoded subset, no
-  toggle). The choice persists per reader. `INV-26`
+  toggle). **The choice is a single global preference**, held in `localStorage` under one shared key
+  (`tc_recsort`) that every widget reads and writes, exactly like the view selector (`tc_view`, §B.15/INV-41):
+  set the card order on one track and it carries to every track's Detailed view. The key is global, never
+  scoped to a single widget or run. `INV-26`
 
 #### B.11.1 Resolution — BRIGHTNESS is descriptive, not a prescriptive per-stem card
 When A1 (per-measure validity) reached brightness, the *premise* was rejected, not just the threshold:
@@ -903,15 +906,18 @@ fields (boxy/harsh/dip/lift) are untouched — the scale phrase is ADDED, not sw
 - **Swing speaks in feel, on a named grid.** The swing card's body replaces its canned "so the groove
   clearly swings, sounds human rather than machine" with a phrase chosen by the measured offset — a gentle
   human push (30–60 ms) / a hard, unmistakably human swing (60–90) / loose to the point of broken-beat
-  (>90) — and keeps naming the tight-grid window (~25–30 ms) so the number has a floor to stand on. `INV-50a`
+  (>90) — and keeps naming the tight-grid window (~25–30 ms) so the number has a floor to stand on. An offset
+  at or below the tight-grid floor (~25–30 ms) reads as on-the-grid and fires no swing card at all, so the
+  feel phrase appears only above 30 ms; the gentle/hard boundary sits at 60 ms and belongs to the hard side,
+  so an offset of exactly 60 ms reads as a hard, unmistakably human swing. `INV-50a`
 - **Dynamic range stands on a ladder.** The squashed card's body adds the scale sentence: even loud club
   masters keep around 6–8 dB; open, punchy mixes sit at 10 and up. The measured DR then reads as a position
   on that ladder, not a lone figure. `INV-50b`
 - **The tonal offset is translated to the ear.** The tonal-resonance card renders the dB deviation with a
   computed perceived-loudness phrase: ≥9 dB ≈ "about twice as loud as its neighbours, to the ear" / ≥6 ≈
   "half again as loud" / ≥4 ≈ "a clearly audible bump" (mirrored wording for dips: "about half as loud" /
-  "noticeably recessed" / "a clearly audible dip"). The step boundaries live in ONE place in code beside
-  the card. `INV-50c`
+  "noticeably recessed" / "a clearly audible dip"). A band contrast below 4 dB fires no tonal card at all, so 4 dB is the floor where
+  the ladder begins. The step boundaries live in ONE place in code beside the card. `INV-50c`
 - *Composed across the axes:* view — card bodies render identically in Simple/Detailed (the view ladder
   gates WHICH cards show, never their text); mode — quick runs that produce these cards get the same
   bodies; viewport/touch — text only, wraps as any body text; empty — a card that doesn't fire has no
@@ -1489,11 +1495,14 @@ hiding that the sibling is far. A reference **runner-up (+second direction) is n
 tinting** (D-24 resolved 2026-06-26): the surface shows the **up to three nearest directions as a
 nearest-first selector** (§D.10.1, D-INV-27), so a second and third direction are their own clearly-ordered entries — not a self-contradictory second tint crammed into one cell. The old worry (a *tied*
 second under relative lean means the nearest does NOT stand apart) dissolves because a list HAS an order to
-carry the ranking, exactly as §F's own-library list does. So colour is never the *sole* channel:
-in **§F** (a list of up to three) the **nearest-first order** carries the ranking; in the **§D reference
-column** (one direction per cell, no order to lean on) a **greyscale-safe glyph tier** (●●● close / ●●○ mild /
-●○○ no real lean) sits beside the name. A **hover label** names the closeness on both. So the cue stays
-readable in greyscale, in print, and for a colour-blind reader without adding closeness words. `D-INV-26`
+carry the ranking, exactly as §F's own-library list does. So colour is never the *sole* channel. **Both
+similarity columns are ordered and glyph-tiered, from one shared scheme.** Each entry — a §D reference
+direction or a §F own-library sibling — lists nearest-first and carries the same **greyscale-safe glyph tier**
+(●●● close / ●●○ mild / ●○○ no real lean) beside the name; the §D column tops out at ●●○ because it never
+lists a far direction, while §F may show ●○○ as its last-resort sibling. A **hover label** names the
+closeness on both. The cue stays readable in greyscale, in print, and for a colour-blind reader without
+adding closeness words, because the filled-versus-hollow dot shape carries it independently of colour.
+`D-INV-26`
 
 ### D.10.1 The up-to-three selector — your three nearest directions, chosen one at a time
 
@@ -1583,8 +1592,15 @@ like the own-track column). `D-INV-28`
   (2026-07-05, s60: a silently absent panel read as a hole, and the earlier one-line `<details>` read as
   broken). The note names the reason in this surface's own words: none clearing the lean bar ⇒ **"no close
   direction yet"**; a run with no fingerprint (an old or partial full run) ⇒ **"no comparison data in this
-  run"** — the stub replaces the pre-s60 silent absence for that case; no shared measured facets (degenerate)
-  ⇒ **"can't compare yet"**. Never the siblings phrase "No similar tracks" (the pre-merge widget wrongly
+  run"** — the stub replaces the pre-s60 silent absence for that case; a defensive last case — no
+  direction sharing a measured facet the per-facet read can use — is guarded against but does not arise for a
+  production fingerprint (a listed lean already requires a shared measured basis of at least the minimum
+  shared-axis count, and the per-facet read spans those same axes, so a shown lean always yields at least one
+  bar). Were it reached, the stub names the track's missing signals when it has some ⇒ **"can't compare — this track is missing ⟨signals⟩"**, the stub naming the absent signals in the same
+  plain read vocabulary as the plaque chip and the completeness line (D-INV-22, e.g. "harmonic brightness");
+  when the track is fully measured yet no direction shares a facet, the stub states the shared basis is absent
+  ("can't compare — no reference direction shares a measured facet with this track") rather than blaming the
+  track for an empty missing-set, so the absence reads as a cause either way. Never the siblings phrase "No similar tracks" (the pre-merge widget wrongly
   printed it here — fixed with the merge, the phrase is the §F/D-INV-22 vocabulary, never this surface's).
   The stub keeps the `#refPanel` id, so Simple hides it (INV-18/22) and the D-INV-37 entry reader stays
   inert on it. With no reference directions defined at all the panel is absent — the feature isn't in play,
@@ -1927,6 +1943,13 @@ render as an open panel with only its summary inside. The rule holds at every ru
 quick, full-Simple, full-Detailed — because a gate that only ever builds `full` fixtures is blind to the other
 configs (exactly how the empty quick-mode evidence drawer shipped). `INV-47`
 
+**One rule governs every absence-handling surface: a signal the rung never promised stays silent, and a signal
+the rung promised but this track leaves empty renders a plain acknowledgment in its place.** The near-silent
+stem lane (INV-42) and the reference-panel stub (D-INV-36) are the promised-but-empty case that acknowledges;
+the evidence drawer, on a rung where stems and .als are never promised, is the unpromised-so-silent case and
+self-hides (INV-47). RC-INV-7 is this rule read along the run-mode axis. A new surface deciding between silence
+and a rendered acknowledgment inherits this rule and states which one an absent signal earns. `INV-51`
+
 **The same missing axis reads identically in the coach, the catalog, and the reference layer** — one track's
 fingerprint, its catalog row, and its dot/divergence in §D all draw "not measured" from the same manifest, so a
 facet can't read as present in one surface and absent in another. `RC-INV-8`
@@ -2001,6 +2024,15 @@ redo. `RC-INV-13d`
 | other_share · pad_sustain · pad_notes · pad_bright | other stem | the other stem is significant |
 | lead_share | guitar, vocals, piano | ≥1 of the three is significant `[default]` |
 
+*A stated limitation of the require-rule.* The table keys each require-rule to a part's conventional home —
+a pad or lead in the `other` stem, a lead also reachable in guitar/vocals/piano. §B.7 holds that a pad or a
+lead can land in any Demucs stem, so when the material sits in a stem other than the one the table assumes,
+this stem-name correspondence can misjudge completeness (a pad the model routed to the bass stem, say, is
+checked against the wrong axis and can read complete when its home axis is unmeasured, or invalid when it
+is). The rule is honest for the conventional case and is a known approximation elsewhere; keying the
+require-rule on the measured role rather than the raw stem name is the refinement to make if the project
+reopens. `tags: RC-INV-13d · known-limitation`
+
 - **An invalid run is redone once, automatically; a run that still cannot measure a gate-present signal is an
   honest failure, held out and not re-looped.** (E-1 reversed 2026-07-12: the redo is automatic. E-1's cost
   concern is met by the bound — the auto-redo fires only on a genuinely-invalid run, never on missing-by-mode
@@ -2015,8 +2047,14 @@ redo. `RC-INV-13d`
   result. It announces what it is completing ("completing 3 incomplete runs…") so a long Demucs pass is never
   a silent hang, and it touches only genuinely-broken runs — a run whose only gaps are gate-absent parts (a
   track with no pad) is already complete and is left alone, never re-looped. A `--only-this` flag (or a
-  dedicated single-run command) opts out for when the user wants exactly one track and nothing else. Until a
-  run is completed it keeps rendering, marked, so the standing library never blinks out at once. `RC-INV-13c`
+  dedicated single-run command) opts out for when the user wants exactly one track and nothing else. While a
+  run is being analysed or topped up, its own surface shows a plain in-progress status: the interface reads
+  "Analysing — reload when it's ready." That status line is what "marked" means, and it never presents a
+  partial measurement as a finished value — the RC-INV-13 law holds, so an incomplete run's numbers never
+  render as complete, never deposit, and never feed a fingerprint, a nearest-direction, or a sibling distance.
+  An already-deposited complete widget keeps showing its last complete version until its freshly-completed
+  version lands, so the standing library never blinks out at once; what stays on screen is always the last
+  complete deposit, and a run carrying an unmeasured gate-present signal is never among them. `RC-INV-13c`
 - *Composition with the completeness line.* Because an invalid run never reaches the screen, a shown run's
   completeness line (RC-INV-12) counts only signals genuinely present, so its "measured N of M" discloses
   **what the music contains**, and its tail names signals **absent in this track**, never a measurement that
@@ -2076,9 +2114,11 @@ people's music out of your signatures; this column only ever lists your own). `t
   for when there is truly no other placeable track at all. `F-INV-1`
 - **A track is never its own neighbour**, and the relation is **symmetric in geometry** but shown per-row
   (A may list B without B's top-3 listing A, since each row shows ITS three nearest). `F-INV-2`
-- **No number shown — closeness is a colour, not a score.** It names the neighbour tracks, each tinted by the
-  same green/amber/red closeness cue as §D (D-INV-26), never a percentage, rank number, or raw distance. Same
-  observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
+- **Closeness shows as a colour and a glyph, no number.** It names the neighbour tracks, each carrying the
+  **greyscale-safe dot-tier glyph** (●●● close / ●●○ mid / ●○○ far, the shared scheme of D-INV-26) beside the
+  name and tinted by the same green/amber/red closeness cue as §D, without a percentage, rank number, or raw
+  distance. The glyph makes the own-library cue survive greyscale and colour-blind reading exactly as the
+  reference column's does. Same observe-don't-grade stance as D-INV-1/D-INV-25. `F-INV-3`
 
 ### F.2 Navigation — click a neighbour, scroll to it
 
@@ -2099,8 +2139,13 @@ people's music out of your signatures; this column only ever lists your own). `t
 - **Completeness.** A version **missing a fingerprint axis is not comparable**, so it neither lists neighbours
   nor is offered AS a neighbour to others (it would be a fabricated nearest) — its cell reads "can't compare —
   ⟨missing signals⟩" from the same run manifest as the coach, the catalog, and §D (E.3, RC-INV-5a). `F-INV-6`
-- **A library of one (or of one placeable track).** With no other placeable own-track, the column reads
-  "no comparison yet" rather than an empty cell that looks broken. `F-INV-7`
+- **A library of one (or of one placeable track).** The own-library column carries the same presence rule as
+  the reference column (D-INV-22): it appears whenever at least one own version has a computed sibling result —
+  a neighbour list, a "no comparison yet", or a "can't compare — ⟨missing signals⟩" — and it is absent only
+  when no own version has any sibling computation at all (an all-quick library, no fingerprint anywhere). At
+  the one-track edge, where a version is computed but has no other placeable track to sit beside, the column
+  is present and its cell reads "no comparison yet" rather than an empty cell that looks broken, so a
+  single-track library never reads as a missing feature. `F-INV-7`
 - **Recompute, never stale.** Neighbours are a pure function of (the library's fingerprints, the current
   normalisation epoch); when the library grows or an epoch changes, every row's neighbour list recomputes and
   re-stamps together (D-INV-12/14) — the catalog never shows a neighbour the current geometry no longer
@@ -2614,7 +2659,8 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 3. **collapsible-panel `.tc-panel`** — radius 18 → `--radius-xl`, nested 12 → `--radius-lg`; ▸/▾
    marker = closed/open on `--wob`; nested background `rgba(0,0,0,.12)`. **Expansion animates via
    `grid-template-rows: 0fr → 1fr` (CSS cannot transition `height:auto`), `--dur-base` — NOT a raw
-   `height` transition (that no-ops and the native jump persists).** Persistence rule: a panel
+   `height` transition (that no-ops and the native jump persists).** Collapse mirrors the expansion: the same
+   `--dur-base` reversed via `grid-template-rows: 1fr → 0fr`. Persistence rule: a panel
    RESTORED open on reopen renders expanded with NO first-frame zero-height (the animate-from-0 must
    only run on a user toggle, not on initial restore).
 4. **panel** — `.panel/.panel2` → `--radius-lg`; backgrounds `--panel/--panel2`; kicker `--wob`.
@@ -2663,6 +2709,23 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
   read (`#refRead`), web notes (`#webPanel`) and the up-to-three tab selector (`.reftab`) also stay within the viewport when
   narrow — no horizontal overflow, no internal h-scroll, no tab-row spill (pass-3 composition s56;
   pinned browser-level, `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow`).
+
+### I.10a Legibility floor (a named review lens)
+A standing lens the review pass reads the rendered widget against, so nothing ships below the readable bar.
+- **Minimum body text size.** Running-prose body text holds to the smallest type rung, `--fs-1` = 12px
+  (§I.8) — the legibility floor for anything a reader reads as a sentence. Small non-prose marks are the
+  acknowledged exceptions and sit below it by design: chips, tags, meta lines, the stale/mode badges, and
+  the closeness glyph (a redundancy behind a worded label, D-INV-26). The floor is not yet a machine-checked
+  guarantee across every component — the same fractional-size drift the typography audit tracks (`13.5/12.5/
+  11.5`, §I.8 / DS-INV-14 / ⟨DECIDE DS-1⟩) still carries sub-12px label sizes, folded by the mechanical snap
+  rather than asserted clean here — so this is a review lens the pass reads the rendered widget against, not
+  a settled invariant. A prose component found drifting smaller snaps up to the floor.
+- **Readable contrast for muted text.** Tinted and muted body text (`--muted` over its `--panel`/`--panel2`
+  background) holds to a readable-contrast target for body text of a contrast ratio at or above 4.5:1, so a
+  dimmed label stays legible against its panel.
+- **The far sibling reads without colour too.** The §F own-library last-resort red (F-INV-1) carries a
+  non-colour cue for its meaning: the label revealed on tap states "far", so the far reading also stands on
+  that word and does not rest on the red tint alone.
 
 ### I.11 Open decisions
 - **⟨DECIDE DS-1⟩** — §I.8 typography weight placement (above). The only open taste call.

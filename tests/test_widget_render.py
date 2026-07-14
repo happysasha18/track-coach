@@ -90,10 +90,19 @@ class CompletenessLineShipped(unittest.TestCase):
     def _render_with_run_dir(self, mode):
         tmp = Path(tempfile.mkdtemp(prefix="tc_comp_"))
         run = tmp / "run"; run.mkdir()
-        # core only → the five mix signals measured; no masking → the nine stem signals absent
         (run / "result_core.json").write_text(json.dumps({
             "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
             "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        if mode == "full":
+            # A COMPLETE full run: Demucs ran and wrote masking, but every stem is near-silent
+            # (below the significance floor), so the nine stem signals are genuinely ABSENT in this
+            # track — a valid "not present", not an unmeasured gap. (A core-only full run with NO
+            # masking is a crashed-Demucs INCOMPLETE run and renders the placeholder instead.)
+            bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+            (run / "result_masking.json").write_text(json.dumps({
+                "band_rms_db": {"drums": bands(-85.0), "bass": bands(-85.0), "other": bands(-85.0)},
+                "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+                "total_windows": 8}))
         out = tmp / "widget.html"
         build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Comp Test",
                                 build_widget.STRINGS, mode=mode, run_dir=str(run),
@@ -106,7 +115,7 @@ class CompletenessLineShipped(unittest.TestCase):
                       "the widget must ship the RC-INV-12 completeness line")
         self.assertIn("of 14 signals", html, "a full run promises all 14 signals")
         self.assertIn("Measured", html)
-        # a core-only full run has no stems, so the nine stem signals read as absent in this track
+        # every stem is near-silent, so the nine stem signals read as genuinely absent in this track
         self.assertIn("absent in this track:", html)
         self.assertIn("bass sustain", html)
 
@@ -115,6 +124,100 @@ class CompletenessLineShipped(unittest.TestCase):
         self.assertIn('class="completeness"', html)
         self.assertIn("5 of 5 signals", html,
                       "quick promises only the mix-level signals, all measured from core")
+
+
+class IncompleteRunRendersStatusPlaceholder(unittest.TestCase):
+    """RC-INV-13c: the RENDER boundary refuses an incomplete run. The deposit boundary already
+    refused it (library.py), but a standalone widget built from a run that left a significance-gate
+    PRESENT signal unmeasured still rendered its partial "Measured N of M signals" line as if final.
+    An incomplete run's surface must instead show the in-progress status line and ask for a reload —
+    a partial run never renders as a finished read (E-3, "never show a partial run")."""
+
+    def _incomplete_run(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_incomplete_"))
+        run = tmp / "run"; run.mkdir()
+        # a full run whose `other` stem is significant (loud in every band) but whose sustain and
+        # spectral centroid were NEVER measured → validity judges promised-and-present signals
+        # unmeasured → INCOMPLETE (mirrors test_validity._run(sustain=False, centroid=False)).
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-30.0), "bass": bands(-30.0), "other": bands(-30.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0,
+            "total_windows": 8}))  # no sustain, no spectral_centroid → present signals unmeasured
+        return tmp, run
+
+    def test_incomplete_run_shows_status_line_not_partial_numbers(self):
+        import validity as V
+        tmp, run = self._incomplete_run()
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INCOMPLETE run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Partial Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        # (a) the in-progress status line is shown, verbatim
+        self.assertIn("Analysing — reload when it's ready.", html,
+                      "an incomplete run must render the in-progress status line")
+        # (b) the partial "Measured N of M signals" completeness claim is NOT presented as final
+        self.assertIsNone(re.search(r"Measured\s+\d+\s+of\s+\d+\s+signals", html),
+                          "an incomplete run must NOT present a partial completeness count as final")
+        self.assertNotIn('class="completeness"', html,
+                         "the completeness line belongs to a finished read, not an in-progress one")
+        # the title/shell is still there — this is a status placeholder, not a blank page
+        self.assertIn("Partial Track", html, "the placeholder must keep the track title")
+
+    def test_complete_run_still_renders_the_full_read(self):
+        # guard the no-change case: a genuinely COMPLETE full run renders exactly as before (with its
+        # completeness line and no status placeholder). "Complete" means the mode's promised gate is
+        # measured — here Demucs ran and wrote masking (stems near-silent = a valid "not present").
+        tmp = Path(tempfile.mkdtemp(prefix="tc_complete_"))
+        run = tmp / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-85.0), "bass": bands(-85.0), "other": bands(-85.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0, "total_windows": 8}))
+        import validity as V
+        self.assertTrue(V.is_valid(str(run), "full"), "fixture must be a genuinely COMPLETE run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Whole Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertNotIn("Analysing — reload when it's ready.", html,
+                         "a complete run must NOT show the in-progress placeholder")
+        self.assertIn('class="completeness"', html, "a complete run keeps its completeness line")
+
+    def test_core_only_full_run_renders_the_placeholder_not_fabricated_absences(self):
+        # FIX 1: the widest partial shape — a full run that crashed during Demucs has result_core.json
+        # but NO result_masking.json. It must be INVALID and render the in-progress placeholder, never
+        # a full read asserting the track has no drums/bass/lead ("absent in this track").
+        import validity as V
+        tmp = Path(tempfile.mkdtemp(prefix="tc_coreonly_"))
+        run = tmp / "run"; run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        # (a) validity rejects the crashed-Demucs full run
+        self.assertFalse(V.is_valid(str(run), "full"),
+                         "a full run with no masking (Demucs never ran) must be INVALID")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Crashed Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        # (b) it renders the placeholder, NOT a full read with a fabricated absence claim
+        self.assertIn("Analysing — reload when it's ready.", html,
+                      "a crashed-Demucs full run must render the in-progress placeholder")
+        self.assertNotIn("absent in this track", html,
+                         "a crashed-Demucs run must not fabricate 'absent in this track' claims")
+        self.assertNotIn('class="completeness"', html,
+                         "a crashed-Demucs run must not present a partial completeness line as final")
 
 
 class StoryCurvesReachThePayload(unittest.TestCase):

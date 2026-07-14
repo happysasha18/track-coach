@@ -46,10 +46,21 @@ def present_axes(run_dir, mode: str = "full") -> set:
     """The axes this run's rung PROMISES whose source part the gate reads as present (RC-INV-13d).
 
     A gate-absent part's axes are dropped here, BEFORE validity is judged, so a track that genuinely
-    lacks a part (a near-silent bass) stays complete instead of being bricked into a redo."""
+    lacks a part (a near-silent bass) stays complete instead of being bricked into a redo.
+
+    Mode-aware. A non-quick rung promises stem axes gated by `result_masking.json`. When that file is
+    ABSENT — a full-mode run that crashed before Demucs wrote it (`track_analyzer` writes result_core
+    BEFORE Demucs runs) — the significance gate is UNMEASURED, not "every stem absent" (mirrors
+    `completeness.significance`'s UNKNOWN state). Those stem axes stay REQUIRED, so the run reads
+    INCOMPLETE and never renders a fabricated "absent in this track" claim. Absent masking is a
+    legitimately-empty gate ONLY for quick, which promises no stem axes."""
     promised = FP.PROMISED_BY_MODE.get(mode, FP.PROMISED_BY_MODE["full"])
     if mode == "quick":
         return set(promised)  # quick promises only mix axes, and the mix is always present
+    if not FP._jload(str(run_dir) + "/result_masking.json"):
+        # No masking on a stem-promising rung: the gate was never measured (Demucs did not finish),
+        # so every promised axis stays present-and-required and the run is judged incomplete.
+        return set(promised)
     sig = significant(run_dir)
     out = set()
     for ax in promised:
