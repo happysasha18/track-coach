@@ -17,6 +17,7 @@ config straight out of the generated HTML, then reason about what each view draw
 """
 import json
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -24,6 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import build_widget  # noqa: E402
+
+BUILD_WIDGET_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "build_widget.py"
 
 # What Simple must show — SETTLED in session 0b5ab53e (supersedes the older 2-lane reading):
 #   L186 "keep stereo or density in Simple too" + L7 "Simple is short on lines" ⇒ Simple =
@@ -316,6 +319,121 @@ class FailedRunRendersHonestPlaceholder(unittest.TestCase):
         self.assertNotIn(build_widget._INCOMPLETE_STATUS, html,
                          "a valid run must NOT show the incomplete placeholder either")
         self.assertIn('class="completeness"', html, "a valid run keeps its completeness line")
+
+
+class EarlyNoCoreFailureRendersPlaceholder(unittest.TestCase):
+    """RC-INV-13f (tail, 1.7.2): a run whose analysis died BEFORE result_core.json was even written
+    (the "core" step itself is what broke — track_analyzer's `analyze_core.py` step runs first and
+    never got to write its output) still carries `analysis_state:"failed"` in run_meta.json, but has
+    no core file for `build_widget.py`'s main() to read. main()'s core read
+    (`core = json.loads(Path(args.core).read_text())`) used to be unconditional, so building such a
+    run's widget crashed with FileNotFoundError instead of showing the honest failed placeholder
+    build_html already knows how to draw for every OTHER invalid-run shape. This drives the real CLI
+    via subprocess — build_html's own internal guard (exercised by the class above) never gets a
+    chance to run when main() dies first reading the core file, so only a real main() invocation can
+    catch this regression."""
+
+    def _run_dir_no_core(self, analysis_state):
+        tmp = Path(tempfile.mkdtemp(prefix="tc_earlyfail_"))
+        run = tmp / "run"
+        run.mkdir()
+        meta = {"analysis_error": "audio not found: /gone.wav"}
+        if analysis_state is not None:
+            meta["analysis_state"] = analysis_state
+        (run / "run_meta.json").write_text(json.dumps(meta))
+        # deliberately NO result_core.json / result_detail.json — the failure happened before
+        # either measure step wrote its output.
+        return run
+
+    def _invoke(self, run, title):
+        out = run / "analysis_widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"),
+               "--detail", str(run / "result_detail.json"),
+               "--out", str(out), "--title", title, "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        return proc, out
+
+    def test_main_renders_placeholder_instead_of_crashing(self):
+        run = self._run_dir_no_core("failed")
+        proc, out = self._invoke(run, "Gone Track")
+        self.assertEqual(proc.returncode, 0,
+                         f"main() must not crash on a failed run with no core file on disk; "
+                         f"stderr={proc.stderr}")
+        self.assertTrue(out.exists(), "the placeholder HTML must still be written")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn(build_widget._FAILED_STATUS, html,
+                      "an early no-core failure must render the honest failed message")
+        self.assertIn(build_widget._FAILED_HINT, html,
+                      "an early no-core failure must render the plain next-step hint")
+        self.assertIn("Gone Track", html, "the placeholder must keep the track title")
+
+    def test_running_state_with_no_core_still_errors(self):
+        # fence: this new guard is scoped to the FAILED marker only, matching RC-INV-13f's rule
+        # that the analyzer only LABELS a failure it already hit, never invents new recovery. A run
+        # with no core file that is merely mid-analysis (or carries no marker at all) is a genuine
+        # usage error — calling `build` before there is anything to build — and must keep crashing
+        # loud rather than being silently repainted as an honest placeholder.
+        for state in ("running", None):
+            run = self._run_dir_no_core(state)
+            proc, out = self._invoke(run, "Mid Track")
+            self.assertNotEqual(proc.returncode, 0,
+                                f"state={state!r}: a non-failed run with no core file must still "
+                                f"error, not silently render a placeholder")
+
+
+class StatusStringsLocalisable(unittest.TestCase):
+    """RC-INV-13f (tail, 1.7.2): the three placeholder strings (`status.incomplete`,
+    `status.failed`, `status.failed_hint`) move from hardcoded module constants into
+    `STRINGS["status"]`, so they localise via `--strings`/`--dump-strings` exactly like every other
+    panel string in the widget."""
+
+    def test_dump_strings_includes_status_block(self):
+        proc = subprocess.run([sys.executable, str(BUILD_WIDGET_SCRIPT), "--dump-strings"],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"--dump-strings must not fail; stderr={proc.stderr}")
+        dumped = json.loads(proc.stdout)
+        self.assertIn("status", dumped, "--dump-strings must expose the status block for translation")
+        self.assertEqual(set(dumped["status"]), {"incomplete", "failed", "failed_hint"})
+        self.assertEqual(dumped["status"]["failed"], build_widget._FAILED_STATUS)
+        self.assertEqual(dumped["status"]["incomplete"], build_widget._INCOMPLETE_STATUS)
+        self.assertEqual(dumped["status"]["failed_hint"], build_widget._FAILED_HINT)
+
+    def test_strings_override_reaches_failed_placeholder(self):
+        import validity as V
+        # same invalid-run shape as FailedRunRendersHonestPlaceholder._incomplete_run: an `other`
+        # stem that IS significant (loud) but whose sustain/spectral_centroid were never measured.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_localised_"))
+        run = tmp / "run"
+        run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        (run / "result_detail.json").write_text("{}")
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-30.0), "bass": bands(-30.0), "other": bands(-30.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0, "total_windows": 8}))
+        (run / "run_meta.json").write_text(json.dumps({"analysis_state": "failed",
+                                                        "analysis_error": "audio not found"}))
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        strings_path = run / "strings.json"
+        strings_path.write_text(json.dumps({"status": {"failed": "L'ANALYSE A ECHOUE."}}))
+        out = run / "widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"), "--detail", str(run / "result_detail.json"),
+               "--masking", str(run / "result_masking.json"), "--strings", str(strings_path),
+               "--out", str(out), "--title", "Broken Track", "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"stderr={proc.stderr}")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("L'ANALYSE A ECHOUE.", html,
+                      "a --strings override of status.failed must reach the rendered placeholder")
+        self.assertNotIn(build_widget._FAILED_STATUS, html,
+                         "the override must REPLACE the English default, not sit beside it")
+        # the un-overridden key still falls back to English (partial translation, per module docstring)
+        self.assertIn(build_widget._FAILED_HINT, html,
+                      "an un-overridden status key must still fall back to the English default")
 
 
 class StoryCurvesReachThePayload(unittest.TestCase):

@@ -28,7 +28,12 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.7.1"  # Track Coach analyzer version — s69: RC-INV-13f — a terminally-FAILED run ("analysis_state":"failed" in run_meta.json) renders a distinct honest "Analysis couldn't complete for this track." message instead of the recoverable "reload when it's ready." placeholder; the analyzer stamps the marker at a terminal step failure and clears it on a fresh attempt. Analysis OUTPUT of valid runs unchanged (failed runs never deposit), so nothing stales. Prior 1.7.0 s68 MILESTONE: the live-spec prover (v1.1.4), a new design-review pass, and a Fable adversarial audit all ran over the spec; every finding folded here. Render-boundary validity guard (RC-INV-13c): an INCOMPLETE run no longer renders its partial "Measured N of M signals" line as a finished read — `build_html` shows the in-progress status placeholder ("Analysing — reload when it's ready.") instead. The guard now also catches a run that crashed during Demucs — an absent masking file in a stem-promising rung reads as UNMEASURED, not "no significant stems", closing the widest partial-run window. Both catalog similarity columns carry the greyscale closeness mark (●●● / ●●○ / ●○○) plus a worded closeness label (hover title + screen-reader text). Near-silent labels documented as always-distinct (INV-44); the card-order sort is one global preference (INV-26); the absence-acknowledgment rule named once (INV-51); a legibility floor stated honestly (§I.10a). Test harness hardened against headless-Chrome crash flakes (retry-on-crash). A COMPLETE run renders exactly as before. Prior 1.6.3: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
+TC_VERSION = "1.7.2"  # Track Coach analyzer version — s69 cont.: RC-INV-13f tail — a run whose
+# analysis failed BEFORE result_core.json was even written (the "core" step itself broke) now
+# renders the honest failed placeholder too, instead of the CLI crashing on the missing core file;
+# and the three placeholder strings (the recoverable "reload" one plus the two failed-run ones) are
+# now localisable via --strings/--dump-strings like every other panel string. Analysis OUTPUT of
+# valid runs unchanged, nothing stales. Prior 1.7.1 s69: RC-INV-13f — a terminally-FAILED run ("analysis_state":"failed" in run_meta.json) renders a distinct honest "Analysis couldn't complete for this track." message instead of the recoverable "reload when it's ready." placeholder; the analyzer stamps the marker at a terminal step failure and clears it on a fresh attempt. Analysis OUTPUT of valid runs unchanged (failed runs never deposit), so nothing stales. Prior 1.7.0 s68 MILESTONE: the live-spec prover (v1.1.4), a new design-review pass, and a Fable adversarial audit all ran over the spec; every finding folded here. Render-boundary validity guard (RC-INV-13c): an INCOMPLETE run no longer renders its partial "Measured N of M signals" line as a finished read — `build_html` shows the in-progress status placeholder ("Analysing — reload when it's ready.") instead. The guard now also catches a run that crashed during Demucs — an absent masking file in a stem-promising rung reads as UNMEASURED, not "no significant stems", closing the widest partial-run window. Both catalog similarity columns carry the greyscale closeness mark (●●● / ●●○ / ●○○) plus a worded closeness label (hover title + screen-reader text). Near-silent labels documented as always-distinct (INV-44); the card-order sort is one global preference (INV-26); the absence-acknowledgment rule named once (INV-51); a legibility floor stated honestly (§I.10a). Test harness hardened against headless-Chrome crash flakes (retry-on-crash). A COMPLETE run renders exactly as before. Prior 1.6.3: same-song alias merge (G-INV-23) — two filenames of one song fold to a single catalog row via aliases.json (`library alias --merge/--list/--remove`), bounces kept as versions; pure additive metadata, no aliases = unchanged pipeline. Prior 1.6.2: Detailed-only card-order toggle (urgency ⇄ chronological, INV-26) — a pure presentation reorder of the existing card nodes, keeping INV-48 click nav; hides when nothing to reorder. Widget MARKUP change only (a new control + JS), analysis OUTPUT unchanged, so nothing stales. Prior 1.6.1: the revalidate completion path is fixed — it resolved the source under the wrong key and silently no-oped on old runs, reported success over a still-partial library, and deposited a slug-drifted sibling instead of superseding; now it resolves `audio_path`, fails loud on a gone source, verifies by deed, and forgets the old deposit. Reference-run validity checked at direction-generation (RC-INV-13e). Analysis OUTPUT unchanged (footer stamp only), so nothing stales
 
 # Staleness (INV-12) reads the ANALYSIS version, not TC_VERSION. TC_ANALYSIS_VERSION advances ONLY when a
 # change alters what the analysis OUTPUTS — the content layers signal-analysis / project-parsing /
@@ -417,6 +422,14 @@ STRINGS = {
                     "because it's blended. Do your low-end work on the project's bass group (solo <b>Grp Bass</b> in Ableton and "
                     "export it) — that's the real low end, not a guess.",
             "fix": "Solo & export <b>Grp Bass</b> in Ableton and do low-end EQ/sidechain there — not on the separated bass stem."},
+    },
+    # RC-INV-13f (tail): the status placeholder text — localisable via --strings like every other
+    # panel string. "incomplete" = the recoverable RC-INV-13c reload wording; "failed"/"failed_hint"
+    # = the honest terminal-failure wording (E-4). Verbatim English, both the string and the render.
+    "status": {
+        "incomplete": "Analysing — reload when it's ready.",
+        "failed": "Analysis couldn't complete for this track.",
+        "failed_hint": "The source may be unreadable — check the file and re-run.",
     },
 }
 
@@ -2066,9 +2079,9 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             # actively BROKE (analysis_state:"failed" in run_meta.json) gets the honest
             # can't-complete message; every other invalid run keeps the recoverable reload wording.
             if _read_analysis_state(run_dir) == "failed":
-                _render_failed_placeholder(out_path, title or "Untitled track")
+                _render_failed_placeholder(out_path, title or "Untitled track", S)
             else:
-                _render_incomplete_placeholder(out_path, title or "Untitled track")
+                _render_incomplete_placeholder(out_path, title or "Untitled track", S)
             return
     dur = core["duration_s"]
     tb = core["time_bins"]
@@ -2385,14 +2398,19 @@ def _esc(s):
 
 # RC-INV-13c: the in-progress status shown in place of a finished read. Verbatim, both the string
 # and the render — a partial run never presents its partial numbers as final (E-3).
-_INCOMPLETE_STATUS = "Analysing — reload when it's ready."
+# RC-INV-13f (tail): the canonical English text now lives in STRINGS["status"] (localisable via
+# --strings, like every other panel string) — these three names stay as module-level ALIASES to the
+# STRINGS default so existing callers/tests that reference build_widget._FAILED_STATUS etc. keep
+# resolving to the same English text. The renderers below read from the caller's `S` (which may
+# carry a --strings override), never from these aliases directly.
+_INCOMPLETE_STATUS = STRINGS["status"]["incomplete"]
 
 # RC-INV-13f: an invalid run whose analysis actively BROKE (the analyzer caught a terminal step
 # failure it cannot proceed past) gets this honest message instead of the recoverable
 # _INCOMPLETE_STATUS above — the data is never coming on its own, so promising a reload is a false
 # promise (E-4). Verbatim, both the string and the render.
-_FAILED_STATUS = "Analysis couldn't complete for this track."
-_FAILED_HINT = "The source may be unreadable — check the file and re-run."
+_FAILED_STATUS = STRINGS["status"]["failed"]
+_FAILED_HINT = STRINGS["status"]["failed_hint"]
 
 
 def _read_analysis_state(run_dir):
@@ -2409,11 +2427,14 @@ def _read_analysis_state(run_dir):
         return None
 
 
-def _render_failed_placeholder(out_path, title):
+def _render_failed_placeholder(out_path, title, S):
     """RC-INV-13f: render the status placeholder for a run whose analysis TERMINALLY FAILED — the
     title/shell plus the honest failure line and a plain next step, NEVER the recoverable "reload
     when it's ready" wording (that promises data that will never arrive on its own). Mirrors
-    _render_incomplete_placeholder's shell/CSS exactly, plus one muted hint line."""
+    _render_incomplete_placeholder's shell/CSS exactly, plus one muted hint line. `S` is the caller's
+    (possibly --strings-overridden) strings dict — the text is localisable like every other panel."""
+    status_text = S["status"]["failed"]
+    hint_text = S["status"]["failed_hint"]
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -2431,19 +2452,21 @@ def _render_failed_placeholder(out_path, title):
         '</style></head><body><div class="card">\n'
         '<div class="brandkick">Track Coach</div>\n'
         f'<h1 id="title">{_esc(title)}</h1>\n'
-        f'<p class="status" id="failedStatus">{_esc(_FAILED_STATUS)}</p>\n'
-        f'<p class="hint" id="failedHint">{_esc(_FAILED_HINT)}</p>\n'
+        f'<p class="status" id="failedStatus">{_esc(status_text)}</p>\n'
+        f'<p class="hint" id="failedHint">{_esc(hint_text)}</p>\n'
         '</div></body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved (failed-run placeholder): {out_path}  (Track Coach v{TC_VERSION})")
 
 
-def _render_incomplete_placeholder(out_path, title):
+def _render_incomplete_placeholder(out_path, title, S):
     """RC-INV-13c: render the status placeholder for an INCOMPLETE run — the title/shell plus the
     in-progress status line, NEVER the partial "Measured N of M signals" completeness claim. The
     deposit boundary already refuses an incomplete run (library.py); this is the render-boundary
-    twin so a standalone widget built from a partial run can't read as a finished analysis either."""
+    twin so a standalone widget built from a partial run can't read as a finished analysis either.
+    `S` is the caller's (possibly --strings-overridden) strings dict."""
+    status_text = S["status"]["incomplete"]
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -2460,7 +2483,7 @@ def _render_incomplete_placeholder(out_path, title):
         '</style></head><body><div class="card">\n'
         '<div class="brandkick">Track Coach</div>\n'
         f'<h1 id="title">{_esc(title)}</h1>\n'
-        f'<p class="status" id="analysingStatus">{_esc(_INCOMPLETE_STATUS)}</p>\n'
+        f'<p class="status" id="analysingStatus">{_esc(status_text)}</p>\n'
         '</div></body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
@@ -4611,6 +4634,21 @@ def main():
     if args.strings:
         S = deep_merge(STRINGS, json.loads(Path(args.strings).read_text()))
 
+    # Derive run_dir from --core EARLY (before the read below) so a run whose analysis TERMINALLY
+    # FAILED before result_core.json was even written (the "core" step itself is what broke — see
+    # track_analyzer.cmd_analyze's step order) can still render the honest failed placeholder
+    # instead of crashing here. build_html's own render-boundary guard (RC-INV-13c/13f) never gets
+    # the chance to run in that case, because main() used to die on the unconditional core read
+    # below before build_html was ever called. This mirrors that same guard, one level up, for the
+    # one case it's unreachable in: the core file itself is missing. Every other invalid-run shape
+    # (core exists, some other signal wasn't measured) is still caught by build_html's guard as
+    # before — this only widens coverage to the no-core-at-all case.
+    run_dir = str(Path(args.core).resolve().parent) if args.core else None
+    if run_dir and not Path(args.core).exists() and _read_analysis_state(run_dir) == "failed":
+        _render_failed_placeholder(args.out, args.title or "Untitled track", S)
+        print(f"Widget saved (failed placeholder): {args.out}")
+        return
+
     core = json.loads(Path(args.core).read_text())
     detail = json.loads(Path(args.detail).read_text())
     masking = json.loads(Path(args.masking).read_text()) if args.masking else None
@@ -4675,8 +4713,8 @@ def main():
         "built_at": _now.strftime("%Y-%m-%d"),
     }
     catalog = json.loads(Path(args.catalog).read_text()) if args.catalog and Path(args.catalog).exists() else None
-    # Derive run_dir from --core so the reference-read block can load the fingerprint (§D.10.3).
-    run_dir = str(Path(args.core).resolve().parent) if args.core else None
+    # run_dir was already derived from --core above (before the core read), so the reference-read
+    # block can load the fingerprint (§D.10.3) using the same value computed earlier.
     build_html(core, detail, masking, als, args.out, args.title, S,
                als_offset_s=args.als_offset_s, stemmap=stemmap, rhythm=rhythm, notes=notes, drums=drums,
                audio_stems_rel=args.audio_stems_rel, presence_threshold=args.presence_threshold,

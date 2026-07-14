@@ -5,6 +5,20 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.7.2] — 2026-07-14
+
+### Fixed
+- **A track that can't be read at all now shows the same honest message, instead of erroring out.**
+  Say the source file went missing before the analysis even started measuring — before, opening that
+  track's page could error out entirely rather than showing anything. Now it shows the same *Analysis
+  couldn't complete for this track.* message (with the *The source may be unreadable — check the file
+  and re-run.* next step) that 1.7.1 already shows for a track that broke partway through.
+
+### Improved
+- **The two status messages — the in-progress one and the two "couldn't complete" ones — can now be
+  translated.** They work the same way every other piece of text in the widget already does: dump the
+  current English wording, translate it, pass it back in.
+
 ## [1.7.1] — 2026-07-14
 
 ### Fixed

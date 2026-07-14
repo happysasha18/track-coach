@@ -2073,12 +2073,15 @@ reopens. `tags: RC-INV-13d · known-limitation`
   shows a promise that it will. The render guard reads the marker: an invalid run carrying the failed marker
   takes the honest-failure message, an invalid run without it keeps the reload placeholder, and a valid run
   renders unchanged. The analyzer only LABELS the failure it already hits — it adds no new recovery attempt,
-  and no change to what makes a run invalid. *Boundary:* a failure so early that nothing was measured (an
-  unreadable source, before `result_core.json` exists) exits loud with a non-zero code and builds no widget,
-  so it presents no surface to mislead; giving that no-core failed run its own honest widget is a queued
-  follow-up. A hard kill (`kill -9`, out of memory) the analyzer cannot catch
-  leaves the run at "running" and it keeps the recoverable placeholder, since a killed run would complete on
-  re-run. The two message strings are `[default]`. `RC-INV-13f`
+  and no change to what makes a run invalid. *Early failures.* A failure so early that nothing was measured
+  (an unreadable source, before `result_core.json` exists) carries the same `failed` marker. The analysis run
+  itself exits loud with a non-zero code and builds no widget; but when a widget is later built for such a
+  run, the build reads the marker before it requires the core file, so a no-core failed run renders the
+  honest failure placeholder directly rather than erroring on the missing core. The honest message therefore
+  covers the whole caught-failure range, from an unreadable source to a stem pass that died mid-run. A hard
+  kill (`kill -9`, out of memory) the analyzer cannot catch leaves the run at "running" and it keeps the
+  recoverable placeholder, since a killed run would complete on re-run. The two message strings are overridable
+  through the localisation file (`--strings`), English by `[default]`. `RC-INV-13f`
 - *Validity is stable per run.* The promised-set version is stamped into the run at analysis time, so a run's
   validity never silently flips when the axis list grows later; an axis addition routes through the
   re-validate pass (RC-INV-13c), never a silent re-invalidation of the standing library.
