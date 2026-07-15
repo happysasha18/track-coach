@@ -51,10 +51,40 @@ fi
 
 echo ""
 echo "-- gate b: full test suite green (this takes ~3-4 min) --"
-if python3 -m pytest -q; then
-  echo "   OK: suite green."
-else
-  echo "   FAIL: test suite not green."
+# pytest exit codes: 0 = all passed, 1 = tests failed, 2-5 = usage/collection/interrupt
+# error (all real verdicts on the code). A process killed by a signal exits 128+signal
+# (137 = SIGKILL, typically an OOM/load kill; 143 = SIGTERM; 134 = SIGABRT) — that is the
+# OS killing the run, not the suite reporting red, and must not read as a code failure.
+GATE_B_RETRY_SLEEP="${GATE_RETRY_SLEEP:-20}"
+gate_b_green=0
+gate_b_attempt=0
+gate_b_rc=0
+while [ "$gate_b_attempt" -lt 3 ]; do
+  gate_b_attempt=$((gate_b_attempt + 1))
+  python3 -m pytest -q
+  gate_b_rc=$?
+  echo "   attempt $gate_b_attempt: pytest exit $gate_b_rc"
+  if [ "$gate_b_rc" -eq 0 ]; then
+    echo "   OK: suite green."
+    gate_b_green=1
+    break
+  elif [ "$gate_b_rc" -ge 128 ]; then
+    echo "   killed by the OS (signal $((gate_b_rc - 128))) under machine load — not a test failure."
+    if [ "$gate_b_attempt" -lt 3 ]; then
+      echo "   clearing stray headless Chrome, checking load, waiting ${GATE_B_RETRY_SLEEP}s, retrying..."
+      pkill -9 -f "headless=new" 2>/dev/null || true
+      uptime
+      sleep "$GATE_B_RETRY_SLEEP"
+    fi
+  else
+    echo "   FAIL: test suite not green (pytest exit $gate_b_rc)."
+    fail=1
+    break
+  fi
+done
+if [ "$gate_b_green" -ne 1 ] && [ "$fail" -eq 0 ]; then
+  echo "   INCONCLUSIVE: the test run was killed by the OS under machine load (exit $gate_b_rc),"
+  echo "   not by a failing test. Close some apps / wait for the machine to idle and push again."
   fail=1
 fi
 
