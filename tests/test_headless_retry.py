@@ -15,6 +15,7 @@ fast + deterministic. They pin three behaviours:
   3. a REAL read failure (the browser is alive, the read itself fails) → raises IMMEDIATELY
      without relaunching — recovery can never mask a genuine test failure.
 """
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -67,6 +68,38 @@ class HeadlessBrowserLivenessRecovery(unittest.TestCase):
                          "a real read failure must fail immediately — no relaunch")
         sd.assert_not_called()
         sleep_mock.assert_not_called()
+
+
+@unittest.skipUnless(Path(hc.CHROME).exists(), "real Chrome not installed on this host")
+class HeadlessBrowserProcessGroupIsolation(unittest.TestCase):
+    """The persistent browser runs in its OWN process group, and shutdown reaps that whole
+    group. This is what keeps a forced/hung teardown from leaking orphan browsers AND keeps a
+    reap scoped to THIS run — never a name/path pattern that could match another window's Chrome
+    or the human's real browser. Drives a real Chrome, so it is skipped where none is installed."""
+
+    def tearDown(self):
+        # never leak the module-global browser into a sibling test
+        try:
+            hc._shutdown()
+        except Exception:
+            pass
+        hc._BROWSER = None
+
+    def test_browser_runs_in_own_group_and_shutdown_reaps_it(self):
+        b = hc._browser()
+        pid = b._proc.pid
+        pgid = os.getpgid(pid)
+        # start_new_session makes the browser its own group leader (pgid == pid), distinct from
+        # this test runner's group — so a group reap can never hit the runner.
+        self.assertEqual(pgid, pid, "browser must lead its own process group (start_new_session)")
+        self.assertNotEqual(pgid, os.getpgid(0), "browser group must differ from the test runner's")
+        # a live CDP round-trip confirms the browser is really up before we tear it down
+        self.assertTrue(b.call("Browser.getVersion", timeout=20), "browser must be live")
+        hc._shutdown()
+        # the whole group must be gone — killpg with signal 0 is an existence probe
+        with self.assertRaises(ProcessLookupError,
+                               msg="shutdown must reap the browser's entire process group"):
+            os.killpg(pgid, 0)
 
 
 if __name__ == "__main__":

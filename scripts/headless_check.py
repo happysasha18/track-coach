@@ -41,6 +41,7 @@ import atexit
 import base64
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -141,11 +142,17 @@ class _Browser:
         # surfacing as a bare "pipe closed" (the pattern proven in tlvphotos/tests/headless.py).
         self._stderr_f = tempfile.NamedTemporaryFile(
             "w+b", prefix="tc_chrome_", suffix=".log", delete=False)
+        # start_new_session puts Chrome (and every renderer/helper it forks) in its OWN
+        # process group, distinct from this test runner's. Teardown then reaps that group by
+        # id, so even a forced kill targets only THIS run's browser tree and can never match a
+        # shared install-path pattern that would reach another project's live Chrome
+        # (inbox wish 2026-07-15 cross-project test-Chrome collision).
         self._proc = subprocess.Popen(
             [CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
              "--hide-scrollbars", "--remote-debugging-pipe", "about:blank"],
             preexec_fn=_preexec, pass_fds=(3, 4),
             stdout=subprocess.DEVNULL, stderr=self._stderr_f,
+            start_new_session=True,
         )
         os.close(cmd_r)
         os.close(resp_w)
@@ -239,12 +246,25 @@ class _Browser:
             self.call("Browser.close", timeout=5)
         except Exception:
             pass
+        # Read the group id BEFORE the process dies (getpgid fails once it is reaped).
+        try:
+            pgid = os.getpgid(self._proc.pid)
+        except Exception:
+            pgid = None
         try:
             self._proc.terminate()
             self._proc.wait(timeout=5)
         except Exception:
             try:
                 self._proc.kill()
+            except Exception:
+                pass
+        # Sweep the whole group so a detached renderer/helper never lingers as an orphan for a
+        # later run to trip over. Safe because start_new_session gave the browser its own group,
+        # so this reaches only this run's Chrome, never the test runner or another project.
+        if pgid is not None:
+            try:
+                os.killpg(pgid, signal.SIGKILL)
             except Exception:
                 pass
         for fd in (self._cmd_w, self._resp_r):
