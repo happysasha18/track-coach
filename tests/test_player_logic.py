@@ -132,6 +132,15 @@ class PlayerStateMachine(unittest.TestCase):
         A(P.pgains(r).every(x=>x===false),'after resetMix every stem must be audible: '+JSON.stringify(P.pgains(r)));
         """)
 
+    def test_reset_mix_preserves_near_silent_mute(self):  # INV-45 x INV-40 — a near-silent lane's safety
+        # mute must SURVIVE the Simple resetMix (INV-45 is a safety baseline, not a strandable user choice);
+        # an ordinary lane still resets to audible (INV-40 unchanged for real user solo/mute).
+        self._node(r"""
+        const r=P.resetMix([{mute:true,solo:false,nearSilent:true},{mute:false,solo:false,nearSilent:false}]);
+        A(r[0].mute===true && P.pgains(r)[0]===true, 'near-silent lane must stay muted after resetMix');
+        A(r[1].mute===false, 'ordinary lane still resets audible');
+        """)
+
 
 # ── INV-41: resolveView — global remembered view helper (SPEC §B.15)
 _VIEW_BLOCK = re.compile(r"/\* VIEW_LOGIC_START.*?VIEW_LOGIC_END \*/", re.S)

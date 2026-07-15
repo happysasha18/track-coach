@@ -90,12 +90,14 @@ def computed_stages(run_dir: Path):
 
 
 def newest_run(root: Path):
+    # RC-INV-9: most-complete-then-newest, not plain newest — rank by result_*.json count on
+    # disk (the completeness proxy), tiebreak by mtime.
     if not root.exists():
         return None
     runs = [p for p in root.iterdir() if p.is_dir() and p.name != "latest"]
     if not runs:
         return None
-    return max(runs, key=lambda p: p.stat().st_mtime)
+    return max(runs, key=lambda p: (len(list(p.glob("result_*.json"))), p.stat().st_mtime))
 
 
 def update_symlink(root: Path, target: Path):

@@ -156,7 +156,7 @@ class StereoWidthMeasure(unittest.TestCase):
     card, never be merged into the "louder but sparser" activity card. SPEC §B.11."""
 
     def test_stereo_in_prescriptive_measures(self):
-        self.assertIn("stereo_width", bw.PER_STEM_MEASURES)
+        self.assertNotIn("stereo_width", bw.PER_STEM_MEASURES)  # SPEC §B.11.1 point 1: PER_STEM_MEASURES = (energy, density) only
         self.assertEqual(bw.CORRELATED_MEASURES, ("energy", "density"))
 
     def test_stereo_wording(self):

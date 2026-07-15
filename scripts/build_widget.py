@@ -755,11 +755,15 @@ DIVERGENCE_MIN = 0.35            # provisional τ (A3, validated on Lazy 2026-06
 # REMOVED here (SPEC §B.11.1, 2026-06-22): a part being brighter/darker than the rest is not a
 # defect — the coach can't know intent (a drum/synth burst may be wanted), so a prescriptive brightness
 # card asserts a problem it can't justify. Relative brightness is descriptive / a future viz, not a card.
-PER_STEM_MEASURES = ("energy", "density", "stereo_width")  # curves present in result_core_<stem>.json
+PER_STEM_MEASURES = ("energy", "density")  # SPEC §B.11.1 point 1: energy+density only — a wider default
+                                # axis needs to be arc-relevant/actionable (point 3), a stronger filter than
+                                # raw validity; stereo_width is descriptive and stays OUT of the default set.
 CORRELATED_MEASURES = ("energy", "density")   # the activity/loudness pair — these two restate one another
                                 # (a part that pulls back is usually quieter AND sparser), so they COLLAPSE
-                                # into one card (collapse_correlated). Other axes (stereo width, …) are
-                                # independent and each earn their own card. E2 2026-06-23, SPEC §B.11.
+                                # into one card (collapse_correlated). `stem_divergence_candidates` still
+                                # accepts other axes (e.g. stereo width) via an explicit `measures=` override,
+                                # each earning its own independent card if a caller opts in. E2 2026-06-23 /
+                                # taste-B 2026-07-15, SPEC §B.11.1.
 STEREO_MONO_FLOOR = 0.05        # below this mean stereo width a part is effectively MONO — it has no stereo
                                 # image to read, so we suppress its "wider/narrower" card (A1 validity).
 
@@ -4620,7 +4624,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
  const _nsOmit=new Set((D.stem&&D.stem.omitted)||[]);
  const auds=PL.srcs.map(s=>{const a=new Audio();a.src=s.src;a.preload="auto";wrap.appendChild(a);
   const startMuted=_nsOmit.has(s.name);if(startMuted)a.muted=true;
-  return {name:s.name,a:a,mute:startMuted,solo:false};});
+  return {name:s.name,a:a,mute:startMuted,solo:false,nearSilent:startMuted};});
  // Expose state for test_nearsilent_stems_appear_as_muted_lanes (INV-44)
  window.__ns_state=auds.map(s=>({name:s.name,mute:s.mute}));
  /* PLAYER_LOGIC_START — pure DOM-free player state machine (SPEC §B.14); node-executed by test_player_logic */
@@ -4629,7 +4633,7 @@ function drawLocators(ctx,xOf,top,bot,labelY){
   if(kind==="mute"){s[i].mute=!s[i].mute;if(s[i].mute)s.forEach(x=>x.solo=false);}
   else{s[i].solo=!s[i].solo;if(s[i].solo)s.forEach(x=>x.mute=false);}return s;};
  const seekResult=(t,dur,wasPlaying)=>{t=Math.max(0,Math.min(dur,t));return {t:t,resume:!!wasPlaying};};   // clamp + keep transport
- const resetMix=stems=>stems.map(()=>({mute:false,solo:false}));   // full mix — solo/mute is a Detailed-only capability (SPEC §B.14): leaving the stem grid (→ Simple) resets to full mix so you never strand a hidden solo
+ const resetMix=stems=>stems.map(s=>({mute:!!s.nearSilent,solo:false}));   // full mix — solo/mute is a Detailed-only capability (SPEC §B.14): leaving the stem grid (→ Simple) resets to full mix, EXCEPT a near-silent lane's safety mute (INV-45) survives the reset so you never strand a hidden solo/mute but also never un-silence a safety default
  if(typeof module!=="undefined")module.exports={pgains,toggleStem,seekResult,resetMix};
  /* PLAYER_LOGIC_END */
  const master=auds[0].a;

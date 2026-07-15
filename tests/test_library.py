@@ -577,5 +577,17 @@ class ReferenceCleanup(unittest.TestCase):
                 del os.environ["TRACK_COACH_LIBRARY"]
 
 
+class RepSelection(unittest.TestCase):
+    """group_versions picks the rep by most-complete-then-newest (RC-INV-9 / D-INV-35), never
+    plain newest — a full run outranks a later quick run of the same bounce."""
+
+    def test_full_beats_newer_quick(self):
+        a = {"track": "T", "audio_sha": "x", "stamp": "2026-01-01_1000", "mode": "full"}
+        b = {"track": "T", "audio_sha": "x", "stamp": "2026-02-01_1000", "mode": "quick"}
+        out = library.group_versions([a, b])
+        self.assertIs(out["T"][0]["rep"], a,
+                       "rep must be the most-complete (full) entry, not merely the newest")
+
+
 if __name__ == "__main__":
     unittest.main()

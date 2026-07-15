@@ -210,6 +210,15 @@ def run_metrics(core: dict, meta: dict) -> dict:
     }
 
 
+def _rep_sort_key(e):
+    """Single canonical most-complete-then-newest ordering for picking a version's rep (RC-INV-9:
+    "reads from the most-complete run", "never blended"). Completeness metric per input type — a
+    PURE index entry: its `mode` field (a "full" run is more complete than "quick", full ⊇ quick
+    by design, both already passed the validity gate at deposit); a run dir on disk: its
+    result_*.json file count (see _count_result_files, already how gc measures it)."""
+    return (1 if e.get("mode") == "full" else 0, e.get("stamp", ""), e.get("deposited_at", ""))
+
+
 def group_versions(entries: list) -> dict:
     """Group index entries into tracks → versions for the catalog. PURE — no filesystem.
 
@@ -230,7 +239,7 @@ def group_versions(entries: list) -> dict:
             by_sha.setdefault(e.get("audio_sha") or e.get("widget"), []).append(e)
         versions = []
         for sha, grp in by_sha.items():
-            rep = max(grp, key=lambda e: (e.get("stamp", ""), e.get("deposited_at", "")))
+            rep = max(grp, key=_rep_sort_key)
             versions.append({"sha": sha, "rep": rep, "n_runs": len(grp),
                              "okey": rep.get("audio_mtime") or rep.get("stamp", "")})
         versions.sort(key=lambda x: (x["okey"] == "", x["okey"]))  # oldest first; unknowns last
@@ -553,17 +562,22 @@ def migrate_plan(root: Path, output_root: Path) -> list:
 
 def migrate_apply(root: Path, output_root: Path) -> list:
     """Move run dirs outside the output root into ``<output_root>/projects/<slug>/`` and rewrite
-    the library index.  The index is only rewritten AFTER all moves succeed (G-INV-16
-    all-or-clean-report).
+    the library index.  Crash-consistent PER MEMBER: each member's index entry is rewritten
+    immediately after its own move succeeds, so index and disk agree at every step of the loop —
+    a later member's failure can never leave an earlier, already-moved member's entry pointing at
+    its stale (now-nonexistent) source (G-INV-16/G-INV-11 all-or-clean-report … or nothing is
+    changed, applied per member rather than only at the end).
 
     Returns the list of moved plan items (same shape as ``migrate_plan``).
-    Raises ``RuntimeError`` on the first move failure; already-moved dirs are left in place but
-    the index is NOT updated for the failed member.
+    Raises ``RuntimeError`` on the first move failure; already-moved dirs — and their index
+    entries — are left in their new, consistent state; the failed member and anything after it
+    in the plan is untouched.
     """
     plan = migrate_plan(root, output_root)
     if not plan:
         return []
 
+    root = Path(root)
     moved = []
     for item in plan:
         src, dst = item["src"], item["dst"]
@@ -574,16 +588,14 @@ def migrate_apply(root: Path, output_root: Path) -> list:
         shutil.move(str(src), str(dst))
         moved.append(item)
 
-    # All moves succeeded — rewrite the index atomically (single write).
-    root = Path(root)
-    idx = load_index(root)
-    new_sdr = {str(item["src"]): str(item["dst"]) for item in moved}
-    for e in idx.get("entries", []):
-        if isinstance(e, dict):
-            sd = e.get("src_run_dir", "")
-            if sd in new_sdr:
-                e["src_run_dir"] = new_sdr[sd]
-    save_index(root, idx)
+        # Persist this member's new pointer right away — index and disk stay consistent even
+        # if a later member's move raises.
+        idx = load_index(root)
+        for e in idx.get("entries", []):
+            if isinstance(e, dict) and e.get("src_run_dir", "") == str(src):
+                e["src_run_dir"] = str(dst)
+        save_index(root, idx)
+
     return moved
 
 
@@ -835,7 +847,7 @@ def prune_versions_plan(entries: list, keep_n: int) -> tuple:
         # Sort versions oldest→newest
         versions: list = []
         for sha, grp in by_sha.items():
-            rep = max(grp, key=lambda e: (e.get("stamp", ""), e.get("deposited_at", "")))
+            rep = max(grp, key=_rep_sort_key)
             okey = rep.get("audio_mtime") or rep.get("stamp", "")
             versions.append({"sha": sha, "entries": grp, "okey": okey})
         versions.sort(key=lambda v: (v["okey"] == "", v["okey"]))  # oldest first; unknowns last
@@ -1009,8 +1021,10 @@ def _cmd_restore(args):
     is_full = (snap_dir / "projects").exists()
     tiers_to_restore = [src for src in (snap_dir / "library", snap_dir / "explore")
                         if src.exists()]
+    config_src = snap_dir / "config.json"
+    has_config = config_src.exists()
 
-    if not tiers_to_restore:
+    if not tiers_to_restore and not has_config:
         print(f"restore: snapshot {snap_dir.name} contains no curated tiers to restore.")
         return
 
@@ -1023,6 +1037,10 @@ def _cmd_restore(args):
         print(f"  overwrite: {d}")
     for d in added:
         print(f"  add: {d}")
+    if has_config:
+        config_dest = base / "config.json"
+        action = "overwrite" if config_dest.exists() else "add"
+        print(f"  {action}: {config_dest}")
 
     if not is_full:
         print("  WARNING: this is a non-full snapshot — previews will go silent, opens fall back "
@@ -1050,6 +1068,11 @@ def _cmd_restore(args):
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(src, dest)
+
+    # H-INV-9: config.json is captured on backup — restore it too, even if it's the only thing
+    # in the snapshot (a config-only restore must not be skipped by the tiers-only guard above).
+    if has_config:
+        shutil.copy2(config_src, base / "config.json")
 
     print(f"restore: done — {snap_dir.name} → {base}")
 

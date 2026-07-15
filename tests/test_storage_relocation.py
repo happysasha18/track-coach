@@ -779,6 +779,59 @@ class MigrateCommand(unittest.TestCase):
             self.assertEqual(updated_src, str(new_dir),
                             f"src_run_dir not updated in index: {updated_src!r}")
 
+    def test_migrate_apply_partial_failure_persists_completed_moves(self):
+        """Defect #5: when a move fails mid-loop, the index must still be rewritten for every
+        member whose move already succeeded — src_run_dir must point at the member's NEW dst,
+        not the stale source (G-INV-16/G-INV-11: crash-consistent per member, never a stale
+        pointer left after a partial apply)."""
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            lib_root = tmp / "output_root" / "library"
+            (lib_root / "widgets").mkdir(parents=True)
+            output_root = tmp / "output_root"
+
+            run1 = tmp / "ableton_project" / "track-coach-output" / "Track1" / "v1__2026-01-01_1000"
+            run1.mkdir(parents=True)
+            (run1 / "run_meta.json").write_text("{}")
+            run2 = tmp / "ableton_project" / "track-coach-output" / "Track2" / "v1__2026-01-02_1000"
+            run2.mkdir(parents=True)
+            (run2 / "run_meta.json").write_text("{}")
+
+            entries = [
+                {"track": "Track1", "version": "v1", "stamp": "2026-01-01_1000",
+                 "widget": "Track1__v1__2026-01-01_1000.html", "mode": "full",
+                 "src_run_dir": str(run1), "deposited_at": "2026-01-01T10:00:00+00:00"},
+                {"track": "Track2", "version": "v1", "stamp": "2026-01-02_1000",
+                 "widget": "Track2__v1__2026-01-02_1000.html", "mode": "full",
+                 "src_run_dir": str(run2), "deposited_at": "2026-01-02T10:00:00+00:00"},
+            ]
+            (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+
+            plan = library.migrate_plan(lib_root, output_root)
+            self.assertEqual(len(plan), 2)
+            dst1 = plan[0]["dst"]
+
+            import shutil as real_shutil_module
+            real_move = real_shutil_module.move
+
+            def flaky_move(src, dst):
+                if str(dst) == str(dst1):
+                    return real_move(src, dst)
+                raise OSError("simulated move failure")
+
+            with mock.patch.object(library.shutil, "move", side_effect=flaky_move):
+                with self.assertRaises(Exception):
+                    library.migrate_apply(lib_root, output_root)
+
+            idx = library.load_index(lib_root)
+            e1 = next(e for e in idx["entries"] if e["track"] == "Track1")
+            self.assertEqual(
+                e1["src_run_dir"], str(dst1),
+                "member-1's already-succeeded move must be reflected in the index even though "
+                "member-2's move raised")
+
     def test_migrate_apply_no_op_when_already_inside(self):
         """migrate_apply does nothing when all members are already inside the output root."""
         with tempfile.TemporaryDirectory() as td:

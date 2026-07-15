@@ -826,7 +826,7 @@ class RestoreCommand(unittest.TestCase):
         os.environ.pop("TRACK_COACH_ROOT", None)
 
     def _make_state(self):
-        """Create library/ + explore/ under self.base."""
+        """Create library/ + explore/ + config.json under self.base."""
         lib = self.base / "library" / "widgets"
         lib.mkdir(parents=True)
         (lib / "widget.html").write_text("<html>widget</html>")
@@ -834,6 +834,7 @@ class RestoreCommand(unittest.TestCase):
         explore = self.base / "explore"
         explore.mkdir(parents=True)
         (explore / "ref.json").write_text('{"ref": true}')
+        (self.base / "config.json").write_text('{"k":1}')
 
     def test_restore_dry_run_by_default(self):
         """Bare restore (no --apply) reports plan and writes nothing. H-INV-9 / G-INV-8."""
@@ -852,7 +853,8 @@ class RestoreCommand(unittest.TestCase):
                          "dry-run restore must not write library/")
 
     def test_restore_round_trip(self):
-        """backup then restore --apply --force reproduces original library/ + explore/. H-INV-9."""
+        """backup then restore --apply --force reproduces original library/ + explore/ +
+        config.json. H-INV-9."""
         self._make_state()
         os.environ["TRACK_COACH_ROOT"] = str(self.base)
         snap = library._do_backup(self.base)
@@ -860,6 +862,7 @@ class RestoreCommand(unittest.TestCase):
 
         shutil.rmtree(self.base / "library")
         shutil.rmtree(self.base / "explore")
+        (self.base / "config.json").unlink()
 
         args = types.SimpleNamespace(base=None, stamp=stamp, apply=True, force=True)
         library._cmd_restore(args)
@@ -868,6 +871,9 @@ class RestoreCommand(unittest.TestCase):
         self.assertTrue((self.base / "explore").exists(), "explore/ must be restored")
         idx = library.load_index(self.base / "library")
         self.assertEqual(len(idx["entries"]), 1, "index must be restored with 1 entry")
+        self.assertTrue((self.base / "config.json").exists(), "config.json must be restored (H-INV-9)")
+        self.assertEqual((self.base / "config.json").read_text(), '{"k":1}',
+                         "restored config.json must match the backed-up content")
 
     def test_restore_latest_resolves_to_most_recent(self):
         """restore stamp='latest' resolves to the most-recent valid snapshot. H-INV-9."""

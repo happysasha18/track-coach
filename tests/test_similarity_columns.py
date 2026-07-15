@@ -243,5 +243,64 @@ class TopKBasics(unittest.TestCase):
         self.assertEqual(S.leans_toward_topk(track, dirs), [])
 
 
+class ReasonProbe(unittest.TestCase):
+    """Shared reason-plumbing (D-INV-22 / D-INV-22-completeness / F-INV-5/6/7): an empty similarity
+    result carries WHY it is empty + which signals are missing, so the cell can phrase it (never a
+    bare []) and the presence gate can drop an all-empty column. One missing-signals probe, threaded
+    to both columns."""
+
+    def _real_fp(self, **over):
+        """A fingerprint on the REAL 14 axis names (so missing_signals maps to producer reads)."""
+        import fingerprints as FP
+        v = {ax: 0.0 for ax in FP.AXES}
+        v.update(over)
+        return v
+
+    def test_missing_signals_names_the_absent_axes_in_producer_words(self):
+        import fingerprints as FP
+        fp = self._real_fp()
+        del fp["brightness"]          # drop one measured axis
+        fp["density"] = None          # None = not-measured (RC-INV-1), a measured 0 stays measured
+        reads = S.missing_signals(fp)
+        self.assertIn(FP.AXIS_READS["brightness"], reads)  # 'brightness'
+        self.assertIn(FP.AXIS_READS["density"], reads)     # 'density'
+        self.assertNotIn(FP.AXIS_READS["tempo"], reads, "a measured 0.0 axis is NOT missing (RC-INV-1)")
+
+    def test_missing_signals_empty_when_complete(self):
+        self.assertEqual(S.missing_signals(self._real_fp()), [])
+
+    def test_lean_reason_no_data_when_no_directions(self):
+        # no directions defined at all → the reference column is absent (D-INV-22)
+        self.assertEqual(S.lean_reason(self._real_fp(), {}), (S.R_NO_DATA, []))
+
+    def test_lean_reason_missing_axis_when_not_comparable(self):
+        # a fingerprint measuring only 1 axis can't share MIN_SHARED with any full direction → missing-axis
+        track = {"tempo": 1.0}
+        dirs = {"x": cloud(self._real_fp())}
+        reason, miss = S.lean_reason(track, dirs)
+        self.assertEqual(reason, S.R_MISSING)
+        self.assertTrue(miss, "the missing-signal reads must be named for the 'can't compare' cell")
+
+    def test_lean_reason_no_direction_when_comparable_but_far(self):
+        # fully comparable, but the caller found no CLOSE/MID lean → 'no close direction yet'
+        reason, miss = S.lean_reason(self._real_fp(), {"x": cloud(self._real_fp(tempo=9.0))})
+        self.assertEqual(reason, S.R_NO_DIRECTION)
+        self.assertEqual(miss, [])
+
+    def test_sibling_reason_no_comparison_for_library_of_one(self):
+        lib = {"solo": self._real_fp()}
+        self.assertEqual(S.sibling_reason("solo", lib), (S.R_NO_COMPARISON, []))
+
+    def test_sibling_reason_missing_axis_when_self_not_comparable(self):
+        # this track measures 1 axis; a full sibling exists but they can't share MIN_SHARED → missing-axis
+        lib = {"me": {"tempo": 1.0}, "full": self._real_fp()}
+        reason, miss = S.sibling_reason("me", lib)
+        self.assertEqual(reason, S.R_MISSING)
+        self.assertTrue(miss)
+
+    def test_sibling_reason_no_data_when_absent(self):
+        self.assertEqual(S.sibling_reason("ghost", {"other": fp(a0=1.0)}), (S.R_NO_DATA, []))
+
+
 if __name__ == "__main__":
     unittest.main()

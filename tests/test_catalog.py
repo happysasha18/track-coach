@@ -253,9 +253,14 @@ class LeanCellEmptyCopy(unittest.TestCase):
     shipped `_lean_cell` wrongly emitted 'no similar tracks' for every empty lean, incl. quick)."""
 
     def test_quick_row_reads_full_analysis_only(self):
+        # D-INV-22 presence gate (defect #7): an ALL-quick library sheds the column entirely, so to
+        # SEE the quick row's 'full analysis only' cell the library must also carry a full row that
+        # keeps the column present. The quick row then reads its missing-by-mode phrase.
         page = catalog.render_catalog_html(
-            [_e("Q", "h1", "2026-01-01_0900", 1000, mode="quick", title="Q", bpm=120)])
-        self.assertIn("full analysis only", page)          # D-INV-22 quick-cell copy
+            [_e("F", "h0", "2026-01-02_0900", 2000, mode="full", title="F", bpm=120),
+             _e("Q", "h1", "2026-01-01_0900", 1000, mode="quick", title="Q", bpm=120)])
+        self.assertIn("Leans toward", page)                 # the full row keeps the column present
+        self.assertIn("full analysis only", page)           # D-INV-22 quick-cell copy
         self.assertNotIn("no similar tracks", page)         # never the siblings-column phrase
 
     def test_full_row_no_lean_reads_no_close_direction(self):
@@ -265,12 +270,38 @@ class LeanCellEmptyCopy(unittest.TestCase):
         self.assertNotIn("no similar tracks", page)
 
     def test_no_similar_tracks_phrase_never_in_lean_column(self):
-        # the phrase belongs to the §F "Similar in library" column's own empty state ("—"),
+        # the phrase belongs to the §F "Similar in library" column's own empty state,
         # never the reference/leans column — a whole-catalog guard against the collision.
         for m in ("quick", "full"):
             page = catalog.render_catalog_html(
                 [_e("T", "h1", "2026-01-01_0900", 1000, mode=m, title="T")])
             self.assertNotIn("no similar tracks", page)
+
+
+class LeanCellCantCompare(unittest.TestCase):
+    """D-INV-22-completeness (defect #2): a full run whose fingerprint is MISSING an axis is not
+    comparable, so its reference cell reads 'can't compare — ⟨missing signals⟩' with the missing
+    measurements named — the THIRD empty state, distinct from 'full analysis only' (quick) and
+    'no close direction yet' (measured but no separation). Never a fabricated nearest, never a dash."""
+
+    def test_missing_axis_reads_cant_compare_with_signals(self):
+        # A full-mode row whose reference result came back empty for the missing-axis reason (as
+        # build_catalog's reason probe injects) → 'can't compare — <reads>', never 'no close direction'.
+        page = catalog.render_catalog_html(
+            [_e("M", "h1", "2026-01-01_0900", 1000, mode="full", title="M", bpm=120,
+                _leans=[], _lean_reason="missing-axis", _lean_missing=["brightness", "drum balance"])])
+        self.assertIn("can't compare", page, "missing-axis reference cell must read 'can't compare' (D-INV-22-completeness)")
+        self.assertIn("brightness", page, "the missing-signal reads must be named in the cell")
+        self.assertNotIn("no close direction yet", page,
+                         "missing-axis is a DISTINCT state from measured-but-no-separation")
+
+    def test_own_library_missing_axis_reads_cant_compare(self):
+        # F-INV-6: the own-library cell has the same missing-axis phrasing.
+        page = catalog.render_catalog_html(
+            [_e("M", "h1", "2026-01-01_0900", 1000, mode="full", title="M", bpm=120,
+                _siblings=[], _sib_reason="missing-axis", _sib_missing=["bass balance"])])
+        self.assertIn("can't compare", page, "missing-axis own-library cell must read 'can't compare' (F-INV-6)")
+        self.assertNotIn("no comparison yet", page, "missing-axis is distinct from no-other-placeable-track")
 
 
 class LinkPointsAtOriginal(unittest.TestCase):

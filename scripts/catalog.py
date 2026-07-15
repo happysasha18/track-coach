@@ -268,17 +268,19 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
-def _lean_cell(leans, widget_href=None, mode=None) -> str:
+def _lean_cell(leans, widget_href=None, reason=None, missing=None) -> str:
     """Render the 'leans toward' (reference) TD for a row (§D.10.1).
 
     Accepts a list of up to 3 Lean objects (nearest-first, CLOSE/MID only — FAR never
     reaches here, leans_toward_topk already excluded them). Each direction is a coloured
     clickable link stacked vertically. No red for the reference column — owner decision 2026-06-29.
 
-    Empty state is MODE-AWARE (D-INV-22) and uses THIS column's own phrases, never the siblings
-    column's 'no similar tracks' (Fable audit 2026-07-03):
-      • quick-only row → 'full analysis only' — quick never promised a reference (D-INV-20/22);
-      • full row, no close direction → 'no close direction yet' (SPEC §D, the reference miss).
+    Empty state is THREE-WAY (D-INV-22 + D-INV-22-completeness) and uses THIS column's own phrases,
+    never the siblings column's 'no similar tracks' (Fable audit 2026-07-03):
+      • quick-only row (R_QUICK) → 'full analysis only' — quick never promised a reference (D-INV-20/22);
+      • full run missing axes (R_MISSING) → 'can't compare — ⟨missing signals⟩', never a fabricated
+        nearest (D-INV-22-completeness) — the missing measurements named inline;
+      • full run, no close direction (R_NO_DIRECTION / default) → 'no close direction yet' (SPEC §D).
 
     widget_href: the row's own widget URL (from _open_href). Direction links carry the
     ONE-SHOT ENTRY PAIR `?direction=⟨URL-encoded name⟩#detailed` (D-INV-37, wired s59):
@@ -287,7 +289,13 @@ def _lean_cell(leans, widget_href=None, mode=None) -> str:
     (INV-18/22), so entry must ride it. Neither half persists anything.
     When None, falls back to '#refRead' (in-page no-op but never the dead bare '#')."""
     if not leans:
-        msg = "full analysis only" if mode == "quick" else "no close direction yet"
+        if reason == SC.R_QUICK:
+            msg = "full analysis only"
+        elif reason == SC.R_MISSING:
+            names = html.escape(SC.signals_phrase(missing or []))  # only the dynamic names need escaping
+            msg = f"can't compare — {names}" if names else "can't compare"
+        else:  # R_NO_DIRECTION (and the graceful default)
+            msg = "no close direction yet"
         return f'<td class="c-sim c-lean"><span class="sim-none">{msg}</span></td>'
     chips = ""
     for lean in leans:
@@ -301,18 +309,35 @@ def _lean_cell(leans, widget_href=None, mode=None) -> str:
     return f'<td class="c-sim c-lean">{chips}</td>'
 
 
-def _siblings_cell(siblings, title_map: dict, href_map: dict) -> str:
+def _siblings_cell(siblings, title_map: dict, href_map: dict, reason=None, missing=None) -> str:
     """Render the 'similar in your library' TD for a row.
     Up to 3 siblings, each as a coloured chip link. FAR siblings are allowed here (F-INV-1).
-    Uses title_map for display labels and href_map for widget links."""
+    Uses title_map for display labels.
+
+    The chip is IN-PAGE NAVIGATION, not a widget link (F-INV-4 / D-INV-28): its href is the sibling
+    row's `#row-<slug>` anchor and the catalog scrolls+highlights that row on click — the click
+    changes no analysis state. (An own sibling scrolls; a reference DIRECTION opens the widget — the
+    two are deliberately different, D-INV-28.)
+
+    Empty state is THREE-WAY (F-INV-5/6/7), never a bare '—':
+      • quick-only row (R_QUICK) → 'full analysis only' (F-INV-5);
+      • full run missing axes (R_MISSING) → 'can't compare — ⟨missing signals⟩' (F-INV-6);
+      • computed but no other placeable track (R_NO_COMPARISON / default) → 'no comparison yet' (F-INV-7)."""
     if not siblings:
-        return '<td class="c-sim c-sibs"><span class="sim-none">—</span></td>'
+        if reason == SC.R_QUICK:
+            msg = "full analysis only"
+        elif reason == SC.R_MISSING:
+            names = html.escape(SC.signals_phrase(missing or []))  # only the dynamic names need escaping
+            msg = f"can't compare — {names}" if names else "can't compare"
+        else:  # R_NO_COMPARISON (and the graceful default) — never a bare dash
+            msg = "no comparison yet"
+        return f'<td class="c-sim c-sibs"><span class="sim-none">{msg}</span></td>'
     chips = ""
     for sib in siblings:
         col = _SIM_COL.get(sib.level, "#8b94a8")  # unknown level → neutral grey, never a KeyError
         label = html.escape(title_map.get(sib.track) or sib.track.replace("_", " "))
-        href = html.escape(href_map.get(sib.track) or "#")
-        chips += (f'<a class="sib-chip" href="{href}" '
+        href = "#" + _row_id(sib.track)           # F-INV-4: scroll to the sibling's row, not its widget
+        chips += (f'<a class="sib-chip" href="{html.escape(href)}" data-scroll-row="{html.escape(_row_id(sib.track))}" '
                   f'title="closeness: {_closeness_word(sib.level)}" '
                   f'style="border-color:{col}66;color:{col}">{_closeness_dots(sib.level)}{label}</a>')
     return f'<td class="c-sim c-sibs">{chips}</td>'
@@ -406,7 +431,8 @@ def _open_href(e, widgets_rel):
     return f"{widgets_rel}/{widget}" if widget else ""
 
 
-def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=None):
+def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=None,
+         show_lean=True, show_sib=True):
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
     href = _open_href(e, widgets_rel)
@@ -424,11 +450,18 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
     def num(x):
         return f"{x}" if isinstance(x, (int, float)) else "-1"
     mix_attr = f' data-mix="{html.escape(mix_uri)}"' if mix_uri else ""
+    # F-INV-4: a stable per-track row anchor a sibling chip can scroll to (`#row-<slug>`).
+    _leans, _lreason, _lmiss = _lean_state(e)
+    _sibs, _sreason, _smiss = _sib_state(e)
+    lean_td = (_lean_cell(_leans, widget_href=href, reason=_lreason, missing=_lmiss)
+               if show_lean else "")
+    sib_td = (_siblings_cell(_sibs, title_map or {}, href_map or {}, reason=_sreason, missing=_smiss)
+              if show_sib else "")
     return f"""<tr data-track="{html.escape(track.lower())}" data-mode="{html.escape(e.get('mode',''))}"{mix_attr}
       data-version="{html.escape(str(ver['label']))}" data-date="{html.escape(str(e.get('stamp','')))}"
       data-bpm="{num(e.get('bpm'))}" data-key="{html.escape(str(e.get('key') or ''))}"
       data-len="{num(e.get('length_s'))}" data-lufs="{num(e.get('lufs'))}"
-      data-energy="{num(e.get('energy_level'))}">
+      data-energy="{num(e.get('energy_level'))}" id="{html.escape(_row_id(track))}">
  <td class="c-track"><div class="tcell">{play_btn}<span class="tmeta">{title_cell}</span></div></td>
  <td class="c-ver">{html.escape(str(ver['label']))}{'' if ver['n_runs']<2 else f' <span class=runs>×{ver["n_runs"]}</span>'}{_stale_chip(e)}</td>
  <td class="c-date">{html.escape(_display_date(e))}</td>
@@ -439,21 +472,100 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
  <td class="c-num">{_fmt_num(e.get('lufs'),dp=1)}{_delta_html(ver.get('delta'),'lufs')}</td>
  <td class="c-tags">{_tag_chips(e.get('mood_tags'),e.get('style_tags'),e.get('tags_source'))}</td>
  <td class="c-mode"><span class="mode {html.escape(e.get('mode',''))}">{html.escape(e.get('mode',''))}</span></td>
- {_lean_cell(e.get('_leans') or [], widget_href=href, mode=e.get('mode'))}
- {_siblings_cell(e.get('_siblings') or [], title_map or {{}}, href_map or {{}})}
+ {lean_td}
+ {sib_td}
 </tr>"""
 
 
 # The one-line "verdict" was dropped from the catalog (2026-06-20: the verdict column broke the layout
 # and wasn't worth keeping) — it was the widest, most variable column and forced the table off the
 # screen. The verdict still lives inside each track's widget; the catalog stays scannable.
-_HEADERS = [
-    ("track", "Track"), ("version", "Version"), ("date", "Date"), (None, "Signature"),
-    ("bpm", "BPM"), ("key", "Key"), ("len", "Length"), ("lufs", "LUFS"),
-    (None, "Mood / style"), ("mode", "Analysis"),
-    (None, "Leans toward"), (None, "Similar in library"),
+# Full column spec (the superset). Each row is (col_id, sort_key, label): `col_id` is the stable
+# identity the presence-gate + responsive shedding key off (never a fixed nth-child), `sort_key`
+# drives client sort (None = not sortable). The two similarity columns ("lean"/"sib") are DROPPED
+# per-render when no version carries their data (D-INV-22 / F-INV-7); everything else always renders.
+_COLUMNS = [
+    ("track", "track", "Track"), ("version", "version", "Version"), ("date", "date", "Date"),
+    ("sig", None, "Signature"), ("bpm", "bpm", "BPM"), ("key", "key", "Key"),
+    ("len", "len", "Length"), ("lufs", "lufs", "LUFS"),
+    ("tags", None, "Mood / style"), ("mode", "mode", "Analysis"),
+    ("lean", None, "Leans toward"), ("sib", None, "Similar in library"),
 ]
-_NCOLS = len(_HEADERS)  # keep the empty-state colspan in lock-step with the header count
+# Legacy view kept for callers/tests that read the header list as (sort_key, label) pairs.
+_HEADERS = [(sk, label) for _cid, sk, label in _COLUMNS]
+_NCOLS = len(_COLUMNS)  # the SUPERSET column count; the empty-state colspan uses the per-render count
+
+
+def _lean_state(e):
+    """(leans_list, reason, missing_reads) for the reference cell. An explicit `_lean_reason`
+    (injected by build_catalog) wins; a non-empty `_leans` is always "ok"; otherwise the reason is
+    inferred from run mode so unit fixtures that inject no reason still read correctly — a quick row
+    is the missing-by-mode "quick" case, a full row defaults to a computed "no-direction" result."""
+    leans = e.get("_leans") or []
+    if leans:
+        return leans, "ok", []
+    reason = e.get("_lean_reason")
+    if reason:
+        return leans, reason, (e.get("_lean_missing") or [])
+    return leans, (SC.R_QUICK if e.get("mode") == "quick" else SC.R_NO_DIRECTION), []
+
+
+def _sib_state(e):
+    """(siblings_list, reason, missing_reads) for the own-library cell — same inference contract as
+    `_lean_state`, but a full row with no result defaults to the "no-comparison yet" edge (F-INV-7)."""
+    sibs = e.get("_siblings") or []
+    if sibs:
+        return sibs, "ok", []
+    reason = e.get("_sib_reason")
+    if reason:
+        return sibs, reason, (e.get("_sib_missing") or [])
+    return sibs, (SC.R_QUICK if e.get("mode") == "quick" else SC.R_NO_COMPARISON), []
+
+
+# A column carries data (so it renders, D-INV-22 / F-INV-7) when at least one version produced a
+# computed RESULT — a hit, a "no close direction"/"no comparison", or a "can't compare". A quick row
+# (missing-by-mode) and a no-data row do NOT count, so an all-quick / no-directions library sheds the
+# whole column instead of carrying an all-empty one.
+_LEAN_RESULT_REASONS = frozenset({"ok", SC.R_NO_DIRECTION, SC.R_MISSING})
+_SIB_RESULT_REASONS = frozenset({"ok", SC.R_NO_COMPARISON, SC.R_MISSING})
+
+
+def _row_id(track: str) -> str:
+    """Stable, HTML-id-safe row anchor for a track slug — the sibling chip scrolls to `#<this>`
+    (F-INV-4). Non-word chars fold to '-' so any deposited slug yields a valid id/fragment; the same
+    helper builds both the `<tr id>` and the chip href so they always match."""
+    return "row-" + re.sub(r"[^A-Za-z0-9_-]", "-", str(track or ""))
+
+
+def _responsive_css(active_ids) -> str:
+    """Build the column-shedding media queries from the ACTUAL rendered column order, so the shed
+    stays in lock-step when a similarity column is absent (its nth-child position would otherwise
+    shift). Priority is unchanged: mood/style + Analysis drop first (≤1440), the reference columns
+    only at ≤1100, date at ≤880 (which also tightens padding). A rule is emitted only for columns
+    that are actually present."""
+    pos = {cid: i + 1 for i, cid in enumerate(active_ids)}
+
+    def sel(ids):
+        parts = []
+        for cid in ids:
+            if cid in pos:
+                n = pos[cid]
+                parts.append(f"thead th:nth-child({n})")
+                parts.append(f"tbody td:nth-child({n})")
+        return ",".join(parts)
+
+    blocks = []
+    s1 = sel(["tags", "mode"])
+    if s1:
+        blocks.append(f"@media(max-width:1440px){{{s1}{{display:none}}}}")       # mood/style + mode
+    s2 = sel(["lean", "sib"])
+    if s2:
+        blocks.append(f"@media(max-width:1100px){{{s2}{{display:none}}}}")       # last resort: ref cols
+    s3 = sel(["date"])
+    date_rule = f"{s3}{{display:none}};" if s3 else ""
+    blocks.append(f"@media(max-width:880px){{{date_rule}"
+                  f".wrap{{padding:18px 12px 48px}};tbody td,thead th{{padding:6px 8px}}}}")  # date
+    return "\n".join(blocks)
 
 
 def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach — Library",
@@ -480,22 +592,36 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
             _title_map[t] = e.get("title") or t.replace("_", " ")
             _href_map[t] = _open_href(e, widgets_rel)
 
+    # D-INV-35: one row per track — its NEWEST version (group_versions orders newest-first). Older
+    # versions live only in the per-track plaque (INV-11), never as a second catalog row.
+    ordered = [(track, groups[track][0]) for track in sorted(groups, key=str.lower)]
+
+    # PRESENCE GATE (D-INV-22 / F-INV-7): the two similarity columns render only when at least one
+    # shown version produced a computed RESULT. An all-quick / no-directions library carries no
+    # all-empty column — the header and every per-row cell drop together, and the responsive shed +
+    # empty-state colspan follow the resulting column count so nothing goes out of lock-step.
+    reps = [ver["rep"] for _t, ver in ordered]
+    show_lean = any(_lean_state(e)[1] in _LEAN_RESULT_REASONS for e in reps)
+    show_sib = any(_sib_state(e)[1] in _SIB_RESULT_REASONS for e in reps)
+    active_cols = [(cid, sk, label) for cid, sk, label in _COLUMNS
+                   if (cid != "lean" or show_lean) and (cid != "sib" or show_sib)]
+    ncols = len(active_cols)
+
     body_rows = []
     uid = 0
-    for track in sorted(groups, key=str.lower):
-        ver = groups[track][0]  # D-INV-35: one row per track — its NEWEST version (group_versions
-        #                          orders newest-first). Older versions live only in the per-track
-        #                          plaque (INV-11), never as a second catalog row.
+    for track, ver in ordered:
         body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
                               mix_uri=ver["rep"].get("mix_uri"),
-                              title_map=_title_map, href_map=_href_map))
+                              title_map=_title_map, href_map=_href_map,
+                              show_lean=show_lean, show_sib=show_sib))
         uid += 1
     rows_html = "\n".join(body_rows) or (
-        f'<tr><td colspan="{_NCOLS}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
+        f'<tr><td colspan="{ncols}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
     ths = "".join(
         (f'<th class="sortable" data-key="{k}">{html.escape(label)}<span class="ar"></span></th>'
          if k else f'<th>{html.escape(label)}</th>')
-        for k, label in _HEADERS)
+        for _cid, k, label in active_cols)
+    responsive_css = _responsive_css([cid for cid, _sk, _label in active_cols])
     p = PALETTE
     # G-INV-16/22 passive banners: a member still on disk can be consolidated (migrate); a member
     # whose source is gone can only be deleted or re-analysed — never shown as consolidatable.
@@ -592,17 +718,17 @@ svg.sig{{width:168px;height:47px;display:block}}.c-sig{{width:168px}}
 .dot-tier{{font-size:.82em;letter-spacing:.5px;margin-right:5px;vertical-align:middle}}
 .sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
  clip:rect(0,0,0,0);white-space:nowrap;border:0}}
-/* Responsive columns: the full 12-col table only fits on a wide/maximised window. Drop the LEAST
-   important columns FIRST and keep the reference columns (Leans toward / Similar) visible longest —
-   they were the ones clipping off-screen at 1400 (Fable pre-1.0 V1). Priority: mood/style + mode go
-   at ≤1440 (so the reference work stays on a normal full window); the reference cols themselves only
-   drop at ≤1100; overflow-x:auto is the last-resort fallback. */
-@media(max-width:1440px){{thead th:nth-child(9),tbody td:nth-child(9),
- thead th:nth-child(10),tbody td:nth-child(10){{display:none}}}}       /* mood/style + mode — keep reference cols */
-@media(max-width:1100px){{thead th:nth-child(11),tbody td:nth-child(11),
- thead th:nth-child(12),tbody td:nth-child(12){{display:none}}}}       /* last resort: the reference cols too */
-@media(max-width:880px){{thead th:nth-child(3),tbody td:nth-child(3){{display:none}};
- .wrap{{padding:18px 12px 48px}};tbody td,thead th{{padding:6px 8px}}}}                        /* date */
+/* Responsive columns: the full table fits only on a wide/maximised window. Drop the LEAST important
+   columns FIRST and keep the two similarity columns visible longest — they were
+   the ones clipping off-screen at 1400 (Fable pre-1.0 V1). The nth-child positions are generated
+   from the ACTUAL rendered column order (a shed similarity column would otherwise shift them out of
+   lock-step), priority unchanged: mood/style + mode ≤1440, reference cols ≤1100, date ≤880;
+   overflow-x:auto is the last-resort fallback. */
+{responsive_css}
+/* F-INV-4: a row a sibling chip scrolled to gets a brief highlight pulse — pure navigation feedback,
+   no analysis state changes. Two seconds, then it fades back to the normal row. */
+tbody tr.row-pulse{{animation:rowpulse 2s ease-out 1}}
+@keyframes rowpulse{{0%{{background:rgba(167,139,250,.42)}}100%{{background:transparent}}}}
 .empty{{text-align:center;color:var(--muted);padding:40px}}
 .foot{{color:var(--muted);font-size:11px;margin-top:18px;text-align:center}}
 tr.hide{{display:none}}
@@ -696,6 +822,19 @@ document.querySelectorAll("th.sortable").forEach(th=>th.addEventListener("click"
    if(!a.duration||!isFinite(a.duration))return; const r=svg.getBoundingClientRect();
    const f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); a.currentTime=f*a.duration;
    if(cur&&cur.audio===a)place(cur); }});
+ }});
+}})();
+// ── §F own-library sibling navigation (F-INV-4 / D-INV-28): clicking a sibling chip scrolls the
+// catalog to that track's row and pulses a highlight — pure navigation, it changes no analysis
+// state. (A reference DIRECTION link, by contrast, opens the widget — the two are different.)
+(function(){{
+ tbody.addEventListener("click",e=>{{
+  const chip=e.target.closest("a.sib-chip[data-scroll-row]"); if(!chip)return;
+  const id=chip.getAttribute("data-scroll-row"); const row=id&&document.getElementById(id);
+  if(!row)return;                                   // target gone — let the href fall through
+  e.preventDefault();
+  row.scrollIntoView({{behavior:"smooth",block:"center"}});
+  row.classList.remove("row-pulse"); void row.offsetWidth; row.classList.add("row-pulse");
  }});
 }})();
 apply();
@@ -792,18 +931,40 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
                 else:
                     missing_banner += 1
 
-    # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here,
-    # pure renderer reads the pre-computed fields via e["_lean"] / e["_siblings"]).
+    # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here, pure
+    # renderer reads the pre-computed fields). Each empty result also carries the WHY (reason +
+    # missing-signal reads) so the cell can phrase it (quick / can't-compare / no-direction /
+    # no-comparison) and the presence gate can drop an all-empty column (D-INV-22 / F-INV-5/6/7).
     directions, z_library = _load_sim_data(entries)
     for e in entries:
         key = e.get("track")
         fp = z_library.get(key)
-        if fp and directions:
-            e["_leans"] = SC.leans_toward_topk(fp, directions)  # up to 3, CLOSE/MID only (§D.10.1)
-            e["_siblings"] = SC.nearest_own(key, z_library)
+        is_quick = e.get("mode") == "quick"
+        # Reference column.
+        if fp is not None and directions:
+            leans = SC.leans_toward_topk(fp, directions)  # up to 3, CLOSE/MID only (§D.10.1)
+            e["_leans"] = leans
+            if leans:
+                e["_lean_reason"], e["_lean_missing"] = "ok", []
+            else:
+                e["_lean_reason"], e["_lean_missing"] = SC.lean_reason(fp, directions)
         else:
             e["_leans"] = []
+            if is_quick or fp is None:
+                e["_lean_reason"], e["_lean_missing"] = SC.R_QUICK, []
+            else:                                         # fingerprint present but no directions defined
+                e["_lean_reason"], e["_lean_missing"] = SC.R_NO_DATA, []
+        # Own-library column.
+        if fp is not None:
+            sibs = SC.nearest_own(key, z_library)
+            e["_siblings"] = sibs
+            if sibs:
+                e["_sib_reason"], e["_sib_missing"] = "ok", []
+            else:
+                e["_sib_reason"], e["_sib_missing"] = SC.sibling_reason(key, z_library)
+        else:
             e["_siblings"] = []
+            e["_sib_reason"], e["_sib_missing"] = SC.R_QUICK, []
 
     html_str = render_catalog_html(entries, migrate_banner=migrate_banner,
                                    missing_banner=missing_banner)

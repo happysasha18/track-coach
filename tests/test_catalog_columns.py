@@ -144,9 +144,15 @@ class SiblingCellRendering(unittest.TestCase):
         html = self._render(_e("A_Track", _siblings=[sib]), _e("B_Track"))
         self.assertIn('<a class="sib-chip"', html, "sibling must be an anchor element")
 
-    def test_no_siblings_shows_dash(self):
+    def test_no_siblings_shows_no_comparison_yet(self):
+        # F-INV-7 (defect #3): a single-track full-run library has one placeable version but no OTHER
+        # placeable track, so the own-library cell reads 'no comparison yet' — NEVER a bare '—'
+        # (the old bug rendered a dash for all three distinct empty reasons).
         html = catalog.render_catalog_html([_e("T", _siblings=[])])
-        self.assertIn("sim-none", html, "empty siblings cell must show the grey dash")
+        self.assertIn("sim-none", html, "empty siblings cell must render the grey empty-state span")
+        self.assertIn("no comparison yet", html, "single-track full library → 'no comparison yet' (F-INV-7)")
+        self.assertNotIn('<span class="sim-none">—</span>', html,
+                         "the empty own-library cell must not be a bare dash")
 
     def test_up_to_three_siblings_shown(self):
         sibs = [S.Sibling(track=f"T{i}", level=S.CLOSE, n_shared=12) for i in range(3)]
@@ -242,21 +248,59 @@ class ClosenessCarriesAccessibleWord(unittest.TestCase):
 
 
 class Ncols(unittest.TestCase):
-    """_NCOLS stays in sync with _HEADERS and is used in responsive shedding."""
+    """_NCOLS is the SUPERSET column count; the RENDERED count is dynamic — the two similarity
+    columns drop when no version carries their data (D-INV-22 / F-INV-7), so the header count,
+    empty-state colspan and responsive shed all follow the actual rendered columns."""
 
     def test_ncols_equals_header_count(self):
         self.assertEqual(catalog._NCOLS, len(catalog._HEADERS))
 
-    def test_ncols_is_12(self):
-        # 10 original + 2 new sim columns
-        self.assertEqual(catalog._NCOLS, 12, "expected 12 columns (10 original + 2 sim)")
+    def test_ncols_is_the_full_superset(self):
+        # 10 base columns + 2 similarity columns = the full superset _NCOLS
+        self.assertEqual(catalog._NCOLS, 12, "expected 12-column superset (10 base + 2 similarity)")
+
+    def test_full_library_renders_all_twelve_columns(self):
+        import re
+        # a full-run library carries both similarity columns → 12 header cells (<th ...> / <th>,
+        # never counting the <thead> wrapper)
+        html = catalog.render_catalog_html([_e("T")])
+        self.assertEqual(len(re.findall(r"<th[ >]", html)), 12, "a full-run row renders all 12 columns")
+
+    def test_all_quick_library_renders_only_ten_columns(self):
+        import re
+        # an all-quick library has no reference/sibling computation → both similarity columns drop
+        html = catalog.render_catalog_html([_e("Q1", mode="quick"), _e("Q2", mode="quick")])
+        self.assertEqual(len(re.findall(r"<th[ >]", html)), 10, "all-quick library sheds both similarity columns")
 
     def test_last_column_shed_on_narrow(self):
         import re
         html = catalog.render_catalog_html([_e("T")])
         shed = {int(n) for n in re.findall(r"nth-child\((\d+)\)", html)}
         self.assertIn(catalog._NCOLS, shed,
-                      f"column #{catalog._NCOLS} (last) must be shed on narrow screens")
+                      f"the last rendered column (#{catalog._NCOLS}) must be shed on narrow screens")
+
+
+class ColumnPresenceGate(unittest.TestCase):
+    """Defect #7 — D-INV-22 / F-INV-7: a similarity column is ABSENT when NO shown version produced
+    a computed result. An all-quick library (no fingerprints, no directions) carries neither an
+    all-empty 'Leans toward' nor an all-empty 'Similar in library' column — so a brand-new column
+    never reads as a missing feature and an all-quick library doesn't carry a dead column. A MIXED
+    library keeps both columns (data for even one track, D-INV-22 2026-06-25)."""
+
+    def test_all_quick_library_drops_both_similarity_columns(self):
+        html = catalog.render_catalog_html([_e("Q1", mode="quick"), _e("Q2", mode="quick")])
+        self.assertNotIn("Leans toward", html,
+                         "an all-quick library has no reference computation → the column is absent (D-INV-22)")
+        self.assertNotIn("Similar in library", html,
+                         "an all-quick library has no sibling computation → the column is absent (F-INV-7)")
+
+    def test_mixed_library_keeps_both_columns(self):
+        # one full row produces a computed result → both columns render; the quick row reads its
+        # missing-by-mode phrase inside the present column.
+        html = catalog.render_catalog_html([_e("F", mode="full"), _e("Q", mode="quick")])
+        self.assertIn("Leans toward", html)
+        self.assertIn("Similar in library", html)
+        self.assertIn("full analysis only", html, "the quick row reads 'full analysis only' inside the present column")
 
 
 if __name__ == "__main__":

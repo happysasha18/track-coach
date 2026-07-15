@@ -99,6 +99,73 @@ def leans_toward_topk(track, directions, k=3, min_shared=C.MIN_SHARED_AXES):
     return result
 
 
+def missing_signals(fp):
+    """The plain-language read names (fingerprints.AXIS_READS) of the axes a FULL fingerprint should
+    carry but THIS fingerprint did not measure — the fill for the "can't compare — ⟨missing signals⟩"
+    phrase (D-INV-22-completeness / F-INV-6, RC-INV-10). Reuses `completeness.manifest`, so "missing"
+    means the one honest thing (None / NaN), never a measured zero (RC-INV-1). Empty when complete.
+    Capped for the surface at three names + "+N more" so a cell with many holes stays scannable."""
+    import fingerprints as _FP  # lazy: same scripts/ dir; avoids any import-order coupling
+    present = C.manifest(fp)
+    miss = [ax for ax in _FP.AXES if ax not in present]
+    return [_FP.AXIS_READS.get(ax, ax) for ax in miss]
+
+
+def signals_phrase(reads, cap=3):
+    """Join missing-signal read names for the cell, capped so the cell stays short. '' when none."""
+    if not reads:
+        return ""
+    if len(reads) <= cap:
+        return ", ".join(reads)
+    return ", ".join(reads[:cap]) + f" +{len(reads) - cap} more"
+
+
+# Reason codes shared by the two columns' empty cells (the WHY behind an empty list), threaded from
+# here → catalog's injector → the cell renderers so a bare [] never discards the reason (D-INV-22 /
+# D-INV-22-completeness / F-INV-5/6/7). "ok" is implicit (the list is non-empty).
+R_QUICK = "quick"                # quick-only run, no fingerprint → "full analysis only"
+R_MISSING = "missing-axis"       # full run missing axes, not comparable → "can't compare — ⟨…⟩"
+R_NO_DIRECTION = "no-direction"  # comparable, but no direction stands close → "no close direction yet"
+R_NO_COMPARISON = "no-comparison"  # comparable, but no other placeable track → "no comparison yet"
+R_NO_DATA = "no-data"            # nothing computed at all (no directions / no fingerprint) → column absent
+
+
+def lean_reason(fp, directions, min_shared=C.MIN_SHARED_AXES):
+    """Why `leans_toward_topk(fp, directions)` came back empty — (reason, missing_reads). Only
+    meaningful when that list is empty; a non-empty list is the "ok" case the caller handles.
+      R_NO_DATA      no directions defined at all → the reference column is absent (D-INV-22).
+      R_MISSING      the fingerprint is not comparable to ANY direction because it lacks measured
+                     axes → "can't compare — ⟨missing signals⟩" (D-INV-22-completeness).
+      R_NO_DIRECTION comparable, but no direction stands close → "no close direction yet"."""
+    if not directions:
+        return (R_NO_DATA, [])
+    comparable_any = any(C.comparable(fp, cen, min_shared) for cen in directions.values())
+    if not comparable_any:
+        miss = missing_signals(fp)
+        if miss:
+            return (R_MISSING, miss)
+    return (R_NO_DIRECTION, [])
+
+
+def sibling_reason(track_id, library, min_shared=C.MIN_SHARED_AXES):
+    """Why `nearest_own(track_id, library)` came back empty — (reason, missing_reads). Only
+    meaningful when that list is empty.
+      R_NO_DATA       this track has no fingerprint in the library → column absent.
+      R_MISSING       this track's fingerprint lacks axes, so it is not comparable to any other
+                      track (nor offered AS a neighbour) → "can't compare — ⟨missing signals⟩" (F-INV-6).
+      R_NO_COMPARISON comparable, but no OTHER placeable track exists → "no comparison yet" (F-INV-7)."""
+    fp = library.get(track_id)
+    if fp is None:
+        return (R_NO_DATA, [])
+    others = [o for t, o in library.items() if t != track_id]
+    comparable_any = any(C.comparable(fp, o, min_shared) for o in others)
+    if others and not comparable_any:
+        miss = missing_signals(fp)
+        if miss:
+            return (R_MISSING, miss)
+    return (R_NO_COMPARISON, [])
+
+
 def _own_buckets(track_id, library, min_shared):
     """Distances from `track_id` to every OTHER comparable library track, ascending, with the
     library-wide tercile cuts used to bucket them (D-27 basis)."""
