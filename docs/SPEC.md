@@ -565,6 +565,12 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
    distinguish **arc-relevant / actionable** axes (worth a prescriptive card) from **descriptive** axes (belong
    in a viz / one balance card). Default to descriptive unless an axis has a defensible "this fights the track"
    reading. This is a stronger filter than raw validity and is why E2 widens AFTER this, not before.
+   **stereo_width evaluated + REMOVED from the default set (reopen 2026-07-15):** an E2 change once added
+   `stereo_width` to `PER_STEM_MEASURES` gated only by a mono-floor (raw validity), which is exactly the
+   weaker filter point 3 rejects — a part being wider/narrower than the rest has no "this fights the track"
+   reading, so it is descriptive, not a prescriptive card. `PER_STEM_MEASURES` is back to `("energy",
+   "density")`; the stereo divergence mechanism stays available via an explicit `measures=` override for a
+   future viz, never as a default card.
 
 ### B.12 Producer's read — name HOW it develops, flag an idle axis
 The Producer's read is authored prose — *"here's what I hear, and my thoughts as I go"*. Its job is
@@ -757,9 +763,14 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
      (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
      absent in quick (the view ladder, INV-18/22). So a per-stem mute/solo state is only **visible and
      reversible in Detailed**. Invariant: **entering Simple RESETS the per-stem mix to the full mix**
-     (`resetMix` clears every mute+solo, then `pgains` → all audible) — so the user is never left hearing a
+     (`resetMix` clears every USER mute+solo, then `pgains` → all audible) — so the user is never left hearing a
      solo / muted part they can't see or undo. Re-entering Detailed starts from the full mix (no hidden
-     leftover state). The general rule: an interactive surface must be specified across EVERY view/mode axis
+     leftover state). **Composition with INV-45 (the near-silent safety mute), resolved 2026-07-15:** a
+     near-silent lane's auto-mute is a safety default, not user-created state, so `resetMix` PRESERVES it —
+     each lane carries a `nearSilent` flag and `resetMix` returns `mute:nearSilent`. INV-45 wins for the
+     near-silent lane (it stays muted through a Simple→Detailed round-trip); INV-40 still wins for every
+     user solo/mute (those reset). Without this, a round-trip through Simple un-silenced a near-silent lane
+     for the rest of the page life. The general rule: an interactive surface must be specified across EVERY view/mode axis
      it lives under, not just its own. (Quick never has the grid, so it never reaches this state.) `INV-40`
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
@@ -1431,7 +1442,7 @@ aim-dependent rows are inert without the mapping input (⟨DECIDE D-2⟩, cut fr
 | Web descriptor — "what the web says about ⟨artist⟩" (nested disclosure, open; follows the selector) | `#webPanel` (inside `#refPanel`) | **SHIPS-1.0** | the focused direction has web content | yes — non-null `gated_by` |
 | Up-to-three nearest-direction selector (`.reftab` tabs) | top of `#refPanel` | **SHIPS-1.0** | ≥2 real leans (green/amber; 1 lean = no tab bar) | folded into the `#refPanel` gate |
 | Similar in your own library (§F own-library) | catalog `.sib-chip` column | **SHIPS-1.0** | ≥1 own sibling track in the library | yes — via the catalog gate (`test_19_catalog_rows_and_hrefs`) + the D-INV-26 browser colour test (`.sib-chip`); it is a catalog COLUMN, not a standalone panel |
-| References show/hide switch (D-INV-6/23) | catalog + widget toggle | **⟨DECIDE⟩ SHIPS-1.0 or DEFERRED — pending Alexander** | a reference surface renders | — pending the scope call |
+| References show/hide switch (D-INV-6/23) | catalog + widget toggle | **SHIPS-1.0 — BUILT (reopen 2026-07-15)** | a reference surface renders | yes — the control renders only when a reference surface renders |
 | Aim glyph · pinned-aimed entry · re-flavouring (§D.6) | — | **DEFERRED-post-1.0** | never in 1.0 (no mapping input) | no — not rendered, not gated |
 
 **Property (F1 — the anti-regression net covers what ships).** Every SHIPS-1.0 §D surface has a `USER_SURFACES`
