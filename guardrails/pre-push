@@ -19,9 +19,11 @@
 # Emergency escape (documented, loud): TC_PUSH_SKIP_GATE=1 git push
 #   — prints a red banner; use only when the owner explicitly says to ship around the gate.
 #
-# NOTE the human gate is NOT automated here on purpose: track-coach never pushes without
-# the owner's explicit OK. A hook can't verify a conversation — the rule lives in
-# .live-spec/profile.md and NEXT_STEPS; this hook guards the MACHINE-checkable part.
+# NOTE the human push gate was REMOVED 2026-07-15 on the owner's explicit word ("убрать совсем"):
+# track-coach now pushes autonomously the moment this gate is green — no explicit OK, no waiting.
+# A green suite is the authorization. This hook IS the gate now; there is no conversation to verify.
+# The one standing caveat (owner's word, global): a push must never regress a good README — re-shoot a
+# screenshot only when the widget output changed, and keep it at least as good. See .live-spec/profile.md.
 
 set -uo pipefail
 
@@ -112,9 +114,22 @@ else
 fi
 
 echo ""
+echo "-- gate g (warning): no derivable work parked for a greenlight --"
+# NEXT_STEPS is a gitignored working doc, so this is a discipline WARNING, not a block:
+# it surfaces any code-vs-spec defect still sitting behind a "wait for his greenlight"
+# marker (INV-152 / host profile override 6 — a defect is derivable, the agent's own).
+if python3 guardrails/check_deferral_marker.py >/tmp/tc_gate_g.out 2>&1; then
+  echo "   OK: no wrongly-parked work in NEXT_STEPS."
+else
+  echo "   WARNING: NEXT_STEPS parks derivable work for a greenlight — unpark and do it:"
+  sed -n '4,40p' /tmp/tc_gate_g.out
+fi
+
+echo ""
 if [ "$fail" -ne 0 ]; then
   echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, the owner's word only.)"
   exit 1
 fi
-echo "All blocking gates green — push allowed. (The HUMAN gate still applies: the owner's OK.)"
+echo "All blocking gates green — push allowed. No human gate: the push gate was removed"
+echo "2026-07-15 on the owner's word — a green suite is the authorization."
 exit 0
