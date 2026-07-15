@@ -20,13 +20,13 @@ Every chart is wired to the audio: click a moment on any curve and the track pla
 
 ### Keep every version
 
-Every run is kept under its own version and date. The library lists everything you've analysed — one row per track, on its newest version, with its spectral signature, vitals, and mood / style tags, sortable and searchable — and each track holds its full history on its own page, so today's bounce opens right next to last month's and you can see what moved.
+Every run is kept under its own version and date. The library lists everything you've analysed — one row per track, on its newest version, with its spectral signature, vitals, and mood / style tags, sortable and searchable — and each track holds its full history on its own page, so today's bounce opens right next to last month's and you can see what moved. The library keys a track on its filename, so one song saved under two names (a rename, a differently-named bounce) shows up as two rows. You can tell it they are one song: `library.py alias --merge <this-name> --into <keep-this-name>` folds them into one row, and both sets of bounces stay listed as versions. `alias --list` shows your merges; `alias --remove <name>` undoes one. Nothing merges on its own; only you know two filenames are the same track.
 
 ![The library: one row per track in a sortable table](docs/catalog.png)
 
 ### Place it among your music
 
-A full run sets the track in context, in one panel: *You vs your closest match*. It names the reference directions the track leans toward — artists you've analysed, up to three tabs — and reads the one you pick facet by facet. It also finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Closeness shows as colour and bars; the read stays observation, the call stays yours. And the library links straight into it: click a direction name in the catalog and the track's page opens right on that comparison. When there's nothing close to show — no direction near, or a run with no comparison data — the panel doesn't vanish: it stays in its place as a quiet one-liner saying exactly that.
+A full run sets the track in context, in one panel: *You vs your closest match*. It names the reference directions the track leans toward — artists you've analysed, up to three tabs — and reads the one you pick facet by facet. It also finds the nearest siblings in your own library, so you can see which of your tracks this one sits closest to: handy for a set, a transition, or an honest A/B. Every listed neighbour — in the catalog's "similar in your library" column and in the reference "leans toward" column — carries a small three-dot mark beside its colour: ●●● close, ●●○ medium, ●○○ far. The mark reads the same in greyscale, in print, and to colour-blind eyes. The read stays observation; the call stays yours. And the library links straight into it: click a direction name in the catalog and the track's page opens right on that comparison. When there's nothing close to show — no direction near, or a run with no comparison data — the panel doesn't vanish: it stays in its place as a quiet one-liner saying exactly that.
 
 ![The reference read: pick a direction, see the facet-by-facet bars](docs/similarity.png)
 
@@ -76,7 +76,7 @@ The player and the reference read above are two panels on one page. The rest:
 
 **Stem ↔ project map.** Each separated stem is matched to the real project tracks by envelope similarity; confident matches are named, quiet ones labelled by their frequency range.
 
-**Recommendations.** A short ranked list, most important first — each card carries the measurement behind it and one concrete move. Clicking a card takes you to the panel its evidence lives in — the tonal bars, the master's numbers, the drum timing, the automation envelopes — and timecoded cards also seek the player to their moment. It works both ways: on the story graph, clicking a lettered moment lights the card that talks about it.
+**Recommendations.** A short ranked list, most important first — each card carries the measurement behind it and one concrete move. In Detailed, an Order control flips the cards between By urgency (fix-first) and By time (the order the moments happen, matching the a/b/c letters on the timeline); your choice is remembered. Clicking a card takes you to the panel its evidence lives in — the tonal bars, the master's numbers, the drum timing, the automation envelopes — and timecoded cards also seek the player to their moment. It works both ways: on the story graph, clicking a lettered moment lights the card that talks about it.
 
 **Producer's read.** A plain-language account of how the track develops: which dimensions trend (louder, brighter, busier, wider) and which sit idle.
 
@@ -87,6 +87,8 @@ Content panels collapse; the Evidence drawer (arrangement, stem map, rhythm, not
 | **Quick read** | Vitals, structure bar + power curve, single-track mix player, producer's read, top recommendations. Fast — no stem separation. |
 | **Simple** (default, full analysis) | Everything in Quick, plus the synced multi-stem player. The Evidence drawer sits closed. |
 | **Detailed** | Adds the player lanes, the modulation and stereo-width curves, and the full recommendation list. Mute / solo live here. |
+
+**When an analysis could not finish.** If a run fails or is still going, the track's page says so plainly, with a plain next step. It shows a short "Got this far" list — which steps finished, which were never reached — and the actual error underneath. It names the source file, filename and full path, with a Copy button, so you can paste the path straight into Finder or a terminal. A finished track's page is unchanged.
 
 ---
 
