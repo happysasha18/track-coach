@@ -38,8 +38,6 @@ from it (`spec → prove → matrix → test → code`). Still-open decisions ar
 track-coach's whole value is **trust**: a true, specific reading you can act on — the arc, the masking,
 the arrangement, in plain words.
 
-The reason §A–§B exist: early on it "produced plausible-sounding WORDS, but the moment you dig in, it fell
-apart". So before any coaching features, the numbers behind the words had to be made defensible.
 That is the credibility layer, and it is the first thing this spec pins down.
 
 ## A. The building blocks (what track-coach reasons about)
@@ -51,10 +49,11 @@ The nouns the rest of the spec talks about. Each is a real measured thing with a
 - **stem** — one Demucs-separated layer of the track. It carries two states: whether it's **significant**
   (worth reading at all) and its **mapped identity** (which real project part it is).
   - **What "significant" means**: a stem matters only if it has enough information in BOTH
-    loudness AND time. Quiet the whole way, or one loud blip in silence, does NOT count. The real gate is
-    **temporal coverage** — how much of the track the stem is actually above a loudness floor — not a
-    single peak. (So a stem at median −76 dB with one −16 dB stab is not significant; a quiet stem with
-    steady hits across the track is.) States: `significant` / `insignificant (quiet/empty)` / `unknown (not
+    loudness AND time. Quiet the whole way, or one loud blip in silence, does NOT count. The **intended**
+    gate is **temporal coverage** — how much of the track the stem is actually above a loudness floor, not a
+    single peak — but the **shipped** gate is loudness-only (see Known debt below); the temporal-coverage
+    half is not built yet. (Intended: a stem at median −76 dB with one −16 dB stab is not significant; a
+    quiet stem with steady hits across the track is.) States: `significant` / `insignificant (quiet/empty)` / `unknown (not
     measured)` — the third for a run that lacks the gate's inputs (quick mode, a partial stem), which must NOT
     be dropped as empty (§E / RC-INV-11).
     - _Known debt (a deliberate call — leave the code, record the gap):_ the shipped gate is loudness-only —
@@ -88,62 +87,47 @@ bold headline of each to get the shape, drop into the detail when you need the e
 for a claim is too weak to be real, the claim is **left out with a one-line note**, not dressed up as a
 finding. "Don't cry wolf, and don't paint silence."
 
-**What that forces (each first found by deed on a real track — Lazy_Sparks):**
+**What that forces:**
 
 - **CR-2 — empty stems are not PARSED, but stay VISIBLE and IDENTIFIED.** A stem below the floor is dropped
   from *analysis* — no notes / rhythm / masking / per-stem viz (nothing honest to read in silence), and it is
   never placed in the rhythm tiles (no pulse in silence). But it is NOT erased: it stays as a **muted, labelled
   row in the player lanes** and is **named in the omitted note** (`"stems Bass Sub, low-mid omitted — too
   little material to read"`), each via its identifying near-silent label (`INV-STEMNAME-NEARSILENT-ID`), never a
-  bare count and never an anonymous "near-silent, near-silent" (that was the s45 regression — the fix that
-  excluded them from the lanes/tiles erased which stem they were; the producer needs them SEEN, identified).
+  bare count and never an anonymous "near-silent, near-silent" (the producer needs them SEEN, identified).
   The acknowledgment itself must RENDER — a missing lane reads as a decision, not a bug. `INV-42`
-  Evidence: Lazy_Sparks vocals −92 dB (peak −61), piano −88 dB (peak −42). ⟨DECIDE⟩ floor value →
-  **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)** — reused the existing empty-caveat floor, no
-  dedicated peak floor. **INV-45 (APPROVED 2026-07-03): a near-silent stem's lane starts MUTED
-  on first load** (`build_widget.py:3868`, `if(startMuted)a.muted=true`). This avoids surprise silence
-  when the producer hits play (a muted lane carries no real content). The mute is cosmetic-initial only:
+  ⟨DECIDE⟩ floor value →
+  **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)**. **INV-45: a near-silent stem's lane starts MUTED
+  on first load** (`build_widget.py:3868`, `if(startMuted)a.muted=true`). The mute is cosmetic-initial only:
   the M/S buttons still work, and the lane is visible and identified as usual (CR-2 visibility unaffected).
 
 - **CR-3 — per-stem visuals are gated on ABSOLUTE level, not per-stem normalization.** A silent stem
-  must render as empty, never full-colour. Evidence: vocals sits at −92 dB yet its loudest band
-  normalizes to full colour → looks like content. ⟨DECIDE⟩ the dB at which a band reads as "present" →
+  must render as empty, never full-colour. ⟨DECIDE⟩ the dB at which a band reads as "present" →
   **SETTLED §B.2: −60 dB absolute (`STEM_COLOUR_FLOOR_DB`)**, not per-stem max.
 
 - **CR-4 — bled energy is not attributed to the wrong stem.** Where a stem's band energy is dominated by
-  measured leakage from another stem, it is caveated or not shown as that stem's content. Evidence:
-  guitar low −40 dB > its own mid −46 dB; bass low is −26 dB (~14 dB louder) and bass↔guitar leakage =
-  0.24 → the guitar's "low/red" is bass bleed. ⟨DECIDE⟩ suppress vs caveat → **SETTLED §B.3 (G9): caveat,
+  measured leakage from another stem, it is caveated or not shown as that stem's content. ⟨DECIDE⟩ suppress vs caveat → **SETTLED §B.3 (G9): caveat,
   not suppress** — `leakage_caveats()` flags the loudest band when a carrier owns it ≥ `LEAK_LOUDER_DB`(10)
   louder AND r ≥ `LEAK_CORR_MIN`(0.2); windowed time-refinement (CR-4a) deferred.
 
 - **CR-5 — scene names are MUSICAL (read from curve DYNAMICS), not relative-loudness.**
-  **Definition (pinned 2026-06-20 — standard EDM term, written down for precision):** a **Drop** is the
+  **Definition:** a **Drop** is the
   high-energy RELEASE that enters right after a build/breakdown — energy goes UP ("the bass drops IN",
   not down). The dip/tension before it (the "dip before the lift") is the **Build/Breakdown**. So a
   Drop is **defined by the contrast**: a lower section immediately precedes a top-band section. Without a
   preceding dip/build it is not a Drop — just a loud section.
-  Today's bug: `build_widget.py:769` calls any section ≥0.8 of peak a Drop (`tier = ti / mx`, relative),
-  ignoring the required preceding dip → a continuously-loud track reads as "all drops." The signal
+  The signal
   lives in the **shape** of the curve (fall/build → sharp return + family entrance + density jump), read
-  **in aggregate**. The original ambition was for the interpretation layer (an LLM reading the real curves)
-  to make the call rather than a single hard threshold; **what SHIPPED (§B.2, G5/G6) is a hand-coded
-  NECESSARY condition** — a Drop requires a strictly-lower predecessor (`LIFT`=0.12 tier) — validated by the
-  necessary-condition tests in `tests/test_credibility.py` (G5/G6), NOT a phantom "§D". The LLM-reads-the-curve
-  version stays a possible future direction; for now the threshold IS the design. Prefer labelling the
-  **pair** "Build/Breakdown → Drop" as a unit rather than scattering "Drop". Numbering must be gap-free
-  (today names are set before `_coalesce_scenes` merges → "Drop, Drop 3, Drop 5"). ⟨DECIDE⟩ the Δ and the
+  **in aggregate**. The shipped rule (§B.2, G5/G6) is a hand-coded
+  NECESSARY condition: a Drop requires a strictly-lower predecessor (`LIFT`=0.12 tier), validated by the
+  necessary-condition tests in `tests/test_credibility.py` (G5/G6). Prefer labelling the
+  **pair** "Build/Breakdown → Drop" as a unit rather than scattering "Drop". Numbering must be gap-free. ⟨DECIDE⟩ the Δ and the
   name for sustained-high non-lift sections ("Main"/"Peak"/letter only)?
-  **Dig on Lazy_Sparks (by deed, 2026-06-20) — two more findings:**
-  - **CR-5a: structure SOURCE is wrong.** The story bar uses `core.section_bounds_s` (agglomerative, ≤8)
-    and flattened 170–337 s into ONE "Drop 3" (167 s), swallowing what self-similarity correctly sees as
-    `C E C E C` (the main section C returns 4×, two E breakdowns between) — so it "didn't find
-    everything." Accurate structure source = the **self-sim segmentation** (`result_selfsim.json`, 11
-    segments: `A B C D C E C E C F A`), not the coarse section_bounds. Build scenes from self-sim.
-  - **CR-5b: energy alone misses breakdowns.** An energy-dip→rise detector found ZERO transitions here —
-    the E "dips" are timbral/density shifts, not energy valleys (self-sim/MFCC catches them, energy
-    doesn't). Confirms the call must be **aggregate** (self-sim boundary + energy + density + family
-    entrance), per "read the data in aggregate".
+  - **CR-5a: structure SOURCE.** Accurate structure source = the **self-sim segmentation**
+    (`result_selfsim.json`), not the coarse `core.section_bounds_s`. Build scenes from self-sim.
+  - **CR-5b: energy alone misses breakdowns.** Some breakdowns are timbral/density shifts, not energy
+    valleys (self-sim/MFCC catches them, energy doesn't). So the call must be **aggregate** (self-sim
+    boundary + energy + density + family entrance).
 
 - **CR-6 — repetition is read on the significant stems too.** Self-similarity / returns are computed on
   the non-empty stems, not only the mix, so "this part returns" is grounded in real recurring material.
@@ -154,15 +138,13 @@ finding. "Don't cry wolf, and don't paint silence."
   flagged for design, not a hard promise yet.
 
 ### B.1 Phase-2 resolutions
-- **CR-1a (from P2):** mix-level claims (energy/brightness/density/vitals/arc) are INDEPENDENT of stem
+- **CR-1a:** mix-level claims (energy/brightness/density/vitals/arc) are INDEPENDENT of stem
   significance — an all-insignificant-stems run still gives the full arc; only the stem layer is omitted.
-- **CR-2a (from P1) — DEFERRED (2026-06-23): the shipped gate is whole-track.** The intent: significance
-  is **per-scene**, not whole-track — a stem that carries only the drop is significant THERE; "omit + don't
-  parse" would apply only to a stem insignificant in EVERY scene. NOT implemented — `significant_stems` is
-  whole-track + level-only (§A KNOWN DEBT). Nothing downstream depends on the per-scene refinement yet.
-- **CR-4a (from P3):** leakage honesty is windowed (bleed varies over time) — caveat rather than globally
+- **CR-2a — the shipped significance gate is whole-track + level-only** (`significant_stems`, §A KNOWN
+  DEBT); the per-scene refinement is deferred and nothing downstream depends on it yet.
+- **CR-4a:** leakage honesty is windowed (bleed varies over time) — caveat rather than globally
   suppress.
-- **CR-5c (from P4/P5):** using the self-sim segmentation requires it be stable (enough distinct
+- **CR-5c:** using the self-sim segmentation requires it be stable (enough distinct
   material across `k`); fall back to a coarser bar otherwise. A RETURN to a prior high level after a dip
   (…C E C…) IS a drop — don't require a new global peak.
 Open ⟨DECIDE⟩ thresholds remain tuning, to settle on fixtures.
@@ -174,9 +156,8 @@ RESOLVED in code (guard in parens): **CR-2/CR-7** insignificant stems dropped + 
 max (G3); **CR-5a** scenes follow self-sim when stable (≥3 segs, ≥2 labels; G4); **CR-5** Drop requires a
 strictly-lower predecessor (`LIFT`=**0.12** tier), sustained-high = **"Main"**, numbered after coalesce
 (G5/G6). ⟨DECIDE⟩ now settled: empty floor −55, colour floor −60, LIFT 0.12, sustained-high name = "Main".
-Derived correction to the prover's G5: a strict "⅓ Drop cap" is **too strict** (an honest alternating
-build→drop track is ~½ Drops); the real necessary condition is **≤ ½** (every Drop needs a non-Drop dip
-before it) — encoded that + a positive "real drops still detected" test instead.
+The necessary condition is **≤ ½** Drops — every Drop needs a non-Drop dip
+before it (a positive "real drops still detected" test guards the other direction).
 STILL OPEN (not in the G1–G7 layer-1 set): **CR-4** leakage honesty (windowed caveat), **CR-6** the actual
 per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-7** Ableton↔stem.
 
@@ -187,15 +168,14 @@ per-stem self-sim computation (the gate exists; the analysis doesn't yet), **CR-
   Layer-1 uses per-band MEDIANS, not windows — CR-4a's time-windowing is a later refinement.
 - **CR-7 (G10) DONE (as a lock):** the map panel already states a project family only on a `clear` verdict
   (only `map_clear` carries `{fam}`); G10 prevents a non-clear verdict from ever naming one. No new UI.
-- **CR-6 (G11) COMPUTED, then SURFACED (G20, 0.8.18).** `stem_repetition()` reads each significant stem's
+- **CR-6 (G11) — computed and surfaced (G20).** `stem_repetition()` reads each significant stem's
   own self-sim (recurrence 0..1), gated by `significant_stems()`; the pipeline writes `result_selfsim_<stem>.json`
   for significant stems and build_widget auto-discovers them. **Surfacing (G20):** one "Development · what
   carries it vs what loops" card contrasts the part that EVOLVES (recurrence ≤ `EVOLVE_MAX_RECURRENCE`=0.25,
   carrying the development) with the ones that LOOP (≥ `LOOP_MIN_RECURRENCE`=0.45). Honest-naming rules: parts
   named by their character label, never the raw Demucs name (a stem with no label is skipped); shared labels
   are DEDUPED ("the mid, the mid" → "the mid", the §B.7 salad). Fires only on a real spread (someone clearly
-  evolves AND someone clearly loops) and only when characters exist. Verified by deed on Lazy_Sparks: *"The
-  bass keeps changing (recurrence 0.14) — carrying the development — while the mid and the drums mostly loop."*
+  evolves AND someone clearly loops) and only when characters exist.
   Tests: `G20_RepetitionSurfacing` (7). ⟨DECIDE⟩ the two thresholds (tune as tracks land).
 
 ### B.4 Stem CHARACTER labels   [G12–G13]
@@ -212,14 +192,14 @@ read reliably (the low-end exception, §B.7)** — and the label must be DETERMI
 renaming) and gated to `significant_stems()`. Same credibility family as CR-1: a label is a claim, so it
 must be backed by a measurement, marked `approx` (shown `≈`) when the measurement is indicative not certain.
 
-- **G12 (0.8.3) — the two coarse axes.** freq-role (which third of the spectrum carries the energy,
+- **G12 — the two coarse axes.** freq-role (which third of the spectrum carries the energy,
   EXCLUDING CR-4-bled bands) × percussive-vs-sustained (`onset_rate ≥ ONSET_PERCUSSIVE`). Gives:
   low·perc=`kick`, low·sus=`bass` (both `clear` — the low end reads reliably), mid·perc=
   `perc`, high·perc=`hats`, high·sus=`air`. mid·sustained was the honest umbrella **`tonal`** (`approx`) —
   it DELIBERATELY did not claim melody-vs-pad, because freq+onset can't split those.
 
-- **G13 (0.8.6, THIS pass) — split the `tonal` umbrella into 5 measured buckets** (a design call,
-  2026-06-21: the producer wants to tell a chord from a melody, and it IS measurable — polyphony). Only the mid·sustained
+- **G13 — split the `tonal` umbrella into 5 measured buckets** (the producer wants to tell a chord
+  from a melody, and it IS measurable — polyphony). Only the mid·sustained
   (old `tonal`) case is refined; every other G12 label is unchanged. Two new MEASURES per significant stem:
   1. **polyphony** — run `basic-pitch` (`transcribe.py`) on each significant non-drum stem →
      `result_notes_<stem>.json`; `poly_frac` = fraction of the stem's SOUNDING time during which ≥2 notes
@@ -235,8 +215,7 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     it stays `approx` and the JOURNAL flags it for tuning._
   - else POLY: envelope CONTINUITY (`masking.sustain`) ≥ `PAD_SUSTAIN_MIN` → **`pad`** (a held drone),
     else → **`chord`** (rhythmic stabs). `sustain` = sounding-frames ÷ frames-in-active-span (a drone-pad
-    reads ~0.88, a chord/arp ~0.49 on real stems). Was mean note duration — that NEVER fired because
-    basic-pitch fragments held synths into ~0.2 s notes; the envelope holds up where note length didn't.
+    reads ~0.88, a chord/arp ~0.49 on real stems).
   - **fallback:** a mid·sustained stem with NO transcribed notes (basic-pitch found nothing, or transcribe
     was skipped) keeps the honest **`tonal`** umbrella INTERNALLY — we never invent a melody/chord verdict
     from missing data (CR-1). **It is DISPLAYED as the base role `mid`, never the word `tonal`** (§B.7 INV).
@@ -245,41 +224,27 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     weak approach. Every bucket is a deterministic threshold on a measured quantity.
   - ⟨DECIDE⟩ thresholds (tune as more tracks land): `POLY_FRAC_MONO_MAX`=0.20, `PAD_SUSTAIN_MIN`=0.7.
     `lead` = the single loudest mono line (exclusive; no margin).
-  - **VERIFY-BY-DEED (2026-06-21, real Fragile stems) — status of the 5 buckets:**
-    - `melody`/`lead`/`chord` (polyphony + exclusive-loudest lead): WORKING. Fragile → vocals `melody`,
-      guitar `lead`, other `chord`. (Earlier dual-lead from a loudness margin was fixed → single lead.)
-    - `pad`: now via envelope `sustain` (≥0.7), NOT note length. Mechanism validated on real values
-      (drone-pad piano 0.88 vs chord/arp other 0.49); fires only on a genuinely held poly stem — on
-      Fragile nothing significant sustains that high, so pad correctly doesn't appear. Pad CASE still
-      wants a track with a significant held pad to confirm by deed (calibration backlog).
-    - `noise`: STILL DEFERRED. Real energy-weighted flatness on harmonic stems is 0.000–0.003, so
-      `FLATNESS_NOISE_MIN`=0.30 never fires; can't enable a noise label without a track that has a real
-      noise/riser stem to verify against. Kept inert (never a wrong label) until such a test track exists.
+  - **Status of the buckets.** `melody`/`lead`/`chord` and `pad` (via envelope `sustain` ≥0.7) are working.
+    `noise` is inert: `FLATNESS_NOISE_MIN`=0.30 never fires on harmonic stems, so it is kept inert (never a
+    wrong label) until a track with a real noise/riser stem exists to verify it.
 
-- **G14 (0.8.6, THIS pass) — robust freq-ROLE via a HIGH-PASS drop (2026-06-21).** G12 typed
-  the role from the loudest band-group, which broke on real intermittent stems two different ways (found by
-  deed): typing by per-band **median** makes a bass that only hits some beats read as ~silence in every band
-  (its role becomes noise → it got mislabeled mid/"melody"); typing by **loud-level** (85th pct) instead
-  picks up a guitar's loud kick-BLEED in the low and mislabels the guitar "bass" (the exact CR-4 failure).
-  The fix sidesteps the bleed argument entirely: **high-pass the stem (ignore `sub`+`low`) and ask how
-  much energy it LOSES.** A genuine low/bass stem loses almost everything; a mid stem with bled low keeps
-  its real mid content.
+- **G14 — robust freq-ROLE via a HIGH-PASS drop.** Sidestep the CR-4 bleed argument entirely:
+  **high-pass the stem (ignore `sub`+`low`) and ask how much energy it LOSES.** A genuine low/bass stem
+  loses almost everything; a mid stem with bled low keeps its real mid content.
   - measure (no extra audio pass — reuse the per-band loud-levels): `hp_drop` = full loud-level −
     high-passed loud-level (combining `low_mid`+`mid`+`hi_mid`+`air`).
   - rule: a SUSTAINED stem with `hp_drop ≥ HP_DROP_DB` → **`bass`** (low carrier); otherwise it's a mid/high
     part (→ G13 split, or `air` if its surviving energy sits in `hi_mid`+`air`). Percussive stems keep the
     G12 onset path (kick/perc/hats).
-  - Use the **relative drop, NOT an absolute residue floor** — verify-by-deed track 2: a loud bass dropped
-    27 dB yet its residue (−42.6) was still above the −55 empty-floor, so a floor rule would have missed it.
-    The drop self-normalizes: bass dropped 22–27 dB on both tracks; every non-bass stem 0–8 dB.
+  - Use the **relative drop, NOT an absolute residue floor** — the drop self-normalizes across tracks (a
+    loud bass can drop well below the −55 empty-floor yet still read as bass).
   - **Leaves CR-4 `leakage_caveats` UNTOUCHED** — role no longer depends on it (it stays only for the
-    separation-panel UI). ⟨DECIDE⟩ default `HP_DROP_DB`=15 (clean gap between 8 and 22 on the two tracks).
+    separation-panel UI). ⟨DECIDE⟩ default `HP_DROP_DB`=15.
 
-- **G15 (0.8.7) — percussive-vs-tonal by CONTENT, not onset alone (found by deed on track 2).** G12 set
+- **G15 — percussive-vs-tonal by CONTENT, not onset alone.** G12 set
   `percussive = onset_rate ≥ ONSET_PERCUSSIVE`(3.0) and a percussive stem short-circuits to kick/perc/hats
-  BEFORE the G13 tonal split runs. On *Simon Fava — Ta Bueno Ya* this mislabeled two clearly PITCHED mid
-  stems as `perc`: `other` (onset 3.18, polyphony 0.49, sustain 0.73 — a real pad/chord layer) and
-  `vocals` (onset 3.72, monophonic — a vocal line), both just over the 3.0 gate. Same family as G14: judge
+  BEFORE the G13 tonal split runs, which mislabels a clearly PITCHED mid stem just over the gate as `perc`.
+  Same family as G14: judge
   by CONTENT. A stem with real pitched content — basic-pitch transcribed notes, so `polyphony()` returns
   a value — is TONAL even when rhythmic; `perc` is reserved for transient stems with NO pitched content.
   - rule: `percussive = (onset_rate ≥ ONSET_PERCUSSIVE) AND NOT pitched`, where `pitched` = the stem has
@@ -287,18 +252,12 @@ must be backed by a measurement, marked `approx` (shown `≈`) when the measurem
     rhythmic synth → routes to the G13 split (melody/lead/chord/pad) instead of `perc`.
   - **Safe fallback:** with no per-stem notes (a render without transcription) `pitched` is false → the
     old onset-only behaviour, so nothing regresses when notes are absent.
-  - Verify-by-deed (Simon Fava): `other` → `pad` (was `perc`), `vocals` → `melody` (was `perc`); drums
-    still `kick`, bass still `bass`.
 
 ### B.5 Individual recommendations — name the PART, not a template   [G16]
-A standing complaint (2026-06-20, looking at the Lazy_Sparks render): recommendations "feel samey
-because `build_recommendations` is a FIXED template catalog fired by thresholds — same handful repeats
-track-to-track." The bet: now that we measure each stem, a rec can name the SPECIFIC part, band, and time
-instead of a generic line. First target = the masking/frequency-clash rec, which already has the data per
-conflict (`masking_flags`: which low stem buries which mid stem, in which band, at which times, by how much).
-- **Before:** one generic card — `bass covers "{mid}" in {pct}% of spots` — using the RAW Demucs stem name
-  (`guitar`, `vocals`), which is wrong for electronic music.
-- **After (G16):** one card PER masked significant stem, naming both parts by their measured G13/G14
+A rec names the SPECIFIC part, band, and time rather than a generic templated line. First target = the
+masking/frequency-clash rec, which already has the data per conflict (`masking_flags`: which low stem
+buries which mid stem, in which band, at which times, by how much).
+- **Rule (G16):** one card PER masked significant stem, naming both parts by their measured G13/G14
   CHARACTER label (the hard requirement [[track-coach-stem-labels]]: real terms, never raw Demucs names):
   e.g. *"the bass buries the lead around 250–600 Hz ~18% of the track, worst around 1:18"*. Carries the
   band's frequency range, the `pct_masked`, and the worst flag's time (pinned on the timeline).
@@ -306,15 +265,12 @@ conflict (`masking_flags`: which low stem buries which mid stem, in which band, 
   the masking low stem named by its character label (`bass`→"bass", `drums`→"drums" since §B.7 — was "kick").
   Falls back to the old generic card when stem characters aren't available (no masking/rhythm).
 - **EVALUATION (the success metric):** specificity up = fewer generic-type cards, more named-stem/time cards.
-  Deed on Fragile: the one generic masking card → two named cards ("bass buries the lead 18%", "…the
-  melody 15%"), piano (empty) dropped.
 
 ### B.6 The `late_entry` rec — name the part, never the raw Demucs name   [G17]
-Continuing #2 ("wire per-stem character into MORE recs beyond masking"): the `late_entry` rec — fired
-when a stem is silent for almost the whole track and only appears near the end — was the last LIVE rec
-still printing the **raw Demucs stem name** (`Stem "{st}" is silent… bring "{st}" in earlier`). That
+The `late_entry` rec — fired when a stem is silent for almost the whole track and only appears near the
+end — must not print the **raw Demucs stem name** (`Stem "{st}" is silent… bring "{st}" in earlier`), which
 violates the hard requirement [[track-coach-stem-labels]] (the target user makes electronic music — a `vocals`
-stem is a synth, etc.) exactly as the masking card did before G16.
+stem is a synth, etc.).
 - **Wrinkle:** `late_entry` is BY DEFINITION about a near-silent stem, and `stem_character` only labels
   SIGNIFICANT stems — so the G16 character label is usually ABSENT here. We can't lean on it alone.
 - **Honest naming hierarchy (most → least specific, never the raw name):**
@@ -327,25 +283,16 @@ stem is a synth, etc.) exactly as the masking card did before G16.
   *"A part (lead) is silent for almost the whole track and only appears at 3:40…"* / *"A new element
   enters right at the end…"* when unidentifiable. INV: a `late_entry` rec's text never contains a raw
   Demucs family name unless that name is also the real mapped track name.
-- **The real cleanup wasn't the name — it was DON'T CRY WOLF (0.8.10, found by deed on Lazy_Sparks when
-  questioning what the pre-existing card was for).** late_entry was firing on the `vocals`
-  stem whose late spike only reached **−61 dB** (peak), median −81, stemmap verdict `empty` — i.e. a
-  near-silent SEPARATION ARTIFACT at the very end, not a musical event. Renaming it honestly is cosmetic;
-  the card shouldn't fire at all. So late_entry is now GATED: it fires only when the entering peak clears
-  the real-content floor `arr[peak] ≥ STEM_EMPTY_FLOOR_DB` (−55 dB). This is CR-1 "don't paint silence"
-  applied to recs (same floor `significant_stems` uses), and it's peak-based (not `loud_level`/`empties`)
-  on purpose: a GENUINE late accent is silent most of the track so its 85th-pct is low — only its PEAK
-  proves it's real content. On Lazy_Sparks this card now correctly DISAPPEARS. INV: late_entry never
-  fires on a stem whose entering peak is below the empty floor.
+- **Don't cry wolf — the card is gated, not just renamed.** late_entry is GATED: it fires only when the
+  entering peak clears the real-content floor `arr[peak] ≥ STEM_EMPTY_FLOOR_DB` (−55 dB). This is CR-1
+  "don't paint silence" applied to recs (same floor `significant_stems` uses), and it's peak-based (not
+  `loud_level`/`empties`) on purpose: a GENUINE late accent is silent most of the track so its 85th-pct is
+  low — only its PEAK proves it's real content. INV: late_entry never fires on a stem whose entering peak
+  is below the empty floor.
 
 ### B.7 ONE plain label per stem — kill the label salad
-On the real Lazy_Sparks render, the stem area had THREE overlapping,
-half-confident systems stacked on each stem — (1) measured `character` with a `≈` "uncertain" prefix,
-(2) the stem↔project map verdict (which ALSO used `≈`, meaning the OPPOSITE — "matches a family"), and
-(3) per-stem repetition letters. Worse, the headline character often degraded: on Lazy_Sparks the **bass
-stem read `≈ tonal`** (G14's high-pass drop didn't trip on a synth bass with mid harmonics), the whole
-`drums` stem read `kick`, and empty stems STILL leaked the **raw Demucs name** (`vocals`) into the lane
-label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE plain label per stem:
+Collapse to ONE plain label per stem — no stacked half-confident systems, no `≈` markers, no raw Demucs
+name leaking into the lane:
 - **Trust the stem for the reliable low-end families.** Demucs separates bass & drums cleanly and the low
   end reads reliably, so a `bass` stem is **"bass"** (we do NOT run it through the G14
   high-pass that demoted it) and a `drums` stem is **"drums"** (not "kick" — kick is a drum-breakdown
@@ -356,17 +303,13 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   "tonal", never a `≈`-uncertain marker (the rule: when uncertain, fall back to the base role).
 - **No raw Demucs name in the lane label, ever.** No character ⇒ "near-silent" (the stem is empty),
   never `L.name`.
-- **Sub-line = the REAL project track, never the raw Demucs name (0.8.12/0.8.13, updated from the 0.8.11
-  text above).** The tiny line under each lane now shows the real project track name when the stemmap
-  verdict is `clear` (e.g. guitar→"Guitar"), "near-silent" for empty stems, and NOTHING otherwise — the
-  raw Demucs name and the `→ family` marker are both GONE (0.8.11's "guitar · → other" salad is removed).
-  The sub-line is also suppressed when it would merely repeat the main label (0.8.13 — no double
-  "near-silent").
+- **Sub-line = the REAL project track, never the raw Demucs name.** The tiny line under each lane shows the
+  real project track name when the stemmap verdict is `clear` (e.g. guitar→"Guitar"), "near-silent" for
+  empty stems, and NOTHING otherwise — the raw Demucs name and the `→ family` marker are both GONE. The
+  sub-line is also suppressed when it would merely repeat the main label (no double "near-silent").
 - **Three surfaces name a stem differently ON PURPOSE** (cross-ref §B.6): the late_entry rec needs one
   best single guess (character → clear track-name → "a new element"); the lane shows the measured ROLE as
   the headline and the real track-name as supporting sub-text. Same data, different jobs.
-- Verified by deed (Lazy_Sparks 0.8.11–0.8.15): drums→"drums", bass→"bass", other→"lead", guitar→"mid",
-  vocals/piano→"near-silent"; guitar sub-line→"Guitar".
 - **INV (label set).** The displayed lane label is EXACTLY one of three FORMS (this is a pattern, not a fixed
   member list — the near-silent form is stated as a pattern per `INV-STEMNAME-NEARSILENT-ID` below, so a
   membership test asserts the FORM, not a frozen word set):
@@ -381,8 +324,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   **`kick` is NOT a lane label.** A `drums`-family stem renders as `drums` (§B.7 trusts the low families), and a
   low+percussive UNTRUSTED stem is itself the drums family — so no path emits a standalone `kick` lane. `kick`
   lives ONLY in the drum-hit breakdown (§B.11 — the kick/snare/hat sub-parts) and its stem colour there; it is
-  never a member of the lane-label set, so a membership test must not carry it. (F4, s54: closed the phantom
-  member the prover flagged.)
+  never a member of the lane-label set, so a membership test must not carry it.
   **Never** `tonal`, never a `≈` prefix, never a raw Demucs family name. **Internal buckets that DON'T appear
   verbatim:** `tonal` (G13 fallback) is displayed as the base role `mid`; `air` (G12/G14 high-sustained) is
   displayed as `high`; `noise` is inert (the flatness gate never fires — §B.4/G13 — so it is never emitted,
@@ -395,10 +337,7 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
   base role "mid"? Held because `clear` matches are noisy (drums→"7-Impulse"). NOTE: 0.8.12 already put the
   real name in the SUB-line, so if it's ever promoted to PRIMARY, drop the sub-line duplicate (else
   "Guitar / Guitar").
-- **INV-STEMNAME-ALL (0.9.22, s45 — Fable pre-1.0 blocker #1; the §B.7 rule now binds EVERY surface, not just
-  the lane).** The bug: the SAME stem showed DIFFERENT names across surfaces (arc bar "lead: other" · player
-  lane "melody" · rhythm tile "other" · notes "Demucs's 'other' stem"), and raw splitter/model/tool names
-  (`other`/`vocals`/`guitar`/`piano`, `Demucs`/`htdemucs`/`htdemucs_6s`, `basic-pitch`) leaked. Rule:
+- **INV-STEMNAME-ALL — the §B.7 rule binds EVERY surface, not just the lane.** Rule:
   - **ONE display name per stem, resolved ONCE at build.** `stem_display_name(stem)` has three branches: (1) the `stem_character` label when the stem is **significant**; (2) an **IDENTIFIED near-silent label** when the stem is **measured and found empty** — the mapped real project-track name if the stem maps to an `.als` track (via `stemmap`), ELSE a frequency-band descriptor (`low`/`low-mid`/`mid`/`high`, derived from the stem's dominant band) — always suffixed ` (near-silent)`; **NEVER a bare `near-silent`** (that erased which stem it was — the s45 regression), and **NEVER the raw Demucs family word** (`piano`/`vocals`) even for an empty stem (a standing rule: those labels lie for electronic music); (3) **`"not measured"`** when the stem's significance is **unknown or the character cannot be computed** (significance-gate inputs absent, quick-mode stem, partial run) — distinct from near-silent, per §A/RC-INV-11: a not-measured stem must never be read as measured-silent. **NEVER** the raw Demucs family name on any path. `INV-STEMNAME-NEARSILENT-ID` (= `INV-44`; s46): every near-silent stem carries an identifying word (track name or frequency band) + the `(near-silent)` qualifier — two near-silent stems can never collide into an anonymous "near-silent, near-silent". Two near-silent stems always carry distinct labels: when two same-band stems resolve to the same base word, the collision is broken by a trailing number suffix (`⟨word⟩ 1 (near-silent)`, `⟨word⟩ 2 (near-silent)`, …, with the space before the number as shown), assigned deterministically over the stems sorted in order, so the shipped code never emits the same near-silent label twice. The full `{raw_stem → display}` map ships in the payload as `stem_display`; every JS surface reads it through one `disp(stem)` helper; every Python surface uses the same resolver. Same stem ⇒ identical word on the arc bar, player lane, rhythm tiles, stem↔project panel, masking cards, notes title. `INV-STEMNAME-NOTMEASURED`
   - **No model/tool name in ANY user-facing string.** `Demucs`→"the separator/splitter", `htdemucs_6s`→"a
     6-stem model" (established 0.9.21), `basic-pitch`→"read from the audio". Applies to static STRINGS
@@ -433,9 +372,8 @@ label (G17 had only fixed the recs, not the panel). Decision — collapse to ONE
     `INV-ANALYSIS-RERENDER`
 
 ### B.8 Freq-role from the per-stem FREQUENCY ANALYZER (centroid)   [G18]
-The idea (s14): run the frequency analyzer on each stem too. We already run full spectral
-analysis on the MIX; per stem we only had 6 coarse bands + flatness. So `masking.py:stem_spectrum(y)` now
-computes, per stem (reusing the loaded audio, one extra STFT):
+`masking.py:stem_spectrum(y)` runs the frequency analyzer on each stem (the MIX already gets full spectral
+analysis; per stem there were only 6 coarse bands + flatness), reusing the loaded audio in one extra STFT:
 - **spectral centroid** (Hz) — energy-weighted "centre of gravity" of the spectrum = where the stem's
   energy sits (≈ perceived brightness). Power-weighted across frames (reflects "when it plays").
 - a **32-bin log-frequency spectrum** profile (dB, peak-normalised) — emitted as `spectrum`/`spectrum_freqs`
@@ -447,16 +385,12 @@ computes, per stem (reusing the loaded audio, one extra STFT):
   failure at the root (a 6-band high-pass drop was a poor proxy for "where the energy is"). The **G14
   high-pass drop is kept ONLY as the fallback** when the masking carries no centroid (pre-0.8.14 jsons),
   so nothing regresses. Trusted `bass`/`drums` (§B.7) still short-circuit before any role computation.
-- VERIFY-BY-DEED (Lazy_Sparks, regenerated masking): centroids bass 117 / drums 203 / piano 602 /
-  vocals 633 / other 942 / guitar 1008 Hz; resulting labels bass→bass, drums→drums, guitar→mid, other→
-  lead — identical to 0.8.11 but now centroid-derived, no regression. Unit tests: `G18_CentroidFreqRole`.
+- Unit tests: `G18_CentroidFreqRole`.
 - INV: when `spectral_centroid[st]` is present, a non-trusted sustained stem's role is a pure function of
   it (deterministic); `< LOW_CENTROID_HZ` ⇒ role `low` ⇒ label `bass`.
 - ⟨DECIDE⟩ thresholds: `LOW_CENTROID_HZ`=250, `HIGH_CENTROID_HZ`=3500 (tune as tracks land). **OPEN
   (F5):** should an UNTRUSTED low-centroid stem read `bass`, or a neutral `low` so "bass" stays
   identity-only? Currently it reads `bass` (honest about the frequency range it occupies).
-- IDEA (s14): split into MORE than 32 bins to drive concrete MIXING recs ("cut 3 dB at 380 Hz on
-  the bass") — **DONE: §B.9 (G19) named the spot; 0.8.20 bumped the grid 32→64 bins** (see §B.9 note).
 
 ### B.9 PRECISE masking frequency — name the cut spot, not the whole band   [G19]
 The §B.5 masking card said *"the bass buries the lead around **250–600 Hz**"* — the whole coarse band, the
@@ -472,20 +406,16 @@ already say WHERE inside the band the two parts fight, so the card can name a cu
   back. So the card never invents a spot the maskee isn't in.
 - **After (G19):** *"the bass is louder than the lead around **≈380 Hz** (in 250–600 Hz) ~18% … Notch the
   bass around ≈380 Hz."* Each conflict gets its OWN frequency. `fmt_hz`: nearest 10 Hz, kHz above 1 kHz.
-- VERIFY-BY-DEED (Lazy_Sparks, regenerated masking): distinct, in-band spots — bass↔other ≈270 Hz,
-  bass↔vocals ≈510 Hz, bass↔guitar ≈340 Hz, kick↔bass (sub) ≈60 Hz (was a flat "250–600 Hz" for all).
 - INV: the named frequency always lies inside the zone's band; an out-of-band overlap is never chosen; a
   silent/absent spectrum yields the band-range fallback. Unit tests: `G19_PreciseMaskingFreq` (7).
 - ⟨DECIDE⟩ `MASK_FREQ_MIN_LEVEL_DB` = −24 dB (tune as tracks land). OPEN: scale the SUGGESTED cut depth
   ("a couple dB") from the measured overlap — held; the depth stays advice-not-measurement for now.
-- **0.8.20 — grid bumped 32→64 bins (`masking.SPEC_NBINS`), the finer frequency analyzer.** At 32 bins (~3.3/octave)
-  two DIFFERENT low-mid clashes (bass↔other, bass↔guitar) both snapped to ≈270 Hz — too coarse to tell apart.
-  Experiment across 32/48/64/96 bins (verified by deed on Lazy_Sparks): at ≥48 they separate (other ≈290,
-  guitar ≈260) and stay STABLE through 96. Chose 64 (~6.6/oct): clear discrimination, stable, not so fine it
-  chases spectral spikes. Pure schema change (spectrum array 32→64 long); G19/centroid consume it unchanged.
+- **The grid is 64 bins (`masking.SPEC_NBINS`), the finer frequency analyzer** (~6.6/oct: fine enough to
+  discriminate neighbouring low-mid clashes, not so fine it chases spectral spikes). Pure schema change
+  (spectrum array is 64 long); G19/centroid consume it unchanged.
 
 ### B.10 "Where does it get boring?" — the development plateau   [G21]
-The idea (2026-06-22): for evolving tracks, show at what point it gets boring. For an
+For an
 EVOLVING track, mark the onset after which it stops introducing NEW material and only recombines sections
 already heard.
 - **Mechanism (`development_plateau(selfsim, dur)`, pure-python).** Read the self-sim segment letters in time
@@ -496,10 +426,6 @@ already heard.
   track. A track that keeps introducing new sections to the end → `None` (correctly NOT flagged); a track that
   never develops → `None`. NOT a value judgement: the card says "no new material from here", action left to
   the producer; anchored to the onset time on the timeline.
-- VERIFY-BY-DEED (3 library tracks): **Shared_Memories** plateaus — letters `A B C B C D C D C B`, last new
-  `D` at 2:53, tail 49% → *"After 2:53 nothing new is introduced — the last 49% recombines earlier sections."*
-  **Lazy_Sparks** (`A B C D C E C E C F A`, new `F` near the end) and **Wobble_Drift** (`A B C D E C`, new `E`
-  late) → `None`, both still developing. So the gate discriminates on real material.
 - INV: the onset always equals the end of a NEW-letter segment; `None` whenever distinct letters < 3 or the
   no-new tail < 30%. Tests: `G21_DevelopmentPlateau` (5).
 - ⟨DECIDE⟩ `MIN_DEV_SECTIONS`=3, `PLATEAU_MIN_FRAC`=0.30. **OPEN (refinement):** this catches only the
@@ -557,6 +483,8 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
     genuine contrast: bigger yet fewer hits) → **MERGE into ONE richer card** ("louder but sparser") so the
     contrast survives instead of being dropped. Either way each part yields at most one divergence card.
     Composite cards (a different KIND) are unaffected. Code: `collapse_correlated` before `select_cards`.
+    (Note: `build_cards` and its `S["cards"]` output are currently unreferenced DEAD CODE — the live card
+    path is `build_recommendations` → `select_cards`; `build_cards` should be dropped or revived.)
   - **"Show more" on demand (2026-06-22).** The default budget stays tight (only the high-score cards).
     A separate control / command lowers the score threshold to reveal the next tier of lower-rated candidates
     for a user who wants to dig — the strict default is what's shown first, the deeper set is opt-in (it never
@@ -618,8 +546,7 @@ classification, drum-hit breakdown, masking, role — already exist; this is the
   scoped to a single widget or run. `INV-26`
 
 #### B.11.1 Resolution — BRIGHTNESS is descriptive, not a prescriptive per-stem card
-When A1 (per-measure validity) reached brightness, the *premise* was rejected, not just the threshold:
-there is no basis for saying anything *should* be brighter than anything else, and no way to tell whether
+There is no basis for saying anything *should* be brighter than anything else, and no way to tell whether
 it's a mistake — the drums might be meant to burst in, or a synth; better to push this to some
 visualization later. The point:
 a part being **brighter/darker than the rest is not a defect** — brightness divergence carries no intent, the
@@ -629,8 +556,7 @@ justify** (the credibility invariant: don't present a guess as a finding). Resol
 1. **Brightness is REMOVED from the prescriptive per-stem divergence measures.** `PER_STEM_MEASURES` =
    `("energy", "density")` only. Energy/density divergence stay because they read against the *arc* (a part
    fighting the energy build, dropping out as everything lifts) — closer to an actionable observation; brightness
-   does not. (This SUPERSEDES the earlier plan A1, which treated brightness as a card needing only a validity
-   gate.) The F5 validity discipline still governs any FUTURE measure added in E2 (stereo on a mono stem, etc.).
+   does not. The F5 validity discipline still governs any FUTURE measure added in E2 (stereo on a mono stem, etc.).
 2. **Relative brightness, if surfaced at all, is DESCRIPTIVE — one balance reading, or (preferred) a future
    VIZ, never a per-part nudge.** Backlog: a single "relative brightness balance across the parts" card (no
    judgement) OR a small per-stem brightness visualization. Deferred — leaning toward a visualization later.
@@ -645,12 +571,12 @@ The Producer's read is authored prose — *"here's what I hear, and my thoughts 
 **OBSERVATION**, not a command: the actionable "do X" lives in the **cards**; the read carries thinking-aloud
 + technical remarks (the two-layer principle, memory `track-coach-two-layers-cards-vs-read`). So the read MAY
 state a precise observation or a soft flag **without** forcing a fake action item.
-Observation (2026-06-23): the read shows the curves and what's heard, but never states a short **verdict of which
+The read shows the curves and what's heard, but never states a short **verdict of which
 FORM the development takes**, nor FLAGS a dimension that sits idle. Add to the read's "shape" paragraph one
 observation:
 - name the **dominant development mode(s)** — which of {energy/loudness, brightness, density, stereo width}
   actually trend across the track, **each with its DIRECTION** (the trend's sign): louder vs pulls back,
-  brightens vs darkens, busier vs thins, widens vs tightens the image. (F1, prover 2026-06-23: dominance is on
+  brightens vs darkens, busier vs thins, widens vs tightens the image. (Dominance is on
   `|trend|`, so any axis can be dominant while moving DOWN — the read must never say "grows by brightness" on a
   darkening track.)
 - **flag an idle axis** as a soft option, never a defect — *"stereo and density barely move — the image
@@ -658,21 +584,18 @@ observation:
 - **Credibility:** the verdict comes from the measured trends via a pure helper `development_mode(core)`
   reading `energy_trend` / `brightness_trend` / `density_trend` / `stereo_width_trend`. **All four are the SAME
   metric — Pearson correlation of the curve with its time index (`_common.trend`), in [−1,1], scale-invariant
-  (direction/monotonicity, not magnitude)** — so ONE threshold across all four is sound (F4 resolved by deed,
-  prover 2026-06-23). Dominant = `|trend| ≥ DEV_DOMINANT` (0.12); idle = `|trend| < DEV_IDLE` (0.10); the
+  (direction/monotonicity, not magnitude)** — so ONE threshold across all four is sound. Dominant =
+  `|trend| ≥ DEV_DOMINANT` (0.12); idle = `|trend| < DEV_IDLE` (0.10); the
   0.10–0.12 gap is "moderate" (neither named nor flagged). NEVER name a mode whose `|trend|` is below
   DEV_DOMINANT; flag an idle axis ONLY when ≥1 axis is dominant. **Flat-track postcondition (F5):** when NO
   axis reaches DEV_DOMINANT, `development_mode` returns empty dominant + empty idle, and the read adds **no**
-  development sentence (it does not say "no dominant mode" — that would double-cover `energy_flat`). Calibrated
-  by deed on the 3 library tracks (Lazy → grows by loud+bright, idle density+stereo; Shared → busier + image
-  tightens; Wobble → opens only in brightness) — matches the hand-written stories in `docs/signal_value_map.md`.
+  development sentence (it does not say "no dominant mode" — that would double-cover `energy_flat`).
   `INV-32`
 - **NOT a card** (no fake action) — an observation IN the read. The helper is pure + unit-tested; the prose is
   authored, and `SKILL.md` carries the writing rule so every read includes it.
-- **Standalone (2026-06-23, by deed on Wobble — a Demucs run with NO authored narrative):** the line renders
+- **Standalone.** The line renders
   even when there's no authored read, so a developing track without a written read still gets this one real
   observation. The producer's read hides ONLY when BOTH the dev line is empty (flat track) AND there's no narrative.
-  (This SUPERSEDES the earlier "empty narrative → panel always hidden" rule.)
 
 ### B.13 Card evidence — every card names where it came from
 The requirement: show which signals drove each card. Every recommendation card carries a plain
@@ -681,7 +604,7 @@ number/tag says nothing — *"dynamics 30.7 — is that a lot? measured in what,
 in **plain language, never a bare metric identifier** (`true_peak_db`, `dynamic_range_db`). It names the
 **result and a simple unit** (a dB figure, a percentage, a time) but **not the measurement METHOD** — the
 technical *how* (`4× oversampled`, `peak-to-RMS`, `self-similarity`) is a signal-processing detail, not the
-finding, so it stays out of the user-facing line (2026-07-02). `tags: result-not-method`
+finding, so it stays out of the user-facing line. `tags: result-not-method`
 
 **Run-level provenance — the header names what was analysed.** The source-file line under the title states
 the audio that was analysed, and whenever an `.als` project was part of the same run it is shown beside the
@@ -691,10 +614,10 @@ audio with equal treatment, so the header never reads audio-only when a project 
 **A long source name stays readable.** A long unbroken audio or project filename truncates with an ellipsis
 and carries its full value on hover, and the source line still wraps between its parts on a narrow window, so
 one long path never blows the header out. `INV-30`
-- **Scope of "every card" (F2, prover 2026-06-23): the `D.recs` list** rendered at `#recs` (the "Start here"
+- **Scope of "every card": the `D.recs` list** rendered at `#recs` (the "Start here"
   advice) — mix-level recs AND per-stem cards. The separately-built note cards in the separation / rhythm /
   project panel (export, model, leakage) are an evidence SURFACE, out of scope this increment.
-- **Tier-A vs Tier-B/C wording (F3, prover 2026-06-23):** a **single-signal (Tier-A)** card (true-peak,
+- **Tier-A vs Tier-B/C wording:** a **single-signal (Tier-A)** card (true-peak,
   swing, tonal resonance) honestly comes from one number — its based-on names that **one signal in plain
   words** ("from the master's true-peak meter"), which is allowed; the ban is only on a bare tag. A
   **fused (Tier-B/C)** card names the **combination** ("the bass and the lead overlap around ≈290 Hz for ~half
@@ -706,12 +629,8 @@ one long path never blows the header out. `INV-30`
   the canvas render is the fragile surface we never edit blind). A deeper per-lane / per-part highlight (light
   up the exact lane the card is about) stays deferred — it needs canvas work and a live render review. `INV-34`
 
-**A card leads to ITS evidence — the click shows what the based-on line names (2026-07-05, the navigation
-half of the "card evidence" requirement).** The based-on line SAYS where the advice came from; clicking the
-card SHOWS it. Before this, every clickable card scrolled to the story arc even when its evidence renders
-elsewhere — the automation card pulsed the arc while the "intention vs result" envelopes sat further down,
-closed; the tonal-resonance card wasn't clickable at all though the offending band is right there in the
-Tonal-balance bars.
+**A card leads to ITS evidence — the click shows what the based-on line names.** The based-on line SAYS
+where the advice came from; clicking the card SHOWS it.
 *Fences — neighbouring promises that stay true through this change:* the based-on line itself is untouched
 (INV-31); the pulse stays CSS/DOM-only (INV-34, above); a timecoded card's click still seeks the playhead and
 seek still preserves playback (§B.14, INV-33/38); the view ladder is untouched — a card click never switches
@@ -764,13 +683,9 @@ Simple↔Detailed and never writes `tc_view` (§B.15, INV-41); the `?direction` 
   `based_on`. "Plain language / not a bare tag / does not restate the action" is authored-prose quality, not
   unit-tested.
 
-**The arc answers back — a marked moment's whole column lights its card (2026-07-05 late, the backpointer
-half of card-evidence; the finishing pass before the project closes).** The arc already MARKS every moment
+**The arc answers back — a marked moment's whole column lights its card.** The arc MARKS every moment
 the coach wrote a timecoded card about: the lettered triangle cues above the scenes, one shared identity
-with the letter badges on the cards. But only the thin triangle band (≈22 px tall) answered a click — on
-the arc BODY at the very same moment, the click just moved the playhead, and "what does the coach say
-about THIS moment?" had a 22-pixel answer zone. This story completes the loop the s61 block above began:
-cards lead to their evidence; the graph now leads back to its cards.
+with the letter badges on the cards. Cards lead to their evidence; the graph leads back to its cards.
 *Fences — neighbouring promises that stay true:* the arc's plain click=seek away from cues (§B.14 seek
 sources, INV-33/38 — seek still preserves playback); the forward card→panel navigation is untouched
 (INV-48a–e); the flash stays a CSS/DOM class toggle, the canvas DRAWING code is not edited — this change
@@ -806,8 +721,8 @@ click ever switches Simple↔Detailed (§B.15, INV-41); the `?direction` entry-f
 
 ### B.14 The synced player as a STATE MACHINE
 The full-mode player is the widget's most interactive surface (play/pause × per-stem mute × solo × seek ×
-card-click) and was, until this pass, NOT in the spec and tested only by string-matching the JS source — so
-the COMBINATIONS were never exercised (the seek-stops-playback bug, 0.8.28/INV-33, was exactly this class).
+card-click), and its cross-control COMBINATIONS need explicit specs (the seek-stops-playback bug, INV-33, was
+exactly this class).
 This section names the machine; the cross-control invariants are extracted into pure, DOM-free JS helpers
 (`pgains` / `toggleStem` / `seekResult`) so they can be unit-tested by EXECUTING the real shipped code in
 node — not by mirroring it in Python (assert against the artifact, not a fragment).
@@ -828,7 +743,7 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
   - **card-click** (timecoded rec): = seek(t) + scroll `#storyPanel` into view + a CSS `pulse` on the graph
     panel (DOM/CSS only, never the canvas — §B.13/INV-34).
 - **Cross-control INVARIANTS (the combinations that were untested).**
-  1. **One mode at a time (2026-06-21 — the mixed state is wrong).** After ANY sequence of mute/solo toggles,
+  1. **One mode at a time.** After ANY sequence of mute/solo toggles,
      never `(some stem muted) AND (some stem soloed)` simultaneously. `toggleStem` guarantees it. `INV-35`
   2. **Solo resolves gains.** When `anySolo`, the audible set is EXACTLY the soloed stems (every non-soloed
      stem is muted), regardless of individual mute flags. `INV-36`
@@ -838,25 +753,21 @@ node — not by mirroring it in Python (assert against the artifact, not a fragm
      stem is still the only one audible AND playback continues (INV-33 generalised to the combination). `INV-38`
   5. **Seek clamps.** The resulting time is always in [0, dur]; a gutter/negative/over-dur click never seeks
      out of range. `INV-39`
-  6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability (2026-06-23, found
-     by deed: solo a stem → switch to Simple → the soloed part visually vanishes and you can't un-solo
-     it).** The stem grid (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
+  6. **The player COMPOSES with the VIEW axis — solo/mute is a Detailed-only capability.** The stem grid
+     (`#stemlanes`, where the M/S controls + waveforms live) is hidden in Simple and
      absent in quick (the view ladder, INV-18/22). So a per-stem mute/solo state is only **visible and
      reversible in Detailed**. Invariant: **entering Simple RESETS the per-stem mix to the full mix**
      (`resetMix` clears every mute+solo, then `pgains` → all audible) — so the user is never left hearing a
      solo / muted part they can't see or undo. Re-entering Detailed starts from the full mix (no hidden
-     leftover state). This is the general rule the original §B.14 missed by modelling the player on the audio
-     axis ALONE: an interactive surface must be specified across EVERY view/mode axis it lives under, not just
-     its own. (Quick never has the grid, so it never reaches this state.) `INV-40`
+     leftover state). The general rule: an interactive surface must be specified across EVERY view/mode axis
+     it lives under, not just its own. (Quick never has the grid, so it never reaches this state.) `INV-40`
 - **Mix-mode (quick run).** One source, transport + seek only — no mute/solo grid; `pgains`/`toggleStem`
   are not wired (a single source is always audible). `seekResult` still governs its seeks.
 
 ### B.15 The view selector as remembered state
-The Simple/Detailed selector is the second interactive widget-state machine (beside the player, §B.14). Until
-this pass each widget opened in Simple and **deliberately did NOT restore** a prior choice — the "opens calm by
-default" stance (it was even in the skill's one-liner). This was revised (2026-06-29): the chosen view is
-**remembered and uniform across all tracks**, so opening any track lands you in the view you last used — *but a
-brand-new user still meets the calm screen first.*
+The Simple/Detailed selector is the second interactive widget-state machine (beside the player, §B.14). The
+chosen view is **remembered and uniform across all tracks**, so opening any track lands you in the view you
+last used — *but a brand-new user still meets the calm screen first.*
 
 - **State + storage.** The current view ∈ {`Simple`, `Detailed`} is a **single global preference** persisted in
   `localStorage` (`tc_view`), shared by every widget — not per-widget URL-only state. Toggling the selector
@@ -880,16 +791,14 @@ brand-new user still meets the calm screen first.*
   (`#detailed`/`#simple`) if present — the entry-focus pattern, for a shared/deep link; else (2) the remembered
   `tc_view`; else (3) **calm (Simple)** on the first-ever open, before any choice exists. So a newcomer still
   meets the calm screen; a returning user lands where they left off. The hash is a one-shot entry, not a
-  persisted channel; the remembered preference is the durable one. (2026-06-29: remember last,
-  first-use calm.) `tags: view-state · entry-override · calm-first-use · INV-41`
+  persisted channel; the remembered preference is the durable one. `tags: view-state · entry-override · calm-first-use · INV-41`
 - **It does NOT touch the ladder.** This changes only WHERE the initial view comes from, never WHAT is visible
   at each rung — `quick ⊆ Simple ⊆ Detailed` (INV-18/22) is untouched, and entering Simple still resets the
   per-stem mix (§B.14) so no soloed part strands. Remembering Detailed never makes a Simple-hidden surface
   visible in Simple; it just opens Detailed when that's your remembered view. `tags: view-ladder-unchanged · INV-41`
-- **Why it matters for the reference read.** The reference panel (centroid read + web notes, one container
-  since the 2026-07-05 merge, D-INV-36) lives in Detailed (depth, §D.10.3), and Simple hides `#refPanel` —
-  its nested disclosures with it. With the old always-calm open it was invisible unless you switched every
-  time — the reason a producer couldn't find it. Remembering Detailed is what makes it reliably present.
+- **Why it matters for the reference read.** The reference panel (centroid read + web notes, one container,
+  D-INV-36) lives in Detailed (depth, §D.10.3), and Simple hides `#refPanel` — its nested disclosures with
+  it. Remembering Detailed is what makes it reliably present.
   `tags: INV-41 · D-INV-30 · D-INV-36`
 
 ### B.16 A number wears its scale
@@ -1251,11 +1160,8 @@ changes emphasis and words, never the truth. A track with no mapping is untouche
 
 ### D.6.1 — REMOVED 0.9.15 (see JOURNAL 2026-07-02)
 
-_What it was:_ the in-widget aim picker (`#aimpanel`) and «toward X» panel — a `<select>` dropdown letting you pick a reference direction and see a ranked list of steps toward it (ordered by per-facet divergence toward the aim), persisted per-track in `localStorage`.
-
-_Why removed (0.9.15):_ redundant while one offerable direction equals the measured lean; the persisted localStorage state also caused a visible regression on reopen (cards swapped for re-flavoured set, centroid `#refRead` hidden, widget looked broken). Decision: s33.
-
-_History lives in:_ JOURNAL 2026-07-02 (excision details) and CHANGELOG 0.9.15.
+_The in-widget aim picker (`#aimpanel`) and «toward X» panel was removed 0.9.15; it is not part of 1.0.
+See JOURNAL 2026-07-02 (what it was, why removed) and CHANGELOG 0.9.15._
 
 ### D.7 How it fits the views, the switch, and the player
 
@@ -1525,6 +1431,7 @@ aim-dependent rows are inert without the mapping input (⟨DECIDE D-2⟩, cut fr
 | Web descriptor — "what the web says about ⟨artist⟩" (nested disclosure, open; follows the selector) | `#webPanel` (inside `#refPanel`) | **SHIPS-1.0** | the focused direction has web content | yes — non-null `gated_by` |
 | Up-to-three nearest-direction selector (`.reftab` tabs) | top of `#refPanel` | **SHIPS-1.0** | ≥2 real leans (green/amber; 1 lean = no tab bar) | folded into the `#refPanel` gate |
 | Similar in your own library (§F own-library) | catalog `.sib-chip` column | **SHIPS-1.0** | ≥1 own sibling track in the library | yes — via the catalog gate (`test_19_catalog_rows_and_hrefs`) + the D-INV-26 browser colour test (`.sib-chip`); it is a catalog COLUMN, not a standalone panel |
+| References show/hide switch (D-INV-6/23) | catalog + widget toggle | **⟨DECIDE⟩ SHIPS-1.0 or DEFERRED — pending Alexander** | a reference surface renders | — pending the scope call |
 | Aim glyph · pinned-aimed entry · re-flavouring (§D.6) | — | **DEFERRED-post-1.0** | never in 1.0 (no mapping input) | no — not rendered, not gated |
 
 **Property (F1 — the anti-regression net covers what ships).** Every SHIPS-1.0 §D surface has a `USER_SURFACES`
@@ -1671,24 +1578,20 @@ only the parts we can tie to measurement.** When the read is focused on a direct
 harmony, wide stereo pads…). It is the visible face of the web-descriptor layer — **web suggests, measurement
 decides** (D-INV-2). `D-INV-29`
 
-**It is a READABLE, RICH panel — the side page's depth, folded into the widget (2026-06-29/30 — the web
-info wasn't surfaced anywhere and more of it was wanted).** The first cut showed only the 4 confirmed
-★ lines; the fuller picture the side `reference_notes.html` already has is needed (Image: artist blurb +
-a full trait list, each badged). This brings that in: a **nested disclosure** ("What the web says about
+**It is a READABLE, RICH panel.** The web notes are a **nested disclosure** ("What the web says about
 ⟨artist⟩") **inside the one reference panel (`#refPanel`, D-INV-36), sitting right after the centroid-read
-disclosure** (§D.10.3 order), **open by default** *(supersedes the earlier "standalone panel, collapsed by
-default" — 2026-07-05 the two reference panels were merged into one, nested-open like the Evidence
-sub-panels)*. Per artist of the focused direction it shows:
+disclosure** (§D.10.3 order), **open by default** — nested-open like the Evidence sub-panels. Per artist of
+the focused direction it shows:
 - **a one-line genre / era** + **a short prose blurb** of what the web says the artist's sound IS (e.g. "DeepChord —
   dub/ambient techno, Detroit; the second-wave Basic Channel sound, ambient-led, kick added last");
 - **the FULL trait list, not only the confirmed ones** — each trait = a short readable phrase + the measured
   axis it ties to (or "—" if unmeasurable) + a **status badge**.
 
-**Sorted by status, strongest evidence first (2026-06-30).** The order is: (1) **★ measurement confirms** — the web trait our centroid
+**Sorted by status, strongest evidence first.** The order is: (1) **★ measurement confirms** — the web trait our centroid
 bears out; (2) **☆ soundly tied** — confirmed indirectly; (3) **"web says · our tracks don't show it"** — a web
 trait our measurement does NOT bear out, or that our axes can't measure (the teaching contrast: web suggested,
-measurement didn't find it). This **RESOLVES ⟨D-30⟩ in favour of show-labeled, not silent-drop**
-(2026-06-30): the unconfirmed traits are SHOWN, clearly badged as web-only, never silently dropped — that
+measurement didn't find it). This **RESOLVES ⟨D-30⟩ in favour of show-labeled, not silent-drop**: the
+unconfirmed traits are SHOWN, clearly badged as web-only, never silently dropped — that
 contrast is the value. It stays observation, never a grade about *your* track (D-INV-1): "our tracks don't show
 it" describes the REFERENCE centroid vs the web claim, not your music. Within a tier the order is a stable key
 (axis, then phrase) so it never flickers. `tags: rich-panel · sorted-by-status · ⟨D-30⟩-resolved · D-INV-29`
@@ -1702,17 +1605,15 @@ indirect+agrees → ☆, none / contradicted / axis-not-measured → the "web sa
 (missing ≠ contradicted — both land in the honest bottom tier, neither auto-★, RC-INV-1). `tags: one-source ·
 D-INV-2 · RC-INV-1`
 
-**Header styled like its sibling drawers (2026-06-30).** The panel's `<summary>` uses the **same
+**Header styled like its sibling drawers.** The panel's `<summary>` uses the **same
 visual style as the other collapsibles** (the Evidence drawer, the catalog) — same weight, same disclosure
 arrow — not a fainter, smaller heading; it reads as a peer drawer, not an afterthought. `tags: consistent-summary`
 
-**The web notes FOLLOW the shared selector, for every shown direction (2026-07-05 — the merge's
-payoff; folds in the s47 "web-descriptor for all 3 nearest" feature).** The build embeds the web content
+**The web notes FOLLOW the shared selector, for every shown direction.** The build embeds the web content
 **per shown direction** (all ≤3 that qualify, from the one-source file), and switching a `#refPanel` tab swaps
 the web disclosure's body AND its `<summary>` artist name to the focused direction — client-side, no re-run,
-ephemeral like the tab itself (D-INV-28). The pre-merge widget rendered web notes only for the top match and
-never re-targeted them (bars said DeepChord, web said SCSI-9); that state is now
-impossible by construction: one selector, both disclosures. A focused direction **with no web content hides
+ephemeral like the tab itself (D-INV-28). One selector drives both disclosures, so the bars and the web notes
+can never show two different directions. A focused direction **with no web content hides
 the web disclosure entirely while it is focused** (the §D.10.2 liveness rule composed across the selector —
 absent, never a blank box implying "no style"); switching back to a direction with content brings it back.
 `D-INV-36`
@@ -1731,8 +1632,8 @@ web says is dropped, never shown as untethered prose. Two marks, by how the tie 
   measured confirmation. `tags: D-INV-2 · facet→signal-map`
 - **☆ — indirect but soundly tied.** The map ties the facet to a measured signal by a sound, unambiguous
   argument even though no axis confirms it head-on (e.g. "underwater, dubby" ↔ a steep low-pass + long
-  reverb tail). ☆ is a **curated judgement** that the tie is unambiguous, not a free-floating web claim
-  (2026-06-29). `tags: D-INV-2 · indirect-tie`
+  reverb tail). ☆ is a **curated judgement** that the tie is unambiguous, not a free-floating web claim.
+  `tags: D-INV-2 · indirect-tie`
 - **"web says · our tracks don't show it" — the web claimed it but our measurement doesn't bear it out, or our
   axes can't measure it.** SHOWN, in the panel's bottom tier, plainly badged (⟨D-30⟩ resolved 2026-06-30:
   show-labeled, not silent-drop — the contrast "web suggested, measurement didn't find it" is the teaching
@@ -1743,24 +1644,21 @@ web says is dropped, never shown as untethered prose. Two marks, by how the tie 
 **The marks are compact — two glyphs and one footnote, never long per-row labels.** Each facet carries just
 ★ or ☆; a single footnote under the plaque explains both once (★ = web said, measurement confirms directly;
 ☆ = measurement doesn't show it head-on but it's unambiguously tied to what we measure). No per-row "web said ·
-measured" tag strings — they read long and slow (2026-06-29). `tags: compact-marking · D-INV-29`
+measured" tag strings — they read long and slow. `tags: compact-marking · D-INV-29`
 
-**Approved readable layout (2026-07-04 — variant A on real-data mockup, both amendments
-accepted).** The panel body reads in this order: (1) **prose blurb first** — sets context before any
+**Approved readable layout.** The panel body reads in this order: (1) **prose blurb first** — sets context before any
 measurement verdicts; (2) **note box** (if present) — the coverage-confidence callout, left-bordered;
 (3) **"YOUR MEASUREMENT BACKS THESE UP" section** — the ★/☆ confirmed traits, each as a glyph-led row
 (★ or ☆ in a column, phrase beside it); no pill on each row — the glyph IS the mark; (4) **one muted
 compact group line for web-only traits** — heading "Web describes these — your tracks don't bear them out"
-followed by the web-only trait phrases as a `·`-separated inline run (not one pill per row — the old
+followed by the web-only trait phrases as a `·`-separated inline run (not one pill per row — the
 repeated grey pills are the spec violation D-INV-29 forbids); (5) **sources links** — the list of source
-`<a href>` links stays VISIBLE at the panel bottom (2026-07-04 amendment: the v2 mockup had
-dropped this; the decision: keep it); (6) **one footnote legend** — a single line explaining ★/☆/· once:
+`<a href>` links stays VISIBLE at the panel bottom; (6) **one footnote legend** — a single line explaining ★/☆/· once:
 "★ web-described, your measurement confirms it directly · ☆ indirectly but soundly tied · unmarked ·
-= web-described, your measurement doesn't bear it out". This layout resolves the D-INV-29 contradiction
-(shipped code emitted a long pill on EVERY row — exactly the long-per-row labels the spec forbids). All
-content is preserved; only the layout changes. `tags: approved-layout-2026-07-04 · compact-marking · D-INV-29`
+= web-described, your measurement doesn't bear it out". This layout satisfies D-INV-29 (no long-per-row
+labels). All content is preserved; only the layout changes. `tags: approved-layout-2026-07-04 · compact-marking · D-INV-29`
 
-**Readability pass (2026-07-05 — D-INV-29-typo).** Three fixes, in-panel scope only: (a) **brightness
+**Readability pass.** Three fixes, in-panel scope only: (a) **brightness
 hierarchy** — a section heading is NEVER dimmer than the body it heads; `.rn-section-label` /
 `.tc-rn-sources-label` are `--ink` (were `--muted` sitting under `--ink` body — a brightness inversion the eye
 reads as "the letters are louder than their own heading"); (b) **type scale** — the panel's fonts snap to the
@@ -1768,9 +1666,7 @@ widget's whole-number scale (section labels + footnote 11px, blurb/traits 13px, 
 12px), retiring the scattered 10 / 10.5 / 11.5 / 12.5 "fractional" sizes the font audit flagged — no widget-wide
 type-token rollout (out of scope); (c) **source links** — each source reads as a link: an underline plus a
 leading **chain-link icon** (the conventional link glyph, an inline SVG `svg.tc-rn-link-ico` coloured via
-`currentColor`), so the sources block is unmistakably a list of clickable links, not muted prose. *(Refined
-2026-07-05: the first cut used a ↗ arrow, which read as the wrong, ugly glyph, so it was replaced with the
-conventional chain-link link icon.)*
+`currentColor`), so the sources block is unmistakably a list of clickable links, not muted prose.
 `tags: readability-2026-07-05 · brightness-hierarchy · type-scale · D-INV-29-typo`
 
 **What ★ / ☆ are measured against — the direction's CENTROID.** Both marks judge the trait on the
@@ -1829,16 +1725,14 @@ of that artist's cloud in fingerprint space. This is where "the centroid and all
 producer who reads vectors. It is **not a map** (dropped, D-INV-11); it is a per-facet decomposition plus the
 overall closeness.
 
-**Where it sits in the read — the fixed order (2026-06-29; merged into one panel 2026-07-05).** The
+**Where it sits in the read — the fixed order.** The
 Detailed read runs top-to-bottom in this order, so the eye moves from your own track outward to the reference
 and only then to the web: **(1) the producer's read** (the worded observation, §B.12) → **(2) tonal balance**
 (the spectrum) → **(3) the reference panel** (`#refPanel`, D-INV-36) — ONE container holding the shared
 direction selector, then **the centroid read** (this section's per-facet bars, first nested disclosure) →
 **the web notes** (§D.10.2, second nested disclosure, what the web says about the direction's artist). The
-outward order is unchanged by the merge: the centroid read still comes **after** tonal balance and **before**
-the web plaque, which stays the last and most external layer — the merge changed the packaging (two top-level
-panels → one panel, two nested-open disclosures), never the reading order. `tags: read-order · D-INV-30 ·
-D-INV-29 · D-INV-36`
+centroid read comes **after** tonal balance and **before** the web plaque, which stays the last and most
+external layer. `tags: read-order · D-INV-30 · D-INV-29 · D-INV-36`
 
 **What it shows (Detailed, against the focused direction).**
 - **Per-facet comparison — your value vs the centroid, axis by axis.** For each producer facet (a fingerprint
@@ -1984,20 +1878,17 @@ partial stem) the stem is **significance-unknown**, a third state distinct from 
 `insignificant (quiet/empty)` — shown as "not measured", never dropped as empty. This is the §A debt seen on
 the completeness axis: a not-measured stem must not masquerade as a measured-silent one (RC-INV-1). `RC-INV-11`
 
-**A partial run is a TECHNICAL ERROR — flag it and re-run; never invent the value.** (2026-06-25: a partial run is a technical error — don’t fake or invent around it) When a measurement that the run's mode **should**
+**A partial run is a TECHNICAL ERROR — flag it and re-run; never invent the value.** When a measurement that the run's mode **should**
 have produced is missing (Lazy's un-transcribed bass/lead notes; an old run with no `sustain`), the run is
 **incomplete** — the tool says plainly "incomplete run — re-run" and the user re-runs it; it is NOT
 auto-fixed, NOT imputed, NOT silently degraded. This is distinct from **missing-by-mode**, which is not an
 error: a quick run has no stems *by design* (RC-INV-7), so per-stem axes aren't "broken", they're simply not
 promised. So: *should-have-measured-but-didn't* = error, re-run; *mode-never-promised-it* = silent. Until a
 genuinely-incomplete run is re-run, its missing axes stay *missing* under the rules above (dropped from
-comparison, shown as "not measured"). E-1 (resolved) **RESOLVED — flag-and-re-run, manual; auto-trigger rejected**
-(a Demucs/transcription re-run is expensive and surprising — the user pulls the trigger). `RC-INV-10`
+comparison, shown as "not measured"). `RC-INV-10`
 
 **A run reaches a surface only when it is complete; an incomplete run is held back and redone automatically,
-and it is never shown as a result.** (2026-07-12, Alexander's word: a run either exists or it does not; an
-invalid run is redone.) RC-INV-10 made a partial run a technical error and left the re-run to the user, so a
-partial run could still render, deposit, and feed similarity while it waited. This closes that gap. A run is
+and it is never shown as a result.** A run is
 **complete** when every signal its mode promises for the material the track actually contains carries a real
 value: for each promised axis, the significance gate (RC-INV-11, §A) is read on that axis's source part; a
 part the gate reads as PRESENT must carry a measured value, and a part the gate reads as ABSENT is a real
@@ -2218,16 +2109,16 @@ people's music out of your signatures; this column only ever lists your own). `t
 - ⟨DECIDE D-27⟩ (shared with §D.9) the own-library high/medium/low bucket boundaries — relative to the
   library's own distance distribution, since §F has no cloud spread to borrow.
 - **Placement (P-1).** This column is the **other of the last two columns**, beside the §D.10 reference one,
-  with the same slightly-smaller font (2026-06-25). Both are catalog-tail columns.
+  with the same slightly-smaller font (2026-06-25). Both are catalog-tail columns. Both tail similarity
+  columns responsively collapse (hide) below ~1100px viewport width via a `catalog.py` media query,
+  independent of the references show/hide switch (D-INV-23).
 
 ## G. Where things live on disk — output locations, the library, and cleanup
 
-Every analysis writes files: separated stems, web-preview audio, result JSONs, the built widget. Until now those
-landed **inside the user's Ableton project folder** (a `track-coach-output/` dir next to the audio). That
-was flagged as both ugly and unsafe for 1.0: it clutters the project folder, and a user tidying their Ableton
-project can delete the analysis by accident. This section moves all output to a personal home under `$HOME`,
-keyed per project, and adds a safe way to clean up — without ever touching the user's own files. It is the one
-place that says where things live, so the analyzer, the library, and the catalog all agree. `tags: RC-INV-9 · D-INV-14`
+Every analysis writes files: separated stems, web-preview audio, result JSONs, the built widget. All output
+lives in a personal home under `$HOME`, keyed per project, with a safe way to clean up — without ever
+touching the user's own files. It is the one place that says where things live, so the analyzer, the library,
+and the catalog all agree. `tags: RC-INV-9 · D-INV-14`
 
 ### G.0 The pieces, named once
 
@@ -2286,7 +2177,7 @@ data lives outside `$HOME`, never someone else's reference album. `G-INV-16b`
 `$HOME`. A member whose `src_run_dir` no longer exists cannot be migrated, because there is nothing left to
 move; it is reported separately as a missing source to delete or re-analyse, never folded into the "run
 migrate to consolidate" count. This keeps the banner honest once a scratch or temporary source is cleared
-away — the case where a removed smoke run once still showed as consolidatable. `G-INV-22`
+away. `G-INV-22`
 
 ### G.1 Output never lands in the user's project folder
 
@@ -2317,9 +2208,8 @@ check. `G-INV-2b`
 
 **Source identity is als-AGNOSTIC — it is the audio's full path, never the `.als` path.** Adding an `.als` to a
 previously audio-only track (same audio) must group as a **new version under the same track**, not fork a
-second one. Keying identity on the `.als` path broke exactly this (the s47 `-2` catalog-fork bug): a track first
-analysed audio-only, then re-analysed with `--als`, forked into `<slug>-2` because the two identities differed.
-Identity is therefore the audio full path on both sides of the compare; an old run whose stored `source_identity`
+second one. Keying identity on the `.als` path forks such a track into `<slug>-2` because the two
+identities differ. Identity is therefore the audio full path on both sides of the compare; an old run whose stored `source_identity`
 was an als path still matches by its stored `audio_path`. (Audio *path*, not audio *bytes/sha*: successive
 versions of one track differ in bytes by design, so a content hash would wrongly fork every new version.)
 `G-INV-2c`
@@ -2460,8 +2350,10 @@ handles. `tags: §G`
 ### H.0 The command surface, named once
 
 What exists today (real, shipped): `analyze` (measure → result JSON + stems), `build` (rebuild a run's widget +
-auto-deposit), `migrate` (consolidate pre-1.0 runs under $HOME, §G G-INV-16), and on the library: `list`,
-`deposit`, `catalog`, `clean`. The 1.0 additions below fill the named gaps: real remove, scratch
+auto-deposit), `migrate` (consolidate pre-1.0 runs under $HOME, §G G-INV-16), `alias` (record two filenames
+as one song, §D.10 G-INV-23), and on the library: `list`,
+`deposit`, `catalog`, `clean`, `dereference` (drop pre-marker reference albums from the library, §G.6
+G-INV-20). The 1.0 additions below fill the named gaps: real remove, scratch
 `gc`, explicit version pruning, an Ableton-tail sweep, a `backup`/`restore` safety net, and the two-rung
 `reset` / `hard reset` wipe.
 
@@ -2491,15 +2383,15 @@ out. `H-INV-2`
 intermediate output under the output root — keeping every deposited member's referenced run and the
 most-complete undeposited run per track (§G G-INV-9/10/15). Dry-run by default; `--apply` to act. `H-INV-3`
 
-**Old versions are kept by default; pruning them is a separate, explicit, dry-run-first verb.** Per the
-s31 decision: the library keeps ALL versions and ALL run results as a feature (any version opens from the per-track
+**Old versions are kept by default; pruning them is a separate, explicit, dry-run-first verb.** The
+library keeps ALL versions and ALL run results as a feature (any version opens from the per-track
 plaque). gc must NOT drop versions automatically. A distinct `prune-versions` (e.g. "keep newest N per track")
 exists only as an explicit command, shows what it would drop, and never runs as part of routine gc. `H-INV-4`
 
 **An Ableton-tail sweep removes only truly-orphaned leftovers, and only after showing them.** After `migrate`,
 old `track-coach-output/` folders in Ableton projects can hold a dangling `latest` symlink and a stale
-`index.json` — but they may ALSO still hold real undeposited/older run data (verified by deed s31: those
-folders held whole extra runs, not just empty tails). The sweep therefore distinguishes *empty / dangling-only*
+`index.json` — but they may ALSO still hold real undeposited/older run data (whole extra runs, not just
+empty tails). The sweep therefore distinguishes *empty / dangling-only*
 tails (safe to delete) from *folders that still contain real runs* (listed, never auto-deleted), and shows
 everything in dry-run before any removal. It operates outside the output root by design, so it requires an
 explicit target/confirm and never touches non-track-coach files (the user's audio/`.als`). `H-INV-5`
@@ -2541,8 +2433,8 @@ curated work without a good snapshot behind it. What the safety backup recovers 
 `.als`/audio are untouched and the analyses rebuild by re-running, and reports exactly what it removed and
 reclaimed. It stays all-or-clean-report (G-INV-11). When `--no-backup` is combined with no existing snapshot
 covering the curated tiers, `reset` warns that the curated work will be unrecoverable and requires the extra
-acknowledgement (as `hard reset` does), since that combination is as irreversible as a `hard reset` for the
-curated data. It is the dogfood path used to verify cleanup end-to-end before re-accumulating
+acknowledgement flag `--i-understand` (as `hard reset` does), since that combination is as irreversible as a
+`hard reset` for the curated data. It is the dogfood path used to verify cleanup end-to-end before re-accumulating
 versions. `H-INV-6`
 
 **`hard reset` is the only irreversible verb — it removes everything, backups included.** Where `reset` keeps
@@ -2552,8 +2444,7 @@ so demands the strongest confirm: both `--yes-wipe-everything` and an explicit `
 (equivalently `reset --hard`), and it names that the backups themselves will be destroyed before acting. Like
 every rung it is dry-run by default: a bare `hard reset` (no flags) lists everything it would remove, backups
 included, before either confirm flag is given. After a `hard reset`, nothing on disk recovers the prior state
-except re-analysing the source audio/`.als`. This
-settles the earlier open 'truly-full flag' question: the truly-full wipe is `hard reset`. `H-INV-10`
+except re-analysing the source audio/`.als`. `H-INV-10`
 
 **The cleanup verbs form one reversibility ladder; only the last rung is irreversible.** Read from safe to
 final: `backup` (additive) → `gc` / `prune-versions` / `remove` (prune scratch or a named member; the keep
@@ -2585,24 +2476,17 @@ user never has to remember to save. The management verbs (`backup`, `restore`, `
   the user names N).
 - ⟨DECIDE H-2⟩ does `remove` of a version also delete its run dir by default, or only the library entry (run dir
   left for gc)? Lean: only the library entry; gc reclaims the run dir later.
-- H-3 (resolved) RESOLVED (2026-07-01) — the 'truly-full' wipe is a distinct `hard reset` that also
-  removes `backups/` (H-INV-10); plain `reset` keeps the safety net (H-INV-6). Backups capture the curated tiers
-  only (keep + references), scratch excluded unless `--full` (H-INV-8).
 
 ## I. The visual design system — tokens & components
 
-**Why this exists.** The widget CSS kept drifting: the same visual role lived as several raw hex
-values, radii were ad-hoc (6/8/9/11/12), three near-identical segmented controls were maintained
-separately, and the catalog palette had silently forked from the widget. A design
-session on claude.ai/design (project `track-coach`, `aae67990-…`) produced a settled decision
-record — the implementable form is `docs/design/DESIGN_SESSION_2026-07-02.md` (v3). This section is
-the prover-ready spec of that system; the design doc is its human narrative, and the claude.ai/design
-project is its browsable component library. One role = one token = one name.
+**What this is.** This section is
+the prover-ready spec of the widget design system; the design doc is its human narrative
+(`docs/design/DESIGN_SESSION_2026-07-02.md`, v3), and the claude.ai/design project is its browsable
+component library. One role = one token = one name.
 
 ### I.0 Single token source (root of the drift)
 - **Entity: the token set.** The canonical values are the WIDGET `:root` (`build_widget.py`), NOT
-  the catalog. The catalog (`catalog.py PALETTE`) had drifted on two roles — `ink` #e8ecf6 (widget
-  #e8ecf5) and `line` #2a3142 (widget #262c3c).
+  the catalog (`catalog.py PALETTE`).
 - **DS-INV-1 (one source):** every UI role has ONE value, defined once, used by both the widget and
   the catalog. Canon = the widget values. The catalog re-declares the SAME values (it is a separate
   offline HTML file, so it carries its own copy, but the copy must be byte-equal on shared roles).
@@ -2621,13 +2505,14 @@ project is its browsable component library. One role = one token = one name.
   (dimmest). 8 → 3. `--ink-dim` is a NEW token — add it to the widget `:root` AND the catalog copy.
 - **Reds (DS-INV-4):** UI-red → `--bad`; the magma/data reds stay in the gradient (below).
 - **Colour drift → tokens (DS-INV-5):** `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn`.
-  (⟨DECIDE DS-4⟩ RECONCILED s43: the category backgrounds are NOT the dim `#3a4060/#2e3a52/#3a3040/#3a2832`
-  this line originally assumed — those hexes do not exist in the code. The real category backgrounds are
+  (⟨DECIDE DS-4⟩: the category backgrounds are
   saturated CATEGORY-IDENTITY colours `_CAT_COLORS` = Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`
   (`build_widget.py:68`, applied inline). They are the same KIND of thing as the stem colours (DS-INV-7b) —
   a categorical group, LEFT as literals; deriving them from `--panel2/--line` would destroy the colour-coding.)
 - **rec-card severity (DS-INV-6):** the left stripe encodes severity `good / warn / bad` (ADD the
-  `bad`/red variant). `--wob` is the neutral/brand accent, never an alarm level.
+  `bad`/red variant). `--wob` is the neutral/brand accent, never an alarm level. A rec key absent from
+  `REC_CLASS` defaults to severity "do"/green; ⟨DECIDE⟩ whether climax/brightness keys warrant "concept"
+  instead of the "do" default.
 - **Data-viz colours are OUTSIDE the UI palette and are LEFT UNTOUCHED — TWO sets:**
   - **DS-INV-7a (colormap):** the arc/frequency colours are a magma/viridis perceptual gradient
     (#4cc9f0 … #fcfdbf #8c2981 #3b0f70). NOT tokenised.
@@ -2652,20 +2537,16 @@ project is its browsable component library. One role = one token = one name.
   `grid-template-columns: repeat(auto-fill, minmax(<min>px, 1fr))` — columns emerge from
   `floor((width+gap)/(minCard+gap))`, no media queries; `<min>` is chosen from the desired column
   count at the target window. Fluid sizes use `clamp()`; a component in variable-width slots uses a
-  container query, not media. **This REPLACES the s34 `#recsPanel` container-query recs grid — the
-  existing `test_headless_render` recs column-count assertions are UPDATED to the new expected counts,
-  not held constant (this is a deliberate layout change, not a restyle). The recs cap stays 2 columns
-  (a rec card wants a readable line length; `<min>` picked so a ~1120px content column yields 2).**
-- **Spacing split (DS-INV-9) — PANEL-RHYTHM SLICE BUILT s57; broad normalisation still POST-1.0.**
+  container query, not media. **The recs cap stays 2 columns
+  (a rec card wants a readable line length; `<min>` picked so a ~1120px content column yields 2); the
+  `test_headless_render` recs column-count assertions follow the emergent counts, not a held constant.**
+- **Spacing split (DS-INV-9) — panel-rhythm built; broad normalisation still POST-1.0.**
   The system is two roles — `--gap 8/12/16` (within a group) and `--rhythm 28/44` (between sections).
-  **Built (s57, the design-system values):** the two role tokens exist (`--gap:16px`,
+  **Built (the design-system values):** the two role tokens exist (`--gap:16px`,
   `--rhythm:28px`) and drive the PANEL spacing — every top-level `.tc-panel` carries `margin-bottom:var(--rhythm)`
   (between sections), while the sub-panels nested inside `#evidence` take `margin-bottom:var(--gap)`
-  (within the group). This makes the **inter-panel gap strictly larger than the intra-panel gap**, fixing
-  the earlier inversion (measured 24px between top-level panels < 30px between sub-panels — the reverse of
-  correct hierarchy; per the 2026-07-05 review). The old per-id overrides that caused it
-  (`#webPanel{margin:10px 0 0}`, `#evidence,#catalog{margin:24px 0 0}` — both zeroed the bottom margin)
-  are removed. **Still POST-1.0 (deferred):** the BROADER normalisation of the ~13 remaining raw `gap:`
+  (within the group). This makes the **inter-panel gap strictly larger than the intra-panel gap**.
+  **Still POST-1.0 (deferred):** the BROADER normalisation of the ~13 remaining raw `gap:`
   literals (2–20 px) inside components to the three-value scale — that stays a design/taste pass (which of
   5/6/7 px becomes 8 px is a design/taste call), not done here. `tags: panel-rhythm-built-s57 · post-1.0-broad · design-call · F5`
 
@@ -2690,16 +2571,12 @@ project is its browsable component library. One role = one token = one name.
 
 ### I.6 Segmented control (one, not three)
 - **Entity: the segmented control.** `.viewtoggle` and `.reftabs` merge into ONE component `.seg`.
-  (RECONCILED s43: the original text named THREE — `.seg`/`.viewtoggle`/`.reftabs` — but `.seg` did not
-  exist in the code; there were only two controls. The shared class is now named `.seg`. Shipped 0.9.18.)
 - **DS-INV-13:** container `border:1px solid --line; border-radius:--radius; overflow:hidden`;
   buttons `padding:9px 14px`; `rest` = transparent bg + text `--muted`; `hover` → `--ink`;
   transition `--dur-fast`. Both former controls render from this ONE class.
-  **`selected` = CALM (2026-07-02, REVERSED after seeing it rendered):** the old subtle
+  **`selected` = CALM:** a subtle
   `--panel2` lift + `--ink` text, SAME weight — NOT a `--wob` fill, NO contrast inversion, NO sudden bold.
-  Rationale: the loud `--wob` fill (the earlier design-session value) clashed with the calm-by-default
-  aesthetic; the invert + bold jarred. The win kept from the merge is structural (one class for both
-  controls); the look stays the old calm one. Browser test asserts the calm selected look.
+  Browser test asserts the calm selected look.
 
 ### I.7 Per-component contracts (all 10)
 Each component draws ONLY from the tokens above (all §7 taste calls decided in the design doc v3):
@@ -2717,9 +2594,9 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 4. **panel** — `.panel/.panel2` → `--radius-lg`; backgrounds `--panel/--panel2`; kicker `--wob`.
 5. **player-transport** — `.pbtn/.pmini` as buttons; `.ptime` tabular-nums `--muted`; `.seekbar`
    track `--panel2` + fill `--wob`, thumb `--wob` + ring; `.pstem` mute.on `--bad` / solo.on `--good`.
-6. **rec-card** — left stripe severity (DS-INV-6); `--radius-lg`; stripe 3px. (RECONCILED s43: the red/bad
-   stripe already exists — `.rec.crit → --bad`; the three code levels are `crit → --bad`, `do → --good`,
-   `concept → --bright` yellow. ⟨DECIDE DS-3⟩: keep the third level `--bright` yellow, or move it to `--warn` amber?)
+6. **rec-card** — left stripe severity (DS-INV-6); `--radius-lg`; stripe 3px. The three code levels are
+   `crit → --bad`, `do → --good`, `concept → --bright` yellow. (⟨DECIDE DS-3⟩: keep the third level
+   `--bright` yellow, or move it to `--warn` amber?)
 7. **reference-bar** — `.reftabs` → the one segmented control (`.seg`, shipped 0.9.18); `.refread-cat`
    backgrounds are the categorical `_CAT_COLORS` (⟨DECIDE DS-4⟩ — left as identity colours, NOT panel-derived);
    star #ffb13f → `--warn`, chip #6fdfb8 → `--good`, halfstar → `--muted`.
