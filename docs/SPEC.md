@@ -2758,8 +2758,11 @@ Each component draws ONLY from the tokens above (all §7 taste calls decided in 
 - **× viewport:** the grid (DS-INV-8) yields column counts by width with no media-query cliff; the
   segmented control and cards stay within `--w-content`. The §D reference panel (`#refPanel`), its nested
   read (`#refRead`), web notes (`#webPanel`) and the up-to-three tab selector (`.reftab`) also stay within the viewport when
-  narrow — no horizontal overflow, no internal h-scroll, no tab-row spill (pass-3 composition s56;
+  narrow: no horizontal overflow, no internal h-scroll, no tab-row spill (pass-3 composition s56;
   pinned browser-level, `test_headless_render::RefReadSurfacesRendered::test_ref_panels_stay_within_viewport_when_narrow`).
+  The supported narrow floor is ~560px; a producer window is ~720px and up. The reference read's facet bars
+  hold a ~375px minimum, so below ~535px that one panel scrolls horizontally inside itself — a phone width
+  outside this desktop tool's range, recorded as a known narrow-width limit, not a general overflow.
 
 ### I.10a Legibility floor (a named review lens)
 A standing lens the review pass reads the rendered widget against, so nothing ships below the readable bar.

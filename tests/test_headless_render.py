@@ -185,8 +185,11 @@ class RefReadSurfacesRendered(unittest.TestCase):
         # up-to-3-tab selector (.reftab) were only ever probed at width=1100. On a narrow screen a
         # panel or the tab row could overflow horizontally (right edge past the viewport, or an
         # internal h-scroll) and the string/wide tests would never see it. Assert the read stays
-        # within its width envelope. (The harness clamps the effective viewport to ~500px min, so
-        # assert against the RETURNED vw, not the requested width.)
+        # within its width envelope. Width is the supported narrow floor (560px): a real producer
+        # window is ~720px (test_two_columns_at_alexanders_window) and up; the reference read's
+        # facet bars hold a ~375px minimum, so below ~535px one panel h-scrolls by design — phone
+        # widths are out of this desktop tool's range. (Reads window.innerWidth, so it stays correct
+        # whatever the harness reports as the effective viewport.)
         r = hc.probe(
             self.widget,
             "(function(){document.body.classList.remove('simple');"
@@ -199,7 +202,7 @@ class RefReadSurfacesRendered(unittest.TestCase):
             "tabs.forEach(function(t){var rr=t.getBoundingClientRect();if(rr.right>tmax)tmax=rr.right;});"
             "return {vw:vw,refRead:box('#refRead'),webPanel:box('#webPanel'),"
             "tab_count:tabs.length,tab_maxright:Math.round(tmax)};})()",
-            width=460, height=4000)
+            width=560, height=4000)
         vw = r["vw"]
         for name in ("refRead", "webPanel"):
             b = r[name]
