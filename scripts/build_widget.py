@@ -28,7 +28,7 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.7.4"  # Track Coach analyzer version — s70 cont.: RC-INV-13g tail — the two
+TC_VERSION = "1.8.0"  # Track Coach analyzer version — 1.8.0 (2026-07-15): audit reopen — 8 code-vs-spec
 # under-rendered pages (failed + in-progress) now also name the SOURCE FILE — its filename and full
 # path, read from run_meta.json's audio_path (fallback: audio) — as the first detail block, right
 # after the status line and before "Got this far". The path is user-selectable text plus a Copy
@@ -2102,6 +2102,20 @@ def _coalesce_scenes(scenes, dur):
     return out
 
 
+def _refs_toggle_html(present):
+    """The widget half of the ONE show/hide-references switch (D-INV-6/23). Renders the control
+    only when a reference surface (#refPanel) renders on this run (`present`), so the switch never
+    appears with nothing to switch — mirroring the catalog, which sheds the whole control with its
+    reference column. Same label + behaviour as the catalog control (one named switch). The flag is
+    global + persisted in localStorage under `tc_refs_hidden`; the wiring JS lives in TEMPLATE.
+    Default state is SHOWN, so the server-rendered button starts aria-pressed="false"; the JS
+    corrects the label/state from the stored flag on load."""
+    if not present:
+        return ""
+    return ('<button id="refsToggle" class="refstoggle" type="button" '
+            'aria-pressed="false">Hide references</button>')
+
+
 def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None, stemmap=None,
                rhythm=None, notes=None, drums=None, audio_stems_rel=None, presence_threshold=0.3,
                narrative_md=None, selfsim=None, meta=None, verdict=None, catalog=None, mode="full",
@@ -2417,11 +2431,15 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
                    if _q else '<div class="viewtoggle seg" id="viewToggle"></div>')
     # §D.10.3 — reference read: Detailed-only; skipped for quick (no fingerprint) and when run_dir absent.
     ref_read_html = _ref_read_html(run_dir) if not _q else ""
+    # References show/hide switch (D-INV-6/23): the control renders wherever a reference surface
+    # renders — here, only when this run actually emits a #refPanel (ref_read_html non-empty).
+    refs_toggle_html = _refs_toggle_html(bool(ref_read_html))
     html = (TEMPLATE.replace("__TITLE__", _esc(title))
             .replace("__BODYCLASS__", "quick" if _q else "")
             .replace("__MODEBADGE__", badge_html)
             .replace("__MODENOTE__", note_html)
             .replace("__VIEWTOGGLE__", view_toggle)
+            .replace("__REFSTOGGLE__", refs_toggle_html)
             .replace("__READTITLE__", read_title)
             .replace("__READPANELSTYLE__", read_panel_style)
             .replace("__READBODY__", read_body)
@@ -3532,6 +3550,13 @@ h1{font-size:20px;margin:0 0 2px;font-weight:700}
 .seg>button.on,.seg>button.active{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}
 /* quick reads have no Simple/Detailed view (no stems to reveal) — a hint sits where the toggle was */
 .viewhint{color:var(--muted);font-size:12px;max-width:300px;line-height:1.4;align-self:center;text-align:right}
+/* Top-right control cluster: the references switch sits beside the Simple/Detailed toggle. */
+.topctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+/* References show/hide switch control (D-INV-6/23) — the widget half of the ONE named switch; same
+   label + behaviour as the catalog's. A pill button matching the .backlink look; pressed = hidden. */
+.refstoggle{align-self:center;padding:7px 13px;border:1px solid var(--line);border-radius:20px;
+ background:var(--panel);color:var(--muted);font:600 12.5px/1 inherit;cursor:pointer;white-space:nowrap}
+.refstoggle:hover,.refstoggle[aria-pressed="true"]{color:var(--ink);border-color:var(--wob)}
 /* (the calm verdict headline panel was removed 2026-07-03, s49) */
 /* SIMPLE VIEW — Simple no longer strips substance. The PLAYER, the Producer's read, the EVIDENCE
    drawer, and the timecoded recs all stay visible in BOTH views (hiding them just read as "things
@@ -3545,6 +3570,13 @@ body.simple #stemlanes,body.simple #seqKey{display:none!important}
 /* The merged reference panel (§D.10.1/D-INV-36): ONE container #refPanel — shared selector +
    nested centroid read (#refRead) + nested web notes (#webPanel) — Detailed-only as a unit. */
 body.simple #refPanel{display:none!important}
+/* References show/hide switch (D-INV-6/23) — ONE global persisted flag `tc_refs_hidden`, SHARED
+   with the catalog page (same key on both). The class rides the widget <body>; the JS reads
+   localStorage on every load so the state survives view flips and reopen. Hiding references hides
+   the whole plaque #refPanel — the leans-toward chip and its nested read/web notes — TOGETHER.
+   Independent of the Simple/Detailed view (which hides #refPanel too, INV-18/22). The §F own-library
+   data is NOT a reference surface (D-INV-7) and lives only on the catalog, so nothing here. */
+body.refs-hidden #refPanel{display:none!important}
 /* reference-direction tabs: the same `.seg` segmented bar (container styling comes from
    `.seg`; the buttons from `.seg>button`); only spacing below is bespoke here. */
 #refPanel .reftabs{margin-bottom:14px}
@@ -3841,8 +3873,10 @@ canvas{width:100%;display:block;border-radius:10px;cursor:crosshair}
    <h1 id="title"></h1><div class="sub" id="sub"></div></div>
  <!-- Simple⇄Detailed is a PURE client-side toggle: it shows/hides panels already
       embedded in this file. It never calls the network, never costs anything. On a QUICK read
-      there are no stems to reveal, so the toggle is replaced server-side by a hint. -->
- __VIEWTOGGLE__
+      there are no stems to reveal, so the toggle is replaced server-side by a hint.
+      __REFSTOGGLE__ is the references show/hide switch (D-INV-6/23) — present only when a
+      reference surface renders on this run; blank otherwise (never a switch with nothing to switch). -->
+ <div class="topctl">__REFSTOGGLE__ __VIEWTOGGLE__</div>
 </div>
 <div class="srcmeta" id="srcmeta"></div>
 <!-- Run-mode note: only on a quick read, spell out what a full run would add (2026-06-20). -->
@@ -4042,6 +4076,22 @@ const META=D.meta||{};
  // INV-31: initial view from URL hash (one-shot) > remembered preference > calm default.
  // Only a toggle writes tc_view; loading from hash or default never persists a preference.
  applyView(resolveView(location.hash,safeGetView()));_viewInited=true;})();
+// ── References show/hide switch (D-INV-6/23). ONE global persisted flag — localStorage
+// `tc_refs_hidden` = "1" (hidden) / "0"|absent (shown) — SHARED with the catalog page under the
+// SAME key, so hiding references on either surface hides both. Flips `refs-hidden` on <body>; the
+// CSS hides the whole reference plaque #refPanel (the leans-toward chip + its nested read/web).
+// Independent of the Simple/Detailed view: its state is read from localStorage on EVERY load, so it
+// survives view flips and page reopen. Default = shown (flag absent → visible). The §F own-library
+// data is not a reference surface (D-INV-7) and is never touched here.
+(function(){var KEY="tc_refs_hidden";var btn=document.getElementById("refsToggle");
+ function isHidden(){try{return localStorage.getItem(KEY)==="1";}catch(e){return false;}}
+ function paint(h){document.body.classList.toggle("refs-hidden",h);
+  if(!btn)return;btn.setAttribute("aria-pressed",h?"true":"false");
+  btn.textContent=h?"Show references":"Hide references";}
+ if(btn)btn.addEventListener("click",function(){
+  var h=!document.body.classList.contains("refs-hidden");
+  try{localStorage.setItem(KEY,h?"1":"0");}catch(e){}paint(h);});
+ paint(isHidden());})();
 // The Producer's read (#readTitle/#readBody) is rendered SERVER-SIDE (see _read_html in
 // build_widget.py) and already present in the markup — no client-side markdown parsing here.
 document.getElementById("arrTitle").textContent=T.arr_title;

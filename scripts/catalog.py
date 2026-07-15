@@ -617,10 +617,16 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
         uid += 1
     rows_html = "\n".join(body_rows) or (
         f'<tr><td colspan="{ncols}" class="empty">Library is empty — analyse a track to populate it.</td></tr>')
-    ths = "".join(
-        (f'<th class="sortable" data-key="{k}">{html.escape(label)}<span class="ar"></span></th>'
-         if k else f'<th>{html.escape(label)}</th>')
-        for _cid, k, label in active_cols)
+    def _th(cid, k, label):
+        # The lean (reference) header carries the `c-lean` hook so the references switch
+        # (D-INV-6/23) hides the whole column — header AND cells — together. The §F own-library
+        # header ("sib") gets no hook: it is not a reference surface (D-INV-7), never hidden.
+        classes = ([ "sortable" ] if k else []) + (["c-lean"] if cid == "lean" else [])
+        cls_attr = f' class="{" ".join(classes)}"' if classes else ""
+        dk = f' data-key="{k}"' if k else ""
+        ar = '<span class="ar"></span>' if k else ""
+        return f'<th{cls_attr}{dk}>{html.escape(label)}{ar}</th>'
+    ths = "".join(_th(cid, k, label) for cid, k, label in active_cols)
     responsive_css = _responsive_css([cid for cid, _sk, _label in active_cols])
     p = PALETTE
     # G-INV-16/22 passive banners: a member still on disk can be consolidated (migrate); a member
@@ -641,6 +647,11 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
             f'<div class="missing-banner">{m_word} {has_have} a missing source folder'
             f' — nothing left to consolidate; delete the entry or re-analyse the track.</div>'
         )
+    # References show/hide switch (D-INV-6/23): the control renders wherever a reference surface
+    # renders — here, only when the reference (leans-toward) column is shown (show_lean). Same label +
+    # behaviour + shared flag key as the widget control, so it is ONE named switch across both pages.
+    refs_toggle = ('<button id="refsToggle" class="refstoggle" type="button" '
+                   'aria-pressed="false">Hide references</button>' if show_lean else "")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(title)}</title>
@@ -662,6 +673,16 @@ h1{{font-size:21px;margin:0 0 2px}}.brand{{color:var(--wob);font-weight:700;font
 .seg button:hover:not(.on){{color:var(--ink)}}
 .seg button.on{{background:var(--panel2);color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.3)}}
 .count{{color:var(--muted);font-size:12px;margin-left:auto}}
+/* References show/hide switch (D-INV-6/23) — the catalog half of the ONE named switch; same label
+   + behaviour as the widget's. Pill button matching the surrounding controls; pressed = hidden. */
+.refstoggle{{padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
+ color:var(--muted);font:600 12.5px/1 inherit;cursor:pointer;white-space:nowrap}}
+.refstoggle:hover,.refstoggle[aria-pressed="true"]{{color:var(--ink);border-color:var(--wob)}}
+/* The one global persisted flag (localStorage `tc_refs_hidden`, shared with the widget) rides the
+   <body> class `refs-hidden`; it hides the reference (leans-toward) column — header AND cells
+   (both carry `c-lean`) — TOGETHER. The §F own-library column (`c-sibs`) is NOT a reference surface
+   (D-INV-7) and is deliberately NOT under this hook — it stays visible. */
+body.refs-hidden .c-lean{{display:none!important}}
 table{{width:100%;border-collapse:collapse;font-size:13px}}
 thead th{{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
  letter-spacing:.05em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--bg)}}
@@ -754,6 +775,7 @@ tr.hide{{display:none}}
    <button data-mode="full">Full</button>
    <button data-mode="quick">Quick</button>
   </div>
+  {refs_toggle}
   <span class="count" id="count"></span>
  </div>
  <div class="tablewrap"><table><thead><tr>{ths}</tr></thead><tbody id="rows">
@@ -837,6 +859,21 @@ document.querySelectorAll("th.sortable").forEach(th=>th.addEventListener("click"
   row.classList.remove("row-pulse"); void row.offsetWidth; row.classList.add("row-pulse");
  }});
 }})();
+// ── References show/hide switch (D-INV-6/23). ONE global persisted flag — localStorage
+// `tc_refs_hidden` = "1" (hidden) / "0"|absent (shown) — SHARED with a track's widget under the
+// SAME key, so hiding references on either surface hides both. Flips `refs-hidden` on <body>; the
+// CSS hides the reference (leans-toward) column (header + cells, both `c-lean`). The §F own-library
+// column (`c-sibs`) is not a reference surface (D-INV-7) and stays visible. Read on every load, so
+// the state persists across reopen. Default = shown (flag absent → visible).
+(function(){{var KEY="tc_refs_hidden";var btn=document.getElementById("refsToggle");
+ function isHidden(){{try{{return localStorage.getItem(KEY)==="1";}}catch(e){{return false;}}}}
+ function paint(h){{document.body.classList.toggle("refs-hidden",h);
+  if(!btn)return;btn.setAttribute("aria-pressed",h?"true":"false");
+  btn.textContent=h?"Show references":"Hide references";}}
+ if(btn)btn.addEventListener("click",function(){{
+  var h=!document.body.classList.contains("refs-hidden");
+  try{{localStorage.setItem(KEY,h?"1":"0");}}catch(e){{}}paint(h);}});
+ paint(isHidden());}})();
 apply();
 </script></body></html>"""
 
