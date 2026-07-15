@@ -5,6 +5,17 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.7.4] — 2026-07-15
+
+### Improved
+- **A track's under-rendered page now tells you which file it was — and lets you jump straight to
+  it.** Say a track's analysis failed or is still running. Before, the page named neither the file nor
+  where it lives. Now it shows *Source file* — the filename (e.g. *Midnight Run — v3.wav*) and its
+  full path (e.g. */Users/alexander/Music/Producer Sessions/Midnight Run — v3.wav*) — with a *Copy*
+  button next to it, so you can paste the path straight into Finder or a terminal instead of hunting
+  for the file by name. The path text is also selectable on its own. A run with no recorded source
+  path simply omits this block. A finished track's page is unchanged.
+
 ## [1.7.3] — 2026-07-15
 
 ### Improved

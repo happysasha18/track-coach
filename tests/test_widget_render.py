@@ -539,6 +539,29 @@ class ProgressBlockDisclosesRunStanding(unittest.TestCase):
         self.assertNotIn("Got this far", html,
                          "the override must REPLACE the English default, not sit beside it")
 
+    def test_strings_override_of_progress_step_label_reaches_the_page(self):
+        # RC-INV-13g: the per-step labels localise via --strings like every other panel string
+        # (the spec + matrix promise it; this closes the gap the audit found where the labels were
+        # read from the module default and an override never reached the page).
+        import validity as V
+        tmp, run = self._failed_core_only_run("audio not found")
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        (run / "result_detail.json").write_text("{}")
+        strings_path = run / "strings.json"
+        strings_path.write_text(json.dumps({"progress": {"steps": {"core": "SONIE ET COURBE"}}}))
+        out = run / "widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"), "--detail", str(run / "result_detail.json"),
+               "--strings", str(strings_path),
+               "--out", str(out), "--title", "Broken Track", "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"stderr={proc.stderr}")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("SONIE ET COURBE", html,
+                      "a --strings override of a progress.steps label must reach the rendered page")
+        self.assertNotIn("Loudness and arc", html,
+                         "the override must REPLACE the English step label, not sit beside it")
+
     def test_valid_run_shows_neither_progress_phrase(self):
         # regression: a genuinely complete run renders the full widget unchanged — no "got this
         # far" scaffolding and no error box belong on a finished read.
@@ -561,6 +584,69 @@ class ProgressBlockDisclosesRunStanding(unittest.TestCase):
         html = out.read_text(encoding="utf-8")
         self.assertNotIn("Got this far", html)
         self.assertNotIn("What went wrong", html)
+
+    def test_failed_run_names_source_file_and_copyable_path(self):
+        # RC-INV-13g tail: the source-file block — filename, full path, and a copy control —
+        # named on the failed placeholder, ahead of "Got this far".
+        import validity as V
+        audio_path = "/Users/x/Music/Midnight Run — v3.wav"
+        tmp, run = self._failed_core_only_run("demucs step failed (exit 1)")
+        meta = json.loads((run / "run_meta.json").read_text())
+        meta["audio_path"] = audio_path
+        (run / "run_meta.json").write_text(json.dumps(meta))
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Broken Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("Source file", html)
+        self.assertIn("Midnight Run — v3.wav", html, "the basename must be shown")
+        self.assertIn(audio_path, html, "the full path must be shown verbatim")
+        self.assertIn('id="copyPath"', html, "a copy button must be present")
+        # the source block must lead "Got this far" (status → source → progress, per SPEC order)
+        self.assertLess(html.index("Source file"), html.index("Got this far"))
+
+    def test_run_with_no_audio_path_omits_source_block(self):
+        # RC-INV-13g tail NEG: a run with no recorded source path names none — the block is
+        # omitted entirely, and the page still renders its status line without crashing.
+        tmp, run = self._failed_core_only_run("demucs step failed (exit 1)")
+        # the fixture's run_meta.json carries no audio_path/audio key at all
+        import validity as V
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Broken Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertNotIn("Source file", html, "no recorded path means the block is omitted")
+        self.assertIn("Analysis couldn't complete for this track.", html,
+                      "the status line must still render with no crash")
+
+    def test_strings_override_of_progress_copy_reaches_the_button(self):
+        # RC-INV-13g tail: --strings can localise the copy button's label like every other
+        # panel string, confirmed via the CLI (mirrors test_strings_override_of_progress_heading).
+        import validity as V
+        tmp, run = self._failed_core_only_run("audio not found")
+        meta = json.loads((run / "run_meta.json").read_text())
+        meta["audio_path"] = "/tmp/track.wav"
+        (run / "run_meta.json").write_text(json.dumps(meta))
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        (run / "result_detail.json").write_text("{}")
+        strings_path = run / "strings.json"
+        strings_path.write_text(json.dumps({"progress": {"copy": "COPIER"}}))
+        out = run / "widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"), "--detail", str(run / "result_detail.json"),
+               "--strings", str(strings_path),
+               "--out", str(out), "--title", "Broken Track", "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"stderr={proc.stderr}")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("COPIER", html,
+                      "a --strings override of progress.copy must reach the button label")
+        self.assertNotIn('>Copy<', html,
+                         "the override must REPLACE the English default, not sit beside it")
 
 
 class StoryCurvesReachThePayload(unittest.TestCase):

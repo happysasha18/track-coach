@@ -28,7 +28,14 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.7.3"  # Track Coach analyzer version — s70: RC-INV-13g — the two under-rendered
+TC_VERSION = "1.7.4"  # Track Coach analyzer version — s70 cont.: RC-INV-13g tail — the two
+# under-rendered pages (failed + in-progress) now also name the SOURCE FILE — its filename and full
+# path, read from run_meta.json's audio_path (fallback: audio) — as the first detail block, right
+# after the status line and before "Got this far". The path is user-selectable text plus a Copy
+# button (clipboard.writeText with an execCommand fallback so it still works from a file:// page); a
+# run with no recorded source path omits the block entirely. Best-effort, like every other
+# placeholder disclosure. Valid-run widgets and the two status lines are unchanged; analysis OUTPUT
+# of valid runs unchanged, nothing stales. Prior 1.7.3 s70: RC-INV-13g — the two under-rendered
 # pages (failed + in-progress) now disclose where the run stands instead of a bare status line: a
 # "got this far" step list read from which result_*.json the run actually wrote (done/not-yet, per
 # producer-terms label), and the failed page also shows the caught analysis_error verbatim plus keeps
@@ -445,6 +452,11 @@ STRINGS = {
         "heading": "Got this far",
         "nothing": "Nothing measured yet.",
         "error_heading": "What went wrong",
+        # RC-INV-13g tail: the source-file block's own strings — heading + the copy button's two
+        # states (idle / just-copied). Overridable via --strings like every other panel string.
+        "source_heading": "Source file",
+        "copy": "Copy",
+        "copied": "Copied",
         "steps": {
             "core": "Loudness and arc",
             "stems": "Stem separation",
@@ -2466,6 +2478,87 @@ def _read_analysis_error(run_dir):
         return None
 
 
+def _read_audio_path(run_dir):
+    """RC-INV-13g tail: the run's recorded source path from run_meta.json, or None. Mirrors
+    _read_analysis_error's best-effort read exactly (any error → None, so the placeholder still
+    renders — without the source block — rather than crashing on a read it can't do). Prefers
+    `audio_path` (the full path every real run writes, run_dir.py); falls back to `audio` (a bare
+    basename on old runs / build-only run_dirs) so an older run still names something, even if it
+    can't offer a full copyable path."""
+    if not run_dir:
+        return None
+    try:
+        import json
+        m = json.loads((Path(run_dir) / "run_meta.json").read_text())
+        return m.get("audio_path") or m.get("audio")
+    except Exception:  # noqa: BLE001 — best-effort; absence means no source block to show
+        return None
+
+
+def _source_block_html(run_dir, S):
+    """RC-INV-13g tail (SPEC.md, the "source file" sentence): the "Source file" block shown on both
+    under-rendered placeholders — the basename plus the full path, read from run_meta.json's
+    audio_path (fallback: audio), with a copy control. Returns "" (the whole block omitted) when
+    `_read_audio_path` finds nothing — a run with no recorded source path names none, per spec,
+    rather than showing an empty/misleading block."""
+    path = _read_audio_path(run_dir)
+    if not path:
+        return ""
+    prog = S.get("progress") or STRINGS["progress"]
+    heading = prog.get("source_heading", STRINGS["progress"]["source_heading"])
+    copy_label = prog.get("copy", STRINGS["progress"]["copy"])
+    name = Path(path).name
+    return (
+        '<div class="srcfile">'
+        f'<p class="phead">{_esc(heading)}</p>'
+        f'<p class="fname">{_esc(name)}</p>'
+        '<div class="pathrow">'
+        f'<code class="path" id="srcPath">{_esc(path)}</code>'
+        f'<button type="button" class="copybtn" id="copyPath">{_esc(copy_label)}</button>'
+        '</div></div>'
+    )
+
+
+def _copy_path_script_html(S):
+    """RC-INV-13g tail: the tiny inline copy-to-clipboard script for the source-file block above.
+    Only ever included by the two placeholder renderers when `_source_block_html` returned a
+    non-empty block. Tries navigator.clipboard.writeText first; falls back to selecting the <code>
+    range + document.execCommand('copy') when the clipboard API is missing or rejects — the
+    fallback is what keeps the button working from a file:// page, where the async clipboard API is
+    commonly blocked. On success the button label swaps to the "copied" string for ~1.5s, then
+    restores its original text."""
+    prog = S.get("progress") or STRINGS["progress"]
+    # `<\/` so a label containing "</script>" can never close this inline script early.
+    copy_label = json.dumps(prog.get("copy", STRINGS["progress"]["copy"])).replace("</", "<\\/")
+    copied_label = json.dumps(prog.get("copied", STRINGS["progress"]["copied"])).replace("</", "<\\/")
+    return (
+        '<script>(function(){\n'
+        'var btn=document.getElementById("copyPath");\n'
+        'if(!btn)return;\n'
+        f'var COPY_LABEL={copy_label},COPIED_LABEL={copied_label};\n'
+        'function flash(){btn.textContent=COPIED_LABEL;setTimeout(function(){btn.textContent=COPY_LABEL;},1500);}\n'
+        'function fallbackCopy(){\n'
+        '  var el=document.getElementById("srcPath");\n'
+        '  try{\n'
+        '    var range=document.createRange();range.selectNodeContents(el);\n'
+        '    var sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);\n'
+        '    var ok=document.execCommand("copy");\n'
+        '    sel.removeAllRanges();\n'
+        '    if(ok){flash();}\n'
+        '  }catch(e){}\n'
+        '}\n'
+        'btn.addEventListener("click",function(){\n'
+        '  var text=document.getElementById("srcPath").textContent;\n'
+        '  if(navigator.clipboard&&navigator.clipboard.writeText){\n'
+        '    navigator.clipboard.writeText(text).then(flash,fallbackCopy);\n'
+        '  }else{\n'
+        '    fallbackCopy();\n'
+        '  }\n'
+        '});\n'
+        '})();</script>\n'
+    )
+
+
 # RC-INV-13g: the ordered (step key, result filename) pairs each MODE promises, read by
 # _run_progress. `als` is the one optional row — an .als is optional input, so a run with no project
 # file to parse never shows it as a not-reached step; it is included ONLY when result_als.json
@@ -2486,18 +2579,20 @@ _PROGRESS_STEP_LABELS_FALLBACK = {
 }
 
 
-def _run_progress(run_dir, mode):
+def _run_progress(run_dir, mode, S=None):
     """RC-INV-13g: an ordered [(label, done: bool), ...] for the steps `mode` promises, each `done`
     read from whether its result file exists in `run_dir` — quick promises just the core step; full
     promises all seven (the .als row included only when result_als.json actually exists, since an
-    .als is optional input, never a "not reached" step). Best-effort: no run_dir, or ANY read error,
-    returns [] so the caller can render "nothing measured yet" and the page never fails to render."""
+    .als is optional input, never a "not reached" step). Step labels come from the caller's merged
+    strings `S` (a `--strings` override reaches the page), falling back to the English defaults.
+    Best-effort: no run_dir, or ANY read error, returns [] so the caller can render "nothing measured
+    yet" and the page never fails to render."""
     if not run_dir:
         return []
     try:
         rd = Path(run_dir)
         steps = _PROGRESS_STEPS_QUICK if mode == "quick" else _PROGRESS_STEPS_FULL
-        labels = (STRINGS.get("progress") or {}).get("steps") or {}
+        labels = ((S or {}).get("progress") or STRINGS.get("progress") or {}).get("steps") or {}
         out = []
         for key, fname in steps:
             exists = (rd / fname).exists()
@@ -2523,7 +2618,7 @@ def _progress_block_html(run_dir, mode, S, *, error=None):
     of nothing-but-dashes reads as the same "nothing measured yet" case, not a real progress list.
     An empty/None `error` omits the error box entirely — the in-progress placeholder never passes one,
     since RC-INV-13g reserves it for a caught failure."""
-    steps = _run_progress(run_dir, mode)
+    steps = _run_progress(run_dir, mode, S)
     prog = S.get("progress") or STRINGS["progress"]
     heading = prog.get("heading", STRINGS["progress"]["heading"])
     nothing = prog.get("nothing", STRINGS["progress"]["nothing"])
@@ -2556,6 +2651,14 @@ _PROGRESS_CSS = (
     '.progress li.todo{color:#6b7385}\n'
     '.errbox{text-align:left;margin:16px auto 0;max-width:420px}\n'
     '.err{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9aa3b5;word-break:break-word;margin:0}\n'
+    # RC-INV-13g tail: the source-file block (basename + full copyable path + copy button) shared
+    # by both placeholder shells, placed above .progress in each page.
+    '.srcfile{text-align:left;margin:20px auto 0;max-width:420px}\n'
+    '.fname{font-size:14px;color:#e8ecf5;font-weight:600;margin:0 0 6px;word-break:break-word}\n'
+    '.pathrow{display:flex;gap:8px;align-items:flex-start}\n'
+    '.path{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9aa3b5;word-break:break-all;user-select:all;flex:1}\n'
+    '.copybtn{flex:none;font-size:11px;font-weight:600;color:#c7cddb;background:#232a3d;border:1px solid #38415a;border-radius:6px;padding:4px 10px;cursor:pointer}\n'
+    '.copybtn:hover{background:#2b3450}\n'
 )
 
 
@@ -2570,6 +2673,8 @@ def _render_failed_placeholder(out_path, title, S, run_dir=None, mode="full"):
     `analysis_error` (read fresh from run_meta.json), verbatim, when one was stamped."""
     status_text = S["status"]["failed"]
     hint_text = S["status"]["failed_hint"]
+    source_html = _source_block_html(run_dir, S)
+    copy_script = _copy_path_script_html(S) if source_html else ""
     progress_html = _progress_block_html(run_dir, mode, S, error=_read_analysis_error(run_dir))
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
@@ -2591,8 +2696,11 @@ def _render_failed_placeholder(out_path, title, S, run_dir=None, mode="full"):
         f'<h1 id="title">{_esc(title)}</h1>\n'
         f'<p class="status" id="failedStatus">{_esc(status_text)}</p>\n'
         f'<p class="hint" id="failedHint">{_esc(hint_text)}</p>\n'
+        f'{source_html}\n'
         f'{progress_html}\n'
-        '</div></body></html>\n'
+        '</div>\n'
+        f'{copy_script}'
+        '</body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved (failed-run placeholder): {out_path}  (Track Coach v{TC_VERSION})")
@@ -2607,6 +2715,8 @@ def _render_incomplete_placeholder(out_path, title, S, run_dir=None, mode="full"
     "got this far" progress block, with no error (an in-progress run never carries a caught error) —
     `run_dir`/`mode` optional, best-effort-empty when absent, never a crash."""
     status_text = S["status"]["incomplete"]
+    source_html = _source_block_html(run_dir, S)
+    copy_script = _copy_path_script_html(S) if source_html else ""
     progress_html = _progress_block_html(run_dir, mode, S)
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
@@ -2626,8 +2736,11 @@ def _render_incomplete_placeholder(out_path, title, S, run_dir=None, mode="full"
         '<div class="brandkick">Track Coach</div>\n'
         f'<h1 id="title">{_esc(title)}</h1>\n'
         f'<p class="status" id="analysingStatus">{_esc(status_text)}</p>\n'
+        f'{source_html}\n'
         f'{progress_html}\n'
-        '</div></body></html>\n'
+        '</div>\n'
+        f'{copy_script}'
+        '</body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved (in-progress placeholder): {out_path}  (Track Coach v{TC_VERSION})")

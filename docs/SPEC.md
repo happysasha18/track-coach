@@ -2095,7 +2095,11 @@ reopens. `tags: RC-INV-13d · known-limitation`
   caught. A run that measured nothing yet shows "nothing measured yet" in place of the list. The disclosure is
   best-effort and never blocks the page: if the progress or error cannot be read, the page still renders its
   status line. The "got this far" step names, the next-step wording, and the "nothing measured yet" line are
-  `[default]` and localisable through `--strings`. *Fences:* the valid-run full widget is unchanged; the two
+  `[default]` and localisable through `--strings`. Every such page also names the **source file** — its
+  filename and full path, read from the run's `audio_path` — so the producer sees which file this is and where
+  it sits. The path is copyable: it is selectable text and carries a copy control that puts the path on the
+  clipboard (a plain-selection fallback keeps it copyable where the clipboard call is blocked). A run with no
+  recorded source path omits the source block. *Fences:* the valid-run full widget is unchanged; the two
   status lines (RC-INV-13c, RC-INV-13f) are unchanged and still lead their pages; an invalid run still never
   deposits or feeds similarity (RC-INV-13). *Non-goals:* no per-error-type branching of the advice beyond the
   one general step, no live auto-refresh of the in-progress page. *Success measure:* a failed page renders the
