@@ -132,7 +132,7 @@ Coded + tested in `tests/test_per_stem.py`, EXCEPT INV-25 (feature not built —
 
 ### PLANNED (not built) — source-file header symmetry & readability
 
-Not critical. The display path already wires both audio + .als (`build_widget.py:2276-2281`); these rows formalize the requirement + tripwire it. Both owning tests EXIST but are `@unittest.skip`ped (the suite's 2 skips) until implemented.
+Not critical. The display path already wires both audio + .als (`build_widget.py`, grep the `#srcmeta` audio+als wiring); these rows formalize the requirement + tripwire it. Both owning tests EXIST but are `@unittest.skip`ped (the suite's 2 skips) until implemented.
 
 | INV | Claim | Owning test (skipped — planned) |
 |---|---|---|
@@ -613,7 +613,7 @@ Three targeted bugs fixed; each owns tests asserting the REAL rendered artifact.
 | code | rule (1-line) | owning test / status |
 |---|---|---|
 | E-BUG-1 | **No dead commented-out refRead/webPanel block in the rendered widget.** `id="refRead"` and `id="webPanel"` each appear EXACTLY ONCE. Root cause: the HTML comment at the `__REFREAD__` slot referenced `__REFREAD__` by name, causing the template substitution to embed a full copy inside the `<!-- … -->` block. Fix: removed `__REFREAD__` from the comment text so only the live slot is substituted. | `test_widget_render::NoDeadRefReadComment::test_refread_appears_exactly_once`, `::test_webpanel_appears_exactly_once`, `::test_no_html_comment_contains_refread_id` |
-| E-BUG-2 | **`char` chip has a visible legend explaining it = 'Character axis — assessed without loudness weighting'.** The chip appears on per-row items in the refRead bars (only a hover tooltip per item); a legend block at the bottom of the refRead panel provides the visible explanation. Investigation: legend was already present at `build_widget.py:2586` — no code change needed; test added as regression guard. | `test_reference_read::CharLegend::test_char_legend_explains_the_chip`, `::test_char_chip_has_tooltip` |
+| E-BUG-2 | **`char` chip has a visible legend explaining it = 'Character axis — assessed without loudness weighting'.** The chip appears on per-row items in the refRead bars (only a hover tooltip per item); a legend block at the bottom of the refRead panel provides the visible explanation. Investigation: legend was already present (`build_widget.py`, grep the refRead `char` legend block) — no code change needed; test added as regression guard. | `test_reference_read::CharLegend::test_char_legend_explains_the_chip`, `::test_char_chip_has_tooltip` |
 | E-BUG-3 | **Catalog 'leans toward' direction links navigate to the track's widget focused on the #refRead section (D-INV-28), not `href="#"`.** Fix: `_lean_cell` now accepts `widget_href`; emits `<widget_href>#refRead`; `_row` passes the resolved `href`. Fallback (no widget): `#refRead` in-page anchor (never bare `#`). | `test_catalog::DirectionLinkIsReal::test_direction_link_href_is_not_dead`, `::test_direction_link_points_to_refread_anchor`, `::test_rendered_catalog_direction_link_not_dead` |
 
 ## §A-metre — Arrangement metre changes (SPEC §A "metre changes")
@@ -653,7 +653,7 @@ Deferred (next movement — surface named, not yet coded):
 | code | rule (1-line) | lands with |
 |---|---|---|
 | DS-INV-6 | rec-card left stripe renders a `bad`/red variant for a bad-severity card. | §1 cont. — rec-card CSS (`build_widget.py` `.rec` block) + a browser test |
-| DS-INV-5 | colour-drift hexes map to tokens: `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn` (matches SPEC §I DS-INV-5). Category IDENTITY backgrounds are NOT derived — they are `_CAT_COLORS` literals (Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`, `build_widget.py:68`), left as a categorical group like the stem colours (⟨DECIDE DS-4⟩ RECONCILED s43; the old `#3a40…` "derive from --panel2/--line" assumption was WRONG — those hexes don't exist). | §I design-tokens — `test_design_tokens` (shared-role token byte-equality) |
+| DS-INV-5 | colour-drift hexes map to tokens: `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn` (matches SPEC §I DS-INV-5). Category IDENTITY backgrounds are NOT derived — they are `_CAT_COLORS` literals (Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`, `build_widget.py`, grep `_CAT_COLORS`), left as a categorical group like the stem colours (⟨DECIDE DS-4⟩ RECONCILED s43; the old `#3a40…` "derive from --panel2/--line" assumption was WRONG — those hexes don't exist). | §I design-tokens — `test_design_tokens` (shared-role token byte-equality) |
 | DS-INV-12 | every `border-radius` ∈ {10,14,18,20}; 6/8/9/11/12 snap. | §5 radii pass + browser test |
 | DS-INV-10 | motion tokens `--dur-fast/--dur-base/--ease` replace `.12s/.15s`. | §3 |
 | DS-INV-11 | one state ladder (rest/hover/focus/active/selected/disabled). | §4 |

@@ -98,7 +98,7 @@ finding. "Don't cry wolf, and don't paint silence."
   The acknowledgment itself must RENDER — a missing lane reads as a decision, not a bug. `INV-42`
   ⟨DECIDE⟩ floor value →
   **SETTLED §B.2: −55 dB broadband (`STEM_EMPTY_FLOOR_DB`)**. **INV-45: a near-silent stem's lane starts MUTED
-  on first load** (`build_widget.py:3868`, `if(startMuted)a.muted=true`). The mute is cosmetic-initial only:
+  on first load** (`build_widget.py`, grep the player JS `if(startMuted)a.muted=true`). The mute is cosmetic-initial only:
   the M/S buttons still work, and the lane is visible and identified as usual (CR-2 visibility unaffected).
 
 - **CR-3 — per-stem visuals are gated on ABSOLUTE level, not per-stem normalization.** A silent stem
@@ -2279,19 +2279,25 @@ remove (paths, counts, reclaimed size) and removes nothing until the user confir
 intermediate output; it **never** removes a deposited library member (a catalogued widget + its index entry)
 without an explicit, separate force. The default `gc` can leave the library wholly intact. `G-INV-9`
 
-**gc keeps referenced runs by default, and names all three losses before pruning one.** A library member's
+**gc keeps referenced runs, and never force-prunes one.** A library member's
 preview audio, its original widget, *and* its similarity data (`result_*.json`) all live in its `src_run_dir`.
-So gc, by default, **keeps** run dirs still referenced by a library member. When the user explicitly overrides
-that, the warning names every casualty — not just "preview/audio": for each affected catalog row, *preview audio
-goes silent · the open-link falls back to the library's HTML copy (G-INV-14) · the track becomes "can't compare"
-in the cloud/siblings (§D/§F) until re-analysed.* Understating it to "you just lose the audio" would be a silent
-loss of comparability. `G-INV-10`
+So gc **keeps** run dirs still referenced by a library member and reports the count it is keeping (`_cmd_gc`:
+"keeping N referenced run(s) (G-INV-10)"). gc itself has **no force-override** — it only ever reclaims orphaned
+run dirs, so it can never cause the loss below on its own. To reclaim a still-referenced run, remove its library
+entry first (`remove` / `clean`), which turns the run into an orphan gc then reclaims; that removal is where the
+loss lands, and it is a full loss for each affected catalog row: the preview audio goes silent, the open-link
+falls back to the library's HTML copy (G-INV-14), and the track becomes "can't compare" in the cloud/siblings
+(§D/§F) until re-analysed — a loss of comparability, wider than just the audio. (Reopen 2026-07-15: the spec
+once described a gc override that warned about this loss; the safe shipped design keeps the run instead and
+requires the deliberate entry-removal, so there is no gc casualty warning to print.) `G-INV-10`
 
 **gc also protects the best *undeposited* run.** The most-complete run for a track (the one §E.4/RC-INV-9 reads
 from) may never have been deposited — e.g. a scratch re-run done to get transcription on more stems. G-INV-10's
 keep-guard only covers *referenced* runs, so this one is invisible to it. gc therefore preserves, for each
-slug, the run RC-INV-9 would select; if the user forces it anyway, the dry-run names it: *"the current best run
-for ⟨track⟩ — pruning downgrades coaching to ⟨N⟩ fewer axes."* `G-INV-15`
+slug, the run RC-INV-9 would select, and reports the count it is keeping (`_cmd_gc`: "keeping N best-undeposited
+run(s) per slug (G-INV-15)"). As with G-INV-10, gc never forces the removal of this best run; reclaiming it
+takes a deliberate step outside gc, which is where the downgrade (coaching drops to the axes a thinner run
+carries) would apply. `G-INV-15`
 
 **Cleanup is all-or-clean-report, including the index.** A reset/gc either completes and reports precisely what
 it removed and how much space it reclaimed, or it aborts having removed nothing — it never leaves a half-deleted
@@ -2305,7 +2311,8 @@ run dir is gone. `G-INV-11`
 **With the `src_run_dir` readers (§D.10 / §F similarity, the catalog open-link, the preview player).** Because
 old runs aren't moved (G-INV-4) and paths are honoured as-stored (G-INV-6), relocating the default root changes
 nothing for already-deposited members; only freshly analysed tracks resolve under `$HOME`. A gc that prunes a
-referenced run is the one interaction that can break a reader — handled by G-INV-10's keep-by-default + warning.
+referenced run is the one interaction that can break a reader — handled by G-INV-10's keep-by-default (gc never
+prunes a referenced run; reclaiming one takes a deliberate entry removal first).
 
 **With the per-track history in `index.json`.** Because identity is stable (G-INV-2), all of a track's versions
 share one history — *except* a track analysed both before and after the move, whose history splits across the
@@ -2333,8 +2340,8 @@ These were the open ⟨DECIDE⟩ points; all are now settled and folded into the
 - **G-2 — pre-1.0 runs.** Build the optional `migrate` (G-INV-16), and run it on the three existing
   library tracks so everything consolidates under `$HOME`. Relocation stays going-forward-only by default;
   `migrate` is the explicit, dry-run-first way to bring the old ones over.
-- **G-3 — pruning a referenced run.** Keep-by-default and warn (G-INV-10); the warning names all three losses
-  (preview, open-link fallback, comparability).
+- **G-3 — pruning a referenced run.** Keep-by-default (G-INV-10); gc never force-prunes a referenced run, so
+  the three losses (preview, open-link fallback, comparability) only follow a deliberate entry removal, outside gc.
 - **G-4 — split history.** Seed the new shared index from the old per-folder one on the first post-move run, from
   the named pre-1.0 path `<audio_parent>/track-coach-output/index.json`; disclose the split only if it isn't
   found (G-INV-12).
@@ -2518,7 +2525,7 @@ component library. One role = one token = one name.
 - **Colour drift → tokens (DS-INV-5):** `#6fdfb8 → --good` · `#ffb13f` (reference star) `→ --warn`.
   (⟨DECIDE DS-4⟩: the category backgrounds are
   saturated CATEGORY-IDENTITY colours `_CAT_COLORS` = Mix `#5b6472` / Balance `#7a6cab` / Character `#c08a3e`
-  (`build_widget.py:68`, applied inline). They are the same KIND of thing as the stem colours (DS-INV-7b) —
+  (`build_widget.py`, grep `_CAT_COLORS`, applied inline). They are the same KIND of thing as the stem colours (DS-INV-7b) —
   a categorical group, LEFT as literals; deriving them from `--panel2/--line` would destroy the colour-coding.)
 - **rec-card severity (DS-INV-6):** the left stripe encodes severity `good / warn / bad` (ADD the
   `bad`/red variant). `--wob` is the neutral/brand accent, never an alarm level. A rec key absent from

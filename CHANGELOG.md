@@ -5,6 +5,38 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.8.0] — 2026-07-15
+
+### Added
+- **One switch to hide every reference.** If you'd rather work without comparisons on screen, a single
+  *Hide references* control turns them all off at once — the "leans toward" column in the library and
+  the whole *You vs your closest match* panel on a track's page — across the catalog and every page,
+  and it stays hidden until you switch it back. Your own-library siblings stay visible, since those are
+  your own tracks — always-on library data.
+
+### Fixed
+- **The library row now reads a track's most-complete run.** A quick re-run made
+  after a full analysis of the same bounce no longer hides the full run's numbers — the row prefers the
+  more complete run and falls back to newest only as a tiebreak. One rule now drives every "which run"
+  choice in the tool, so the catalog, version pruning, and coaching can't disagree.
+- **The library comparison columns now say why a cell is empty.** A track that couldn't be compared
+  because a signal wasn't measured reads *"can't compare — ⟨the missing signals⟩"* instead of a
+  misleading *"no close direction yet"*; an own-library cell with no other placeable track reads
+  *"no comparison yet"* instead of a bare dash that looked broken. An all-quick library shows neither
+  comparison column at all, rather than an empty one.
+- **Click a similar track in your library and the catalog scrolls to its row and highlights it**, so
+  you can find it in place instead of losing your spot to a new page.
+- **A near-silent stem stays muted after you flip between the Simple and Detailed views.** Before, a
+  round-trip through Simple quietly un-muted it for the rest of the session.
+- **Safer library housekeeping.** Relocating your runs to a new folder is now all-or-nothing per run,
+  so an interruption can't leave the library pointing at a moved file; and restoring a backup brings
+  your settings (`config.json`) back with it.
+
+### Changed
+- **The per-part cards drop the stereo-width card.** A part being wider or narrower than the rest is a
+  description the coach can't call right or wrong, so it no longer earns a prescriptive card — the
+  per-part cards stay on the two axes that read against the track's arc (energy, density).
+
 ## [1.7.4] — 2026-07-15
 
 ### Improved
