@@ -436,6 +436,133 @@ class StatusStringsLocalisable(unittest.TestCase):
                       "an un-overridden status key must still fall back to the English default")
 
 
+class ProgressBlockDisclosesRunStanding(unittest.TestCase):
+    """RC-INV-13g: the under-rendered pages (failed + in-progress) tell the producer where the run
+    stands instead of a bare status line — a "got this far" step list read from which result_*.json
+    the run actually wrote, and the failed page also shows the caught analysis_error verbatim. Same
+    fixture shapes as FailedRunRendersHonestPlaceholder / IncompleteRunRendersStatusPlaceholder
+    above."""
+
+    def _failed_core_only_run(self, error_text):
+        # core measured, masking never ran (Demucs died) → "Loudness and arc" done, "Stem
+        # separation" not done — the exact shape design point 1 asks for.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_prog_failed_"))
+        run = tmp / "run"
+        run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        (run / "run_meta.json").write_text(json.dumps({
+            "analysis_state": "failed", "analysis_error": error_text}))
+        return tmp, run
+
+    def test_failed_run_shows_progress_list_and_error(self):
+        import validity as V
+        tmp, run = self._failed_core_only_run("demucs step failed (exit 1)")
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Broken Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("Got this far", html)
+        self.assertIn("What went wrong", html)
+        self.assertIn("demucs step failed (exit 1)", html)
+        # the done step carries a check, the not-done step an em-dash
+        self.assertRegex(html, r'class="done">✓\s*Loudness and arc')
+        self.assertRegex(html, r'class="todo">—\s*Stem separation')
+
+    def test_incomplete_run_shows_progress_no_error_box(self):
+        import validity as V
+        # same shape as IncompleteRunRendersStatusPlaceholder._incomplete_run: core + masking
+        # present, sustain/spectral_centroid never measured → INVALID, no failed marker.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_prog_incomplete_"))
+        run = tmp / "run"
+        run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-30.0), "bass": bands(-30.0), "other": bands(-30.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0, "total_windows": 8}))
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Partial Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("Got this far", html)
+        self.assertRegex(html, r'class="done">✓\s*Loudness and arc')
+        self.assertRegex(html, r'class="done">✓\s*Stem separation')
+        self.assertRegex(html, r'class="todo">—\s*Per-stem rhythm')
+        self.assertNotIn("What went wrong", html,
+                         "an in-progress page never names an error — none was caught")
+
+    def test_no_core_failed_run_shows_nothing_measured(self):
+        # a failure so early nothing was measured at all — mirrors
+        # EarlyNoCoreFailureRendersPlaceholder: main() derives run_dir from --core and finds the
+        # failed marker before it ever requires the (absent) core file.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_prog_nocore_"))
+        run = tmp / "run"
+        run.mkdir()
+        (run / "run_meta.json").write_text(json.dumps({
+            "analysis_state": "failed", "analysis_error": "audio not found: /gone.wav"}))
+        out = run / "widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"),
+               "--detail", str(run / "result_detail.json"),
+               "--out", str(out), "--title", "Gone Track", "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"must not crash; stderr={proc.stderr}")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("Nothing measured yet.", html)
+        self.assertNotIn('class="done"', html, "no step is done when nothing was ever measured")
+
+    def test_strings_override_of_progress_heading_reaches_the_page(self):
+        import validity as V
+        tmp, run = self._failed_core_only_run("audio not found")
+        self.assertFalse(V.is_valid(str(run), "full"), "fixture must be an INVALID run")
+        (run / "result_detail.json").write_text("{}")
+        strings_path = run / "strings.json"
+        strings_path.write_text(json.dumps({"progress": {"heading": "ARRIVE JUSQU'ICI"}}))
+        out = run / "widget.html"
+        cmd = [sys.executable, str(BUILD_WIDGET_SCRIPT),
+               "--core", str(run / "result_core.json"), "--detail", str(run / "result_detail.json"),
+               "--strings", str(strings_path),
+               "--out", str(out), "--title", "Broken Track", "--mode", "full"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"stderr={proc.stderr}")
+        html = out.read_text(encoding="utf-8")
+        self.assertIn("ARRIVE JUSQU'ICI", html,
+                      "a --strings override of progress.heading must reach the rendered page")
+        self.assertNotIn("Got this far", html,
+                         "the override must REPLACE the English default, not sit beside it")
+
+    def test_valid_run_shows_neither_progress_phrase(self):
+        # regression: a genuinely complete run renders the full widget unchanged — no "got this
+        # far" scaffolding and no error box belong on a finished read.
+        tmp = Path(tempfile.mkdtemp(prefix="tc_prog_valid_"))
+        run = tmp / "run"
+        run.mkdir()
+        (run / "result_core.json").write_text(json.dumps({
+            "vitals": {"tempo_bpm": 120.0, "dynamic_range_db": 10.0},
+            "stereo_width_mean": 0.5, "density_lv": 0.6, "energy_trend": 0.2}))
+        bands = lambda db: {b: [db] * 8 for b in ("sub", "low", "low_mid", "mid", "hi_mid", "air")}
+        (run / "result_masking.json").write_text(json.dumps({
+            "band_rms_db": {"drums": bands(-85.0), "bass": bands(-85.0), "other": bands(-85.0)},
+            "stems_analysed": ["drums", "bass", "other"], "duration_s": 48.0, "total_windows": 8}))
+        import validity as V
+        self.assertTrue(V.is_valid(str(run), "full"), "fixture must be a genuinely COMPLETE run")
+        out = tmp / "widget.html"
+        build_widget.build_html(_synthetic_core(), {}, None, None, str(out), "Whole Track",
+                                build_widget.STRINGS, mode="full", run_dir=str(run),
+                                narrative_md="The mix reads clear.")
+        html = out.read_text(encoding="utf-8")
+        self.assertNotIn("Got this far", html)
+        self.assertNotIn("What went wrong", html)
+
+
 class StoryCurvesReachThePayload(unittest.TestCase):
     """Every curve the graph can draw must actually be in the rendered data."""
 

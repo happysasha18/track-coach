@@ -5,6 +5,19 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.7.3] — 2026-07-15
+
+### Improved
+- **A track that couldn't finish now shows what it measured before it stopped, not just that it
+  stopped.** Say a track's stem separation dies partway through analysis. Before, the page just said
+  *Analysis couldn't complete for this track.* with no sense of how far it got. Now it also shows a
+  short "Got this far" list — *Loudness and arc* ✓ done, *Stem separation* — not reached, and so on
+  through the rest of the steps — plus the actual error underneath (e.g. *demucs step failed (exit
+  1)*), so you know exactly where and why it stopped, on top of the existing next-step advice. A
+  track that's still analysing shows the same "Got this far" list under its *reload when it's ready*
+  message, so a long analysis shows visible progress instead of a static wait. A track where nothing
+  has been measured yet simply says *Nothing measured yet.* A finished track's page is unchanged.
+
 ## [1.7.2] — 2026-07-14
 
 ### Fixed

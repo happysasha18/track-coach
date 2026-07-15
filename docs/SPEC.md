@@ -2082,6 +2082,25 @@ reopens. `tags: RC-INV-13d · known-limitation`
   kill (`kill -9`, out of memory) the analyzer cannot catch leaves the run at "running" and it keeps the
   recoverable placeholder, since a killed run would complete on re-run. The two message strings are overridable
   through the localisation file (`--strings`), English by `[default]`. `RC-INV-13f`
+- *The under-rendered page tells the producer where the run stands.* A failed or in-progress page carries more
+  than its one status line: it discloses the run's progress so the producer sees what happened to the file
+  rather than a bare wall. Every such page shows a **"got this far"** list — the analysis steps the run
+  completed, in plain producer terms (loudness and arc, stem separation, per-stem rhythm, note transcription,
+  drum breakdown, the arrangement read), each marked done or not-yet, read from which `result_*.json` the run
+  actually wrote. A **failed** page adds two things: **what went wrong**, the caught `analysis_error` shown
+  verbatim in a muted technical line (empty error omits the line), and **what to do next**, a plain step — a
+  re-run clears a transient failure, and a source that keeps failing is checked for being readable and fully
+  exported. An **in-progress** page shows the same "got this far" list under its "reload when it's ready."
+  line, so a long analysis shows progress instead of a static wait; it names no error, because none was
+  caught. A run that measured nothing yet shows "nothing measured yet" in place of the list. The disclosure is
+  best-effort and never blocks the page: if the progress or error cannot be read, the page still renders its
+  status line. The "got this far" step names, the next-step wording, and the "nothing measured yet" line are
+  `[default]` and localisable through `--strings`. *Fences:* the valid-run full widget is unchanged; the two
+  status lines (RC-INV-13c, RC-INV-13f) are unchanged and still lead their pages; an invalid run still never
+  deposits or feeds similarity (RC-INV-13). *Non-goals:* no per-error-type branching of the advice beyond the
+  one general step, no live auto-refresh of the in-progress page. *Success measure:* a failed page renders the
+  step list plus the stored error and a next step, and an in-progress page renders the step list, each read
+  from the run's real files. `RC-INV-13g`
 - *Validity is stable per run.* The promised-set version is stamped into the run at analysis time, so a run's
   validity never silently flips when the axis list grows later; an axis addition routes through the
   re-validate pass (RC-INV-13c), never a silent re-invalidation of the standing library.

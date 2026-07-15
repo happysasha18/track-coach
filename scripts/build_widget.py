@@ -28,7 +28,13 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.7.2"  # Track Coach analyzer version — s69 cont.: RC-INV-13f tail — a run whose
+TC_VERSION = "1.7.3"  # Track Coach analyzer version — s70: RC-INV-13g — the two under-rendered
+# pages (failed + in-progress) now disclose where the run stands instead of a bare status line: a
+# "got this far" step list read from which result_*.json the run actually wrote (done/not-yet, per
+# producer-terms label), and the failed page also shows the caught analysis_error verbatim plus keeps
+# its existing next-step hint. Best-effort — a run with no run_dir to judge, or nothing measured yet,
+# shows "Nothing measured yet." and never blocks the page. Valid-run widgets and the two status lines
+# are unchanged; analysis OUTPUT of valid runs unchanged, nothing stales. Prior 1.7.2 s69 cont.: RC-INV-13f tail — a run whose
 # analysis failed BEFORE result_core.json was even written (the "core" step itself broke) now
 # renders the honest failed placeholder too, instead of the CLI crashing on the missing core file;
 # and the three placeholder strings (the recoverable "reload" one plus the two failed-run ones) are
@@ -430,6 +436,24 @@ STRINGS = {
         "incomplete": "Analysing — reload when it's ready.",
         "failed": "Analysis couldn't complete for this track.",
         "failed_hint": "The source may be unreadable — check the file and re-run.",
+    },
+    # RC-INV-13g: the "got this far" progress block shown on both under-rendered placeholders above.
+    # `steps` maps a stable step key → its plain producer-terms label (read by _run_progress); the
+    # other three keys are the block's own headings/empty-state line. All overridable via --strings,
+    # dumped via --dump-strings, like every other panel string.
+    "progress": {
+        "heading": "Got this far",
+        "nothing": "Nothing measured yet.",
+        "error_heading": "What went wrong",
+        "steps": {
+            "core": "Loudness and arc",
+            "stems": "Stem separation",
+            "rhythm": "Per-stem rhythm",
+            "notes": "Note transcription",
+            "drums": "Drum breakdown",
+            "selfsim": "Self-similarity",
+            "als": "Arrangement (Ableton)",
+        },
     },
 }
 
@@ -2079,9 +2103,9 @@ def build_html(core, detail, masking, als, out_path, title, S, als_offset_s=None
             # actively BROKE (analysis_state:"failed" in run_meta.json) gets the honest
             # can't-complete message; every other invalid run keeps the recoverable reload wording.
             if _read_analysis_state(run_dir) == "failed":
-                _render_failed_placeholder(out_path, title or "Untitled track", S)
+                _render_failed_placeholder(out_path, title or "Untitled track", S, run_dir=run_dir, mode=mode)
             else:
-                _render_incomplete_placeholder(out_path, title or "Untitled track", S)
+                _render_incomplete_placeholder(out_path, title or "Untitled track", S, run_dir=run_dir, mode=mode)
             return
     dur = core["duration_s"]
     tb = core["time_bins"]
@@ -2427,14 +2451,126 @@ def _read_analysis_state(run_dir):
         return None
 
 
-def _render_failed_placeholder(out_path, title, S):
+def _read_analysis_error(run_dir):
+    """RC-INV-13g: the run's caught `analysis_error` reason from run_meta.json, or None. Mirrors
+    _read_analysis_state's best-effort read exactly: any error (no run_dir, missing/unreadable
+    run_meta.json) returns None, so the failed placeholder still renders — without the error line —
+    rather than crashing on a read it can't do."""
+    if not run_dir:
+        return None
+    try:
+        import json
+        m = json.loads((Path(run_dir) / "run_meta.json").read_text())
+        return m.get("analysis_error")
+    except Exception:  # noqa: BLE001 — best-effort; absence means no error to show
+        return None
+
+
+# RC-INV-13g: the ordered (step key, result filename) pairs each MODE promises, read by
+# _run_progress. `als` is the one optional row — an .als is optional input, so a run with no project
+# file to parse never shows it as a not-reached step; it is included ONLY when result_als.json
+# actually exists on disk (checked in _run_progress, not here).
+_PROGRESS_STEPS_FULL = [
+    ("core", "result_core.json"), ("stems", "result_masking.json"),
+    ("rhythm", "result_rhythm.json"), ("notes", "result_notes_other.json"),
+    ("drums", "result_drums.json"), ("selfsim", "result_selfsim.json"),
+    ("als", "result_als.json"),
+]
+_PROGRESS_STEPS_QUICK = [("core", "result_core.json")]
+# Fallback labels if STRINGS["progress"]["steps"] is ever missing/malformed — kept in sync with the
+# STRINGS default above so a broken --strings override degrades to plain English, never a raw key.
+_PROGRESS_STEP_LABELS_FALLBACK = {
+    "core": "Loudness and arc", "stems": "Stem separation", "rhythm": "Per-stem rhythm",
+    "notes": "Note transcription", "drums": "Drum breakdown", "selfsim": "Self-similarity",
+    "als": "Arrangement (Ableton)",
+}
+
+
+def _run_progress(run_dir, mode):
+    """RC-INV-13g: an ordered [(label, done: bool), ...] for the steps `mode` promises, each `done`
+    read from whether its result file exists in `run_dir` — quick promises just the core step; full
+    promises all seven (the .als row included only when result_als.json actually exists, since an
+    .als is optional input, never a "not reached" step). Best-effort: no run_dir, or ANY read error,
+    returns [] so the caller can render "nothing measured yet" and the page never fails to render."""
+    if not run_dir:
+        return []
+    try:
+        rd = Path(run_dir)
+        steps = _PROGRESS_STEPS_QUICK if mode == "quick" else _PROGRESS_STEPS_FULL
+        labels = (STRINGS.get("progress") or {}).get("steps") or {}
+        out = []
+        for key, fname in steps:
+            exists = (rd / fname).exists()
+            if key == "als" and not exists:
+                continue
+            label = labels.get(key) or _PROGRESS_STEP_LABELS_FALLBACK[key]
+            out.append((label, exists))
+        return out
+    except Exception:  # noqa: BLE001 — best-effort; the page still renders on any read error
+        return []
+
+
+def _progress_block_html(run_dir, mode, S, *, error=None):
+    """RC-INV-13g: the shared "got this far" block for the two under-rendered placeholders below —
+    a left-aligned step list (read from `_run_progress`) plus, when `error` is given, a muted "what
+    went wrong" box with the caught `analysis_error` verbatim.
+
+    "Nothing measured yet" fires whenever there is no DONE step to show — either `_run_progress`
+    returned [] outright (no run_dir, or a read error: SPEC RC-INV-13g's best-effort fence), or it
+    returned the full not-yet-reached checklist for a run whose very first step never landed (a
+    no-core failure: every promised file is absent, so every entry is not-done). SPEC.md RC-INV-13g:
+    "A run that measured nothing yet shows 'nothing measured yet' in place of the list" — a checklist
+    of nothing-but-dashes reads as the same "nothing measured yet" case, not a real progress list.
+    An empty/None `error` omits the error box entirely — the in-progress placeholder never passes one,
+    since RC-INV-13g reserves it for a caught failure."""
+    steps = _run_progress(run_dir, mode)
+    prog = S.get("progress") or STRINGS["progress"]
+    heading = prog.get("heading", STRINGS["progress"]["heading"])
+    nothing = prog.get("nothing", STRINGS["progress"]["nothing"])
+    parts = ['<div class="progress">', f'<p class="phead">{_esc(heading)}</p>']
+    if steps and any(done for _, done in steps):
+        items = "".join(
+            f'<li class="{"done" if done else "todo"}">{"✓" if done else "—"} {_esc(label)}</li>'
+            for label, done in steps
+        )
+        parts.append(f'<ul>{items}</ul>')
+    else:
+        parts.append(f'<p style="font-size:13px;color:#6b7385;margin:0">{_esc(nothing)}</p>')
+    parts.append('</div>')
+    if error:
+        error_heading = prog.get("error_heading", STRINGS["progress"]["error_heading"])
+        parts.append(
+            f'<div class="errbox"><p class="phead">{_esc(error_heading)}</p>'
+            f'<p class="err">{_esc(error)}</p></div>'
+        )
+    return "\n".join(parts)
+
+
+# RC-INV-13g: the CSS shared by both placeholders' progress/error blocks below — added once here in
+# a docstring-adjacent constant so the two `<style>` blocks stay byte-identical instead of drifting.
+_PROGRESS_CSS = (
+    '.progress{text-align:left;margin:20px auto 0;max-width:420px}\n'
+    '.phead{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8b93a7;font-weight:700;margin:0 0 8px}\n'
+    '.progress ul{list-style:none;padding:0;margin:0}\n'
+    '.progress li{font-size:13px;line-height:1.9;color:#c7cddb}\n'
+    '.progress li.todo{color:#6b7385}\n'
+    '.errbox{text-align:left;margin:16px auto 0;max-width:420px}\n'
+    '.err{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9aa3b5;word-break:break-word;margin:0}\n'
+)
+
+
+def _render_failed_placeholder(out_path, title, S, run_dir=None, mode="full"):
     """RC-INV-13f: render the status placeholder for a run whose analysis TERMINALLY FAILED — the
     title/shell plus the honest failure line and a plain next step, NEVER the recoverable "reload
     when it's ready" wording (that promises data that will never arrive on its own). Mirrors
     _render_incomplete_placeholder's shell/CSS exactly, plus one muted hint line. `S` is the caller's
-    (possibly --strings-overridden) strings dict — the text is localisable like every other panel."""
+    (possibly --strings-overridden) strings dict — the text is localisable like every other panel.
+    RC-INV-13g: also renders the "got this far" progress block (`run_dir`/`mode` optional — a caller
+    with no run_dir to judge gets a best-effort-empty block, never a crash) plus the caught
+    `analysis_error` (read fresh from run_meta.json), verbatim, when one was stamped."""
     status_text = S["status"]["failed"]
     hint_text = S["status"]["failed_hint"]
+    progress_html = _progress_block_html(run_dir, mode, S, error=_read_analysis_error(run_dir))
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -2449,24 +2585,29 @@ def _render_failed_placeholder(out_path, title, S):
         'h1{font-size:22px;margin:0 0 18px;font-weight:650}\n'
         '.status{font-size:16px;color:#ffb454;font-weight:600}\n'
         '.hint{font-size:13px;color:#9aa3b5;margin-top:8px}\n'
+        f'{_PROGRESS_CSS}'
         '</style></head><body><div class="card">\n'
         '<div class="brandkick">Track Coach</div>\n'
         f'<h1 id="title">{_esc(title)}</h1>\n'
         f'<p class="status" id="failedStatus">{_esc(status_text)}</p>\n'
         f'<p class="hint" id="failedHint">{_esc(hint_text)}</p>\n'
+        f'{progress_html}\n'
         '</div></body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Widget saved (failed-run placeholder): {out_path}  (Track Coach v{TC_VERSION})")
 
 
-def _render_incomplete_placeholder(out_path, title, S):
+def _render_incomplete_placeholder(out_path, title, S, run_dir=None, mode="full"):
     """RC-INV-13c: render the status placeholder for an INCOMPLETE run — the title/shell plus the
     in-progress status line, NEVER the partial "Measured N of M signals" completeness claim. The
     deposit boundary already refuses an incomplete run (library.py); this is the render-boundary
     twin so a standalone widget built from a partial run can't read as a finished analysis either.
-    `S` is the caller's (possibly --strings-overridden) strings dict."""
+    `S` is the caller's (possibly --strings-overridden) strings dict. RC-INV-13g: also renders the
+    "got this far" progress block, with no error (an in-progress run never carries a caught error) —
+    `run_dir`/`mode` optional, best-effort-empty when absent, never a crash."""
     status_text = S["status"]["incomplete"]
+    progress_html = _progress_block_html(run_dir, mode, S)
     html = (
         '<!DOCTYPE html>\n<html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -2480,10 +2621,12 @@ def _render_incomplete_placeholder(out_path, title, S):
         ' font-weight:700;margin:0 0 6px}\n'
         'h1{font-size:22px;margin:0 0 18px;font-weight:650}\n'
         '.status{font-size:16px;color:#ffb454;font-weight:600}\n'
+        f'{_PROGRESS_CSS}'
         '</style></head><body><div class="card">\n'
         '<div class="brandkick">Track Coach</div>\n'
         f'<h1 id="title">{_esc(title)}</h1>\n'
         f'<p class="status" id="analysingStatus">{_esc(status_text)}</p>\n'
+        f'{progress_html}\n'
         '</div></body></html>\n'
     )
     Path(out_path).write_text(html, encoding="utf-8")
@@ -4645,7 +4788,7 @@ def main():
     # before — this only widens coverage to the no-core-at-all case.
     run_dir = str(Path(args.core).resolve().parent) if args.core else None
     if run_dir and not Path(args.core).exists() and _read_analysis_state(run_dir) == "failed":
-        _render_failed_placeholder(args.out, args.title or "Untitled track", S)
+        _render_failed_placeholder(args.out, args.title or "Untitled track", S, run_dir=run_dir, mode=args.mode)
         print(f"Widget saved (failed placeholder): {args.out}")
         return
 
