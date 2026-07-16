@@ -55,7 +55,7 @@
 | **N1** | Core arc — energy/brightness/density curves, the "where does it get boring" plateau | `analyze_core.py`, `analyze_detail.py` | §A, §B.10 | test_credibility (arc facts), — |
 | **N2** | Stem separation (Demucs) + web-playable stems | `separate.py`, `make_web_stems.py` | §A (stems) | (indirect via fixtures) |
 | **N3** | Per-stem measurements — run the track tools on each stem (rhythm, self-sim, drums, notes) | `self_similarity.py`, `rhythm_quality.py`, `drum_breakdown.py`, `transcribe.py` | §B.11 | test_per_stem |
-| **N4** | Frequency masking — name the exact cut spot, not the whole band | `masking.py` | §B.9 | test_credibility (masking) |
+| **N4** | Frequency masking — name the exact cut spot within the band | `masking.py` | §B.9 | test_credibility (masking) |
 | **N5** | Stem → real-track character & the ONE plain label per stem | `map_stems.py` | §B.4–B.8 | test_credibility (labels) |
 | **N6** | Fingerprints / self-similarity vectors | `fingerprints.py`, `self_similarity.py` | §A, §D.3 | test_similarity_columns (part) |
 
@@ -73,7 +73,7 @@
 
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
-| **N8** | The credibility layer — never say more than the numbers support; name the PART not a template; freq-role from the analyzer; precise masking phrasing | `build_widget.py` claim assembly (`build_recommendations:1355`; `build_cards:1618` — DEAD, unreferenced), `render_spec.py`, `track_analyzer.py` | §B.1–B.9 (CR-*/G-*) | test_credibility (93) |
+| **N8** | The credibility layer — keep every claim inside what the numbers support; name the actual PART each time; freq-role from the analyzer; precise masking phrasing | `build_widget.py` claim assembly (`build_recommendations:1355`; `build_cards:1618` — DEAD, unreferenced), `render_spec.py`, `track_analyzer.py` | §B.1–B.9 (CR-*/G-*) | test_credibility (93) |
 
 *Level expectation:* mostly L0/L1 — the *claim strings* are data, but where a claim's **presence/absence per data-state** is a rendered fact it wants L1 at least, L3 where visibility depends on it.
 
@@ -82,7 +82,7 @@
 | Node | Job | Owning code | SPEC facts | Current tests |
 |---|---|---|---|---|
 | **N9** | Reference directions — the measured centroids you compare against | `gen_reference_directions.py` | §D.5, §D.10 | (data fixtures) |
-| **N10** | Reference-notes DATA (curated web notes) + the standalone light-theme side-page that REUSES the N17 renderer — NOT the in-widget render itself (that is N17) | `build_reference_notes.py` (`build:198`), `data/reference_web_notes.json` | §D.10.2 side-page | test_reference_read, test_rich_panel |
+| **N10** | Reference-notes DATA (curated web notes) + the standalone light-theme side-page that REUSES the N17 renderer; the in-widget render itself is N17, a separate row | `build_reference_notes.py` (`build:198`), `data/reference_web_notes.json` | §D.10.2 side-page | test_reference_read, test_rich_panel |
 | **N11** | Similar-in-your-own-library — the DJ column + click-to-scroll | `similarity_columns.py` | §F | test_similarity_columns |
 
 *Level expectation:* N9 L0-DATA; N10/N11 are **rendered surfaces** → visibility/layout facts need **L3-BROWSER**.

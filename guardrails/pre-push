@@ -126,6 +126,21 @@ else
 fi
 
 echo ""
+echo "-- gate h: compaction ratchet (his-law style at 0, redundancy only ratchets down, 2.0.0) --"
+# The living docs hold ZERO scissors/negation-opener/machine-jargon errors (Alexander's language
+# laws), and SPEC redundancy stays at or below its frozen floor (scripts/spec-debt-cap.json). ALL-CAPS
+# and second-person stay advisory — track-coach's own voice. This is the pack's INV-164 (compaction is
+# a gate, not a habit) scoped to this host. The suite (gate b) also carries it as
+# tests/test_compaction_locks.py; this is the fast, explicit signal.
+if python3 -m pytest tests/test_compaction_locks.py -q >/tmp/tc_gate_h.out 2>&1; then
+  echo "   OK: language laws at 0, redundancy within its floor."
+else
+  echo "   FAIL — compaction ratchet tripped:"
+  tail -20 /tmp/tc_gate_h.out
+  fail=1
+fi
+
+echo ""
 if [ "$fail" -ne 0 ]; then
   echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, the owner's word only.)"
   exit 1

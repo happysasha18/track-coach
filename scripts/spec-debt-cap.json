@@ -1,0 +1,6 @@
+{
+  "_note": "Compaction ratchet floor for track-coach's living docs (live-spec 2.0.0 adoption, 2026-07-16). These caps only RATCHET DOWN: lowering a number is a normal commit; RAISING one is a deliberate, named edit that must say why in the same commit. Enforced by tests/test_compaction_locks.py + guardrails/pre-push gate h.",
+  "style_errors_max": 0,
+  "redundancy_open_max": 29,
+  "redundancy_note": "The 29 open pairs are the spec's DELIBERATE cross-section restatements (an invariant plus its section narrative; a decisions-ledger entry plus its surface application; per-story fences), each carrying a unique code/date/caveat — a Fable triage on 2026-07-16 confirmed every one is load-bearing, zero true duplicates. The cap stops NEW duplication; it does not ask these to merge."
+}
