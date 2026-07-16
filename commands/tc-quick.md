@@ -7,23 +7,35 @@ Use the **track-coach** skill to run a **QUICK** analysis — the low-cost, not-
 Target: $ARGUMENTS
 (If empty, ask the user for the audio file or folder.)
 
-Quick mode = **Fast analysis only**: `analyze_core.py` + `analyze_detail.py` (+ parse the
-.als and run self-similarity if cheaply available). **Do NOT run Demucs / stems / player /
-masking** — those are the heavy parts. This finishes in seconds.
+Quick mode = **fast analysis, no Demucs**: no stems, no per-stem player, no masking — those
+are the heavy parts. It still encodes a single-track **mix player** (transport + seek), so the
+widget is never silent. This finishes in seconds.
 
-Follow the skill, and in particular:
-- Create the output folder with `scripts/run_dir.py init --mode quick` (versioned, never
-  overwrites).
-- Build the widget with just `--core` and `--detail` (plus `--als` / `--selfsim` if you
-  ran them). Every stem-dependent panel auto-omits when its data is absent.
-- Still pass `--src-audio`, `--track-version`, `--verdict` so the header + calm headline
-  are populated.
+Follow the skill. The whole pipeline is ONE entrypoint — do not hand-drive the internal steps;
+drive `scripts/track_analyzer.py --mode quick`, which versions the run, deposits into the
+library, and rebuilds the catalog for you:
 
-The widget opens in the **Simple** view — the calm essentials. Tell the user they can
-later run **/tc** for the full deep version, and it will **reuse** what was already
-computed here (via `run_dir.py resume`) instead of starting over.
+```bash
+# 1) MEASURE (fast): fast analysis + .als + self-similarity, and encodes mix_web/mix.m4a
+#    for the single-track player. Prints {run_dir}. No stems.
+python3 "$SKILL_DIR/scripts/track_analyzer.py" analyze "<AUDIO>" \
+    [--als "<ALS>" --als-offset-s <N>] --mode quick [--track-version "<vX.Y or omit>"]
 
-**Library.** This quick run is auto-deposited into the global library and rebuilds the
-cross-version Catalog too. Offer to open it:
+# 2) INTERPRET (you): read the result_*.json, write your Producer's Read to <run_dir>/narrative.md.
+
+# 3) RENDER: build the widget with the read + deposit + rebuild the catalog, one pass.
+python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
+    --title "<Track name + version>" --verdict "<1–2 sentence verdict>" \
+    --mood-tags "dark,driving" --style-tags "melodic techno"   # genre is YOUR call; '' clears
+```
+
+Every stem-dependent panel auto-omits when its data is absent, so the quick widget is calm by
+construction. The widget opens in the **Simple** view — the calm essentials. Tell the user they
+can later run **/tc** for the full deep version, and it will **reuse** what was already computed
+here (the same track auto-resumes) instead of starting over.
+
+**Library.** The `build` step above auto-deposits this quick run into the global library and
+rebuilds the cross-version Catalog — the deposit happens there, so keep the build on this
+entrypoint. Offer to open it:
 `python3 "$SKILL_DIR/scripts/library.py" catalog --open` ((re)build + open in a new
-window). See SKILL.md "Global library" for `list` / `clean`.
+window). See SKILL.md "Global library" for `list` / `remove` / `prune-versions`.
