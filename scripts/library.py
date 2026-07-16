@@ -409,20 +409,23 @@ def forget_run(root: Path, src_run_dir) -> int:
     src = str(Path(src_run_dir).resolve())
     idx = load_index(root)
     wdir = root / "widgets"
-    keep, removed = [], 0
+    keep, to_unlink = [], []
     for e in idx.get("entries", []):
         sd = e.get("src_run_dir", "")
         if sd and str(Path(sd).resolve()) == src:
-            f = wdir / e.get("widget", "")
-            if e.get("widget") and f.exists():
-                f.unlink()
-            removed += 1
+            if e.get("widget"):
+                to_unlink.append(wdir / e["widget"])
         else:
             keep.append(e)
-    if removed:
+    if to_unlink:
+        # Index-first (atomic), then unlink — a kill in between leaves a harmless orphan widget,
+        # never a dangling index entry (G-INV-11).
         idx["entries"] = keep
         save_index(root, idx)
-    return removed
+        for f in to_unlink:
+            if f.exists():
+                f.unlink()
+    return len(to_unlink)
 
 
 def upsert(entries, entry):
@@ -594,12 +597,14 @@ def _cmd_clean(args):
     if not act:
         print(f"({len(remove)} entr{'y' if len(remove)==1 else 'ies'} would be removed — pass --apply to act)")
         return
+    # Index-first (atomic), then unlink the now-unreferenced widgets — a kill in between leaves a
+    # harmless orphan widget file, never a dangling index entry (G-INV-11).
+    idx["entries"] = keep
+    save_index(root, idx)
     for e in remove:
         w = e.get("widget")
         if w and (wdir / w).exists():
             (wdir / w).unlink()
-    idx["entries"] = keep
-    save_index(root, idx)
     print(f"removed {len(remove)}; {len(keep)} left.")
     _regen_catalog()  # keep the visible catalog in step (G-INV-11), like remove/prune-versions
 
@@ -1535,13 +1540,15 @@ def _cmd_remove(args):
         print("(dry-run — pass --apply to remove)")
         return
 
-    # Delete widget files + rewrite index in one step (G-INV-11)
+    # Rewrite the index FIRST (atomically), THEN unlink the now-unreferenced widgets (G-INV-11).
+    # A kill between the two steps leaves a harmless orphan widget file, never a dangling index
+    # entry pointing at a deleted widget.
+    idx["entries"] = keep
+    save_index(root, idx)
     for e in to_remove:
         wf = wdir / e["widget"]
         if wf.exists():
             wf.unlink()
-    idx["entries"] = keep
-    save_index(root, idx)
     print(f"removed {len(to_remove)} entr{'y' if len(to_remove)==1 else 'ies'}; {len(keep)} left.")
     _regen_catalog()
 
@@ -1592,13 +1599,14 @@ def _cmd_prune_versions(args):
         print(f"(dry-run — pass --apply to prune)")
         return
 
-    # Delete widget files, rewrite index, regen catalog — all in one step (G-INV-11)
+    # Rewrite the index FIRST (atomically), THEN unlink widgets, THEN regen catalog — index-first
+    # so a kill leaves a harmless orphan widget, not a dangling index entry (G-INV-11).
+    idx["entries"] = keep
+    save_index(root, idx)
     for e in to_drop:
         wf = wdir / e["widget"]
         if wf.exists():
             wf.unlink()
-    idx["entries"] = keep
-    save_index(root, idx)
     print(f"pruned {len(to_drop)} entr{'y' if len(to_drop)==1 else 'ies'}; {len(keep)} left.")
     _regen_catalog()
 
@@ -1653,17 +1661,17 @@ def _cmd_dereference(args):
     shutil.copy2(idx_path, bak_path)
     print(f"  backed up index to {bak_path.name}")
 
-    # Unlink each dropped entry's deposited widget HTML, like remove/prune-versions. Otherwise the
-    # reference-album widgets stay in library/widgets/ forever — invisible to every listing and to
-    # gc (which scans run dirs, not the keep tier), so other people's music can never be reclaimed.
+    # Index-first (atomic), then unlink each dropped entry's deposited widget HTML — same
+    # crash-order as remove/prune-versions. Unlinking is what keeps other people's music out of
+    # library/widgets/: those copies are invisible to every listing and to gc (which scans run
+    # dirs, not the keep tier), so without this they orphan forever.
+    idx["entries"] = to_keep
+    save_index(root, idx)
     wdir = root / "widgets"
     for e in to_drop:
         w = e.get("widget")
         if w and (wdir / w).exists():
             (wdir / w).unlink()
-
-    idx["entries"] = to_keep
-    save_index(root, idx)
     print(f"dereference: dropped {len(to_drop)} entr{'y' if len(to_drop) == 1 else 'ies'}; "
           f"{len(to_keep)} left. Run dirs on disk are untouched (use `gc` to reclaim).")
     _regen_catalog()  # rewrite the catalog so purged reference albums leave the visible page
@@ -1719,6 +1727,11 @@ def _cmd_alias(args):
     probe = dict(aliases); probe[slug] = canon
     if resolve_alias(canon, probe) == slug:
         sys.exit(f"alias: refusing to merge — {slug} → {canon} would form a cycle.")
+    if slug in aliases and aliases[slug] != canon:
+        # Re-merging an already-aliased slug used to repoint it silently (a→b became a→c), dropping
+        # the earlier merge with no trace. Disclose the replaced target so the change is visible.
+        print(f"alias: note — {slug} was aliased to {aliases[slug]!r}; replacing it with {canon!r}.",
+              file=sys.stderr)
     aliases[slug] = canon
     save_aliases(root, aliases)
     print(f"alias: {slug} → {canon}; they now share ONE catalog row (bounces become versions). "
