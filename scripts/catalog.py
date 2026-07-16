@@ -67,7 +67,7 @@ PALETTE = {  # slim copy of the build_widget dark theme so the catalog feels lik
     # (test_design_tokens.py guards it). `line`/`ink` drifted here historically and were re-synced.
     "bg": "#0c0e14", "panel": "#141822", "panel2": "#1b2030", "line": "#262c3c",
     "ink": "#e8ecf5", "ink_dim": "#aeb6c8", "muted": "#8b94a8", "wob": "#a78bfa", "good": "#46d39a",
-    "bad": "#ff6b6b", "bright": "#ffd166",
+    "bad": "#ff6b6b", "bright": "#ffd166", "warn": "#ffb454",
 }
 
 
@@ -268,6 +268,15 @@ def signature_svg(e, uid=0, playable=False):
             f'{rib}{strip}</svg>')
 
 
+# G-INV-14: a FULL run whose src_run_dir has vanished from disk (fingerprint None for that reason,
+# not merely "quick" or "no directions defined"). Kept local to catalog.py (not in similarity_columns
+# — SC's reason vocabulary is the leans/siblings GEOMETRY module's own, this reason is about the
+# catalog's own disk-presence probe). Distinct from SC.R_QUICK: a quick row never promised a
+# reference/comparison at all, but a full row that DID once compute one lost its source data — SPEC
+# promises a dedicated phrase for that case, not the quick-mode one (docs/SPEC.md G-INV-14).
+R_SOURCE_GONE = "source-gone"
+
+
 def _lean_cell(leans, widget_href=None, reason=None, missing=None) -> str:
     """Render the 'leans toward' (reference) TD for a row (§D.10.1).
 
@@ -275,9 +284,12 @@ def _lean_cell(leans, widget_href=None, reason=None, missing=None) -> str:
     reaches here, leans_toward_topk already excluded them). Each direction is a coloured
     clickable link stacked vertically. No red for the reference column — owner decision 2026-06-29.
 
-    Empty state is THREE-WAY (D-INV-22 + D-INV-22-completeness) and uses THIS column's own phrases,
-    never the siblings column's 'no similar tracks' (Fable audit 2026-07-03):
+    Empty state is FOUR-WAY (D-INV-22 + D-INV-22-completeness + G-INV-14) and uses THIS column's own
+    phrases, never the siblings column's 'no similar tracks' (Fable audit 2026-07-03):
       • quick-only row (R_QUICK) → 'full analysis only' — quick never promised a reference (D-INV-20/22);
+      • full run, src_run_dir gone (R_SOURCE_GONE) → 'analysis data not available — re-analyse to
+        restore' (G-INV-14) — distinct from R_QUICK: this row DID run full analysis, it just lost its
+        source data, so telling it "full analysis only" would be self-contradicting;
       • full run missing axes (R_MISSING) → 'can't compare — ⟨missing signals⟩', never a fabricated
         nearest (D-INV-22-completeness) — the missing measurements named inline;
       • full run, no close direction (R_NO_DIRECTION / default) → 'no close direction yet' (SPEC §D).
@@ -291,6 +303,8 @@ def _lean_cell(leans, widget_href=None, reason=None, missing=None) -> str:
     if not leans:
         if reason == SC.R_QUICK:
             msg = "full analysis only"
+        elif reason == R_SOURCE_GONE:
+            msg = "analysis data not available — re-analyse to restore"
         elif reason == SC.R_MISSING:
             names = html.escape(SC.signals_phrase(missing or []))  # only the dynamic names need escaping
             msg = f"can't compare — {names}" if names else "can't compare"
@@ -309,7 +323,7 @@ def _lean_cell(leans, widget_href=None, reason=None, missing=None) -> str:
     return f'<td class="c-sim c-lean">{chips}</td>'
 
 
-def _siblings_cell(siblings, title_map: dict, href_map: dict, reason=None, missing=None) -> str:
+def _siblings_cell(siblings, title_map: dict, reason=None, missing=None) -> str:
     """Render the 'similar in your library' TD for a row.
     Up to 3 siblings, each as a coloured chip link. FAR siblings are allowed here (F-INV-1).
     Uses title_map for display labels.
@@ -317,15 +331,20 @@ def _siblings_cell(siblings, title_map: dict, href_map: dict, reason=None, missi
     The chip is IN-PAGE NAVIGATION, not a widget link (F-INV-4 / D-INV-28): its href is the sibling
     row's `#row-<slug>` anchor and the catalog scrolls+highlights that row on click — the click
     changes no analysis state. (An own sibling scrolls; a reference DIRECTION opens the widget — the
-    two are deliberately different, D-INV-28.)
+    two are deliberately different, D-INV-28.) No widget-href map is needed here (F-INV-4) — that's
+    why this helper takes no href_map, unlike `_lean_cell`, which links out to the widget.
 
-    Empty state is THREE-WAY (F-INV-5/6/7), never a bare '—':
+    Empty state is FOUR-WAY (F-INV-5/6/7 + G-INV-14), never a bare '—':
       • quick-only row (R_QUICK) → 'full analysis only' (F-INV-5);
+      • full run, src_run_dir gone (R_SOURCE_GONE) → 'analysis data not available — re-analyse to
+        restore' (G-INV-14) — symmetric with `_lean_cell`'s same-reason branch;
       • full run missing axes (R_MISSING) → 'can't compare — ⟨missing signals⟩' (F-INV-6);
       • computed but no other placeable track (R_NO_COMPARISON / default) → 'no comparison yet' (F-INV-7)."""
     if not siblings:
         if reason == SC.R_QUICK:
             msg = "full analysis only"
+        elif reason == R_SOURCE_GONE:
+            msg = "analysis data not available — re-analyse to restore"
         elif reason == SC.R_MISSING:
             names = html.escape(SC.signals_phrase(missing or []))  # only the dynamic names need escaping
             msg = f"can't compare — {names}" if names else "can't compare"
@@ -431,7 +450,7 @@ def _open_href(e, widgets_rel):
     return f"{widgets_rel}/{widget}" if widget else ""
 
 
-def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=None,
+def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None,
          show_lean=True, show_sib=True):
     e = ver["rep"]
     title = e.get("title") or track.replace("_", " ")
@@ -455,7 +474,7 @@ def _row(track, ver, widgets_rel, uid=0, mix_uri=None, title_map=None, href_map=
     _sibs, _sreason, _smiss = _sib_state(e)
     lean_td = (_lean_cell(_leans, widget_href=href, reason=_lreason, missing=_lmiss)
                if show_lean else "")
-    sib_td = (_siblings_cell(_sibs, title_map or {}, href_map or {}, reason=_sreason, missing=_smiss)
+    sib_td = (_siblings_cell(_sibs, title_map or {}, reason=_sreason, missing=_smiss)
               if show_sib else "")
     return f"""<tr data-track="{html.escape(track.lower())}" data-mode="{html.escape(e.get('mode',''))}"{mix_attr}
       data-version="{html.escape(str(ver['label']))}" data-date="{html.escape(str(e.get('stamp','')))}"
@@ -523,11 +542,12 @@ def _sib_state(e):
 
 
 # A column carries data (so it renders, D-INV-22 / F-INV-7) when at least one version produced a
-# computed RESULT — a hit, a "no close direction"/"no comparison", or a "can't compare". A quick row
-# (missing-by-mode) and a no-data row do NOT count, so an all-quick / no-directions library sheds the
-# whole column instead of carrying an all-empty one.
-_LEAN_RESULT_REASONS = frozenset({"ok", SC.R_NO_DIRECTION, SC.R_MISSING})
-_SIB_RESULT_REASONS = frozenset({"ok", SC.R_NO_COMPARISON, SC.R_MISSING})
+# computed RESULT — a hit, a "no close direction"/"no comparison", a "can't compare", or a
+# "analysis data not available" (G-INV-14 — the row DID once compute a result, it just lost its
+# source). A quick row (missing-by-mode) and a no-data row do NOT count, so an all-quick /
+# no-directions library sheds the whole column instead of carrying an all-empty one.
+_LEAN_RESULT_REASONS = frozenset({"ok", SC.R_NO_DIRECTION, SC.R_MISSING, R_SOURCE_GONE})
+_SIB_RESULT_REASONS = frozenset({"ok", SC.R_NO_COMPARISON, SC.R_MISSING, R_SOURCE_GONE})
 
 
 def _row_id(track: str) -> str:
@@ -582,15 +602,14 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
     groups = library.group_versions(entries)
     n_tracks = len(groups)  # D-INV-35: one row per track, so the count of rows == the count of tracks
 
-    # Pre-build lookup maps from ALL entries (pure: _open_href is pure).
-    # Used to resolve sibling display labels and widget links.
+    # Pre-build a lookup map from ALL entries, used to resolve sibling chip display labels
+    # (F-INV-4 — the chip is in-page navigation to `#row-<slug>`, so no widget-href map is needed
+    # here; that dead `_href_map` was removed, see `_siblings_cell`).
     _title_map = {}
-    _href_map = {}
     for e in entries:
         t = e.get("track")
         if t:
             _title_map[t] = e.get("title") or t.replace("_", " ")
-            _href_map[t] = _open_href(e, widgets_rel)
 
     # D-INV-35: one row per track — its NEWEST version (group_versions orders newest-first). Older
     # versions live only in the per-track plaque (INV-11), never as a second catalog row.
@@ -612,7 +631,7 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
     for track, ver in ordered:
         body_rows.append(_row(track, ver, widgets_rel, uid,  # uid → unique ribbon gradient ids
                               mix_uri=ver["rep"].get("mix_uri"),
-                              title_map=_title_map, href_map=_href_map,
+                              title_map=_title_map,
                               show_lean=show_lean, show_sib=show_sib))
         uid += 1
     rows_html = "\n".join(body_rows) or (
@@ -658,7 +677,7 @@ def render_catalog_html(entries, *, widgets_rel="widgets", title="Track Coach �
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230c0e14'/><rect x='6' y='14' width='4' height='12' rx='1.6' fill='%23a78bfa'/><rect x='13' y='7' width='4' height='19' rx='1.6' fill='%234cc9f0'/><rect x='20' y='11' width='4' height='15' rx='1.6' fill='%23ffd166'/></svg>">
 <style>
 :root{{--bg:{p['bg']};--panel:{p['panel']};--panel2:{p['panel2']};--line:{p['line']};
- --ink:{p['ink']};--muted:{p['muted']};--wob:{p['wob']};--good:{p['good']};--bad:{p['bad']};--bright:{p['bright']}}}
+ --ink:{p['ink']};--muted:{p['muted']};--wob:{p['wob']};--good:{p['good']};--bad:{p['bad']};--bright:{p['bright']};--warn:{p['warn']}}}
 *{{box-sizing:border-box}}
 body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
 .wrap{{max-width:1280px;margin:0 auto;padding:28px 22px 60px}}
@@ -935,18 +954,23 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     # versions). Pure copy when no aliases are set — nothing else in the pipeline changes.
     entries = library.canonicalize_entries(entries, library.load_aliases(root))
 
-    # The output root for the purposes of G-INV-14 and G-INV-16:
-    # library lives at <output_root>/library/; its parent is the output root.
-    output_root = root.parent
+    # The configured output root for the purposes of G-INV-14 and G-INV-16 (honours the documented
+    # $TRACK_COACH_ROOT / $TRACK_COACH_LIBRARY overrides, G-INV-7) — NOT `root.parent`, which silently
+    # assumed the library always sits directly under the output root and broke the banner
+    # classification whenever the two were configured to different bases.
+    output_root = library.output_root()
 
     for e in entries:
         # Probe each run for a playable web mix (graceful if none).
         e["mix_uri"] = _mix_uri_for(e)
 
         # G-INV-14: when src_run_dir is missing on disk, inject the library HTML copy path so
-        # _open_href can fall back to it (pre-computed here; _open_href stays pure).
+        # _open_href can fall back to it (pre-computed here; _open_href stays pure), and remember the
+        # gone-source fact (`_src_gone`) so the similarity injection below can tell a FULL run that
+        # lost its source apart from an ordinary missing-fingerprint case.
         sd = e.get("src_run_dir")
         if sd and not Path(sd).exists():
+            e["_src_gone"] = True
             widget = e.get("widget", "")
             lib_copy = root / "widgets" / widget
             if lib_copy.exists():
@@ -955,8 +979,10 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
     # G-INV-16/22 passive banner: members whose src_run_dir is outside the output root split into
     # two — a source still on disk can be MOVED (consolidate via migrate); a source that is GONE
     # can only be deleted or re-analysed (nothing left to move), so it is never shown as migratable.
-    migrate_banner = 0
-    missing_banner = 0
+    # Counted by DISTINCT TRACK, not by entry (G-INV-16b/22): a track deposited from several
+    # outside-root versions must still read as "1 track", not once per entry.
+    migrate_tracks = set()
+    missing_tracks = set()
     for e in entries:
         sd = e.get("src_run_dir")
         if sd:
@@ -964,19 +990,25 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
                 Path(sd).relative_to(output_root)
             except ValueError:
                 if Path(sd).exists():
-                    migrate_banner += 1
+                    migrate_tracks.add(e.get("track"))
                 else:
-                    missing_banner += 1
+                    missing_tracks.add(e.get("track"))
+    migrate_banner = len(migrate_tracks)
+    missing_banner = len(missing_tracks)
 
     # Inject similarity data into entries (same pattern as mix_uri — filesystem probe here, pure
     # renderer reads the pre-computed fields). Each empty result also carries the WHY (reason +
-    # missing-signal reads) so the cell can phrase it (quick / can't-compare / no-direction /
-    # no-comparison) and the presence gate can drop an all-empty column (D-INV-22 / F-INV-5/6/7).
+    # missing-signal reads) so the cell can phrase it (quick / gone-source / can't-compare /
+    # no-direction / no-comparison) and the presence gate can drop an all-empty column
+    # (D-INV-22 / F-INV-5/6/7).
     directions, z_library = _load_sim_data(entries)
     for e in entries:
         key = e.get("track")
         fp = z_library.get(key)
         is_quick = e.get("mode") == "quick"
+        # G-INV-14: a FULL run (never quick — quick's R_QUICK always wins, unchanged) whose
+        # src_run_dir is gone gets the dedicated "analysis data not available" reason, not R_QUICK.
+        src_gone = bool(e.get("_src_gone")) and not is_quick
         # Reference column.
         if fp is not None and directions:
             leans = SC.leans_toward_topk(fp, directions)  # up to 3, CLOSE/MID only (§D.10.1)
@@ -987,11 +1019,13 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
                 e["_lean_reason"], e["_lean_missing"] = SC.lean_reason(fp, directions)
         else:
             e["_leans"] = []
-            if is_quick or fp is None:
+            if src_gone:
+                e["_lean_reason"], e["_lean_missing"] = R_SOURCE_GONE, []
+            elif is_quick or fp is None:
                 e["_lean_reason"], e["_lean_missing"] = SC.R_QUICK, []
             else:                                         # fingerprint present but no directions defined
                 e["_lean_reason"], e["_lean_missing"] = SC.R_NO_DATA, []
-        # Own-library column.
+        # Own-library column (kept symmetric with the reference branch above).
         if fp is not None:
             sibs = SC.nearest_own(key, z_library)
             e["_siblings"] = sibs
@@ -1001,7 +1035,10 @@ def build_catalog(root: Path = None, *, open_browser: bool = False) -> Path:
                 e["_sib_reason"], e["_sib_missing"] = SC.sibling_reason(key, z_library)
         else:
             e["_siblings"] = []
-            e["_sib_reason"], e["_sib_missing"] = SC.R_QUICK, []
+            if src_gone:
+                e["_sib_reason"], e["_sib_missing"] = R_SOURCE_GONE, []
+            else:
+                e["_sib_reason"], e["_sib_missing"] = SC.R_QUICK, []
 
     html_str = render_catalog_html(entries, migrate_banner=migrate_banner,
                                    missing_banner=missing_banner)

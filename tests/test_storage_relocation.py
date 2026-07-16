@@ -362,6 +362,9 @@ class CatalogFallback(unittest.TestCase):
 class MigrateWarning(unittest.TestCase):
     """G-INV-16 support: catalog shows a banner for entries with src_run_dir outside the output root."""
 
+    def tearDown(self):
+        os.environ.pop("TRACK_COACH_ROOT", None)
+
     def test_banner_counts_outside_root_members(self):
         """Banner appears with N=1 when one member's src_run_dir is outside the output root."""
         with tempfile.TemporaryDirectory() as td:
@@ -404,6 +407,9 @@ class MigrateWarning(unittest.TestCase):
             ]
             (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
 
+            # the output root is lib_root's parent; build_catalog resolves it via
+            # library.output_root(), so pin it here (the documented override).
+            os.environ["TRACK_COACH_ROOT"] = str(lib_root.parent)
             out = catalog.build_catalog(root=lib_root)
             html_text = out.read_text()
 
@@ -429,6 +435,7 @@ class MigrateWarning(unittest.TestCase):
                  "deposited_at": "2026-01-01T10:00:00+00:00"},
             ]
             (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+            os.environ["TRACK_COACH_ROOT"] = str(lib_root.parent)
             out = catalog.build_catalog(root=lib_root)
             html_text = out.read_text()
             # No migrate banner div when all dirs are inside the root
@@ -441,6 +448,9 @@ class MigrateBannerMoveVsJunk(unittest.TestCase):
     """G-INV-22: the migrate banner separates a member to MOVE (source still on disk → consolidate)
     from a member whose source is GONE (nothing to move → delete or re-analyse). A vanished source
     is never folded into the "run migrate to consolidate" count."""
+
+    def tearDown(self):
+        os.environ.pop("TRACK_COACH_ROOT", None)
 
     def _lib_with(self, td_lib, td_outside, *, existing: bool):
         """Build a library with one own inside member + one outside member whose source dir either
@@ -466,6 +476,8 @@ class MigrateBannerMoveVsJunk(unittest.TestCase):
              "deposited_at": "2026-01-01T10:00:00+00:00"},
         ]
         (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+        # output root = lib_root's parent (build_catalog resolves it via library.output_root())
+        os.environ["TRACK_COACH_ROOT"] = str(lib_root.parent)
         return lib_root
 
     def test_existing_source_counts_to_move(self):
@@ -504,6 +516,7 @@ class MigrateBannerMoveVsJunk(unittest.TestCase):
                                 "widget": wd, "mode": "full", "src_run_dir": str(sd),
                                 "deposited_at": "2026-01-01T10:00:00+00:00"})
             (lib_root / "index.json").write_text(json.dumps({"entries": entries}))
+            os.environ["TRACK_COACH_ROOT"] = str(lib_root.parent)
             html_text = catalog.build_catalog(root=lib_root).read_text()
             self.assertIn('<div class="migrate-banner">', html_text)
             self.assertIn('class="missing-banner"', html_text)
