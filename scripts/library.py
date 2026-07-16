@@ -265,26 +265,53 @@ def newest_reps(entries) -> dict:
 
 
 # ── index io ───────────────────────────────────────────────────────────────────────────
+def _atomic_write_text(path, text: str):
+    """Write `text` crash-consistently: dump to a sibling `<name>.tmp`, fsync, then
+    os.replace onto the target. A kill at any instant leaves either the untouched old
+    file or the complete new one — never a truncated file (G-INV-11: no half state).
+    This is the ONE writer every index/marker save routes through so no store file can
+    be torn by a mid-write kill (2026-07-16 audit root class 1)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def load_index(root: Path) -> dict:
     p = root / "index.json"
     if p.exists():
+        text = p.read_text()
+        if not text.strip():
+            return {"entries": []}  # a zero-byte / whitespace file is the fresh-root case
         try:
-            d = json.loads(p.read_text())
-            # Normalize: entries must be dicts. A stray string (legacy slug from an older
-            # run-init that appended a plain slug instead of a metadata dict) is coerced to a
-            # minimal dict so every downstream caller sees a uniform type. Using {"widget": s}
-            # preserves the original string rather than silently discarding it.
-            raw = d.get("entries", [])
-            d["entries"] = [e if isinstance(e, dict) else {"widget": str(e)} for e in raw]
-            return d
-        except ValueError:
-            pass
+            d = json.loads(text)
+        except ValueError as exc:
+            # A present-but-unparseable index is CORRUPT, not empty. Silently returning
+            # {"entries": []} here was the data-loss root: the next save persisted the loss
+            # and gc then reclaimed "unreferenced" run dirs. Refuse loudly instead so the
+            # real catalog is never overwritten with empty (audit root class 1).
+            sys.exit(
+                f"library: index.json is corrupt and cannot be read ({exc}).\n"
+                f"  {p}\n"
+                f"Refusing every read/write so the catalog is not overwritten with an empty "
+                f"one. Inspect or restore the file (library.py restore), then retry.")
+        # Normalize: entries must be dicts. A stray string (legacy slug from an older
+        # run-init that appended a plain slug instead of a metadata dict) is coerced to a
+        # minimal dict so every downstream caller sees a uniform type. Using {"widget": s}
+        # preserves the original string rather than silently discarding it.
+        raw = d.get("entries", [])
+        d["entries"] = [e if isinstance(e, dict) else {"widget": str(e)} for e in raw]
+        return d
     return {"entries": []}
 
 
 def save_index(root: Path, idx: dict):
     root.mkdir(parents=True, exist_ok=True)
-    (root / "index.json").write_text(json.dumps(idx, ensure_ascii=False, indent=2))
+    _atomic_write_text(root / "index.json", json.dumps(idx, ensure_ascii=False, indent=2))
 
 
 ALIASES_FILE = "aliases.json"
@@ -296,17 +323,27 @@ def load_aliases(root: Path) -> dict:
     A user records that two tracks are the SAME song under different filenames (so the catalog shows
     them as one). Returns {} when the file is absent or unreadable — aliasing is purely additive."""
     p = Path(root) / ALIASES_FILE
+    if not p.exists():
+        return {}  # no aliases set — silent, purely additive
     try:
         data = json.loads(p.read_text())
-        m = data.get("aliases", data) if isinstance(data, dict) else {}
-        return {str(k): str(v) for k, v in m.items() if k and v and str(k) != str(v)}
     except (OSError, ValueError):
+        # A present-but-unparseable aliases.json means a kill tore a mid-write save. Unlike
+        # the index (destructive reads depend on it), aliasing is additive, so stay lenient —
+        # but WARN naming the file, so lost same-song merges are visible rather than reading
+        # as an ordinary "no aliases set" (audit root class 1).
+        print(f"library: warning — {p} is unreadable; treating as no aliases "
+              f"(same-song merges may be lost). Re-run `alias --merge` to restore them.",
+              file=sys.stderr)
         return {}
+    m = data.get("aliases", data) if isinstance(data, dict) else {}
+    return {str(k): str(v) for k, v in m.items() if k and v and str(k) != str(v)}
 
 
 def save_aliases(root: Path, aliases: dict):
     Path(root).mkdir(parents=True, exist_ok=True)
-    (Path(root) / ALIASES_FILE).write_text(
+    _atomic_write_text(
+        Path(root) / ALIASES_FILE,
         json.dumps({"aliases": {str(k): str(v) for k, v in aliases.items()}},
                    ensure_ascii=False, indent=2))
 
