@@ -2179,7 +2179,8 @@ does: gc keeps it, never lists it as orphan. Your references are as safe as your
 **A synthetic or smoke run never enters the library.** A run whose `run_meta.json` carries the synthetic
 marker is kept out of the library exactly as a reference is (G-INV-18): auto-deposit at the end of a `build`
 is skipped, and an explicit `deposit` of it is refused rather than silently written. The marker is set two
-ways — the `--synthetic` flag on `build`, and automatically when the analysed source lives under the test
+ways — the `--synthetic` flag on `analyze` (it is stamped at measure time, beside the `--reference` marker),
+and automatically when the analysed source lives under the test
 fixtures tree (a path containing `tests/fixtures/`), so a smoke clip run to exercise the pipeline can never
 surface in the real catalog. This is the enforcement, at the deposit boundary, of the rule that a fixture
 used to test the tool is not one of the user's tracks. `G-INV-21`
@@ -2463,8 +2464,8 @@ versions. `H-INV-6`
 **`hard reset` is the only irreversible verb — it removes everything, backups included.** Where `reset` keeps
 the safety net, `hard reset` clears the *entire* output root — keep, scratch, references, **and** `backups/` —
 leaving a bare `~/.track-coach/`. It makes no safety backup (there would be nowhere recoverable to put it) and
-so demands the strongest confirm: both `--yes-wipe-everything` and an explicit `--including-backups`
-(equivalently `reset --hard`), and it names that the backups themselves will be destroyed before acting. Like
+so demands the strongest confirm: both `--yes-wipe-everything` and an explicit `--including-backups`,
+and it names that the backups themselves will be destroyed before acting. Like
 every rung it is dry-run by default: a bare `hard reset` (no flags) lists everything it would remove, backups
 included, before either confirm flag is given. After a `hard reset`, nothing on disk recovers the prior state
 except re-analysing the source audio/`.als`. `H-INV-10`

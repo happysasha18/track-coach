@@ -69,8 +69,8 @@ class RelocationDefault(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             audio = _touch(Path(td) / "project" / "Beat_v1.wav")
             args = _fake_args(audio=str(audio), base=None)
-            # Redirect stdout to capture run_dir path without writing to real home
-            # Instead, test via base_dir + track_root
+            # Assert on base_dir (the ~/.track-coach/projects root) rather than capturing the
+            # printed run_dir path — no writing to the real home.
             base = run_dir.base_dir(args, audio)
             self.assertTrue(str(base).startswith(str(Path.home() / ".track-coach" / "projects")))
 

@@ -10,12 +10,21 @@ Layout (root = $TRACK_COACH_LIBRARY or ~/.track-coach/library):
   <root>/index.json   {"entries": [ {track, version, stamp, widget, verdict, mode,
                                       deposited_at, src_run_dir}, … ]}
 
-CLI:
+CLI (every destructive verb is dry-run by default; --apply acts):
   library.py path
+  library.py catalog [--open]
   library.py deposit --run-dir DIR [--widget FILE]
   library.py list [--track T] [--json]
-  library.py clean [--all --yes] [--older-than DAYS] [--keep-per-track N] [--track T]
-                   [--missing] [--yes] [--dry-run]
+  library.py remove TRACK [VERSION] [--apply]
+  library.py prune-versions [--keep N] [--apply]
+  library.py clean [--all] [--older-than DAYS] [--keep-per-track N] [--track T] [--missing] [--apply]
+  library.py migrate [--apply]        library.py dereference --album-path P… [--apply]
+  library.py alias (--merge SLUG --into CANON | --list | --remove SLUG)
+  library.py gc [--base DIR] [--ableton-tails [--scan-dir DIR]] [--apply]
+  library.py backup [--full] [--base DIR] [--list]   library.py restore [STAMP] [--apply] [--force]
+  library.py reset --yes-wipe-everything [--no-backup] [--i-understand]
+  library.py hard-reset --yes-wipe-everything --including-backups
+(clean's old --yes is a hidden back-compat alias for --apply.)
 
 The naming + clean policy live in PURE functions (canonical_widget_name, clean_plan) so they're
 unit-tested without touching the filesystem.
@@ -1781,7 +1790,7 @@ def main():
     # reset (H-INV-6)
     # backup (H-INV-8)
     bk = sub.add_parser("backup",
-                         help="snapshot curated tiers (library/ + explore/) — additive, never destructive")
+                         help="snapshot curated tiers (library/ + explore/ + config.json) — additive, never destructive")
     bk.add_argument("--base", default=None, help="output root (default: ~/.track-coach)")
     bk.add_argument("--full", action="store_true",
                     help="also include projects/ scratch tier (full disk image)")

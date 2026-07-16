@@ -53,15 +53,22 @@ SKILL_DIR="<absolute path to skill>"
 #    No widget yet — measuring only. (.als offset defaults to the first locator / first clip.)
 python3 "$SKILL_DIR/scripts/track_analyzer.py" analyze "<AUDIO>" \
     [--als "<ALS>" --als-offset-s <N>] [--mode quick|full] \
-    [--track-version "<vX.Y from filename, or omit>"]
+    [--track-version "<vX.Y from filename, or omit>"] \
+    [--bpm N] [--skip-transcribe] [--model NAME] [--reference [--artist NAME]] [--synthetic]
+#   --bpm overrides a wrong core tempo (the escape hatch for rhythm); --skip-transcribe skips
+#   basic-pitch; --model picks the Demucs model; --reference/--synthetic keep the run OUT of the
+#   library (a reference album / a smoke fixture, marked at measure time).
 
 # 2) INTERPRET (you): read the result_*.json, write your Producer's Read to <run_dir>/narrative.md.
 
-# 3) RENDER (cheap, one pass): build the widget WITH the read + the cross-version catalog.
+# 3) RENDER (cheap for THIS run): build the widget WITH the read + the cross-version catalog.
 #    Set the catalog's mood/style tags here too — override the heuristic draft with your real read.
+#    A bare build also tops up any incomplete PRIOR library runs in the same pass (RC-INV-13c) —
+#    that top-up can run Demucs. Pass --only-this to render exactly this run and nothing else;
+#    --no-catalog skips the catalog rebuild, --no-deposit skips depositing into the library.
 python3 "$SKILL_DIR/scripts/track_analyzer.py" build --run-dir "<RUN_DIR>" \
     --title "<Track name + version>" --verdict "<1–2 sentence verdict for the version catalog>" \
-    --mood-tags "dark,driving" --style-tags "melodic techno"   # genre is YOUR call; '' clears
+    --mood-tags "dark,driving" --style-tags "melodic techno" [--only-this] [--no-catalog]  # genre is YOUR call; '' clears
 ```
 
 `--mode quick` = fast analysis (`/tc-quick`): no Demucs stems, but it DOES encode a `mix_web/mix.m4a`
@@ -91,7 +98,7 @@ deposited (G-INV-18), so other people's music never mixes into your catalog or s
 library with `scripts/library.py`:
 ```bash
 python3 "$SKILL_DIR/scripts/library.py" path           # where the library lives
-python3 "$SKILL_DIR/scripts/library.py" list [--track T]
+python3 "$SKILL_DIR/scripts/library.py" list [--track T] [--json]   # --json: machine-readable entries
 python3 "$SKILL_DIR/scripts/library.py" catalog --open  # (re)build + open the global Catalog page
 python3 "$SKILL_DIR/scripts/library.py" clean [--older-than DAYS] \
     [--keep-per-track N] [--track T] [--missing]        # dry-run by default; add --apply to act
@@ -834,10 +841,10 @@ Run any of these with `uv run --python 3.11 ... python scripts/library.py <verb>
 
 ### backup
 
-Copies `library/` and `explore/` (your accumulated references) into a timestamped snapshot under `~/.track-coach/backups/<stamp>/`. Additive — running it again only adds another snapshot, never removes anything.
+Copies `library/`, `explore/` (your accumulated references), and `config.json` into a timestamped snapshot under `~/.track-coach/backups/<stamp>/`. Additive — running it again only adds another snapshot, never removes anything.
 
 ```
-library.py backup                # snapshot curated tiers (library/ + explore/)
+library.py backup                # snapshot curated tiers (library/ + explore/ + config.json)
 library.py backup --full         # also include projects/ (stems, JSONs — for a full disk image)
 library.py backup --list         # list existing snapshots with dates and sizes
 ```
@@ -871,6 +878,7 @@ Prunes orphaned run directories under `~/.track-coach/projects/`. Keeps every ru
 ```
 library.py gc                    # dry-run: show orphaned run dirs
 library.py gc --apply            # actually prune them
+library.py gc --base DIR         # scope gc to a specific output root (G-INV-7 — never point it at a music folder)
 library.py gc --ableton-tails    # sweep dangling track-coach-output/ tails in Ableton project folders
 library.py gc --ableton-tails --scan-dir /path/to/tco  # explicit scan target
 ```

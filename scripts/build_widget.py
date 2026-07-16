@@ -28,7 +28,16 @@ Usage:
 import sys, argparse, json, math, copy, re
 from pathlib import Path
 
-TC_VERSION = "1.8.0"  # Track Coach analyzer version — 1.8.0 (2026-07-15): audit reopen — 8 code-vs-spec
+TC_VERSION = "1.9.0"  # Track Coach analyzer version — 1.9.0 (2026-07-16): command-audit remediation
+# COMPLETE — the store/CLI defects the 2026-07-16 Fable command audit found, fixed root-class by
+# root-class (all code-vs-spec, each red-first): atomic index/marker writes + loud load (RC1); gc
+# never touches user files (RC2); /tc + /tc-quick drive the sanctioned entrypoint (RC3); every
+# clean/backup/reset/restore guard holds (RC4); versions order by the audio BOUNCE mtime not the
+# analysis stamp, remove/prune-versions are alias-aware, deposit fails closed on a corrupt run_meta,
+# gc keeps the run the read layer reads, restore round-trips the projects/ tier (RC5); clean/
+# dereference/restore rebuild the catalog and dereference unlinks orphaned widgets (RC6); flags/
+# verbs reconciled across SPEC/SKILL/docstrings (RC7). Store/CLI only — analysis OUTPUT and widget
+# markup of valid runs are UNCHANGED, so nothing stales (TC_ANALYSIS_VERSION held at 1). Prior 1.8.0 (2026-07-15): audit reopen — 8 code-vs-spec
 # under-rendered pages (failed + in-progress) now also name the SOURCE FILE — its filename and full
 # path, read from run_meta.json's audio_path (fallback: audio) — as the first detail block, right
 # after the status line and before "Got this far". The path is user-selectable text plus a Copy

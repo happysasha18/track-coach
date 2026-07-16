@@ -5,6 +5,29 @@ versions are the analyzer version printed in the widget footer (`TC_VERSION`).
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [1.9.0] — 2026-07-16
+
+Command-audit remediation — the store and CLI defects a full audit of every command surfaced,
+fixed root class by root class. Nothing here changes what a valid track's page shows; these are
+safety and correctness fixes to how the library keeps, orders, and prunes your work.
+
+### Fixed
+- **Versions now order by the audio bounce, not by when it was analysed.** Keeping the newest N
+  versions of a track (or pruning) uses the bounce's own timestamp, so re-analysing an old bounce
+  can never make it look "newest" and delete the real latest one. A library that mixes older and
+  newer entries no longer errors while sorting.
+- **Same-song merges prune as one row.** Once two filenames are merged into one catalog row,
+  removing or pruning that track acts on the whole row, matching what you see — not the raw
+  filenames underneath. Removing a track by its shown version label (v1, v2…) now works.
+- **The catalog never lags a change.** Cleaning, dereferencing other people's albums, or restoring
+  a snapshot rebuilds the Catalog page in the same step, so it never shows removed tracks with dead
+  links; dereference also deletes the reference-album copies it drops, instead of orphaning them.
+- **Safer library writes.** The index is rewritten before the widget files are deleted, so an
+  interruption leaves a harmless leftover file rather than a broken catalog entry; a corrupt run
+  marker refuses to deposit rather than slipping a reference or test clip into your library; a
+  full backup now restores the working files it captured; and merging an already-merged track
+  tells you it is replacing the earlier merge.
+
 ## [1.8.0] — 2026-07-15
 
 ### Added

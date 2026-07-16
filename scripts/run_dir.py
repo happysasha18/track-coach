@@ -95,10 +95,6 @@ def base_dir(args, audio: Path) -> Path:
         else (Path.home() / ".track-coach" / "projects")
 
 
-def track_root(args, audio: Path) -> Path:
-    return base_dir(args, audio) / slugify(audio.name)
-
-
 def computed_stages(run_dir: Path):
     return [k for k, f in STAGE_FILES.items() if (run_dir / f).exists()]
 
