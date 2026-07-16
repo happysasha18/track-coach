@@ -250,6 +250,17 @@ def cmd_analyze(args):
             if als and offset is not None:
                 rn.step("fast", "map_stems.py", "--stems-dir", stems, "--als", j("result_als.json"),
                         "--als-offset-s", offset, "--out", j("result_stemmap.json"))
+            elif als and args.dry_run:
+                # LOW correctness (audit finding 3): a bare `analyze --als --dry-run` (the documented
+                # default — no explicit --als-offset-s) must not go silent about map_stems just
+                # because the offset can't be resolved without a real parse_als run having produced
+                # result_als.json. The module's own contract (line 29) says --dry-run "prints the plan
+                # without running anything" — so say what a real run WOULD do instead of omitting the
+                # step from the plan entirely.
+                print("  · map_stems: offset resolved from the .als at run time (defaults to the "
+                      "first locator via default_render_offset; pass --als-offset-s to override) — "
+                      "the exact command can't be printed until parse_als has actually run.",
+                      file=sys.stderr)
             elif als and not args.dry_run:
                 print("  · stem↔track map skipped: no locator to align the .als to the audio",
                       file=sys.stderr)
@@ -298,6 +309,13 @@ def cmd_analyze(args):
         # RC-INV-13f: reached the end of the pipeline with no terminal exit → stamp success.
         if not args.dry_run:
             _update_meta(out_dir, {"analysis_state": "ok", "analysis_error": None})
+    except KeyboardInterrupt:
+        # RC-INV-13f / E-4: an interruption (Ctrl-C) is not a terminal failure. Stamping "failed"
+        # here would show the honest-failure page's false "source may be unreadable" diagnosis for a
+        # run that would complete fine on retry — the run stays at whatever recoverable state the
+        # guard already set ("running", stamped at the top of this function). Re-raise unchanged so
+        # the process still exits non-zero exactly as before; only the label is withheld.
+        raise
     except BaseException as e:  # SystemExit from Runner._run's sys.exit + any terminal error
         if not args.dry_run:
             try:
@@ -354,14 +372,21 @@ def _audio_fingerprint(audio: Path) -> dict:
 
 
 def _update_meta(out_dir: Path, fields: dict):
-    """Persist resolved facts (e.g. the render offset) into run_meta.json so `build` reuses them."""
+    """Persist resolved facts (e.g. the render offset) into run_meta.json so `build` reuses them.
+
+    Written via the shared atomic-write helper (audit root class 1 / G-INV-11): this runs 4-7x per
+    run (offset, fingerprint, tags, reference/synthetic markers, analysis_state), so a plain in-place
+    write_text left a real window where a hard kill mid-write tears the file — every reader (validity,
+    _complete_run, build) then degrades it to {}, losing audio_path/mode/analysis_state. tmp+fsync+
+    os.replace leaves either the old or the new complete file, never a truncated one."""
     mp = out_dir / "run_meta.json"
     try:
         meta = json.loads(mp.read_text()) if mp.exists() else {}
     except ValueError:
         meta = {}
     meta.update(fields)
-    mp.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
+    import library
+    library._atomic_write_text(mp, json.dumps(meta, ensure_ascii=False, indent=2))
 
 
 def _humanize_audio_name(path):
@@ -640,12 +665,32 @@ def _complete_run(run_dir, *, dry=False):
     if old_nar.exists():
         shutil.copy2(old_nar, Path(new_dir) / "narrative.md")  # carry the read forward
     build_cmd = [py, script, "build", "--run-dir", new_dir, "--only-this"]
-    subprocess.run(build_cmd)
-    # The fresh complete run has deposited; the old invalid run must now cease to exist (RC-INV-13),
-    # else it lingers in the library/catalog and keeps failing the validity gate. Superseding by slug
-    # alone misses a run whose slug drifted between analysis versions (the folder name changed), so
-    # forget the OLD deposit explicitly by its run dir. Guarded so a same-folder re-analysis (slug
-    # stable, unlikely — analyze writes a fresh dated folder) never forgets the run just deposited.
+    # Audit finding 5: capture (never inherit) the nested build's stdout. `subprocess.run(build_cmd)`
+    # with inherited stdout let this nested build's OWN widget path (its own cmd_build print at the
+    # bottom of that function) leak onto the CALLER's stdout after the requested run's path — cmd_build
+    # promises its stdout is exactly one widget path; backfill must not silently append more. Relay
+    # anything it printed to stderr instead, so the nested build stays visible without polluting stdout.
+    res_build = subprocess.run(build_cmd, capture_output=True, text=True)
+    for _stream in (res_build.stdout, res_build.stderr):
+        if _stream:
+            print(_stream, end="" if _stream.endswith("\n") else "\n", file=sys.stderr)
+    # G-INV-11 / RC-INV-13a: verify BY DEED that the replacement actually deposited before deleting the
+    # old entry — a nested `build` whose deposit is refused still exits 0 (cmd_build catches
+    # DepositError and merely prints "library deposit skipped"), so the return code alone cannot prove
+    # a replacement landed. Only once the build succeeded AND the new run shows up in the library index
+    # do we forget the old deposit; on any other outcome the old entry is KEPT — never delete a library
+    # entry before its replacement is confirmed on disk. Mirrors cmd_revalidate's verify-by-deed re-check.
+    if res_build.returncode != 0 or not _run_deposited(new_dir):
+        print(f"  · could not complete {meta.get('track') or run_dir}: the rebuild did not deposit "
+              f"(exit {res_build.returncode}) — the old entry is kept; re-run by hand.",
+              file=sys.stderr)
+        return [analyze_cmd, build_cmd]
+    # The fresh complete run has deposited (confirmed above); the old invalid run must now cease to
+    # exist (RC-INV-13), else it lingers in the library/catalog and keeps failing the validity gate.
+    # Superseding by slug alone misses a run whose slug drifted between analysis versions (the folder
+    # name changed), so forget the OLD deposit explicitly by its run dir. Guarded so a same-folder
+    # re-analysis (slug stable, unlikely — analyze writes a fresh dated folder) never forgets the run
+    # just deposited.
     if Path(new_dir).resolve() != Path(run_dir).resolve():
         import library as _lib
         gone = _lib.forget_run(_lib.library_root(), run_dir)
@@ -656,8 +701,27 @@ def _complete_run(run_dir, *, dry=False):
     return [analyze_cmd, build_cmd]
 
 
+def _run_deposited(run_dir) -> bool:
+    """RC-INV-13a / G-INV-11 verify-by-deed: does the library index carry an entry deposited FROM
+    `run_dir`? A nested `build`'s return code alone can't tell us — cmd_build swallows DepositError
+    and exits 0 even when the deposit was refused (RC-INV-13: an invalid run never deposits) — so
+    `_complete_run` checks this before it lets the old entry be forgotten."""
+    import library
+    idx = library.load_index(library.library_root())
+    target = str(Path(run_dir).resolve())
+    for e in idx.get("entries", []):
+        sd = e.get("src_run_dir", "")
+        if sd and str(Path(sd).resolve()) == target:
+            return True
+    return False
+
+
 def _backfill_incomplete():
-    """Announce and complete every incomplete deposited run (RC-INV-13c). Never silent."""
+    """Announce and complete every incomplete deposited run (RC-INV-13c). Never silent.
+
+    G-INV-11 / RC-INV-13a: verify by deed after the pass, mirroring cmd_revalidate's re-check — a
+    completion that _complete_run declined to finish (its rebuild didn't deposit, so it kept the old
+    entry rather than delete it, finding 1) must not be reported as silently handled."""
     inc = _incomplete_deposits()
     if not inc:
         return
@@ -666,6 +730,12 @@ def _backfill_incomplete():
     for e, sd, unmeasured in inc:
         print(f"    – {e.get('track')}: needs {', '.join(unmeasured)}", file=sys.stderr)
         _complete_run(sd)
+    still = _incomplete_deposits()
+    if still:
+        print(f"  · could not complete {len(still)} run(s) — the old entries were kept; re-run "
+              f"`revalidate --apply` or redo by hand:", file=sys.stderr)
+        for e, sd, unmeasured in still:
+            print(f"    – {e.get('track')}: still unmeasured {', '.join(unmeasured)}", file=sys.stderr)
 
 
 def cmd_revalidate(args):
