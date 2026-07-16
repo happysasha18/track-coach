@@ -1,6 +1,9 @@
 {
-  "_note": "Compaction ratchet floor for track-coach's living docs (live-spec 2.0.0 adoption, 2026-07-16). These caps only RATCHET DOWN: lowering a number is a normal commit; RAISING one is a deliberate, named edit that must say why in the same commit. Enforced by tests/test_compaction_locks.py + guardrails/pre-push gate h.",
+  "_note": "Compaction ratchet floor for track-coach's living docs. One cap file, two readers. gate h (tests/test_compaction_locks.py, the s73 his-law port) reads style_errors_max / redundancy_open_max; gate r (tests/test_ratchet_lock.py, the live-spec 2.1.0 turnkey kit) reads max_style_errors / max_redundancy_open / max_waivers. The two spellings carry the same numbers on purpose. All caps only RATCHET DOWN: lowering a number is a normal commit; RAISING one is a deliberate, named edit that says why in the same commit (and gate r's lock also guards the raise in tests/test_ratchet_lock.py).",
   "style_errors_max": 0,
   "redundancy_open_max": 29,
+  "max_waivers": 0,
+  "max_style_errors": 0,
+  "max_redundancy_open": 29,
   "redundancy_note": "The 29 open pairs are the spec's DELIBERATE cross-section restatements (an invariant plus its section narrative; a decisions-ledger entry plus its surface application; per-story fences), each carrying a unique code/date/caveat — a Fable triage on 2026-07-16 confirmed every one is load-bearing, zero true duplicates. The cap stops NEW duplication; it does not ask these to merge."
 }

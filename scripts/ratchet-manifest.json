@@ -1,0 +1,15 @@
+{
+  "pack_version": "2.1.0",
+  "vendored": {
+    "scripts/spec-style-lint.py": "df8883287e2b649eb56d7a14bbaf7811c6d444942ac9ecce1473ee3a96dfe81e",
+    "scripts/spec-redundancy-precheck.py": "016f91f2113fe51dae00df2433f449fa4891792ea89cfdd793bef847848ffb0b",
+    "scripts/spec-freeze.py": "12d0950435e6823424847ed2ce5616d65769c2b029f69ec91c5b84c8ad374db2",
+    "scripts/gate_common.py": "a6e7c9eaa42aaaecf771051dbe566baeae21c6db95985f8b8e052152d244e1f3",
+    "guardrails/check-freeze.sh": "9989387134b67fdbc2950b1ee13460e882c031de735f36e8811c108ab82ea7ed"
+  },
+  "seeded": {
+    "style_errors": 0,
+    "redundancy_open": 29
+  },
+  "tier": "universal"
+}

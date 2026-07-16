@@ -141,6 +141,21 @@ else
 fi
 
 echo ""
+echo "-- gate r: ratchet caps (live-spec 2.1.0 turnkey kit, manifest-pinned) --"
+# The universal register tier + redundancy stay at or below the sizes measured at adoption
+# (scripts/spec-debt-cap.json, seeded by adopt/install-ratchet.sh). Growth past a seeded size reds
+# tests/test_ratchet_lock.py; raising a cap means editing that generated test on purpose. This is the
+# pack's canonical, source-pinned ratchet (scripts/ratchet-manifest.json); gate h above is the
+# his-law-scoped sibling — both read the one cap file.
+if python3 -m pytest tests/test_ratchet_lock.py -q >/tmp/tc_gate_r.out 2>&1; then
+  echo "   OK: register + redundancy within their seeded caps."
+else
+  echo "   FAIL — ratchet caps tripped:"
+  tail -20 /tmp/tc_gate_r.out
+  fail=1
+fi
+
+echo ""
 if [ "$fail" -ne 0 ]; then
   echo "PUSH BLOCKED — fix the failing gates above. (Emergency: TC_PUSH_SKIP_GATE=1, the owner's word only.)"
   exit 1

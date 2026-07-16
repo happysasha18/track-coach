@@ -31,7 +31,16 @@ waiver file (scripts/spec-waivers.json) moves a still-unfixed finding into a dat
 instead of a silent pass. Default mode is unchanged (caps-shout and second-person stay advisory), so the
 section-by-section workflow and its tests keep their contract.
 
-Usage: spec-style-lint.py [--gate] FILE       (or: cat text | spec-style-lint.py [--gate] -)
+Two tiers (INV-166, docs/spec-style.md "Two tiers"): the checks split by whom they bind. The UNIVERSAL
+tier (negation-opener, scissors, machine-jargon) is the plainness every live-spec document holds whatever
+its register, so it binds every host's gate. The PACK-REGISTER tier (caps-shout, second-person,
+reassurance, future-narration) is the pack's own reference-documentation taste, a host adopts on its own
+word. `--tier universal` runs the universal tier as the gate and leaves the register tier advisory
+(warnings, visible, non-blocking); `--tier full` runs the union as the gate — the pack's own docs, and
+identical to `--gate`, which stays as its alias. The default (no flag) is unchanged: universal errors,
+caps-shout/second-person warnings, reassurance/future-narration not checked.
+
+Usage: spec-style-lint.py [--gate | --tier universal|full] FILE   (or: cat text | spec-style-lint.py ... -)
 Exit 0 = no ERROR (WARN may still print) · exit 1 = at least one ERROR.
 """
 import os
@@ -222,17 +231,48 @@ def _is_provenance_narrative(scrub):
                 or PROV_STORY_OPEN.search(scrub))
 
 
-def lint(text, gate=False):
+# --- TIERS (INV-166) --------------------------------------------------------------------------
+# The checks split into two named tiers by whom they bind — a host adopts the floor without the
+# pack's own taste. Named here as the code copy of the split; docs/spec-style.md "Two tiers"
+# carries the prose.
+#   UNIVERSAL       negation-opener, scissors, machine-jargon — the plainness every live-spec
+#                   document holds whatever its register; binds every host's gate.
+#   PACK-REGISTER   caps-shout, second-person, reassurance, future-narration — the pack's own
+#                   reference-documentation taste, a host adopts on its own word.
+# (provenance-narrative stays outside the split — a birth-story in a normative body has no
+# register reading at all, so it runs as an error in every tier, unconditionally, as before.)
+UNIVERSAL_RULES = frozenset({"negation-opener", "scissors", "machine-jargon"})
+PACK_REGISTER_RULES = frozenset({"caps-shout", "second-person", "reassurance", "future-narration"})
+TIERS = ("default", "universal", "full")
+
+
+def lint(text, gate=False, tier=None):
     """Return (errors, warnings); each a list of (line_no, code, snippet).
 
-    Default: negation-opener/scissors/machine-jargon are errors; caps-shout/second-person are
-    warnings. --gate: caps-shout and second-person are promoted to errors, reassurance and
-    future-narration join them, and the normative-only rules (negation-opener, second-person,
+    tier resolves the mode; when omitted it derives from gate (back-compat): tier="full" if
+    gate else "default". Explicit values:
+      "default"    negation-opener/scissors/machine-jargon are errors; caps-shout/second-person
+                   are warnings; reassurance/future-narration are not checked. (today's default,
+                   unchanged.)
+      "universal"  the UNIVERSAL tier is the gate (errors); the PACK-REGISTER tier — all four
+                   rules, including reassurance/future-narration — runs as advisory warnings;
+                   informative-region skipping behaves as in "full".
+      "full"       the union as errors (identical to --gate): caps-shout, second-person,
+                   reassurance, and future-narration are all promoted to errors alongside the
+                   UNIVERSAL tier.
+    In both "universal" and "full" the normative-only rules (negation-opener, second-person,
     reassurance, future-narration) skip marked informative regions (user-story line, blockquote,
-    NOTE) — global rules (scissors, machine-jargon, caps-shout) always run."""
+    NOTE) — global rules (scissors, machine-jargon, caps-shout, provenance-narrative) always run."""
+    if tier is None:
+        tier = "full" if gate else "default"
+    if tier not in TIERS:
+        raise ValueError("unknown tier: %r (expected one of %s)" % (tier, ", ".join(TIERS)))
+    gate_like = tier in ("universal", "full")     # exempt-region skipping + reassurance/future-narration run
+    register_errors = tier == "full"              # pack-register rules land as errors only at "full"
+
     errors, warnings = [], []
     lines = text.splitlines()
-    exempt = gate_common.exempt_flags(lines) if gate else [False] * len(lines)
+    exempt = gate_common.exempt_flags(lines) if gate_like else [False] * len(lines)
     prev_blank = True
     for idx, raw in enumerate(lines):
         i = idx + 1
@@ -246,8 +286,8 @@ def lint(text, gate=False):
         # caps / jargon / scissors. A **bold title** is kept — jargon/caps inside it still count.
         scrub = gate_common.scrub(stripped)
         exempt_here = exempt[idx]
-        # bucket a rule by mode: in gate mode the promoted rules are errors, else warnings.
-        norm_bucket = errors if gate else warnings
+        # bucket a pack-register rule by tier: at "full" the promoted rules are errors, else warnings.
+        norm_bucket = errors if register_errors else warnings
 
         is_block_lead = prev_blank or bool(LEAD_MARKERS.match(line))
         if is_block_lead and _is_negation_opener(_strip_lead(line)) and not exempt_here:
@@ -260,18 +300,18 @@ def lint(text, gate=False):
             errors.append((i, "machine-jargon:%s" % m.group(1).lower(), stripped[:110]))
         for m in CAPS_RE.finditer(scrub):                            # global
             if m.group(1) not in CAPS_ALLOW:
-                (errors if gate else warnings).append(
+                (errors if register_errors else warnings).append(
                     (i, "caps-shout:%s" % m.group(1), stripped[:110]))
         if _second_person_outside_quotes(scrub) and not exempt_here:  # normative-only
             norm_bucket.append((i, "second-person", stripped[:110]))
-        if gate and not exempt_here:
+        if gate_like and not exempt_here:
             low = scrub.lower()
             hit = next((p for p in REASSURANCE if p in low), None) or \
                 (REASSURANCE_RE.search(scrub) and "simply")
             if hit:
-                errors.append((i, "reassurance:%s" % hit, stripped[:110]))
+                norm_bucket.append((i, "reassurance:%s" % hit, stripped[:110]))
             if FUTURE_NARRATION.search(scrub):
-                errors.append((i, "future-narration", stripped[:110]))
+                norm_bucket.append((i, "future-narration", stripped[:110]))
         prev_blank = False
     return errors, warnings
 
@@ -299,18 +339,54 @@ STYLE_RULES = {"negation-opener", "scissors", "provenance-narrative", "machine-j
                "caps-shout", "second-person", "reassurance", "future-narration"}
 
 
+USAGE = "usage: spec-style-lint.py [--gate | --tier universal|full] FILE|-\n"
+
+
+def _parse_argv(argv):
+    """Return (tier, positional) or raise ValueError with a usage message. --gate is the alias for
+    --tier full (back-compat, tests/test_convergence_locks.py calls --gate and must keep working
+    unchanged); an explicit --tier wins ties with a redundant --gate on the same command line."""
+    tier = None
+    positional = []
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--gate":
+            tier = tier or "full"
+            i += 1
+        elif a == "--tier":
+            if i + 1 >= len(argv):
+                raise ValueError(USAGE)
+            tier = argv[i + 1]
+            i += 2
+        elif a.startswith("--tier="):
+            tier = a.split("=", 1)[1]
+            i += 1
+        elif a.startswith("--"):
+            raise ValueError(USAGE)
+        else:
+            positional.append(a)
+            i += 1
+    if tier is not None and tier not in ("universal", "full"):
+        raise ValueError(
+            "spec-style-lint.py: unknown --tier %r (expected 'universal' or 'full')\n" % tier)
+    if len(positional) != 1:
+        raise ValueError(USAGE)
+    return (tier or "default"), positional[0]
+
+
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("--")]
-    gate = "--gate" in argv[1:]
-    if len(args) != 1:
-        sys.stderr.write("usage: spec-style-lint.py [--gate] FILE|-\n")
+    try:
+        tier, src = _parse_argv(argv)
+    except ValueError as exc:
+        sys.stderr.write(str(exc))
         return 2
-    src = args[0]
+    gate_like = tier in ("universal", "full")
     text = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
-    errors, warnings = lint(text, gate=gate)
+    errors, warnings = lint(text, tier=tier)
 
     waived, stale = [], []
-    if gate:
+    if gate_like:
         all_waivers = gate_common.load_waivers(WAIVER_PATH)
         errors, waived, matched = apply_waivers(errors, src, all_waivers)
         # The waiver file is shared with other gates (spec-redundancy). Scope the stale check to
@@ -320,7 +396,8 @@ def main(argv):
         stale = gate_common.stale_waivers(mine, matched)
 
     if not errors and not warnings and not waived:
-        print("OK (spec-style%s): no register tells found." % ("/gate" if gate else ""))
+        label = {"default": "", "universal": "/universal", "full": "/gate"}[tier]
+        print("OK (spec-style%s): no register tells found." % label)
     if errors:
         print("SPEC-STYLE LINT — ERROR (docs/spec-style.md): a rule opens with what it is NOT,")
         print("shouts, uses machine jargon, cuts with «X — not Y», carries a birth-story in the body,")
