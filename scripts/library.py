@@ -554,7 +554,12 @@ def _cmd_list(args):
     for e in entries:
         by_track.setdefault(e.get("track", "?"), []).append(e)
     if not by_track:
-        print("(library empty)")
+        # Distinguish a genuinely empty index from a filter that matched nothing — saying
+        # "(library empty)" for a typo'd --track reads as "all deposits are lost".
+        if args.track and load_index(library_root())["entries"]:
+            print(f"list: no match for track {args.track!r} (the library has other tracks).")
+        else:
+            print("(library empty)")
         return
     for track in sorted(by_track):
         runs = sorted(by_track[track], key=lambda e: e.get("stamp", ""), reverse=True)
@@ -596,6 +601,7 @@ def _cmd_clean(args):
     idx["entries"] = keep
     save_index(root, idx)
     print(f"removed {len(remove)}; {len(keep)} left.")
+    _regen_catalog()  # keep the visible catalog in step (G-INV-11), like remove/prune-versions
 
 
 def migrate_plan(root: Path, output_root: Path) -> list:
@@ -1252,6 +1258,10 @@ def _cmd_restore(args):
         shutil.copy2(config_src, base / "config.json")
 
     print(f"restore: done — {snap_dir.name} → {base}")
+    # Rebuild the catalog so a non-full restore's opens fall back to the library HTML copy
+    # (G-INV-14): the restored index.html was built when the snapshot's run dirs still existed and
+    # carries no fallbacks, so without this its open/preview links dangle (H-INV-9).
+    _regen_catalog()
 
 
 # ── reset (H-INV-6) ──────────────────────────────────────────────────────────────────────
@@ -1643,10 +1653,20 @@ def _cmd_dereference(args):
     shutil.copy2(idx_path, bak_path)
     print(f"  backed up index to {bak_path.name}")
 
+    # Unlink each dropped entry's deposited widget HTML, like remove/prune-versions. Otherwise the
+    # reference-album widgets stay in library/widgets/ forever — invisible to every listing and to
+    # gc (which scans run dirs, not the keep tier), so other people's music can never be reclaimed.
+    wdir = root / "widgets"
+    for e in to_drop:
+        w = e.get("widget")
+        if w and (wdir / w).exists():
+            (wdir / w).unlink()
+
     idx["entries"] = to_keep
     save_index(root, idx)
     print(f"dereference: dropped {len(to_drop)} entr{'y' if len(to_drop) == 1 else 'ies'}; "
           f"{len(to_keep)} left. Run dirs on disk are untouched (use `gc` to reclaim).")
+    _regen_catalog()  # rewrite the catalog so purged reference albums leave the visible page
 
 
 def _known_tracks(root: Path) -> set:
