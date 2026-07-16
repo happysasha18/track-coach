@@ -207,6 +207,11 @@ def run_metrics(core: dict, meta: dict) -> dict:
         "tags_source": meta.get("tags_source"),
         "title": meta.get("title"),
         "audio_sha": meta.get("audio_sha256"),
+        # The source bounce's mtime — the PRIMARY version-order key (SPEC:1367 "by audio mtime /
+        # stamp"). The analyzer stamps it into run_meta (_audio_fingerprint); without carrying it
+        # onto the entry, prune/order silently fell back to the stamp = most-recently-ANALYSED, and
+        # could delete the newest bounce while keeping an older one (audit root class 5).
+        "audio_mtime": meta.get("audio_mtime"),
     }
 
 
@@ -217,6 +222,18 @@ def _rep_sort_key(e):
     by design, both already passed the validity gate at deposit); a run dir on disk: its
     result_*.json file count (see _count_result_files, already how gc measures it)."""
     return (1 if e.get("mode") == "full" else 0, e.get("stamp", ""), e.get("deposited_at", ""))
+
+
+def _version_order_key(rep) -> tuple:
+    """Type-stable oldest→newest ordering key for a version's rep (SPEC:1367 "by audio mtime /
+    stamp"). Returns ``(has_mtime, mtime_or_0, stamp)`` so a bounce WITH a stored ``audio_mtime``
+    sorts by bounce time and a legacy bounce WITHOUT one falls back to its dated stamp — and an
+    int mtime never gets compared against a str stamp (a library mixing the two would otherwise
+    raise TypeError at the sort). Entries with no mtime sort as older (before the mtime-stamped
+    ones); every real deposit carries at least a stamp, so a truly empty key is the fresh case."""
+    m = rep.get("audio_mtime")
+    has = isinstance(m, (int, float))
+    return (1 if has else 0, m if has else 0, rep.get("stamp", ""))
 
 
 def group_versions(entries: list) -> dict:
@@ -241,8 +258,8 @@ def group_versions(entries: list) -> dict:
         for sha, grp in by_sha.items():
             rep = max(grp, key=_rep_sort_key)
             versions.append({"sha": sha, "rep": rep, "n_runs": len(grp),
-                             "okey": rep.get("audio_mtime") or rep.get("stamp", "")})
-        versions.sort(key=lambda x: (x["okey"] == "", x["okey"]))  # oldest first; unknowns last
+                             "okey": _version_order_key(rep)})
+        versions.sort(key=lambda x: x["okey"])  # oldest→newest; type-stable (mtime, then stamp)
         for i, ver in enumerate(versions):
             ver["label"] = ver["rep"].get("version") or f"v{i + 1}"
             ver["delta"] = {}
@@ -504,13 +521,24 @@ def _cmd_deposit(args):
         try:
             meta = json.loads(mp.read_text())
         except ValueError:
-            meta = {}
+            # A present-but-unparseable run_meta.json fails CLOSED: it is where the reference
+            # (G-INV-18) and synthetic (G-INV-21) refusal flags live, so coercing to {} let a
+            # torn marker file slip someone else's track / a fixture run into the library. Refuse.
+            sys.exit(f"deposit: run_meta.json is corrupt — refusing to deposit "
+                     f"(the reference/synthetic markers cannot be read).\n  {mp}\n"
+                     f"Fix or re-run `analyze` for this run, then deposit again.")
     widget = Path(args.widget).expanduser() if args.widget else None
     if widget is None:
         cands = sorted(run_dir.glob("analysis_widget*.html"))
         if not cands:
             sys.exit(f"no widget html found in {run_dir}")
-        widget = cands[-1]
+        # Newest by mtime, not lexicographic: widget names embed a version (…_v0.10.1.html), and
+        # "v0.10.1" < "v0.9.22" as strings would deposit the STALE build (audit root class 5).
+        widget = max(cands, key=lambda p: p.stat().st_mtime)
+    elif not widget.exists():
+        # An explicit --widget that does not exist: fail with the command's clean one-line refusal
+        # shape, not a raw FileNotFoundError traceback from shutil.copy2 downstream.
+        sys.exit(f"deposit: widget not found: {widget}")
     entry = deposit_from_run(run_dir, widget, meta)
     print(f"deposited: {library_root() / 'widgets' / entry['widget']}", file=sys.stderr)
     print(entry["widget"])
@@ -698,11 +726,14 @@ def _count_result_files(run_dir: Path) -> int:
 def _best_undeposited_run(slug_dir: Path, referenced: set) -> "Path | None":
     """Return the most-complete run dir under slug_dir that is NOT referenced in the library.
 
-    'Most complete' = most result_*.json files; tiebreak = newest name (lexicographic).
+    'Most complete' = most result_*.json files; tiebreak = newest mtime — the SAME key
+    run_dir.newest_run (the RC-INV-9 read selector) uses, so gc keeps exactly the run the read
+    layer reads from. A name (lexicographic) tiebreak diverged: on equal counts gc could prune the
+    very run coaching reads (G-INV-15).
     Returns None if slug_dir has no undeposited runs.
     G-INV-15 / RC-INV-9.
     """
-    best, best_key = None, (-1, "")
+    best, best_key = None, (-1, -1.0)
     for item in slug_dir.iterdir():
         if item.name == "latest" or item.is_symlink():
             continue
@@ -711,7 +742,11 @@ def _best_undeposited_run(slug_dir: Path, referenced: set) -> "Path | None":
         if str(item) in referenced or str(item.resolve()) in referenced:
             continue
         n = _count_result_files(item)
-        k = (n, item.name)
+        try:
+            mt = item.stat().st_mtime
+        except OSError:
+            mt = -1.0
+        k = (n, mt)
         if k > best_key:
             best_key = k
             best = item
@@ -873,35 +908,50 @@ def _tco_dirs_from_library(lib_root: Path, oroot: Path) -> list:
 
 # ── remove: drop a track or one version from the library (H-INV-2) ─────────────────────
 
-def remove_plan(entries: list, track: str, version: "str | None" = None) -> tuple:
+def remove_plan(entries: list, track: str, version: "str | None" = None,
+                aliases: dict = None) -> tuple:
     """Decide which library entries to remove for a track (and optional version). PURE.
 
-    - version=None → remove ALL entries for that track
-    - version=<str> → remove only entries whose stamp or version field matches
+    - version=None → remove ALL entries for that track (its whole catalog row)
+    - version=<str> → remove one version: a literal stamp/version match, else the synthesized
+      label (v1..vN) the catalog and `prune-versions` show, resolved to its audio_sha group.
+
+    Alias-aware: the requested track and every entry are resolved through ``aliases`` to their
+    canonical slug, so `remove b` where a→b names exactly the ONE visible row b (a's folded
+    bounces included) — H-INV-2 "names exactly what goes (which catalog rows)".
 
     Returns (keep, to_remove). Run dirs are NOT deleted (gc reclaims them). H-INV-2.
     """
-    keep: list = []
-    to_remove: list = []
-    for e in entries:
-        if not isinstance(e, dict):
-            keep.append(e)
-            continue
-        if e.get("track") != track:
-            keep.append(e)
-            continue
-        if version is None:
-            to_remove.append(e)
-        elif e.get("stamp") == version or e.get("version") == version:
-            to_remove.append(e)
+    aliases = aliases or {}
+    canon_req = resolve_alias(track or "", aliases)
+    mine = [e for e in entries
+            if isinstance(e, dict) and e.get("track")
+            and resolve_alias(e["track"], aliases) == canon_req]
+    if not mine:
+        return list(entries), []
+    if version is None:
+        to_remove = mine
+    else:
+        lit = [e for e in mine if e.get("stamp") == version or e.get("version") == version]
+        if lit:
+            to_remove = lit
         else:
-            keep.append(e)
+            # Resolve a synthesized version label (v1..vN, as shown by list/prune) to its bounce
+            # group, so `remove "T" v2` drops all runs of that bounce, not "nothing found".
+            vgroups = group_versions(canonicalize_entries(mine, aliases)).get(canon_req, [])
+            want = next((v["sha"] for v in vgroups if v["label"] == version), None)
+            to_remove = ([e for e in mine if (e.get("audio_sha") or e.get("widget")) == want]
+                         if want else [])
+    if not to_remove:
+        return list(entries), []
+    rid = {id(e) for e in to_remove}
+    keep = [e for e in entries if id(e) not in rid]
     return keep, to_remove
 
 
 # ── prune-versions: explicit old-version pruning (H-INV-4) ───────────────────────────────
 
-def prune_versions_plan(entries: list, keep_n: int) -> tuple:
+def prune_versions_plan(entries: list, keep_n: int, aliases: dict = None) -> tuple:
     """Keep only the newest N audio versions per track; return (keep, to_drop). PURE.
 
     A 'version' is a distinct audio_sha group (same logic as group_versions).
@@ -909,15 +959,22 @@ def prune_versions_plan(entries: list, keep_n: int) -> tuple:
     keep_n=0 → drops all versions for every track.
     Caller must always supply keep_n (no silent default). H-INV-4.
 
+    Grouping is by the CANONICAL slug (``aliases``): a same-song merge (a→b, G-INV-23) folds both
+    filenames onto one catalog row, so "keep newest N per track" must count per row, not per raw
+    slug — otherwise it disagrees with what the user sees. Original entries are still the ones
+    dropped (matched by id), so the merged bounces prune as one version stream.
+
     Returns (keep, to_drop).
     """
     if keep_n < 0:
         raise ValueError(f"keep_n must be >= 0, got {keep_n}")
+    aliases = aliases or {}
     by_track: dict = {}
     for e in entries:
         if not isinstance(e, dict):
             continue
-        by_track.setdefault(e.get("track", "?"), []).append(e)
+        canon = resolve_alias(e.get("track", "?"), aliases)
+        by_track.setdefault(canon, []).append(e)
 
     to_drop_ids: set = set()
     for track_name, es in by_track.items():
@@ -930,9 +987,8 @@ def prune_versions_plan(entries: list, keep_n: int) -> tuple:
         versions: list = []
         for sha, grp in by_sha.items():
             rep = max(grp, key=_rep_sort_key)
-            okey = rep.get("audio_mtime") or rep.get("stamp", "")
-            versions.append({"sha": sha, "entries": grp, "okey": okey})
-        versions.sort(key=lambda v: (v["okey"] == "", v["okey"]))  # oldest first; unknowns last
+            versions.append({"sha": sha, "entries": grp, "okey": _version_order_key(rep)})
+        versions.sort(key=lambda v: v["okey"])  # oldest→newest; type-stable (mtime, then stamp)
         # Keep the newest keep_n versions; drop the rest
         keep_shas = {v["sha"] for v in versions[-keep_n:]} if keep_n > 0 else set()
         for v in versions:
@@ -1134,9 +1190,13 @@ def _cmd_restore(args):
         if not (snap_dir / ".backup_ok").exists():
             sys.exit(f"restore: snapshot {stamp!r} is incomplete (may be partial).")
 
-    # Determine restore plan
+    # Determine restore plan. projects/ only exists in a --full snapshot, so including it as a
+    # candidate leaves non-full behaviour unchanged while a --full restore round-trips the scratch
+    # tier (stems, previews, run JSONs) the H-INV-9 promise covers — previously it was never
+    # restored yet the degradation warning was skipped, telling the user the restore was complete.
     is_full = (snap_dir / "projects").exists()
-    tiers_to_restore = [src for src in (snap_dir / "library", snap_dir / "explore")
+    tiers_to_restore = [src for src in (snap_dir / "library", snap_dir / "explore",
+                                        snap_dir / "projects")
                         if src.exists()]
     config_src = snap_dir / "config.json"
     has_config = config_src.exists()
@@ -1444,7 +1504,7 @@ def _cmd_remove(args):
     track = args.track
     version = args.version if hasattr(args, "version") else None
 
-    keep, to_remove = remove_plan(idx["entries"], track, version)
+    keep, to_remove = remove_plan(idx["entries"], track, version, load_aliases(root))
 
     if not to_remove:
         desc = f"version={version!r}" if version else "any version"
@@ -1484,9 +1544,12 @@ def _cmd_prune_versions(args):
     idx = load_index(root)
     entries = idx["entries"]
 
-    # No --keep → show current counts, do nothing (H-INV-4: no silent default)
+    aliases = load_aliases(root)
+    # No --keep → show current counts, do nothing (H-INV-4: no silent default). Canonicalise first
+    # so the counts match the merged catalog rows (G-INV-23), same as prune_versions_plan groups.
     if args.keep is None:
-        versions = group_versions([e for e in entries if isinstance(e, dict)])
+        versions = group_versions(
+            canonicalize_entries([e for e in entries if isinstance(e, dict)], aliases))
         if not versions:
             print("library is empty.")
             return
@@ -1499,7 +1562,7 @@ def _cmd_prune_versions(args):
     if keep_n < 0:
         sys.exit("prune-versions: --keep must be >= 0")
 
-    keep, to_drop = prune_versions_plan(entries, keep_n)
+    keep, to_drop = prune_versions_plan(entries, keep_n, aliases)
 
     if not to_drop:
         print(f"prune-versions: nothing to drop (all tracks already <= {keep_n} version(s)).")
