@@ -319,8 +319,9 @@ class AbletonTailScan(unittest.TestCase):
                         "real run dir inside slug_b must survive")
 
     def test_missing_tco_dir_reported_as_missing(self):
-        """A non-existent tco_dir must appear in scan['missing'], not crash. H-INV-5."""
-        ghost = Path(self._tmp) / "no_such_tco"
+        """A non-existent but correctly-named tco_dir must appear in scan['missing'], not
+        crash. (A wrongly-named target goes to 'skipped' — see test_gc_guard_audit.) H-INV-5."""
+        ghost = Path(self._tmp) / "no_such" / "track-coach-output"
         scan = library.ableton_tail_scan([ghost])
         self.assertIn(ghost, scan["missing"])
         self.assertEqual(scan["safe"], [])

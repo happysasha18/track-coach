@@ -755,19 +755,31 @@ def gc_plan(projects_dir: Path, lib_root: Path) -> dict:
 # ── Ableton-tail sweep (H-INV-5) ─────────────────────────────────────────────────────────
 
 def _slug_dir_has_real_runs(slug_dir: Path) -> bool:
-    """True if slug_dir contains at least one real (non-symlink) run subdirectory.
+    """True if slug_dir holds ANY real (non-symlink) content beyond index.json.
 
-    'Safe' slug dirs contain only dangling symlinks and index.json — no real run dirs.
-    H-INV-5.
+    'Safe' (deletable) slug dirs contain ONLY dangling symlinks and index.json. A loose
+    regular file — a user's bounce, notes.txt — is real content too, so it disqualifies
+    the dir from 'safe': the audit found this classifier only checked for child *dirs*,
+    letting `rmtree` delete a slug dir that held a loose user file (H-INV-5: the sweep
+    never touches non-track-coach files).
     """
     for item in slug_dir.iterdir():
         if item.name == "index.json":
             continue
         if item.is_symlink():
-            continue  # dangling or live symlink — not a real run dir itself
-        if item.is_dir():
-            return True
+            continue  # dangling or live symlink — not real content itself
+        return True   # any non-symlink file OR dir is real content → not safe
     return False
+
+
+def _is_tco_shape(p) -> bool:
+    """True when `p`'s basename is a track-coach output dir (`track-coach-output`).
+
+    The Ableton-tail sweep must only ever touch a real output dir. The KI-1 shallow-deposit
+    shape makes `src.parent.parent` land on the Ableton project folder itself; gating on this
+    basename skips that folder so the destructive classifier never scans a user's own dir
+    (H-INV-5). PURE."""
+    return Path(p).name == "track-coach-output"
 
 
 def ableton_tail_scan(tco_dirs: list) -> dict:
@@ -777,12 +789,18 @@ def ableton_tail_scan(tco_dirs: list) -> dict:
         'safe': [(tco_dir, slug_dir), …],      # empty/dangling-only — safe to remove
         'real_runs': [(tco_dir, slug_dir), …], # has real run content — NEVER auto-delete
         'missing': [tco_dir, …],               # tco_dir does not exist on disk
+        'skipped': [tco_dir, …],               # not a track-coach-output dir — never scanned
     }
-    H-INV-5: distinguishes safe tails from slug dirs with real runs.
+    H-INV-5: distinguishes safe tails from slug dirs with real runs, and refuses to scan a
+    target that is not itself a `track-coach-output/` dir (a malformed KI-1 index entry could
+    otherwise point the sweep at an arbitrary user folder).
     """
-    result: dict = {"safe": [], "real_runs": [], "missing": []}
+    result: dict = {"safe": [], "real_runs": [], "missing": [], "skipped": []}
     for tco_dir in tco_dirs:
         tco_dir = Path(tco_dir)
+        if not _is_tco_shape(tco_dir):
+            result["skipped"].append(tco_dir)  # never scan a non-output dir (H-INV-5)
+            continue
         if not tco_dir.exists():
             result["missing"].append(tco_dir)
             continue
@@ -1241,6 +1259,11 @@ def _cmd_hard_reset(args):
 
 def _cmd_gc(args):
     """Prune orphaned run dirs (gc) or Ableton tco tail dirs (--ableton-tails)."""
+    if args.scan_dir and not args.ableton_tails:
+        # --scan-dir only scopes the tail sweep; without --ableton-tails it was silently
+        # ignored and the full default-root prune ran instead — a destructive action in a
+        # location the user never named. Refuse rather than run the wrong prune.
+        sys.exit("gc: --scan-dir requires --ableton-tails (it scopes the Ableton-tail sweep).")
     if args.ableton_tails:
         _gc_ableton_tails(args)
         return
@@ -1274,20 +1297,40 @@ def _cmd_gc(args):
         print("(dry-run — pass --apply to prune)")
         return
 
-    # G-INV-7: paranoid check — only delete under our output root
+    # G-INV-7 + G-INV-11: validate EVERY path is under the root BEFORE deleting any (so a
+    # stray path aborts with nothing removed), then delete each guarded and report precisely
+    # what went — all-or-clean-report, never a partial wipe with a bare traceback.
     for p in orphans:
         try:
             p.relative_to(base)
         except ValueError:
-            sys.exit(f"gc: refusing to delete {p} — outside output root {base}")
-        shutil.rmtree(p)
-    print(f"gc: removed {len(orphans)} orphaned run dir(s), reclaimed {_fmt_size(total_sz)}.")
+            sys.exit(f"gc: refusing to delete {p} — outside output root {base} (nothing removed).")
+    removed, freed, failed = 0, 0, []
+    for p in orphans:
+        sz = _dir_size(p)
+        try:
+            shutil.rmtree(p)
+            removed += 1
+            freed += sz
+        except OSError as exc:
+            failed.append((p, exc))
+    print(f"gc: removed {removed} of {len(orphans)} orphaned run dir(s), reclaimed {_fmt_size(freed)}.")
+    if failed:
+        for p, exc in failed:
+            print(f"  FAILED to remove {p}: {exc}")
+        sys.exit(f"gc: {len(failed)} run dir(s) could not be removed (see above).")
 
 
 def _gc_ableton_tails(args):
     """H-INV-5: sweep track-coach-output/ tails outside the output root."""
     if args.scan_dir:
-        tco_dirs = [Path(args.scan_dir).expanduser().resolve()]
+        target = Path(args.scan_dir).expanduser().resolve()
+        if not _is_tco_shape(target):
+            # Refuse an arbitrary user folder — the destructive classifier only ever runs on
+            # a real `track-coach-output/` dir (H-INV-5), never on a careless --scan-dir.
+            sys.exit(f"gc --ableton-tails: --scan-dir must point at a 'track-coach-output' dir, "
+                     f"not {target} — refusing to scan an arbitrary folder (H-INV-5).")
+        tco_dirs = [target]
     else:
         oroot = Path(args.base).expanduser().resolve() if args.base else output_root()
         tco_dirs = _tco_dirs_from_library(library_root(), oroot)
@@ -1302,20 +1345,36 @@ def _gc_ableton_tails(args):
         print(f"  KEEP (has real runs): {slug}")
     verb = "remove" if args.apply else "would remove"
     for tco, slug in scan["safe"]:
-        print(f"  {verb} (empty/dangling only): {slug}")
+        print(f"  {verb} (empty/dangling only): {slug}  ({_fmt_size(_dir_size(slug))})")
     for tco in scan["missing"]:
         print(f"  (not found on disk): {tco}")
+    for tco in scan["skipped"]:
+        print(f"  SKIP (not a track-coach-output dir): {tco}")
 
     if not scan["safe"]:
         print("gc --ableton-tails: nothing safe to remove.")
         return
+    total_sz = sum(_dir_size(s) for _, s in scan["safe"])
     if not args.apply:
-        print(f"({len(scan['safe'])} safe slug dir(s) — pass --apply to remove)")
+        print(f"({len(scan['safe'])} safe slug dir(s), {_fmt_size(total_sz)} — pass --apply to remove)")
         return
 
+    # all-or-clean-report (G-INV-11): delete each guarded, report precisely what went.
+    removed, freed, failed = 0, 0, []
     for _, slug in scan["safe"]:
-        shutil.rmtree(slug)
-    print(f"gc --ableton-tails: removed {len(scan['safe'])} safe slug dir(s).")
+        sz = _dir_size(slug)
+        try:
+            shutil.rmtree(slug)
+            removed += 1
+            freed += sz
+        except OSError as exc:
+            failed.append((slug, exc))
+    print(f"gc --ableton-tails: removed {removed} of {len(scan['safe'])} safe slug dir(s), "
+          f"reclaimed {_fmt_size(freed)}.")
+    if failed:
+        for slug, exc in failed:
+            print(f"  FAILED to remove {slug}: {exc}")
+        sys.exit(f"gc --ableton-tails: {len(failed)} slug dir(s) could not be removed.")
 
 
 # ── remove (H-INV-2) ──────────────────────────────────────────────────────────────────────
