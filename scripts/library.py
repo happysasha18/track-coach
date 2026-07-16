@@ -544,23 +544,27 @@ def _cmd_clean(args):
     if not any([args.all, args.older_than is not None, args.keep_per_track is not None,
                 args.missing]):
         sys.exit("clean: pick at least one of --all / --older-than / --keep-per-track / --missing")
-    act = args.apply or args.yes  # --apply is canonical; --yes is a silent back-compat alias
+    # --apply is canonical; --yes is a silent back-compat alias. An explicit --dry-run ALWAYS
+    # wins: `clean --apply --dry-run` must preview, never delete (the flag was parsed but never
+    # read before — a quiet over-deletion path for a destructive command).
+    act = (args.apply or args.yes) and not getattr(args, "dry_run", False)
     keep, remove = clean_plan(
-        idx["entries"], exists=lambda e: (wdir / e["widget"]).exists(),
+        idx["entries"], exists=lambda e: (wdir / e.get("widget", "")).exists(),
         older_than_days=args.older_than, keep_per_track=args.keep_per_track,
         track=args.track, missing=args.missing, all_=args.all)
     if not remove:
         print("nothing to clean.")
         return
-    for e in remove:
-        print(f"{'would remove' if not act else 'remove'}: {e['track']} · {e.get('stamp','?')} ({e['widget']})")
+    for e in remove:  # .get(): a legacy string entry has no 'track'/'widget' — never KeyError
+        print(f"{'would remove' if not act else 'remove'}: "
+              f"{e.get('track','?')} · {e.get('stamp','?')} ({e.get('widget','?')})")
     if not act:
         print(f"({len(remove)} entr{'y' if len(remove)==1 else 'ies'} would be removed — pass --apply to act)")
         return
     for e in remove:
-        f = wdir / e["widget"]
-        if f.exists():
-            f.unlink()
+        w = e.get("widget")
+        if w and (wdir / w).exists():
+            (wdir / w).unlink()
     idx["entries"] = keep
     save_index(root, idx)
     print(f"removed {len(remove)}; {len(keep)} left.")
@@ -659,6 +663,29 @@ def _fmt_size(n: int) -> str:
             return f"{n:.1f} {unit}"
         n /= 1024
     return f"{n:.1f} GB"  # pragma: no cover
+
+
+def _entry_size(d: Path) -> int:
+    """Size of a top-level output-root entry, symlink-SAFE — a symlink is sized by its own
+    lstat, never by following it (a dangling link would raise). H-INV-10/11."""
+    if d.is_symlink():
+        try:
+            return d.lstat().st_size
+        except OSError:
+            return 0
+    return _dir_size(d) if d.is_dir() else d.stat().st_size
+
+
+def _remove_entry(d: Path):
+    """Delete a top-level entry symlink-SAFELY: unlink a symlink (never rmtree it and never
+    follow it), rmtree a real dir, unlink a real file. A symlinked-in folder therefore has
+    only its link removed, never its target's contents. H-INV-10/11."""
+    if d.is_symlink():
+        d.unlink()
+    elif d.is_dir():
+        shutil.rmtree(d)
+    else:
+        d.unlink()
 
 
 # ── gc: prune scratch, keep referenced + best-undeposited (H-INV-3) ─────────────────────
@@ -953,13 +980,22 @@ def _backup_stamp(base: Path) -> str:
 
 
 def _has_valid_backup(base: Path) -> bool:
-    """True if at least one complete backup snapshot exists under base/backups/. H-INV-6."""
+    """True only if a complete snapshot actually PROTECTS the curated work present at `base`
+    right now: it carries .backup_ok AND, for every curated tier that currently exists at base
+    (library/, explore/), the snapshot contains that tier. An empty `.backup_ok`-only snapshot
+    (a backup taken when the root was still empty) no longer disarms the reset --no-backup
+    irreversibility guard for a since-populated library. H-INV-6."""
     backups_dir = base / "backups"
     if not backups_dir.exists():
         return False
+    needed = [t for t in ("library", "explore") if (base / t).exists()]
     try:
         for snap in backups_dir.iterdir():
-            if snap.is_dir() and (snap / ".backup_ok").exists():
+            if snap.name.startswith("_tmp_"):
+                continue  # a killed backup's litter is never a trusted snapshot
+            if not (snap.is_dir() and (snap / ".backup_ok").exists()):
+                continue
+            if all((snap / t).exists() for t in needed):
                 return True
     except OSError:
         pass
@@ -993,6 +1029,10 @@ def _do_backup(base: Path, full: bool = False) -> Path:
     tmp_dest = backups_dir / f"_tmp_{stamp}"
 
     backups_dir.mkdir(parents=True, exist_ok=True)
+    # Sweep any `_tmp_*` litter a previously-killed backup left behind — it is never a trusted
+    # snapshot, yet only hard-reset would otherwise ever reclaim it (backups/ is not swept).
+    for stale in backups_dir.glob("_tmp_*"):
+        shutil.rmtree(stale, ignore_errors=True)
     try:
         tmp_dest.mkdir(parents=True, exist_ok=True)
         for src in sources:
@@ -1000,11 +1040,14 @@ def _do_backup(base: Path, full: bool = False) -> Path:
                 shutil.copytree(src, tmp_dest / src.name)
             else:
                 shutil.copy2(src, tmp_dest / src.name)
-        (tmp_dest / ".backup_ok").write_text("ok")
         tmp_dest.rename(dest)
+        # Write the trust marker LAST, into the FINAL dir — after the rename. A kill before
+        # this leaves an unmarked (untrusted, ignored) dir, never a trusted `_tmp_` snapshot
+        # that would win `restore latest` (underscore sorts after every real stamp). H-INV-8.
+        (dest / ".backup_ok").write_text("ok")
     except Exception as exc:
-        if tmp_dest.exists():
-            shutil.rmtree(tmp_dest, ignore_errors=True)
+        shutil.rmtree(tmp_dest, ignore_errors=True)
+        shutil.rmtree(dest, ignore_errors=True)
         raise BackupError(f"backup failed: {exc}") from exc
 
     return dest
@@ -1034,6 +1077,15 @@ def _cmd_backup(args):
         return
 
     full = getattr(args, "full", False)
+    # Refuse a no-op backup: nothing curated to capture means an empty `.backup_ok` snapshot
+    # that falsely reads as "your work is backed up" (and, before the _has_valid_backup fix,
+    # could disarm reset's irreversibility guard). Common cause: an unmounted/typo'd --base.
+    has_any = (any((base / t).exists() for t in ("library", "explore"))
+               or (base / "config.json").exists()
+               or (full and (base / "projects").exists()))
+    if not has_any:
+        sys.exit(f"backup: nothing to back up under {base} "
+                 f"(no library/, explore/, or config.json). Check the path (is --base mounted?).")
     try:
         dest = _do_backup(base, full=full)
         label = " (full)" if full else ""
@@ -1066,7 +1118,17 @@ def _cmd_restore(args):
             sys.exit("restore: no valid snapshots found.")
         snap_dir = snaps[-1]
     else:
+        # A stamp with path separators (or an absolute path) would escape backups/ and let
+        # restore source tiers from an arbitrary directory that happens to carry .backup_ok.
+        # Require a plain stamp that resolves to a direct child of backups/. H-INV-11/G-INV-7.
+        if os.sep in stamp or (os.altsep and os.altsep in stamp) or Path(stamp).is_absolute():
+            sys.exit(f"restore: invalid snapshot stamp {stamp!r} — pass a plain stamp under "
+                     f"backups/ (use --base to point at a different root).")
         snap_dir = backups_dir / stamp
+        try:
+            snap_dir.resolve().relative_to(backups_dir.resolve())
+        except ValueError:
+            sys.exit(f"restore: snapshot {stamp!r} escapes {backups_dir} — refusing.")
         if not snap_dir.exists():
             sys.exit(f"restore: snapshot {stamp!r} not found under {backups_dir}.")
         if not (snap_dir / ".backup_ok").exists():
@@ -1150,12 +1212,11 @@ def _cmd_reset(args):
         print(f"reset: nothing under {base} — already clean.")
         return
 
-    total = sum(_dir_size(d) if d.is_dir() else d.stat().st_size for d in targets)
+    total = sum(_entry_size(d) for d in targets)
 
     print(f"reset would remove under {base}:")
     for d in targets:
-        sz = _dir_size(d) if d.is_dir() else d.stat().st_size
-        print(f"  {d}  ({_fmt_size(sz)})")
+        print(f"  {d}  ({_fmt_size(_entry_size(d))})")
     print(f"  Total: {_fmt_size(total)}")
     print("  Source .als/audio files are UNTOUCHED. Re-analyse to rebuild.")
     print("  backups/ is KEPT — use `restore` to recover curated work.")
@@ -1192,10 +1253,7 @@ def _cmd_reset(args):
             d.relative_to(base)
         except ValueError:
             sys.exit(f"reset: refusing to delete {d} — outside output root {base}")
-        if d.is_dir():
-            shutil.rmtree(d)
-        else:
-            d.unlink()
+        _remove_entry(d)  # symlink-safe: a symlinked-in dir loses only its link
         removed.append(d)
 
     total_removed = sum(_dir_size(d) if d.exists() else 0 for d in removed)
@@ -1218,19 +1276,21 @@ def _cmd_hard_reset(args):
 
     try:
         contents = sorted(base.iterdir())
-    except OSError:
-        contents = []
+    except OSError as exc:
+        # An unreadable root (permission denied, or --base pointing at a regular file) must
+        # surface, not be mistaken for 'already empty' — that would tell the user the wipe
+        # target holds nothing when it was simply unreadable.
+        sys.exit(f"hard-reset: cannot read {base}: {exc}")
 
     if not contents:
         print(f"hard-reset: {base} is already empty.")
         return
 
-    total = sum(_dir_size(d) if d.is_dir() else d.stat().st_size for d in contents)
+    total = sum(_entry_size(d) for d in contents)
 
     print(f"hard-reset would remove EVERYTHING under {base}:")
     for d in contents:
-        sz = _dir_size(d) if d.is_dir() else d.stat().st_size
-        print(f"  {d}  ({_fmt_size(sz)})")
+        print(f"  {d}  ({_fmt_size(_entry_size(d))})")
     print(f"  Total: {_fmt_size(total)}")
     print("  THIS INCLUDES ALL BACKUPS — there is no recovery after this.")
 
@@ -1247,10 +1307,7 @@ def _cmd_hard_reset(args):
             d.relative_to(base)
         except ValueError:
             sys.exit(f"hard-reset: refusing to delete {d} — outside output root {base}")
-        if d.is_dir():
-            shutil.rmtree(d)
-        else:
-            d.unlink()
+        _remove_entry(d)  # symlink-safe: unlink a symlink, never rmtree/follow it
 
     print(f"hard-reset: output root {base} cleared — all data destroyed including backups.")
 
@@ -1483,6 +1540,11 @@ def _cmd_dereference(args):
     album_paths = args.album_path or []
     if not album_paths:
         sys.exit("dereference: at least one --album-path is required")
+    if any(not (ap or "").strip() for ap in album_paths):
+        # An empty value is a substring of EVERY src_run_dir → it would drop the whole index
+        # (common cause: an unset shell variable expanding to ""). Refuse it.
+        sys.exit("dereference: --album-path must be a non-empty path substring "
+                 "(an empty value would match every entry).")
 
     idx = load_index(root)
     to_keep = []

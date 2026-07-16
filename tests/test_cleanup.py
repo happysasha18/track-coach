@@ -1060,10 +1060,13 @@ class ResetRevisedCommand(unittest.TestCase):
                          "--no-backup + --i-understand must wipe explore/")
 
     def test_reset_no_backup_with_existing_snapshot_does_not_require_i_understand(self):
-        """--no-backup + existing snapshot → proceeds without --i-understand. H-INV-6."""
+        """--no-backup + an existing snapshot that actually covers the curated tiers →
+        proceeds without --i-understand. (An EMPTY snapshot no longer counts — that hole is
+        pinned in test_destructive_guards_audit.) H-INV-6."""
         self._make_state()
         snap = self.base / "backups" / "2026-01-01_120000"
-        snap.mkdir(parents=True)
+        (snap / "library").mkdir(parents=True)   # a real backup captures the curated tiers
+        (snap / "explore").mkdir(parents=True)
         (snap / ".backup_ok").write_text("ok")
 
         os.environ["TRACK_COACH_ROOT"] = str(self.base)
