@@ -488,9 +488,16 @@ def deposit_from_run(run_dir, widget_path, meta: dict) -> dict:
     import validity as _validity  # lazy: avoids a load-order cycle (validity → build_widget → …)
     _ok, _unmeasured = _validity.validity(run_dir, meta.get("mode", "full"))
     if not _ok:
+        # The build still renders an honest incomplete/failed page (RC-INV-13f); it is only held
+        # OUT of the library. Do NOT point at `revalidate --apply` here: revalidate only re-measures
+        # runs the library already holds, so it can never see this undeposited run (it would report
+        # "all runs complete"). The redo that helps is a fresh `analyze` with inputs that let the
+        # signal be measured — re-analysing the same audio with the same pipeline cannot.
         raise DepositError(
             "refusing to deposit: run is incomplete (RC-INV-13) — unmeasured signals: "
-            f"{', '.join(_unmeasured)}; complete the run (revalidate --apply) before it enters the library")
+            f"{', '.join(_unmeasured)}. The widget renders as an honest incomplete page and is "
+            f"held out of the library. Re-run `analyze` with inputs that let those signals be "
+            f"measured, or accept the tool cannot read that part of this track.")
     core = {}
     cp = run_dir / "result_core.json"
     if cp.exists():

@@ -2149,7 +2149,12 @@ and the catalog all agree. `tags: RC-INV-9 · D-INV-14`
   index at deposit, and read back to open the original widget, play its preview audio, and compute similarity.
 - **Deposit** — copying a finished run's widget HTML into the library. It happens **automatically** at the end
   of every successful `build`, unless `--no-deposit` is passed; it is not a separate manual step. "Successful"
-  now includes **complete** — a build whose run is invalid (RC-INV-13) does not deposit; it redoes first. `G-INV-17`
+  now includes **complete** — a build whose own run is invalid (RC-INV-13) does not deposit: it renders the
+  honest incomplete/failed page (RC-INV-13f) and holds the run out of the library. The automatic redo of
+  RC-INV-13a tops up incomplete runs the library already **holds** (a later pass re-measures them under the
+  current pipeline); it does not re-run the fresh build's own analysis, since re-measuring the same audio under
+  the same pipeline cannot fill a genuinely unmeasurable signal — that run is left for the user to re-`analyze`
+  with inputs that let the signal be read, or to accept as an honest failure. `G-INV-17`
 
 **Reference runs are never deposited into the library.** A run whose `run_meta.json` carries the reference
 marker (§D.3, an explicit `reference` flag) is kept out of the library index (`~/.track-coach/library/index.json`)
