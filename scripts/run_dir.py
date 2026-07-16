@@ -45,6 +45,20 @@ STAGE_FILES = {
 }
 
 
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` atomically: dump to a sibling ``.tmp`` file in the
+    same dir, flush+fsync, then os.replace onto the target — so a crash mid-write
+    leaves either the old or the new complete file, never a truncated one (audit
+    root class 1: atomic index + loud load). run_dir.py does not import library.py,
+    so this is a local helper rather than a shared one."""
+    tmp_path = path.with_suffix(path.suffix + f".tmp-{os.getpid()}")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, path)
+
+
 def slugify(name: str) -> str:
     """Track folder name from the audio filename: drop extension + [vX] tag, sanitise."""
     stem = Path(name).stem
@@ -120,10 +134,26 @@ def update_index(base: Path, slug: str, run_dir: Path, meta: dict, *, audio: Pat
     idx_path = base / "index.json"
     idx = {"runs": []}
     if idx_path.exists():
-        try:
-            idx = json.loads(idx_path.read_text())
-        except (ValueError, OSError):
-            idx = {"runs": []}
+        raw = idx_path.read_text()
+        if raw.strip():
+            try:
+                idx = json.loads(raw)
+            except ValueError:
+                # A non-blank index that fails to parse is real history, not the ordinary
+                # fresh-empty case — never silently zero it (audit root class 1). Move the
+                # unreadable file aside and disclose, then start a fresh, empty index.
+                stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+                corrupt_path = base / f"index.json.corrupt-{stamp}"
+                try:
+                    os.replace(idx_path, corrupt_path)
+                    print(f"run_dir: index.json was unreadable — moved aside to {corrupt_path}, "
+                          f"starting a fresh history", file=sys.stderr)
+                except OSError:
+                    pass  # best-effort preservation; still proceed with a fresh index
+                idx = {"runs": []}
+            except OSError:
+                idx = {"runs": []}
+        # else: blank file — ordinary fresh-empty case, no warning
     idx.setdefault("runs", [])
 
     # G-INV-12: seed from old per-folder index on the very first post-move run for this slug.
@@ -153,7 +183,7 @@ def update_index(base: Path, slug: str, run_dir: Path, meta: dict, *, audio: Pat
     idx["runs"].append(entry)
     idx["latest"] = entry
     base.mkdir(parents=True, exist_ok=True)
-    idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2))
+    _atomic_write_text(idx_path, json.dumps(idx, ensure_ascii=False, indent=2))
 
 
 def _stored_identity(root: Path) -> "str | None":
@@ -189,14 +219,15 @@ def _resolve_slug(base: Path, audio: Path, als_path: "Path | None") -> tuple:
     identity = str(audio)
     base_slug = slugify(audio.name)
     candidate = base_slug
+    warn = None
     n = 2
     while True:
         root = base / candidate
         if not root.exists():
-            return candidate, None          # fresh slot — no collision
+            return candidate, warn          # fresh slot — no collision (warn carries any earlier hop)
         stored = _stored_identity(root)
         if stored is None or stored == identity:
-            return candidate, None          # same source or unreadable → reuse
+            return candidate, warn          # same source or unreadable → reuse
         # Different stored identity → try the next numbered slot
         warn = (f"  ⚠  slug '{candidate}' is used by a different track "
                 f"(stored: {stored!r}); using '{base_slug}-{n}'")
@@ -308,10 +339,18 @@ def cmd_catalog(args):
 
 def cmd_resume(args):
     audio = Path(args.audio).expanduser().resolve()
-    root = track_root(args, audio)
-    run = newest_run(root)
+    base = base_dir(args, audio)
+    # G-INV-2b: resolve the slug the SAME way init does — walk base_slug, base_slug-2, …
+    # comparing _stored_identity against this audio's resolved path, instead of the bare
+    # `base / slugify(name)` that co-mingles two different tracks sharing one filename.
+    # _resolve_slug's fresh-slot branch (root doesn't exist) is exactly "no slot matched":
+    # every existing slot along the walk had a DIFFERENT stored identity.
+    candidate, _warn = _resolve_slug(base, audio, None)
+    root = base / candidate
+    run = newest_run(root) if root.exists() else None
     if not run:
-        print(f"No earlier run found for this track under {root}", file=sys.stderr)
+        print(f"No earlier run found for this track under {base / slugify(audio.name)}*",
+              file=sys.stderr)
         print("")  # empty path → caller starts fresh with `init`
         return
     stages = computed_stages(run)
