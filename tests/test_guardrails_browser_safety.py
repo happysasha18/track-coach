@@ -1,8 +1,8 @@
 """Browser-safety guardrails ride the suite (adopted from live-spec 2.1.0, SPEC INV-162/INV-157).
 
 Two nets the pack learned from real incidents, run here so a regression reds a push:
-  - broad-kill: no tracked script kills a browser by a bare name (a broad `pkill chrome`
-    once closed the user's own browser mid-session).
+  - broad-kill: no tracked script kills a browser by a bare name — the pattern that once
+    closed the user's own browser mid-session by matching it on its process name.
   - muted-launch: every script that drives a real headless browser launches it muted
     (an unmuted headless Chrome plays sound on the machine during a test run).
 Each test runs the vendored gate over track-coach's tracked files and asserts it is green.
