@@ -148,7 +148,7 @@ class _Browser:
         # shared install-path pattern that would reach another project's live Chrome
         # (inbox wish 2026-07-15 cross-project test-Chrome collision).
         self._proc = subprocess.Popen(
-            [CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
+            [CHROME, "--headless=new", "--mute-audio", "--disable-gpu", "--no-sandbox",
              "--hide-scrollbars", "--remote-debugging-pipe", "about:blank"],
             preexec_fn=_preexec, pass_fds=(3, 4),
             stdout=subprocess.DEVNULL, stderr=self._stderr_f,
