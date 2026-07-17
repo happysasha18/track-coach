@@ -1,7 +1,7 @@
 {
-  "pack_version": "2.1.0",
+  "pack_version": "2.4.0",
   "vendored": {
-    "scripts/spec-style-lint.py": "df8883287e2b649eb56d7a14bbaf7811c6d444942ac9ecce1473ee3a96dfe81e",
+    "scripts/spec-style-lint.py": "036ff530084907c82fc72323ecb9b4c380b54009695f82993295f260ac9dcdc0",
     "scripts/spec-redundancy-precheck.py": "016f91f2113fe51dae00df2433f449fa4891792ea89cfdd793bef847848ffb0b",
     "scripts/spec-freeze.py": "12d0950435e6823424847ed2ce5616d65769c2b029f69ec91c5b84c8ad374db2",
     "scripts/gate_common.py": "a6e7c9eaa42aaaecf771051dbe566baeae21c6db95985f8b8e052152d244e1f3",

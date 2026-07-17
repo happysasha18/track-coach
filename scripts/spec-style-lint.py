@@ -131,11 +131,11 @@ JARGON_RE = re.compile(r"(?<!\w)(%s)(?!\w)" % "|".join(sorted(JARGON)), re.IGNOR
 # --- caps-shout ------------------------------------------------------------------------------
 # an ALL-CAPS alphabetic word of length >= 2 that is not a known acronym or defined term.
 CAPS_ALLOW = {"JSON", "CI", "HTML", "CSS", "RFC", "API", "URL", "UI", "MVP", "TTL", "MECE",
-              "LLD", "HLD", "PRD", "README", "OK", "MD", "CLI", "ID", "IDE", "NLP", "SPEC",
+              "LLD", "HLD", "PRD", "README", "LICENSE", "OK", "MD", "CLI", "ID", "IDE", "NLP", "SPEC",
               "LIVE", "STATE", "NEXT", "NOW", "MUST", "SHALL", "NOTE", "QA", "TODO", "HEAD",
               "KPI", "UX", "FIXME", "VCS", "DOM", "PID", "OS", "CDN", "CDP",
               # doc / file names used as bare tokens
-              "ARCHITECTURE", "ROADMAP", "JOURNAL", "VERSION", "LIVE-STATE", "MIGRATION",
+              "ARCHITECTURE", "ROADMAP", "JOURNAL", "VERSION", "LIVE-STATE", "MIGRATION", "CHANGELOG",
               # the audit record's milestone-read disposition values (INV-156), a closed vocabulary
               # pinned in the matrix (M-303) and the real docs/audit/ records — literal terms, not shout
               "MET", "OWED", "FLAG",

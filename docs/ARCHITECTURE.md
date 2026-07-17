@@ -128,6 +128,14 @@
 
 *Level expectation:* N23 is the meta-net; its own tests must be honest (it is what catches the others).
 
+### Quality budgets (mechanically gated)
+
+A stated budget carries the watcher that reds past it, so the claim can never drift silently behind the measured figure (SPEC INV-41, INV-164; adopted from live-spec 2.3.0 on 2026-07-17).
+
+| Budget | Ceiling | Watcher |
+|---|---|---|
+| full suite wall-time | ≤ 240 s | `guardrails/check-suite-budget.sh` reads gate b's captured pytest tail against this row and reds naming both numbers. The serial basis measured at adoption (2026-07-17) was ~146 s; the ceiling holds headroom for a loaded machine, and a real speedup or slowdown re-sets this row on purpose. Only a FULL gate-b run is measured — a reach-scoped run stands the budget down by name. |
+
 ---
 
 ## What this doc lets us finally ask (the rework questions)

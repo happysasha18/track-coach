@@ -52,17 +52,51 @@ else
 fi
 
 echo ""
-echo "-- gate b: full test suite green (this takes ~2-3 min) --"
-# pytest exit codes: 0 = all passed; 1-127 = a real pytest verdict (failures / usage / collection).
-# A process killed by a signal exits 128+signal (137 = SIGKILL under OS/load, 143 = SIGTERM) — the
-# OS killing the run, not the suite reporting red, so it must never read as a code failure. The render
-# harness now drives ONE persistent headless Chrome (scripts/headless_check.py) instead of a fresh
-# browser per probe, so the suite no longer saturates the machine and a signal-kill should not happen.
-# If one still does, it is reported as machine load and blocks (re-run when idle) — never auto-retried.
-python3 -m pytest -q
-gate_b_rc=$?
+echo "-- gate b: test suite green (scoped by the diff's reach, SPEC INV-45) --"
+# The reach map (guardrails/check-push-reach.sh) decides how much of the suite this push runs:
+#   exit 0 = prose-only diff → the suite stands down by name (track-coach declares no prose class,
+#            so this path is effectively unused; kept for parity with the pack).
+#   exit 2 = infra-only diff (guardrails/ and/or tests/test_*.py) → run ONLY the scoped test files
+#            (each names a changed file, + the traceability net). An engine change never reaches here.
+#   else   = FULL — an engine/doc/other change, an unowned infra file, or no diff base runs the whole
+#            suite (the conservative default). This is what makes an infra-only push short.
+# pytest exit codes: 0 = all passed; 1-127 = a real verdict; 128+signal = an OS kill under load
+# (137 SIGKILL / 143 SIGTERM), machine load and never a test-reported red — it blocks as INCONCLUSIVE.
+# The single persistent headless Chrome (scripts/headless_check.py) keeps the machine unsaturated, so
+# a signal-kill should not happen; if one still does it blocks (re-run when idle), never auto-retried.
+reach_out="$(guardrails/check-push-reach.sh)"
+reach_code=$?
+echo "$reach_out"
+suite_log="$(mktemp "${TMPDIR:-/tmp}/tc-suite-log.XXXXXX")"
+scoped_full=0
+case "$reach_code" in
+  0)
+    echo "   prose-only diff: the suite stands down by name."
+    gate_b_rc=0
+    ;;
+  2)
+    scoped_files="$(printf '%s\n' "$reach_out" | sed -n 's/^SCOPED //p')"
+    echo "   scoped run: $(printf '%s' "$scoped_files" | grep -c .) test file(s) reach this diff."
+    # shellcheck disable=SC2086 — word-splitting the newline list into pytest targets is intended
+    python3 -m pytest -q $scoped_files 2>&1 | tee "$suite_log"
+    gate_b_rc="${PIPESTATUS[0]}"
+    ;;
+  *)
+    scoped_full=1
+    python3 -m pytest -q 2>&1 | tee "$suite_log"
+    gate_b_rc="${PIPESTATUS[0]}"
+    ;;
+esac
 if [ "$gate_b_rc" -eq 0 ]; then
   echo "   OK: suite green."
+  if [ "$scoped_full" -eq 1 ]; then
+    # the stated wall-time budget describes only a FULL run (SPEC INV-41, INV-164).
+    budget_out="$(guardrails/check-suite-budget.sh "$suite_log" 2>&1)"; budget_rc=$?
+    echo "$budget_out"
+    [ "$budget_rc" -ne 0 ] && fail=1
+  else
+    echo "   suite budget: stands down by name (scoped or prose run)."
+  fi
 elif [ "$gate_b_rc" -ge 128 ]; then
   echo "   INCONCLUSIVE: the run was killed by the OS (signal $((gate_b_rc - 128))) under machine load,"
   echo "   not by a failing test — unexpected with the single-browser harness. Re-run when the machine"
@@ -72,6 +106,7 @@ else
   echo "   FAIL: test suite not green (pytest exit $gate_b_rc)."
   fail=1
 fi
+rm -f "$suite_log"
 
 echo ""
 echo "-- gate c: spec anchors owned --"
