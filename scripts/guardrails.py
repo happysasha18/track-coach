@@ -61,10 +61,41 @@ def _run_pytest(test_path: str) -> tuple[bool, str]:
     return result.returncode == 0, output
 
 
+def _vendored_pack_scripts() -> set[str]:
+    """The scripts/*.py files vendored from the live-spec pack (ratchet-manifest.json).
+
+    These are upstream pack code, not track-coach product code: their coverage is
+    tests/test_ratchet_lock.py (it runs them against the seeded caps), so a re-vendor
+    refresh owes no NEW track-coach test and is exempt from the tests-present check.
+    """
+    import json
+    manifest = ROOT / "scripts" / "ratchet-manifest.json"
+    try:
+        vendored = json.loads(manifest.read_text(encoding="utf-8")).get("vendored", {})
+    except (OSError, ValueError):
+        return set()
+    return {k for k in vendored if k.startswith("scripts/") and k.endswith(".py")}
+
+
+def _tests_present_verdict(changed, vendored) -> tuple[bool, list, list]:
+    """Pure classifier for the tests-present rule (testable without a real git diff).
+
+    A product scripts/*.py change with no tests/ change fails; a change confined to
+    vendored pack scripts (the exemption set) passes on its own — that code carries its
+    own upstream tests and the ratchet lock covers it here.
+    """
+    scripts_touched = [f for f in changed
+                       if f.startswith("scripts/") and f.endswith(".py") and f not in vendored]
+    tests_touched = [f for f in changed if f.startswith("tests/")]
+    ok = not (scripts_touched and not tests_touched)
+    return ok, scripts_touched, tests_touched
+
+
 def _check_tests_present() -> tuple[bool, str]:
-    """Check that if scripts/*.py were touched in the last commit, tests/ were too.
+    """Check that if product scripts/*.py were touched in the last commit, tests/ were too.
 
     Uses `git diff HEAD~1 HEAD --name-only` to find changed files in the last commit.
+    Vendored pack scripts (ratchet-manifest.json) are exempt — see _vendored_pack_scripts.
     If no git history (first commit), always passes.
     """
     try:
@@ -79,14 +110,14 @@ def _check_tests_present() -> tuple[bool, str]:
     except FileNotFoundError:
         return True, "  (git not found — tests-present check skipped)"
 
-    scripts_touched = [f for f in changed if f.startswith("scripts/") and f.endswith(".py")]
-    tests_touched   = [f for f in changed if f.startswith("tests/")]
+    ok, scripts_touched, tests_touched = _tests_present_verdict(changed, _vendored_pack_scripts())
 
-    if scripts_touched and not tests_touched:
+    if not ok:
         detail = (
-            f"  FAIL: {len(scripts_touched)} script(s) changed but no test file touched.\n"
+            f"  FAIL: {len(scripts_touched)} product script(s) changed but no test file touched.\n"
             f"  Scripts: {scripts_touched}\n"
-            f"  Either add/update a test for this change or update the matrix row."
+            f"  Either add/update a test for this change or update the matrix row.\n"
+            f"  (Vendored pack scripts in ratchet-manifest.json are exempt — covered by test_ratchet_lock.py.)"
         )
         return False, detail
 
