@@ -1,0 +1,19 @@
+{
+  "_note": "Owner-name and Cyrillic waivers for track-coach's shipped set (SPEC INV-120). A NEW offence reds; a listed one is counted debt. Entries mirror the pack's for the vendored detectors track-coach carries.",
+  "user_language_globs": [
+    "scripts/spec-style-lint.py"
+  ],
+  "authorship_globs": [
+    "LICENSE",
+    "guardrails/check_deferral_marker.py"
+  ],
+  "cyrillic_waivers": [],
+  "name_waivers": [
+    {
+      "file": "*README.md",
+      "snippet": "Alexander Abramovich",
+      "note": "authorship byline \u2014 the MIT copyright/attribution line, not a requirement statement (mirrors the pack's own waiver)",
+      "added": "2026-07-17"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_deferral_marker.py — the mechanical net for wrongly-parked work.
 
-WHY this exists (2026-07-15, Alexander: "я нигде не просил меня ждать"):
+WHY this exists (2026-07-15, from the owner's word that day — he never asked to be waited on):
 The recurring failure was work parked for his greenlight that was actually the
 agent's own. A code-vs-spec defect — where the code diverges from an already-correct
 spec — is DERIVABLE from that spec sentence, so by the derivability rule (SPEC INV-152
