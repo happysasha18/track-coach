@@ -86,6 +86,7 @@ def discover_inputs(run_dir: Path) -> dict:
       - analyzed_at (str|None) from run_meta.json
       - mode (str) from run_meta.json (default "full")
       - verdict (str|None) from run_meta.json
+      - track_version (str|None) from run_meta.json (the header version badge)
       - per_stem_selfsim (dict) auto-discovered
       - per_stem_notes (dict) auto-discovered
       - per_stem_core (dict) auto-discovered
@@ -105,6 +106,7 @@ def discover_inputs(run_dir: Path) -> dict:
     found["als_offset_s"] = meta.get("als_offset_s")
     found["analyzed_at"] = meta.get("analyzed_at")
     found["verdict"]     = meta.get("verdict")
+    found["track_version"] = meta.get("track_version")
     found["src_audio"]   = meta.get("audio")
     found["src_als"]     = meta.get("als")
 
@@ -256,6 +258,10 @@ def render(run_dir: Path, out_path: Path, dry_run: bool = False) -> tuple[str, b
         "als":          found.get("src_als"),
         "analyzed_at":  found.get("analyzed_at") or datetime.now().strftime("%Y-%m-%d %H:%M"),
         "built_at":     datetime.now().strftime("%Y-%m-%d"),
+        # the header version badge (build_widget reads META.track_version) — a from-cache
+        # re-render must carry it forward, else the deposited chip is silently dropped. An empty
+        # version normalises to None (the honest "no version"), matching a run with no badge.
+        "track_version": found.get("track_version") or None,
     }
 
     build_widget.build_html(
