@@ -19,6 +19,8 @@ description: >
 
   Supports mp3 / wav / m4a / aiff / flac + Ableton .als. macOS only (v1).
 compatibility: "Runs fully via the Bash tool — no computer use needed. Best on the user's Mac via Claude Code (local compute, MPS, no timeouts); also works in the Cowork sandbox (Demucs in background). macOS or Linux."
+metadata:
+  version: 1.9.0
 ---
 
 # track-coach
@@ -31,6 +33,18 @@ Full-stack compositional coach for music producers. Runs the complete pipeline b
 3. **Up to you** — patterns observed, no directives. The author decides what to do.
 
 Read `references/methodology.md` for the conceptual framework (variety vs development, masking principle, what each metric measures). Read `references/interpretation.md` for the numerical ranges. Read `references/install_troubleshooting.md` if setup fails.
+
+---
+
+## When NOT to use track-coach
+
+track-coach reads a musical mix on the author's own machine and gives a composition-and-mix read. A few jobs sit outside that scope; reach for the fitting tool instead.
+
+- **Spoken or non-musical audio.** Every diagnostic — stem separation, frequency masking, drum breakdown, note transcription — assumes a musical mix. A podcast, a voice memo, or a field recording is the job of a speech or loudness tool.
+- **Delivery loudness certification.** track-coach reports dynamics and tonal balance to guide the read. A streaming or broadcast LUFS delivery target is the job of a certified meter.
+- **Live or real-time monitoring.** The pipeline analyses a rendered bounce offline. Watching levels move during playback is the job of a DAW meter or an analyzer plugin.
+- **Arrangement reading for a non-Ableton project.** The `.als` parser reads Ableton arrangement, automation, and locators. A project from another DAW still gets the full audio analysis; its arrangement layer stays unread.
+- **Phones and tablets.** The Demucs stem pass needs local compute on macOS or Linux; a mobile device cannot run it.
 
 ---
 
