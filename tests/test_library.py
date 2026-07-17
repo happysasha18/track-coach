@@ -11,7 +11,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import library  # noqa: E402
 
-NOW = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+# Anchor fixtures to the REAL clock, not a frozen date. The unit tests below inject now=NOW into
+# clean_plan (hermetic either way), but the CleanCommandConvention integration tests run the real
+# `_cmd_clean`, which compares deposit dates against datetime.now(): a frozen NOW time-bombs those
+# once the wall clock drifts past NOW + the --older-than cutoff (it fired 2026-07-17, when a
+# "2 days old" fixture dated from the frozen 2026-06-18 read as 31 days old). A live NOW keeps the
+# fixtures' relative ages true against whatever clock the command sees.
+NOW = datetime.now(timezone.utc)
 
 
 def E(track, stamp, days_old=0, widget=None):
